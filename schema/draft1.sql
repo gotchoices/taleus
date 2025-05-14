@@ -25,11 +25,12 @@ create table Foil (
         Signature, 
         (select InvitationKey from Stock)
     )) on insert,
+    constraint PartyExists check (select count(*) from PartyKey PK where PK.Sid = New.Sid) on insert,
     constraint InsertOnly check (0) on delete, update
 );
 
 create table PartyKey (
-    Sid text not null,
+    Sid text not null,  -- Cid hash of first revision
     Revision integer not null,
     PublicKey text not null,
     Signature text null,    -- Signed using prior if this is revision > 1
@@ -41,7 +42,8 @@ create table PartyKey (
         Signature,
         (select case when Revision = 1 then (select InvitationKey from Stock) else (select Signature from PartyKey PK where PK.Sid = Sid and PK.Revision = Revision - 1) end PriorSignature from PartyKey PK where PK.Sid = Sid and PK.Revision = Revision)
     )) on insert,
-    constraint InsertOnly check (0) on delete, update
+    constraint InsertOnly check (0) on delete, update,
+    constraint TwoParities check ((select count(distinct Sid) from PartyKey) = 2)) on insert
 );
 
 create table PartyCertificate (
@@ -60,30 +62,7 @@ create table PartyCertificate (
     constraint InsertOnly check (0) on delete, update
 );
 
-create table TallyCore (
-    Cid text not null default RandomUUID(),  -- Hash of all including signatures
-    StockSid text not null,  -- Positive Units = Asset = - polarity
-    FoilSid text not null,  -- Positive Units = Liability = + polarity
-    CreatedAt text not null check ValidDate(CreatedAt),
-    StockSignature text not null,
-    FoilSignature text not null,
-
-    primary key (/* 1 row */),
-    constraint CidValid check (Cid = Digest(StockSid, FoilSid, CreatedAt, StockSignature, FoilSignature)) on insert,
-    constraint StockSignatureValid check (SignatureValid(
-        Digest(StockSid, FoilSid, CreatedAt),
-        StockSignature,
-        (select PublicKey from PartyKey PK where PK.Sid = StockSid order by Revision desc limit 1)
-    )) on insert,
-    constraint FoilSignatureValid check (SignatureValid(
-        Digest(StockSid, FoilSid, CreatedAt),
-        FoilSignature,
-        (select PublicKey from PartyKey PK where PK.Sid = FoilSid order by Revision desc limit 1)
-    )) on insert,
-    constraint InsertOnly check (0) on delete, update
-);
-
-create table TallyRevisionProposal (
+create table TallyContractProposal (
     SequenceNumber integer not null,
     ContractCid text not null,
     Proposer text not null check Proposer in ('S', 'F'),
@@ -97,28 +76,35 @@ create table TallyRevisionProposal (
     )) on insert, update
 );
 
-create table TallyRevision (
-    SequenceNumber integer,
-    ContractCid text,
+
+create table TallyContract (
+    Number integer not null,
+    ContractCid text not null,
+    -- TODO: Credit terms (limit, call) - arguments to contract
     StockSignature text not null,
     FoilSignature text not null,
 
-    primary key (SequenceNumber),
+    primary key (Number),
     constraint StockSignatureValid check (SignatureValid(
-        Digest((select Cid from TallyCore), SequenceNumber, ContractCid),
+        Digest((select Cid from TallyCore), Number, ContractCid),
         StockSignature,
         (select PublicKey from PartyKey PK where PK.Sid = StockSid order by Revision desc limit 1)
     )) on insert, update,
     constraint FoilSignatureValid check (SignatureValid(
-        Digest((select Cid from TallyCore), SequenceNumber, ContractCid),
+        Digest((select Cid from TallyCore), Number, ContractCid),
         FoilSignature,
         (select PublicKey from PartyKey PK where PK.Sid = FoilSid order by Revision desc limit 1)
     )) on insert, update,
     constraint InsertOnly check (0) on delete, update
 );
 
+-- TODO: Trading variables (bound, target, margin, clutch) - should "see" invoice and pending transactions
+
+-- TODO: payment request (invoices)
+
 create table Ledger (
     Number integer, -- Sequential, monotonically increasing
+    ContractNumber integer,
     Id text default RandomUUID(),
     Issuer text check Issuer in ('S', 'F'), -- S = Stock, F = Foil
     Units integer check Units > 0,
@@ -127,6 +113,9 @@ create table Ledger (
     Memo text,
     Signature text,
     Balance integer,
+    -- TODO: lift vs manual
+    -- TODO: pending lift
+
     primary key (Number),
     constraint SignatureValid check (SignatureValid(
         Digest(
