@@ -1,7 +1,9 @@
-![Taleus Logo](doc/images/logo.svg)
-# Taleus
-
-A standardized library for managing private credit tallies using libp2p.
+<div align="center">
+  <img src="doc/images/logo.svg" alt="Taleus Logo" width="150" align="left">
+  <h1>Taleus</h1>
+  <p>A standardized library for managing private credit tallies using libp2p.</p>
+  <br clear="all">
+</div>
 
 ## Overview
 
