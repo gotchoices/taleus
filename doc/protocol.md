@@ -6,49 +6,58 @@ This document defines the protocol by which nodes in a Taleus network communicat
 
 The Taleus protocol consists of several interconnected layers:
 
-1. **Network Layer**: Communication between peers using libp2p
-2. **Tally Layer**: Establishment and maintenance of tallies
-3. **Transaction Layer**: Recording and verification of chits
-4. **Consensus Layer**: Ensuring agreement between parties
+1. **Application Layer (Taleus)**: Manages tallies and credit relationships
+2. **Database Layer (SQLiter)**: Provides SQL query parsing and database operations
+3. **Optimistic Layer (Optimystic)**: Implements optimistic database operations
+4. **DHT Layer (Kademlia)**: Provides distributed hash table functionality
+5. **Network Layer (libp2p)**: Handles peer discovery and communication
 
 This document focuses primarily on the application-level protocols (Tally, Transaction, and Consensus layers) rather than the underlying network transport protocols.
 
+### Node Management
+
+The protocol implements a balanced node management approach:
+
+- Each party nominates trusted nodes to participate in tally management
+- The nominated nodes form a network with equal voting power (50/50 split)
+- This ensures that neither party can unilaterally control the consensus
+- In case of disputes, parties maintain local copies of critical records
+- The system supports Byzantine fault tolerance at the database level
+
 ## Protocol Models
 
-Taleus is currently researching two primary protocol models:
-
-### Message-Based Protocol
-
-Similar to the original MyCHIPs design, this approach uses a state transition model where:
-- Each party maintains their own copy of the tally
-- State changes are communicated via messages
-- Each message has specific validation and processing rules
-- Explicit acknowledgments confirm receipt and processing
+Taleus implements a shared database protocol, evolving from the original MyCHIPs message-based approach:
 
 ### Shared Database Protocol
 
-A newer approach being explored that:
-- Uses a shared database model with distributed consensus
-- Both parties (and potentially their nominated nodes) maintain a common record
-- Changes are written directly to the database
-- Database consensus mechanisms ensure agreement
+The shared database protocol represents a significant advancement over the original MyCHIPs message-based design:
 
-This document will describe both approaches where they differ, as the final protocol implementation is still under development.
+- Instead of each party maintaining their own copy of the tally (as in MyCHIPs), parties maintain a shared record in a distributed database
+- The database is hosted by a small network of nodes built atop a Kademlia DHT
+- Consensus is handled at the distributed database level rather than at the individual tally/chit layer
+- This provides a single source of truth for all participants
+
+Key characteristics:
+- Uses a distributed database with built-in consensus mechanisms
+- Both parties (and their nominated nodes) maintain a common record
+- Changes are written directly to the database
+- Database-level consensus ensures agreement
+- Kademlia DHT provides efficient node discovery and routing
 
 ## State Processing
 
-Like MyCHIPs, the Taleus protocol is implemented as a state transition model. This is important because:
+The Taleus protocol is implemented as a state transition model, with state changes managed through the shared database:
 
 - Nodes may go offline at any time
 - Network connections may not always be reliable
-- Messages may be lost, delayed, or duplicated
+- Database operations may be delayed or need retries
 
 The system is designed to:
-- Maintain a consistent state until a message gets through or is abandoned
-- Re-transmit messages as necessary
-- Tolerate duplicate messages
-- Recover from errant states and data loss
-- Eventually bring associated parties into consensus
+- Maintain a consistent state in the distributed database
+- Handle concurrent updates through database-level consensus
+- Recover from network partitions and node failures
+- Ensure eventual consistency across all participants
+- Provide real-time state synchronization when possible
 
 ## Tally Protocol Flow
 
@@ -112,28 +121,24 @@ Chits can exist in the following states:
 
 ## Consensus Protocol
 
-### Message-Based Consensus
+The shared database model implements consensus at the database level:
 
-In the message-based model, consensus uses a hash chain approach:
+1. **Database-Level Consensus**:
+   - Uses distributed database consensus mechanisms
+   - Implements Byzantine fault tolerance
+   - Ensures consistency across all participating nodes
 
-1. Each chit contains a hash of its contents
-2. Each chit also contains a reference to the hash of the preceding chit
-3. The hash of the latest chit serves as a verification point
-4. Parties exchange messages to ensure chain consistency
+2. **Transaction Verification**:
+   - Each chit is signed by the creating party
+   - Signatures are verified before database updates
+   - Hash chains provide additional integrity verification
+   - Database-level consensus ensures agreement on state changes
 
-The consensus algorithm uses these basic message types:
-- **upd**: Updates the partner with new chits or information
-- **req**: Requests information about specific chits
-- **ack**: Acknowledges correct information
-- **nak**: Rejects incorrect information
-
-### Shared Database Consensus
-
-In the shared database model, consensus may use:
-
-1. Distributed database consensus mechanisms
-2. Optional hash chain for additional integrity verification
-3. Possibly multiple participating nodes for Byzantine fault tolerance
+3. **Node Participation**:
+   - Small network of trusted nodes maintain the database
+   - Nodes are selected based on trust criteria
+   - Kademlia DHT provides efficient node discovery and routing
+   - Byzantine fault tolerance handles potentially malicious nodes
 
 ## Route Discovery and Lifts
 
@@ -175,10 +180,11 @@ The protocol addresses several security aspects:
 
 The following protocol aspects are under active development:
 
-1. Final decision on message-based vs. shared database model
-2. Detailed message formats and validation rules
-3. Consensus algorithm optimization
+1. Detailed database schema and access patterns
+2. Consensus algorithm implementation and optimization
+3. Node selection and trust criteria
 4. Protocol version management
+5. Integration with Kademlia DHT
 
 ---
 
