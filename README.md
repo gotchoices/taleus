@@ -1,3 +1,4 @@
+![Taleus Logo](doc/images/logo.svg)
 # Taleus
 
 A standardized library for managing private credit tallies using libp2p.
