@@ -7,7 +7,7 @@
 
 ## Overview
 
-Taleus is a library for establishing, maintaining, and negotiating private credit relationships (tallies) between participants in a Private Credit Network (PCN).
+Taleus is a library for negotiating, establishing and maintaining private credit relationships (tallies) between participants in a Private Credit Network (PCN).
 
 - A **Private Credit Network (PCN)** is a graph network where:
   - Nodes represent individuals, organizations, or entities
@@ -29,7 +29,7 @@ Taleus extends and builds upon concepts developed in the [MyCHIPs](https://githu
 - **Secure Identity**: Uses cryptographic identity verification and signatures
 - **Contract Management**: Handles contract references and agreement validation
 - **Transaction Tracking**: Records and validates chits (transactions)
-- **Consensus Mechanisms**: Ensures both parties maintain consistent records
+- **Consensus Mechanisms**: Ensures both parties maintain accurate and consistent records
 
 ## Current Status
 
@@ -44,16 +44,22 @@ For a detailed roadmap of development, see [Development Roadmap](doc/issues/READ
 
 ## Architecture
 
-Taleus implements a decentralized tally management system using:
+Taleus implements a decentralized tally management system using a specific technical stack:
 
 - **libp2p**: For peer discovery, connection, and communication
-- **Distributed Database**: For shared tally record management
-- **Cryptographic Signatures**: For transaction verification and validation
-- **Consensus Protocol**: For ensuring consistency across parties
+- **Kademlia DHT**: For distributed hash table functionality
+- **Optimystic**: For optimistic database operations atop Kademlia
+- **SQLiter**: For SQL query parsing and database operations
+- **Taleus**: The application layer managing tallies and credit relationships
 
-The project is exploring two primary models:
-1. **Message-based protocol**: Similar to MyCHIPs, where each party maintains their copy of records
-2. **Shared database model**: Using a distributed database approach where peers maintain a shared record
+The system uses a shared database model where:
+- Each party nominates trusted nodes to participate in tally management
+- The nominated nodes form a network with equal voting power (50/50 split)
+- Consensus is handled at the database level
+- Cryptographic signatures ensure transaction integrity
+- Parties maintain local copies of critical records for dispute resolution
+
+This represents a significant evolution from the original MyCHIPs message-based approach, where each party maintained their own copy of the tally and used a message protocol for synchronization.
 
 See [Architecture Documentation](doc/architecture.md) for more details.
 
