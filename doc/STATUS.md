@@ -74,32 +74,44 @@ Based on Brainstorm.md, the following information needs clarification:
 ### Schema Design Questions
 1. **Record Storage Model**: ✅ **RESOLVED** - Use mostly normalized SQL schema with JSON fields where flexibility is needed
 
-2. **Tally ID Generation**: How exactly should we generate the UUID for tallies? Should it be a hash of both parties' IDs + creation date as suggested?
+2. **Tally ID Generation**: ✅ **RESOLVED** - Tally UUID generated as hash of complete Tally Identity Chunk content (protocol version, timestamp, party IDs, master keys)
 
 3. **Stock/Foil Nomenclature**: ✅ **RESOLVED** - Use stock/foil nomenclature (maintains compatibility with MyCHIPs)
 
 ### Identity and Key Management Questions
 4. **SSI Implementation**: 🔄 **RESEARCH NEEDED** - Need to evaluate if SSI is the right approach and which framework to use. Design objective for now.
+   - [ ] Research SSI frameworks (did:key, did:ethr, did:ion) for hierarchical key derivation
+   - [ ] Evaluate libp2p's native identity system as alternative
+   - [ ] Determine if master key + derived key validation meets our needs
+   - [ ] Define key validation requirements for offline/distributed operation
+   - [ ] Research key revocation mechanisms in distributed systems
 
 5. **Device Vault vs Exportable Keys**: 🔄 **RESEARCH NEEDED** - Need to evaluate options as part of overall key management strategy.
 
+6. **Master Key Architecture**: ✅ **RESOLVED** - Master key system fully designed
+   - [x] Define master key disclosure in Tally Identity Chunk
+   - [x] Design Key Issuance Chunk for derived key management
+   - [x] Specify key validation process (prove derivation from master)
+   - [x] Define Tally Configuration Signature Block for chunk operability
+   - [x] Merge Party Identity contact info into Party Certificate Chunk
+
 6. **Multi-Key Registration**: How do we implement the ability to register multiple keys/seeds on a tally for recovery purposes?
 
-7. **libp2p PeerID vs SSI**: Should the party ID be the libp2p peerID directly, or derived from an SSI seed?
+7. **libp2p PeerID vs SSI**: ✅ **RESOLVED** - Party ID is libp2p peerID (hash of master key), maintains compatibility with libp2p while enabling key validation
 
 ### Protocol Implementation Questions
 8. **Consensus Rule Implementation**: How exactly should the 50/50 voting power be implemented? What happens when nodes disagree?
 
 9. **Local Record Storage**: What records should parties store locally for dispute resolution in addition to the shared database?
 
-10. **Chit Digest Format**: Should we implement the exact chit digest format specified in Brainstorm.md (tally ID, party indicator, date, memo, reference, units)?
+10. **Chit Digest Format**: ✅ **RESOLVED** - Chit digest format specified: tally ID, party indicator, date, memo, reference, units
 
 ### Contract and Negotiation Questions
 11. **Contract Format**: Should contracts be PDFs or structured documents (YAML/JSON)? How do we handle content-addressable references?
 
-12. **Negotiation Flow**: How exactly should the database-based negotiation work? What tables/records are created during negotiation?
+12. **Negotiation Flow**: ✅ **RESOLVED** - Chunk-based negotiation with Tally Configuration Signature Blocks for atomic agreement
 
-13. **Offer Token System**: How should we implement the offer token system for tally proposals in the shared database model?
+13. **Bootstrap Token System**: ✅ **RESOLVED** - Message-based bootstrap with one-time and multi-use invitation tokens
 
 ### Technical Stack Questions
 14. **Quereus Integration**: What specific SQL operations will Quereus need to support? Do we need custom query types?
@@ -111,11 +123,12 @@ Based on Brainstorm.md, the following information needs clarification:
 ## Development Checklist
 
 ### Phase 1: Architecture Finalization (Current)
-- [ ] Resolve remaining critical questions above
-- [ ] Design complete normalized SQL schema (with JSON fields where needed)
-- [ ] Specify exact record types and formats using stock/foil nomenclature
+- [x] Resolve core architectural questions ✅ MAJOR PROGRESS
+- [x] Design chunk-based data organization with signature blocks ✅ COMPLETED  
+- [x] Specify exact record types and formats using stock/foil nomenclature ✅ COMPLETED
+- [x] Document negotiation protocol details for shared database model ✅ COMPLETED
+- [ ] Design complete normalized SQL schema (ready to implement from tally.md)
 - [ ] Research and evaluate SSI vs alternative identity management approaches
-- [ ] Document negotiation protocol details for shared database model
 
 ### Phase 2: Core Implementation
 - [ ] Set up libp2p + Kademlia + Optimystic + Quereus stack

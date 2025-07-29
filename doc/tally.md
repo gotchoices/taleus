@@ -10,79 +10,220 @@ A tally is a digital contract between two parties that:
 - Records transactions (chits) between the parties
 - Enables credit-based exchanges of value
 
-## Tally Structure
+## Evolution from MyCHIPs Implementation
 
-A tally consists of several types of records:
+Taleus builds upon the [MyCHIPs](https://github.com/gotchoices/MyCHIPs) tally concept but adapts it for a shared database model. The original MyCHIPs implementation stored tallies as:
 
-### 1. Tally Identification
+1. **Tally header** - contained party identification, contract, initial terms
+2. **Chits** - originally for payments only, but settings and trading variables were later "wedged into" the same table
+3. **Hash-chain structure** - for consensus verification between separate party databases
 
-- **Tally ID**: A universally unique identifier (UUID) that identifies the tally
-- **Version**: Protocol version information
-- **Creation Date**: When the tally was initially created
+Taleus improves upon this by:
+- Using a shared database with 50/50 consensus voting
+- Breaking tally data into discrete, negotiable chunks
+- Supporting progressive disclosure and revision-based negotiation
+- Maintaining cryptographic signatures for legal dispute resolution
 
-### 2. Party Identification
+## Tally Bootstrap Process
 
-Each tally has two participants, identified by:
+Before tally data chunks can be negotiated, a shared database environment must be established between the parties.
 
-- **Party ID**: The unique identifier for each party (ideally a libp2p peerID)
-- **Party Roles**: Distinguishing between the two parties using stock/foil nomenclature
-  - **Stock Holder**: The party who first proposes the tally (vendor/creditor role)
-  - **Foil Holder**: The party who responds to the tally proposal (client/debtor role)
-  - Maintains compatibility with MyCHIPs terminology and balance sign conventions
-- **Party Certificates**: Containing identity and cryptographic key information
+### Message-Based Bootstrap Handshake (Preferred Approach)
 
-Important considerations:
-- Party IDs should be immutable through the life of the tally
-- If a party ID needs to change, it requires closing the tally and opening a new one
-- There are open questions about using SSI (Self-Sovereign Identity) to allow key rotation while maintaining the same identity
+The bootstrap process uses message-based communication before shared database creation:
 
-### 3. Credit Terms
+1. **Invitation Creation**: The initiator creates an invitation containing:
+   - Initiator's Party ID and contact information (libp2p peer ID, addresses)
+   - Invitation token (one-time or multi-use) with expiration date
+   - Authentication requirements and expected response format
 
-Each party may extend credit to the other under specific terms:
+2. **Token Types**:
+   - **One-time Token**: Becomes invalid after first use, for specific individual invitations
+   - **Multi-use Token**: Valid until expiration, enables multiple parties to create separate tallies (e.g., merchant QR codes)
 
-- **Credit Limit**: Maximum credit extended
+3. **Invitation Delivery**: 
+   - One-time: Communicated privately to intended specific respondent
+   - Multi-use: Published publicly (QR codes, websites, etc.)
+
+4. **Initial Contact Message**: Respondent contacts initiator via libp2p with:
+   - Their Party ID and authentication token
+   - List of their proposed nodes for the Kademlia cluster
+   - Any additional credentials or identity verification data
+
+5. **Validation Phase**: Initiator validates:
+   - Token authenticity and expiration
+   - Respondent's Party ID and credentials
+   - Proposed node list and technical capabilities
+   - Whether to proceed with this particular respondent
+
+6. **Database Instantiation**: If approved, initiator:
+   - Creates new shared database instance for this tally
+   - Pre-populates database with initial chunks (contract proposals, etc.)
+   - Establishes database access controls
+
+7. **Access Grant Message**: Initiator sends respondent:
+   - Database access credentials and connection information
+   - Initial chunk data or references
+   - Cluster formation instructions
+
+8. **Cluster Formation**: Both parties' nodes join to establish 50/50 consensus structure
+
+9. **Chunk Negotiation Phase**: Shared database-based negotiation begins
+
+### Alternative Bootstrap Approaches
+
+**Database-First Approach**: Initiator creates database immediately and includes access credentials in invitation. Simpler but requires pre-authentication mechanisms and resource commitment before validation.
+
+**Escrow Service Approach**: Third-party service facilitates initial handshake and database setup. Reduces peer-to-peer complexity but introduces dependency and potential centralization.
+
+**DHT-Based Discovery**: Use existing Kademlia DHT for initial contact and capability exchange. Leverages existing infrastructure but may complicate authentication and token validation.
+
+### Database State Transitions
+
+- **Invitation Available**: When initiator creates and distributes invitation tokens
+- **Contact Established**: When respondent successfully makes initial contact with valid token
+- **Validation Complete**: When initiator approves respondent's credentials and node proposals
+- **Database Instantiated**: When initiator creates new database instance and grants access
+- **Cluster Formed**: When both parties' nodes successfully join with 50/50 consensus established
+- **Tally Active**: When both parties have signed a complete, common set of required chunks
+- **Chunk Operability**: New chunk revisions become operative when both parties sign the same version
+
+### Multi-Use Token Implications
+
+- Each successful respondent gets their own isolated database instance and unique tally
+- Initiator can reject respondents during validation phase without resource commitment
+- Multiple simultaneous negotiations are managed through separate database instances
+- Token expiration prevents new initiations but doesn't affect active negotiations or tallies
+- Failed validations don't consume multi-use token (remains available for other respondents)
+
+## Tally Data Chunks
+
+In Taleus, tally data is organized into discrete chunks that can be negotiated independently during tally establishment. Each chunk type serves a specific purpose and follows its own revision and signature patterns.
+
+### 1. Tally Identity Chunk
+
+**Purpose**: Establishes basic tally identity that all other chunks reference
+
+**Content**:
+- **Protocol Version**: Taleus protocol version information
+- **Creation Timestamp**: When the tally was initially established
+- **Stock Holder ID**: The initiating party's libp2p peer ID (hash of their master key)
+- **Foil Holder ID**: The responding party's libp2p peer ID (hash of their master key)
+- **Stock Master Key**: Stock holder's master public key (for validating derived keys)
+- **Foil Master Key**: Foil holder's master public key (for validating derived keys)
+- **Tally UUID**: Generated as a hash of all the above fields (provides unique tally identifier)
+
+**Issuing Party**: Stock holder (initiator)
+**Signature Requirement**: Unilateral (issuer signs), operability via Configuration Signature Block
+**Negotiation Pattern**: 
+- Generated by the initiator during database instantiation (after receiving respondent's Party ID)
+- Included in the database when access is granted to the respondent
+- Signed by the stock holder (immutable once signed)
+- Becomes operative when referenced in an active Tally Configuration
+
+### 2. Party Certificate Chunk (per party, revisioned)
+
+**Purpose**: Identity disclosure and verification data that parties share with each other
+
+**Content**:
+- **Names**: All names the party has been known by
+- **Communication Points**: Phone, email, web addresses
+- **Physical Addresses**: Home, mailing, shipping addresses
+- **Documents/Files**: Images, scans, documents (may use content addresses like IPFS)
+- **Current Public Key**: Active derived public key for current operations
+
+**Issuing Party**: Self (each party creates their own)
+**Signature Requirement**: Unilateral (only the issuing party signs)
+**Negotiation Pattern**:
+- Each party can disclose progressively more information through revisions
+- Append-only with increasing revision numbers (older revisions remain accessible)
+- Self-certification: only the disclosing party signs their own certificate
+
+**Example Negotiation Flow**:
+1. Stock party creates basic certificate (revision 1) with minimal information
+2. Foil party objects to insufficient identifying data
+3. Stock party creates enhanced certificate (revision 2) with more complete information
+4. Foil party accepts the enhanced certificate
+5. Negotiation proceeds to other tally aspects
+
+### 3. Key Issuance Chunk (per party, per key change)
+
+**Purpose**: Records issuance of new derived keys while maintaining master key continuity
+
+**Content**:
+- **Issuing Party**: Which party (stock or foil) is issuing the new key
+- **New Public Key**: The new derived public key for operations
+- **Key Derivation Proof**: Cryptographic proof that new key derives from master key
+- **Effective Timestamp**: When the new key becomes active
+- **Previous Key Reference**: Reference to the previously active key (if any)
+
+**Issuing Party**: Self (each party manages their own keys)
+**Signature Requirement**: Unilateral (issuer signs), operability via Configuration Signature Block
+**Negotiation Pattern**:
+- Either party can issue new derived keys as needed
+- Must provide cryptographic proof of derivation from master key (in Tally Identity Chunk)
+- Becomes operative when referenced in an active Tally Configuration
+- Enables key rotation without closing the tally
+
+### 4. Credit Terms Chunk (per party extending credit, revisioned)
+
+**Purpose**: Defines credit limits and terms one party extends to another
+
+**Content**:
+- **Credit Limit**: Maximum credit amount extended
 - **Call Term**: Number of days notice required to reduce the limit
-- **Other Terms**: Additional credit parameters
+- **Additional Terms**: Other credit parameters and conditions
 
-Credit terms:
-- Are signed by the party extending credit
-- Can be amended with a new record at any time
-- If restrictive, only take effect after the call term has expired
+**Issuing Party**: Self (each party sets credit they're willing to extend)
+**Signature Requirement**: Unilateral (only the grantor of credit signs)
+**Negotiation Pattern**:
+- Each party can independently offer credit terms to the other
+- New revision created for each change
+- Restrictive changes only take effect after the call term expires
+- Only the party extending the credit needs to sign
 
-### 4. Contract Reference
+### 5. Contract Reference Chunk (revisioned)
 
-Each tally references a governing contract:
+**Purpose**: References the governing contract document that defines the legal agreement
 
-- **Contract ID**: A content-addressable reference (e.g., IPFS hash)
-- **Contract Format**: How the contract document is structured
-- **Hosting**: Nodes that host the tally are expected to also host/cache referenced contracts
+**Content**:
+- **Contract ID**: Content-addressable reference (e.g., IPFS hash)
+- **Contract Format**: Document structure specification (PDF, structured YAML, etc.)
+- **Document Type**: Identifier for contract template or type
 
-### 5. Trading Variables
+**Issuing Party**: Either (whoever proposes the contract)
+**Signature Requirement**: Unilateral (proposer signs), operability via Configuration Signature Block
+**Negotiation Pattern**:
+- Either party can propose a new contract reference
+- New revision for each contract proposal
+- Becomes operative when referenced in an active Tally Configuration
+- Nodes hosting the tally are expected to cache referenced contracts
 
-Each party can specify variables that control automated trading:
+### 6. Trading Variables Chunk (per party, revisioned)
 
-- **Bound**: Maximum balance (positive or negative) to maintain
-- **Target**: Preferred balance to maintain
-- **Margin**: How much can be earned on lifts that exceed target
-- **Clutch**: How much can be earned on reverse lifts (drops)
+**Purpose**: Automated trading parameters that control credit lifts from each party's perspective
 
-These variables:
-- Are stored as records in the tally
-- Are signed by the party setting them
-- Only affect that party's perspective of the tally
-- Control how automated credit lifts are performed
+**Content** (based on [mychips/schema/tallies.wmt](https://github.com/gotchoices/MyCHIPs/blob/master/schema/tallies.wms)):
+- **Bound**: Upper limit of credit that may be produced by any lift
+- **Target**: Ideal balance to be reached by lifting
+- **Margin**: Amount to charge for lifts exceeding target
+- **Clutch**: Amount to charge for reverse lifts (drops)
 
-### 6. Transaction Records (Chits)
+**Issuing Party**: Self (each party sets their own variables)
+**Signature Requirement**: Unilateral (only the setting party signs)
+**Negotiation Pattern**:
+- Each party sets their own variables independently
+- Only affects that party's perspective of the tally
+- Can be updated independently by each party
+- Only the party setting the variables needs to sign
 
-Tallies contain transaction records called "chits":
+### 7. Operational Chit Chunks (individual records)
 
-- **Pledge Chits**: Recording a certain number of CHIPs pledged from one party to another
-- **Chit Requests**: Requesting a certain number of CHIPs from the other party
-- **Setting Chits**: Changing operating parameters of the tally
+**Purpose**: Transaction records and operational changes during active tally operation
 
 #### Chit Digest Format
 
-Each chit digest consists of the following serialized fields:
+Each chit follows a standardized digest format for cryptographic signing:
 - **Tally ID**: ID of the tally the chit belongs to
 - **Party Indicator**: Which party is issuing the pledge (stock 's' or foil 'f')
 - **Date**: Date of the pledge (format: YYYY-MM-DDTHH:mm:ss.SSSZ in UTC)
@@ -90,110 +231,210 @@ Each chit digest consists of the following serialized fields:
 - **Reference**: Machine readable JSON data
 - **Units**: Integer number of milliCHIPs as a positive number
 
-Each chit:
-- Has a unique identifier
-- Is signed by the party creating it using their cryptographic key
-- Contains the standardized digest format above
-- May include references to external documents (e.g., invoices)
-- Affects tally balance (net sum of all valid chits)
+#### Chit Types
 
-### 7. Close Requests
+**Pledge Chits**: Recording actual value transfers between parties
+- Represents a promise of value from one party to another
+- Affects the tally balance (net sum of all valid chits)
+- Creates either assets (positive) or liabilities (negative) for each party
 
-Either party can register a request to close the tally:
-- The request is signed by the requesting party
+**Chit Requests**: Requesting payment from the other party
+- Signed by the party requesting payment
+- Other party processes the request and creates a corresponding pledge chit
+- Enables formal payment request workflows
+
+**Setting Chits**: Changes to operational parameters
+- Modifications to trading variables or other tally settings
+- Signed by the party making the change
+- May require consensus validation depending on the type of change
+
+**Issuing Party**: Either (whoever creates the chit)
+**Signature Requirement**: Consensus (database validation + creating party signature)
+**Negotiation Pattern**:
+- Created by one party during active tally operation
+- Validated through the shared database consensus mechanism
+- Signed by the creating party using their cryptographic key
+- Parties maintain local copies of chits that protect their position
+
+### 8. Tally Configuration Signature Block (revisioned)
+
+**Purpose**: Establishes which combination of chunk revisions constitutes the operative tally
+
+**Content**:
+- **Configuration Revision**: Incrementing number for this signature block
+- **Required Chunks**: Array of (chunk_type, chunk_revision) pairs referencing all required chunks
+- **Stock Signature**: Stock holder's acceptance of this exact configuration  
+- **Foil Signature**: Foil holder's acceptance of this exact configuration
+- **Supersedes Configuration**: Reference to previous configuration revision (if any)
+- **Configuration Timestamp**: When this configuration was proposed
+
+**Issuing Party**: Either (whoever proposes the configuration)
+**Signature Requirement**: Bilateral (both parties must sign identical configuration)
+**Negotiation Pattern**:
+- Either party can propose a new tally configuration by referencing specific chunk revisions
+- Configuration becomes operative only when both parties sign the same configuration revision
+- Supersedes any previous active configuration when both signatures are present
+- Individual chunks remain "draft" until referenced by an active configuration
+- Enables clean amendment process: propose new configuration → both parties sign → new terms take effect
+
+**Example Configuration Flow**:
+1. Stock party proposes Configuration Rev 1 referencing: Identity(1), Certificate-Stock(2), Certificate-Foil(1), Contract(1), etc.
+2. Foil party signs the same Configuration Rev 1
+3. Tally becomes operative under those exact chunk revisions
+4. Later, either party proposes Configuration Rev 2 with updated chunk references
+5. Both parties sign Configuration Rev 2 → amendment takes effect
+
+### 9. Close Request Chunk (if applicable)
+
+**Purpose**: Formal request to close the tally when conditions are met
+
+**Content**:
+- **Close Request Flag**: Indicates intent to close
+- **Requesting Party**: Identifier of party requesting closure
+- **Request Timestamp**: When the request was made
+
+**Issuing Party**: Either (whoever requests closure)
+**Signature Requirement**: Must be referenced in a Tally Configuration Signature Block for effect
+**Negotiation Pattern**:
+- Either party can create a close request chunk
+- Close request only takes effect when referenced in an active tally configuration
 - The tally remains open until its balance reaches zero
-- Zero can be achieved through lifts or manual chits
+- Zero balance can be achieved through lifts or manual chits
 - A closing tally should only accept chits that move it closer to zero
+
+## Minimum Required Chunks for Valid Tally
+
+For a tally to be considered valid and operational, the following chunks must be present and referenced in an active Tally Configuration Signature Block:
+
+### **Essential Chunks** (required):
+1. **Tally Identity Chunk** (revision 1) - Establishes basic tally identity and party roles
+2. **Party Certificate Chunk** (at least 1 revision per party) - Basic identity disclosure from each party
+3. **Contract Reference Chunk** (at least 1 revision) - Legal framework governing the relationship
+4. **Credit Terms Chunk** (at least 1 revision per party) - Credit limits each party extends to the other
+
+### **Optional Chunks** (may be required by specific contracts):
+5. **Key Issuance Chunk** - Only required if derived keys differ from master keys
+6. **Trading Variables Chunk** - Required if tally participates in automated credit lifts
+7. **Close Request Chunk** - Only present when tally closure is being negotiated
+
+### **Validation Rules**:
+- All essential chunks must be present and referenced in the active configuration
+- Each party must have provided at least basic certificate information
+- Contract reference must point to a valid, accessible contract document
+- Credit terms may be zero (no credit extended) but chunks must still exist
+- Configuration must be signed by both parties to be considered valid
+
+### **Important Distinction: Zero Credit vs. Close Request**
+
+**Zero Credit Terms**:
+- Means "I'm not willing to extend any new credit to you"
+- Tally remains **open** and fully operational
+- Parties can still receive payments, make payments from positive balances, and participate in credit lifts
+- Credit limits can be increased again in the future through new Credit Terms revisions
+- Common scenarios: temporary credit suspension, maxed out credit limits, risk management
+
+**Close Request**:
+- Means "I want to terminate this entire tally relationship"
+- Tally moves to **closing** state with goal of permanent settlement
+- Focus shifts to achieving zero balance and then closing the tally permanently
+- Typically used when business relationship is ending (contract expiration, relocation, disputes)
+- More final in nature - represents intent to end the relationship entirely
+
+These are fundamentally different operational states that serve different purposes in tally lifecycle management.
 
 ## Tally States
 
 A tally progresses through several states during its lifecycle:
 
-1. **Draft**: Initial creation, not yet shared
-2. **Offered**: Proposed to partner, awaiting response
-3. **Open**: Active and accepted by both parties
-4. **Closing**: Marked for closing when balance reaches zero
-5. **Closed**: Fully closed, no more transactions allowed
-6. **Void**: Rejected or abandoned
+1. **Draft**: Initial creation by initiating party, chunk negotiation in progress
+2. **Offered**: Core chunks agreed upon, awaiting final acceptance  
+3. **Open**: All essential chunks present in active configuration, ready for transactions
+4. **Closing**: Close request registered, working toward zero balance
+5. **Closed**: Balance is zero, no more transactions allowed
+6. **Void**: Rejected or abandoned during negotiation
 
-## Tally Operations
+## Negotiation Protocol
 
-### Establishing a Tally
+### Chunk-Based Negotiation Flow
 
-1. **Creation**: A party creates a draft tally
-2. **Proposal**: The tally is offered to another party
-3. **Negotiation**: The recipient can accept, reject, or counter-propose
-4. **Agreement**: Both parties sign the tally
-5. **Activation**: The tally becomes open for transactions
+1. **Initialization**: Stock holder creates Tally Identity chunk
+2. **Chunk Development**: Both parties create and revise individual chunks:
+   - Party Certificate chunks (progressive disclosure)
+   - Credit Terms chunks (independent proposals)
+   - Contract Reference chunks (negotiated proposals)
+   - Trading Variables chunks (independent settings)
+3. **Configuration Proposal**: Either party proposes a Tally Configuration referencing specific chunk revisions
+4. **Configuration Review**: Other party reviews the complete configuration and may:
+   - Sign the configuration (accepting the tally terms)
+   - Propose alternative chunk revisions and create competing configuration
+   - Request changes to individual chunks before signing
+5. **Activation**: Tally becomes "Open" when both parties sign the same configuration revision
+6. **Amendment Process**: Future changes require new configuration proposals referencing updated chunks
 
-### Recording Transactions
+### Revision Management
 
-1. **Direct Payment**: One party issues a chit to the other
-2. **Payment Request**: One party requests a chit from the other
-3. **Settings Change**: A party updates their trading variables or other settings
-4. **Close Request**: A party requests to close the tally when balanced
+- Each chunk type maintains its own revision sequence
+- Revisions are append-only and cryptographically signed
+- Chunks exist in "draft" state until referenced by an active Tally Configuration
+- Multiple revisions of the same chunk can coexist - operability is determined by configuration reference
+- All revisions are preserved for audit and dispute resolution
+- Tally Configuration Signature Blocks determine which combination of chunk revisions is operative
 
-### Maintaining Consensus
+### Database Schema Implications
 
-Depending on the chosen protocol model, consensus is maintained either through:
+Each chunk type will have its own table in the normalized SQL schema:
 
-- **Message-Based Model**: Chain-based consensus with explicit acknowledgments
-- **Shared Database Model**: Database consensus mechanisms
+**Common Fields** (all chunk tables):
+- `tally_id` (UUID, foreign key reference)
+- `chunk_type` (enumerated type)
+- `revision` (integer, incrementing)
+- `issuing_party` (stock 's' or foil 'f' - who created/disclosed this chunk)
+- `issuing_party_signature` (signature from the party who created this chunk)
+- `timestamp` (creation time)
+- `status` (draft, referenced_in_config, superseded)
 
-In either case, the tally must remain in a consistent state that both parties agree upon.
+**Tally Configuration Table** (separate table):
+- `tally_id` (UUID, foreign key reference)
+- `config_revision` (integer, incrementing)
+- `chunk_references` (JSON array of {chunk_type, chunk_revision} objects)
+- `stock_signature` (stock holder's signature accepting this configuration)
+- `foil_signature` (foil holder's signature accepting this configuration)
+- `timestamp` (when configuration was proposed)
+- `effective_timestamp` (when both signatures present - configuration becomes active)
+- `supersedes_config` (reference to previous active configuration)
+
+**Type-Specific Fields**:
+- Varied based on chunk type requirements
+- JSON fields used where flexibility is needed (certificates, contract references)
+- Normalized fields for structured data (credit limits, trading variables)
 
 ## Security Considerations
 
-Tallies incorporate several security features:
+The chunk-based approach incorporates several security features:
 
-1. **Cryptographic Signatures**: All critical records are signed by the creating party
-2. **Immutable Records**: Once signed, records cannot be altered
-3. **Complete Record**: The legally binding tally is the collection of all valid, signed records
-4. **Resilience**: Each party maintains records that protect their position
+1. **Cryptographic Signatures**: All chunks are signed by the creating/agreeing parties
+2. **Immutable Records**: Signed chunks cannot be altered, only superseded
+3. **Progressive Disclosure**: Parties can reveal information incrementally as trust builds
+4. **Dispute Resolution**: Complete audit trail of all chunk revisions and signatures
+5. **Local Backup**: Parties maintain copies of chunks that protect their interests
 
-## Open Questions
+## Consensus and Integrity
 
-Several design decisions regarding tallies are still being resolved:
+- **Shared Database Consensus**: 50/50 voting power split between party-nominated nodes
+- **Chunk Validation**: Database constraints ensure valid chunk sequences and signatures
+- **Hash Chain Integration**: May be added for additional integrity verification beyond database consensus
+- **Byzantine Resilience**: Consensus mechanism prevents unilateral tally modifications
 
-1. **Party Identification**: How to handle identity changes without closing tallies
-2. **Shared vs. Split Model**: Whether to use a message-based or shared database approach
-3. **Schema Design**: Single flexible record structure vs. normalized schema
-4. **Contract Format**: Structured documents vs. PDFs
+## Implementation Benefits
 
-## Example Tally Structure
+This chunk-based approach provides:
 
-While the exact structure depends on the final protocol model, a tally might contain:
-
-```
-Tally:
-  - UUID: "unique-identifier"
-  - Version: 1
-  - Date: "creation-timestamp"
-  
-  Party1:
-    - PeerID: "libp2p-peer-id-1"
-    - Certificate: {...}
-    - Credit Terms: {...}
-    - Trading Variables: {...}
-    
-  Party2:
-    - PeerID: "libp2p-peer-id-2"
-    - Certificate: {...}
-    - Credit Terms: {...}
-    - Trading Variables: {...}
-    
-  Contract:
-    - Reference: "content-hash"
-    - Format: "structured-yaml"
-    
-  Signatures:
-    - Party1: "digital-signature-1"
-    - Party2: "digital-signature-2"
-    
-  Chits:
-    - [...chit records...]
-```
+- **Granular Negotiation**: Each aspect can be negotiated independently
+- **Progressive Trust Building**: Information disclosure can match trust development
+- **Clear Revision Tracking**: Every change is versioned and cryptographically verified
+- **Flexible Schema**: JSON fields accommodate varying certificate and contract formats
+- **Legal Compliance**: Complete signature chain for dispute resolution and legal proceedings
 
 ---
 
-*Note: This document is a working draft and will evolve as implementation decisions are finalized.*
+*Note: This document reflects the current design decisions for Taleus. The chunk structure may be refined during implementation based on technical requirements and user feedback.*
