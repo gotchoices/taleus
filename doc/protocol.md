@@ -7,7 +7,7 @@ This document defines the protocol by which nodes in a Taleus network communicat
 The Taleus protocol consists of several interconnected layers:
 
 1. **Application Layer (Taleus)**: Manages tallies and credit relationships
-2. **Database Layer (SQLiter)**: Provides SQL query parsing and database operations
+2. **Database Layer (Quereus)**: Provides SQL query parsing and database operations
 3. **Optimistic Layer (Optimystic)**: Implements optimistic database operations
 4. **DHT Layer (Kademlia)**: Provides distributed hash table functionality
 5. **Network Layer (libp2p)**: Handles peer discovery and communication
@@ -24,25 +24,25 @@ The protocol implements a balanced node management approach:
 - In case of disputes, parties maintain local copies of critical records
 - The system supports Byzantine fault tolerance at the database level
 
-## Protocol Models
+## Shared Database Protocol
 
-Taleus implements a shared database protocol, evolving from the original MyCHIPs message-based approach:
+Taleus implements a shared database protocol that evolves from the original MyCHIPs design:
 
-### Shared Database Protocol
+### Protocol Characteristics
 
-The shared database protocol represents a significant advancement over the original MyCHIPs message-based design:
+- Parties maintain shared records in a distributed database hosted by nominated nodes
+- Database is built atop Kademlia DHT using Optimystic and Quereus layers
+- Uses mostly normalized SQL schema with JSON fields for flexibility
+- Maintains stock/foil party nomenclature for MyCHIPs compatibility
+- Consensus achieved through 50/50 voting power split between party-nominated nodes
 
-- Instead of each party maintaining their own copy of the tally (as in MyCHIPs), parties maintain a shared record in a distributed database
-- The database is hosted by a small network of nodes built atop a Kademlia DHT
-- Consensus is handled at the distributed database level rather than at the individual tally/chit layer
-- This provides a single source of truth for all participants
+### Database Operations
 
-Key characteristics:
-- Uses a distributed database with built-in consensus mechanisms
-- Both parties (and their nominated nodes) maintain a common record
-- Changes are written directly to the database
-- Database-level consensus ensures agreement
-- Kademlia DHT provides efficient node discovery and routing
+- **Record Creation**: Parties create signed records directly in the shared database
+- **State Transitions**: Database triggers and constraints enforce valid state changes
+- **Consensus**: All operations require agreement from both party groups (50/50 voting)
+- **Integrity**: Cryptographic signatures validate all critical records
+- **Dispute Resolution**: Parties maintain local copies of records protecting their interests
 
 ## State Processing
 
@@ -94,14 +94,14 @@ Each transition includes validation rules to ensure proper state progression.
 
 ## Transaction Protocol Flow
 
-Transactions (chits) in Taleus follow these general steps:
+Transactions (chits) in Taleus follow these database-centered steps:
 
-1. **Creation**: A party creates a chit
-2. **Signing**: The party digitally signs the chit
-3. **Transmission**: The chit is sent to the partner
-4. **Validation**: The partner validates the chit
-5. **Recording**: The chit is recorded on both sides of the tally
-6. **Consensus**: Both parties ensure agreement about the chit's place in the record
+1. **Creation**: A party creates a chit record with required fields (tally ID, party indicator, amount, etc.)
+2. **Signing**: The party digitally signs the chit using their cryptographic key
+3. **Database Insert**: The signed chit is inserted into the shared database
+4. **Consensus Validation**: The database consensus mechanism validates the operation
+5. **State Update**: Tally balance and state are updated automatically via database constraints
+6. **Local Backup**: Each party maintains local copies of records protecting their position
 
 ### Transaction Types
 
@@ -140,16 +140,16 @@ The shared database model implements consensus at the database level:
    - Kademlia DHT provides efficient node discovery and routing
    - Byzantine fault tolerance handles potentially malicious nodes
 
-## Route Discovery and Lifts
+## Credit Lifts
 
-While the primary focus of Taleus is tally management, it also supports the concept of credit lifts:
+While the primary focus of Taleus is tally management, it supports credit lifts through the database model:
 
-1. **Route Discovery**: Finding viable pathways through the network
-2. **Lift Negotiation**: Proposing and agreeing to a lift
-3. **Lift Execution**: Creating and signing chits as part of the lift
-4. **Lift Finalization**: Confirming the lift is complete
+1. **Lift Coordination**: Multiple tallies coordinate lift operations through database transactions
+2. **Atomic Operations**: Database transactions ensure lift operations complete atomically across all involved tallies
+3. **Lift Chits**: Special chit records mark participation in multi-party credit lifts
+4. **Settlement**: Lift completion updates all involved tally balances simultaneously
 
-These operations may be performed by interacting with other components like ChipNet.
+Credit lift coordination may involve external components for route discovery and network-wide optimization.
 
 ## Identity and Authentication
 

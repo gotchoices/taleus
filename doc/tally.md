@@ -25,9 +25,10 @@ A tally consists of several types of records:
 Each tally has two participants, identified by:
 
 - **Party ID**: The unique identifier for each party (ideally a libp2p peerID)
-- **Party Roles**: Distinguishing between the two parties
-  - In the original MyCHIPs, these were "stock holder" (vendor/creditor) and "foil holder" (client/debtor)
-  - In Taleus, they may be simply "party1" (proposer) and "party2" (respondent)
+- **Party Roles**: Distinguishing between the two parties using stock/foil nomenclature
+  - **Stock Holder**: The party who first proposes the tally (vendor/creditor role)
+  - **Foil Holder**: The party who responds to the tally proposal (client/debtor role)
+  - Maintains compatibility with MyCHIPs terminology and balance sign conventions
 - **Party Certificates**: Containing identity and cryptographic key information
 
 Important considerations:
@@ -79,11 +80,22 @@ Tallies contain transaction records called "chits":
 - **Chit Requests**: Requesting a certain number of CHIPs from the other party
 - **Setting Chits**: Changing operating parameters of the tally
 
+#### Chit Digest Format
+
+Each chit digest consists of the following serialized fields:
+- **Tally ID**: ID of the tally the chit belongs to
+- **Party Indicator**: Which party is issuing the pledge (stock 's' or foil 'f')
+- **Date**: Date of the pledge (format: YYYY-MM-DDTHH:mm:ss.SSSZ in UTC)
+- **Memo**: Human readable comment
+- **Reference**: Machine readable JSON data
+- **Units**: Integer number of milliCHIPs as a positive number
+
 Each chit:
 - Has a unique identifier
-- Is signed by the party creating it
-- Contains value and timestamp information
+- Is signed by the party creating it using their cryptographic key
+- Contains the standardized digest format above
 - May include references to external documents (e.g., invoices)
+- Affects tally balance (net sum of all valid chits)
 
 ### 7. Close Requests
 

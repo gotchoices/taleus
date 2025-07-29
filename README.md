@@ -18,9 +18,9 @@ Taleus is a library for negotiating, establishing and maintaining private credit
   - Contains identifying information including cryptographic keys
   - Tracks transactions (chits) between parties
   - Enables credit-based exchanges of value
-  - Allows for automated credit clearing (lifts)
+  - Allows for automated, distributed credit clearing (lifts)
 
-Taleus extends and builds upon concepts developed in the [MyCHIPs](https://github.com/gotchoices/MyCHIPs) project, but focuses on creating a standalone, standard library implementation built atop modern peer-to-peer technologies.
+Taleus extends and builds upon concepts developed in the [MyCHIPs](https://github.com/gotchoices/MyCHIPs) project, but focuses on creating a standalone, standard library implementation of the tally, built atop modern peer-to-peer technologies.
 
 ## Features
 
@@ -40,7 +40,7 @@ Taleus is currently in the design and documentation phase. We are:
 - Defining message formats and communication patterns
 - Designing tally structures and operations
 
-For a detailed roadmap of development, see [Development Roadmap](doc/issues/README.md).
+For a detailed roadmap of development, see [Development Roadmap](doc/STATUS.md).
 
 ## Architecture
 
@@ -49,7 +49,7 @@ Taleus implements a decentralized tally management system using a specific techn
 - **libp2p**: For peer discovery, connection, and communication
 - **Kademlia DHT**: For distributed hash table functionality
 - **Optimystic**: For optimistic database operations atop Kademlia
-- **SQLiter**: For SQL query parsing and database operations
+- **Quereus**: For SQL query parsing and database operations
 - **Taleus**: The application layer managing tallies and credit relationships
 
 The system uses a shared database model where:
@@ -76,9 +76,8 @@ MyCHIPs serves as the prototype implementation for a PCN, demonstrating the viab
 
 - [Architecture Overview](doc/architecture.md)
 - [Protocol Specification](doc/protocol.md)
-- [Message Formats](doc/messages.md)
 - [Tally Structure](doc/tally.md)
-- [Development Roadmap](doc/issues/README.md)
+- [Development Roadmap](doc/STATUS.md)
 
 ## Contributing
 

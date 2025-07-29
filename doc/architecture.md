@@ -18,7 +18,7 @@ Taleus is a library for managing private credit relationships (tallies) between 
 The Taleus system consists of the following key components:
 
 1. **Application Layer (Taleus)**: Manages tallies and credit relationships
-2. **Database Layer (SQLiter)**: Provides SQL query parsing and database operations
+2. **Database Layer (Quereus)**: Provides SQL query parsing and database operations
 3. **Optimistic Layer (Optimystic)**: Implements optimistic database operations
 4. **DHT Layer (Kademlia)**: Provides distributed hash table functionality
 5. **Network Layer (libp2p)**: Handles peer discovery and communication
@@ -41,26 +41,25 @@ Taleus implements a shared database model for tally management, building upon an
 
 ### Shared Database Model
 
-The shared database model represents a significant evolution from the original MyCHIPs message-based approach:
+Taleus implements a shared database model that represents a significant evolution from the original MyCHIPs approach where each party maintained their own copy of the tally:
 
-- Instead of each party maintaining their own copy of the tally (as in MyCHIPs), parties maintain a shared record in a distributed database
-- The database is hosted by a small network of nodes built atop a Kademlia DHT
-- Consensus is handled at the distributed database level rather than at the individual tally/chit layer
-- This provides a single source of truth for all participants
+- Parties maintain a shared record in a distributed database hosted by nominated nodes
+- The database is built atop a Kademlia DHT using the Optimystic and Quereus layers
+- Consensus is handled at the distributed database level using a 50/50 voting power split
+- This provides a single source of truth while maintaining Byzantine fault tolerance
 
-**Advantages:**
-- Single source of truth for all parties
-- Simplified consensus mechanism (handled at database level)
-- More efficient credit clearing and settlement
-- Reduced complexity in reconciliation
-- Better recovery from network issues
+**Schema Design:**
+- Uses a mostly normalized SQL schema for efficient querying and relationships
+- JSON fields are used where flexibility is needed (e.g., certificates, contract references)
+- Maintains stock/foil party nomenclature for compatibility with MyCHIPs concepts
+- Separate tables for different record types (tallies, chits, credit terms, etc.)
 
 **Implementation Details:**
 - Uses Kademlia DHT for node discovery and routing
-- Small network of trusted nodes maintain the shared database
-- Byzantine fault tolerance at the database level
+- Each party nominates trusted nodes with equal voting power (50/50 split)
+- Database consensus prevents unilateral control by either party
 - Cryptographic signatures ensure transaction integrity
-- Real-time consistency across all participants
+- Parties maintain local copies of critical records for dispute resolution
 
 ## System Interactions
 
@@ -80,17 +79,19 @@ The shared database model represents a significant evolution from the original M
 
 ### Consensus Mechanism
 
-Depending on the chosen model, consensus works differently:
+Taleus implements database-level consensus for the shared database model:
 
-**Message-Based Model**:
-- Chain-based consensus similar to MyCHIPs
-- Hash chains verify record integrity
-- Explicit acknowledgments of transmitted messages
+**Database Consensus**:
+- Each party nominates trusted nodes to participate in tally management
+- Nominated nodes form a network with equal voting power (50/50 split between parties)
+- Database operations require consensus between the two party groups
+- Prevents either party from unilaterally modifying tally records
+- Hash chains may be integrated for additional integrity verification
 
-**Shared Database Model**:
-- Database consensus protocols (potentially built on libp2p)
-- Byzantine fault tolerance considerations
-- Possible use of voting or multi-signature approaches
+**Dispute Resolution**:
+- Parties maintain local copies of all records that protect their position
+- Cryptographically signed records serve as legally binding evidence
+- In case of disagreement, parties can present their records to arbitrators
 
 ## Identity Management
 
@@ -100,15 +101,22 @@ Taleus handles identity through:
 2. **Key Management**: Supporting key rotation, recovery, and multiple device access
 3. **Signatures**: Digital signatures for all transactions and changes
 
+## Architecture Decisions Made
+
+The following architectural decisions have been finalized:
+
+1. **Database Structure**: ✅ Mostly normalized SQL schema with JSON fields where flexibility is needed
+2. **Party Nomenclature**: ✅ Stock/foil terminology (maintaining MyCHIPs compatibility)
+3. **Consensus Model**: ✅ Shared database with 50/50 voting power split between parties
+
 ## Open Architecture Questions
 
 The following questions are still being researched and resolved:
 
-1. **Database Structure**: Should tallies use a single flexible table or a fully normalized schema?
-2. **Identity Framework**: What's the best approach for ensuring secure, recoverable identities?
-3. **Hash Chain Integration**: How should hash chains be integrated with the distributed database for additional integrity verification?
-4. **Node Selection**: What criteria should be used for selecting trusted nodes to maintain the shared database?
-5. **Standard Definition**: How should the "standard" be defined for the shared database implementation?
+1. **Identity Framework**: Should we use SSI (Self-Sovereign Identity) or alternative approaches for secure, recoverable identities?
+2. **Hash Chain Integration**: How should hash chains be integrated with the distributed database for additional integrity verification?
+3. **Node Selection**: What criteria should be used for selecting trusted nodes to maintain the shared database?
+4. **Key Management**: Should private keys be stored in device vaults or be exportable for device migration?
 
 ## Interfaces
 
