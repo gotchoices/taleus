@@ -79,12 +79,12 @@ Based on Brainstorm.md, the following information needs clarification:
 3. **Stock/Foil Nomenclature**: ✅ **RESOLVED** - Use stock/foil nomenclature (maintains compatibility with MyCHIPs)
 
 ### Identity and Key Management Questions
-4. **SSI Implementation**: 🔄 **RESEARCH NEEDED** - Need to evaluate if SSI is the right approach and which framework to use. Design objective for now.
-   - [ ] Research SSI frameworks (did:key, did:ethr, did:ion) for hierarchical key derivation
-   - [ ] Evaluate libp2p's native identity system as alternative
-   - [ ] Determine if master key + derived key validation meets our needs
-   - [ ] Define key validation requirements for offline/distributed operation
-   - [ ] Research key revocation mechanisms in distributed systems
+4. **SSI Implementation**: ✅ **RESOLVED** - did:key method recommended for SSI layer on top of libp2p
+   - [x] Research SSI frameworks (did:key, did:ethr, did:ion, Hyperledger Indy) for hierarchical key derivation
+   - [x] Clarify libp2p role as networking layer (not SSI alternative)
+   - [x] Determine optimal SSI framework for master key + derived key validation
+   - [x] Define key validation requirements for offline/distributed operation
+   - [x] Comprehensive SSI framework analysis documented in doc/SSI.md
 
 5. **Device Vault vs Exportable Keys**: 🔄 **RESEARCH NEEDED** - Need to evaluate options as part of overall key management strategy.
 
@@ -162,7 +162,7 @@ Based on Brainstorm.md, the following information needs clarification:
 
 ### New Files Needed
 - [ ] **doc/schema.md** - detailed SQL schema design
-- [ ] **doc/identity.md** - SSI and key management specification  
+- [x] **doc/SSI.md** - SSI framework analysis and key management specification ✅ COMPLETED
 - [ ] **doc/negotiation.md** - detailed negotiation flow for shared database model
 
 ---
