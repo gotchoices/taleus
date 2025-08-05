@@ -1,6 +1,6 @@
 create table Stock (
-    Sid text not null,
-    InvitationKey text not null,    --public key of sk sent to invited party
+    Sid text,
+    InvitationKey text,    --public key of sk sent to invited party
     Signature text null,    -- Signed using party key
     
     primary key (/* 1 row */),
@@ -16,8 +16,8 @@ create table Stock (
 );
 
 create table Foil (
-    Sid text not null,
-    Signature text not null,  -- signed using the out of band exchanged private key
+    Sid text,
+    Signature text,  -- signed using the out of band exchanged private key
     
     primary key (Sid),
     constraint InvitationSignatureValid check (SignatureValid(
@@ -30,9 +30,9 @@ create table Foil (
 );
 
 create table PartyKey (
-    Sid text not null,  -- Cid hash of first revision
-    Revision integer not null,
-    PublicKey text not null,
+    Sid text,  -- Cid hash of first revision
+    Revision integer,
+    PublicKey text,
     Signature text null,    -- Signed using prior if this is revision > 1
     
     primary key (Sid, Revision),
@@ -49,8 +49,8 @@ create table PartyKey (
 create table PartyCertificate (
     PartySid text,
     Revision integer,
-    Certificate text not null,
-    Signature text not null,
+    Certificate text,
+    Signature text,
     
     primary key (PartySid, Revision),
     constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from PartyCertificate PC where PC.PartySid = New.PartySid), 0) + 1) on insert,
@@ -63,10 +63,10 @@ create table PartyCertificate (
 );
 
 create table TallyContractProposal (
-    SequenceNumber integer not null,
-    ContractCid text not null,
-    Proposer text not null check Proposer in ('S', 'F'),
-    Signature text not null,
+    SequenceNumber integer,
+    ContractCid text,
+    Proposer text check Proposer in ('S', 'F'),
+    Signature text,
 
     primary key (/* 1 row */),
     constraint SignatureValid check (SignatureValid(
@@ -78,11 +78,11 @@ create table TallyContractProposal (
 
 
 create table TallyContract (
-    Number integer not null,
-    ContractCid text not null,
+    Number integer,
+    ContractCid text,
     -- TODO: Credit terms (limit, call) - arguments to contract
-    StockSignature text not null,
-    FoilSignature text not null,
+    StockSignature text,
+    FoilSignature text,
 
     primary key (Number),
     constraint StockSignatureValid check (SignatureValid(
