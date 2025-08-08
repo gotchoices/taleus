@@ -1,0 +1,16 @@
+---
+description: Project documentation
+alwaysApply: false
+---
+- Organize project documentation as follows:
+  - README.md - High level overview and usage instructions.
+  - doc/design - Ideas, approaches developed during research phase, less likely to be relevant in later phases.
+  - doc/design/PROJECT.md - Original project requirements and objectives (human authored/maintained).
+  - doc/design/*.md - Topic-specific design worksheets, research, explorations, explanations, results.
+  - doc/STATUS.md - Project development and implementation progress tracking, checklists.
+  - doc/ARCHITECTURE.md - Software components and how they interact.
+  - doc/PROTOCOL.md - How project interacts with other  software, systems.
+  - doc/<other>.md - Topic-specific usage information.
+  - doc/issues/*.md - Topic-specific projects for refactoring, bug fixes, feature additions, migrations.
+  - doc/issues/STATUS.md - Tracks which issues are future, next, completed.
+- Include progress checklists only in STATUS files and issues/*.md files.

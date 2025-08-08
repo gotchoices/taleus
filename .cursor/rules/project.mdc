@@ -1,0 +1,23 @@
+---
+description: Taleus Project Rules
+alwaysApply: true
+---
+- MyCHIPs legacy
+  - Taleus will implement part of the next generation MyCHIPs protocol.
+  - The MyCHIPs project can be found in a parallel folder to Taleus.
+  - Refer to ../mychips/doc/*.md to fully understand the legacy implementation while working on this extension.
+
+- General:
+  - Use typescript
+  - Handle functions like cryptography, conversions centrally, consistently
+  - Use test-driven workflow as much as possible
+
+- Project Phases
+  - Design
+  - Documentation
+  - TLA+ modeling if appropriate
+  - Testing, coding
+  - Integration
+    - Integrate back into MyCHIPs engine
+    - Standalone mobile phone implementation
+  - Maintenance

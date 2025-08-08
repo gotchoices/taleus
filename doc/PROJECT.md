@@ -1,28 +1,32 @@
-Technical Details
+Project Objectives (human generated, maintained)
 
 - Taleus will be built on libp2p.  Specifically, the stack is:
   - Taleus -> Quereus -> Optimystic -> Kademlia -> libp2p
     https://github.com/gotchoices/quereus
     https://github.com/gotchoices/Optimystic
+    https://github.com/libp2p/js-libp2p
+- A tally is a private ledger and contract between two parties.
 - Tallies contain several types of records
   - Tally ID:
-    - Somewhere, somehow, we need to establish a UUID or similar ID for the tally so all other records can be relational to it.
-    - Current thinking is to establish this as a hash of data that includes both parties' ID's and the tally creation date (a content ID of sorts).
+    - Somehow, we need a universally unique ID for the tally so all other records can be relational to it.
+    - Current thinking is to establish this as a hash of data that includes both parties' ID's, the tally creation date and possibly other immutable data..
   - Party ID and keys: 
-    - Each of the two parties to the tally needs to have an ID recorded on, or associated with the tally.
-    - The two parties need to be distinctly identified.  Current thinking is to keep the historical stock/foil nomenclature from MyCHIPs and so to refer to one party as stock and the other as foil.
-    - Whoever first forms a tally proposal would record their ID first and become stock (or proposer).
-    - The recipient of the proposal would become foil (or respondant).
-    - Transactions in the tally ledger will be signed.  By default, a positive number represents a pledge of value from foil to stock.  Negative numbers are a pledge from stock to foil.
-    - The party ID should be a libp2p peerid if possible.
-    - However, if the party ID ever has to change, it necessitates closing the tally and opening a new one.
-    - IOW, the party ID should be writable one-time to a tally and be immutable through the life of the tally.
-    - It would be nice if the party ID could be derived from a SSI (self-sovereign-identify) seed so that a party could issue a series of keys over the lifetime of the tally.  Is there a way to do this with SSI (see https://www.identity.com/self-sovereign-identity/)?  All new keys issued would be the progeny of the original seed ID so they could be verified as valid by the partner.  But a partner could invalidate old keys and issue new ones as needed.
-    - If we use SSI (or similar) can/should the private key be contained within a device vault (i.e. not even accessible to the user)?  Or should the private key be exportable so it can be moved from one device to the next?
-    - If the private key(s) are kept in a device vault, do we have a way to deal with lost devices?  Can I register multiple keys (or key seeds) on a tally so I can use them to revoke old keys or register new keys later?
+    - Each of the parties needs to have an ID recorded on the tally.
+    - The parties must be distinctly identified.  It would be nice to keep the historical stock/foil nomenclature from MyCHIPs (party A is stock, party B is foil).
+    - Whoever first builds the tally database will record their ID first and become stock.
+    - The other party will become foil.
+    - The party ID is a hash of the public key by which the party signs transactions.  This may be libp2p compliant by may not necessarily be so.
+    - Ideally, the party ID will related to a "genesis key" (such as in self-sovereign keys) from which a progeny sequence of keys will originate.
+    - Open question: Will keys be generated inside a secure vault?
+      - If so, we have no way to export them and move them to another device.
+      - Can new SSI keys be generated from a private key that is inside a vault?
+  - Cadre ID's
+    - Each party supplies a list of (libp2p) peer IDs.
+    - The tally is hosted by the set of all nodes supplied by both parties.
+    - The parties should be able to amend this set by appending new records.
   - Identity Certificate
     - Each party should disclose to the other a set of identifying information collectively referred to as the party's certificate.
-    - This includes things such as:
+    - This should be substantially the same as legacy MyCHIPs and includes things such as:
       - All names the person has been known by
       - Communication points (phone, pager, email, web, etc)
       - Addresses (home, mailing, shipping, etc)
@@ -51,8 +55,9 @@ Technical Details
       - clutch: An amount to charge for lifts in the reverse direction (drops).
   - Chit
     - A chit is a pledge for a certain number of CHIPs (the unit of measure for value).
-    - It is signed by the party making the pledge.
-    - The digest consists of the following serialized fields:
+    - A positive amount represents a pledge of value from foil to stock. A negative number implies a pledge from stock to foil.
+    - The chit is signed by the party making the pledge.
+    - The signature digest consists of the following serialized fields:
       - ID of the tally the chit belongs to.
       - Which party is issuing the pledge (s or f).
       - Date of the pledge (format: YYYY-MM-DDTHH:mm:ss.SSSZ in UTC).
@@ -70,19 +75,21 @@ Technical Details
     - The tally will remain open until its balance reaches zero, at which point it is closed.
     - Zero balance can be achieved throught lifts or manual chits.
     - A tally marked as closing should only accept chits that move it closer to zero.
-- Tally records can stand on their own in terms of their validity (cryptographic signatures).  However each record needs to be linked back to a universally unique identifier (tally ID) so they can be taken in context.
-- In the event of a corrupt partner (who somehow tries to delete or hide records), it is up to the
-  other partner to maintain posession of all records that protect his position (for example, signed pledges from the other party).  A complete tally is the collection of all duly signed records that reference the tally ID.  The parties might end up in court presenting 'their version' of the tally, but the legally binding tally is the set of all valid records produced by the parties.
-- Negotiation sequence.  Part of the design will be to validate the sequence of states that can occur when two parties negotiate a tally.  The steps are roughly as follows:
-  - The proposer creates some kind of offer code it will recognize.  In the original MyCHIPs implementation, this was done by generating a unique token.  Tokens could be generated for one-time use or for multiple use.  Tokens were also then associated with a tally template--a draft of the tally that would be offered.
-  - The proposer would then communicate an offer to the respondant.  This involved disclosing the token as well as a physical address where hte proposer's server could be located.  In our libp2p model, the address might consist of a peer ID and one or more bootstrap multiaddresses.  It could also just be a physical multiaddress of the proposer.
-  - Once contacted, the proposer could validate the request and then create a kademlia and database, for the respondant to begin writing to.
-  - Presumably, negotiating a tally would consist of the two parties each writing records to the database which consist of a type, a revision, and associated data.
-  - Negotiation would be complete when a complete set of records of a given version have been signed by both parties.  If multiple such sets are identified, the set with the highest revision number would prevail.
+- Tally records can stand on their own in terms of their validity (cryptographic signatures).  However each record needs to be linked back to the tally ID so they can be understood in context.
+- In the event of a corrupt partner (who somehow tries to delete or hide records), it is up to the other partner to maintain posession of all records that protect his position (for example, signed pledges from the other party).  A complete tally is the collection of all duly signed records that reference the tally ID.  The parties might end up in court presenting 'their version' of the tally, but the legally binding tally is the set of all valid records produced by the parties.
+- Negotiation sequence:  Part of the design will be to validate the sequence of states that can occur when two parties negotiate a tally.  The steps are roughly as follows:
+  - Party A creates some kind of unique token it will recognize.  Tokens can be generated for one-time use or for multiple use.  Tokens are also associated with a tally template--a draft of the tally terms the party will offer.
+  - Party A then communicates an offer to Party B, which offer includes the token and certain data A will add to the tally.
+  - Party B contacts A, dislosing the token, along with its own data.
+  - When a party is in possession of enough information to determine that a tally is feasible, it can create a new libp2p network, kademlia and database.
+  - The creating party writes the draft tally to the database along with any modifications it wants.  It then signs the tally.
+  - This constitutes a binding offer to the other party who can then sign, modify or reject the offer.
+  - When a given record type is entered/modified multiple times, each record has a unique, sequential revision.
+  - Negotiation is complete when a complete set of records of a given revision have been signed by both parties.  If multiple such sets are identified, the set with the highest revision number prevails.
 
 Questions/Observations
 - Original model
-  - In the original MyCHIPs, each party was responsible for keeping a separate record of his half of the tally.
+  - In the original MyCHIPs, each party was responsible for keeping a separate record of its half of the tally.
   - This required some kind of consensus algorithm to help the two parties keep their copies of the ledger consistent.
   - Parties to the tally were identified by the historical tags 'stock holder' and 'foil holder'
   - So one party's copy of the tally was 'the stock' and the other party held 'the foil'
@@ -97,10 +104,8 @@ Questions/Observations
     - The parties will communicate with each other by writing records to the common SQL database.
   - Question: is this model preferable to the split tally (message-protocol) model?
 - Tally balance sign
-  - In the original MyCHIPs, parties would think of net positive pledges to themselves as an asset 
-    (positive number) and net pledges to the other party as a liability (negative number)
-  - But if the tally were ever represented externally, it would use a more objective measure.
-  - For that context, a positive tally balance represents value owed by the foil holder to the stock holder.
+  - In the original MyCHIPs, parties would think of net positive pledges to themselves as an asset (positive number) and net pledges to the other party as a liability (negative number).
+  - But if the tally were ever represented externally, it would use a more objective measure.  Specifically, a positive tally balance represents value owed by the foil holder to the stock holder.
   - Going to the shared database model, can we keep the stock/foil references if, for no other reason, to keep track of what a positive or negative number means?
 - Libp2p peerID's vs SSI identities
   - How do cycled keys work in SSI?
@@ -111,7 +116,7 @@ Questions/Observations
     - Tally header (contained party identification, contract, initial terms).
     - Chits (originally meant for payments only but settings and trading variables were wedged into the same table later).
     - Chits were stored in a hash-chain so as to more easily verify consenus (by comparing end of chain index and hash).
-  - With a shared database model, we may not need to keep a hash chain at all.
+  - With a shared database model, we likely do not need to keep a hash chain.
     - However, consider the byzantine case where one party has more nodes than the other and
       purposely throws away certain records in order to gain advantage.
     - In this case, even though the parties operate on a shared database, individual parties will need a way to locally store valuable records the other party refuses to acknowledge/store so the true tally can be proven before an arbiter or court.
@@ -122,5 +127,5 @@ Questions/Observations
     - We will build an example schema to explore this
 - Standard
   - The objective of this library is to establish the standard by which all MyCHIPs-compliant PCN nodes operate.
-  - In the case of a message-based protocol (like the original MyCHIPs), the standard would be in the message packets themselves.  It was up to the implementation to store state as it will.
+  - In the case of a message-based protocol (like the original MyCHIPs), the standard was in the message packets themselves.  It was up to the implementation to store state appropriately.
   - In the case of this new shared-database model (Taleus), it seems the libary itself will become the standard (or at least the SQL schema).

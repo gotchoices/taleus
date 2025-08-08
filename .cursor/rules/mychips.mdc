@@ -1,0 +1,8 @@
+---
+description: MyCHIPs legacy
+alwaysApply: true
+---
+- 
+- Taleus is implement part of the next generation MyCHIPs protocol.
+- The legacy version of MyCHIPs can be found in a parallel folder to Taleus.
+- Refer to ../mychips/doc/*.md to fully understand the legacy implementation while working on this extension.
