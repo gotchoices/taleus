@@ -37,8 +37,8 @@ Taleus is currently in the design and documentation phase. We are:
 
 - Establishing architecture and protocol specifications
 - Researching and comparing database models and identity frameworks
-- Defining message formats and communication patterns
-- Designing tally structures and operations
+ - Defining chunk structure and SQL operations
+ - Designing tally structures and operations
 
 For a detailed roadmap of development, see [Development Roadmap](doc/STATUS.md).
 
@@ -81,7 +81,7 @@ MyCHIPs serves as the prototype implementation for a PCN, demonstrating the viab
 
 ## Contributing
 
-The Taleus project follows the principles outlined in the [CONTEXT.md](CONTEXT.md) file. When contributing:
+The Taleus project follows the principles outlined in the [Project Objectives](doc/PROJECT.md) file. When contributing:
 
 - Follow normalized coding practices
 - Use TypeScript
