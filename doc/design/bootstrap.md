@@ -6,6 +6,7 @@ This document tracks and compares multiple proposed methods for the tally bootst
 ## Decision Factors
 
 ### Must-Have Requirements
+- Strictly peer-to-peer bootstrap (no centralized third-party services in invitation, validation, or database instantiation)
 - Support for one-time invitation tokens
 - Support for multi-use invitation tokens
 - Authentication of parties before database commitment
@@ -23,7 +24,7 @@ This document tracks and compares multiple proposed methods for the tally bootst
 
 ### 1. Pre-Authenticated Handshake Method (Current)
 **Status**: ✅ Detailed below in this file
-**Details**: See "Pre-Authenticated Handshake: Detailed Flow"
+**Details**: See [Pre-Authenticated Handshake: Detailed Flow](#pre-authenticated-handshake-detailed-flow)
 
 **Summary**: Uses libp2p messages for initial handshake with token-based pre-authentication, creates database only after validation.
 
@@ -34,9 +35,19 @@ This document tracks and compares multiple proposed methods for the tally bootst
 - ⚠️ More complex message handling
 - ⚠️ Requires separate authentication mechanism
 
+**Rough Process Flow**:
+1. Initiator creates invitation with token, expiry, and expected response fields
+2. Respondent contacts initiator over libp2p with token, Party ID, and proposed nodes
+3. Initiator validates token, identity material, and node capabilities
+4. If approved, initiator instantiates the shared database and configures scoped access
+5. Initiator sends DB connection info and credentials to respondent
+6. Both parties’ nominated nodes join; 50/50 governance established
+7. Minimal draft tally is inserted/verified in the shared DB
+8. Shared database is ready for writes by both parties; negotiation continues outside this file
+
 ### 2. Database-First Approach  
 **Status**: ✅ Detailed below in this file
-**Details**: See "Database-First: Detailed Flow"
+**Details**: See [Database-First: Detailed Flow](#database-first-detailed-flow)
 
 **Summary**: Create database immediately, include access credentials in invitation.
 
@@ -46,7 +57,7 @@ This document tracks and compares multiple proposed methods for the tally bootst
 - ⚠️ Requires pre-authentication mechanisms
 
 ### 3. Escrow Service Approach
-**Status**: 🔄 Proposed alternative
+**Status**: ⛔ Does not meet Must-Haves (centralized third-party escrow)
 **Details**: TBD in this file
 
 **Summary**: Third-party service facilitates initial handshake and database setup.
@@ -56,9 +67,11 @@ This document tracks and compares multiple proposed methods for the tally bootst
 - ❌ Introduces centralization dependency
 - ⚠️ Third-party trust requirements
 
+Note: This approach violates the Must-Have requirement for strictly peer-to-peer bootstrap and is therefore recommended for exclusion.
+
 ### 4. DHT-Based Discovery
 **Status**: 🔄 Proposed alternative  
-**Details**: TBD in this file
+**Details**: See [DHT-Based Discovery: Detailed Flow](#dht-based-discovery-detailed-flow)
 
 **Summary**: Use existing Kademlia DHT for initial contact and capability exchange.
 
@@ -89,12 +102,32 @@ This document tracks and compares multiple proposed methods for the tally bootst
    - A's cluster peer IDs and certificate
    - One-time vs multi-use offer tracking
 5. B builds shared Quereus cluster using both parties' info
-6. B populates shared DB with tally offer, triggering notification to A
-7. Formal negotiation begins in shared database
+6. B (or A per method design) populates the shared DB with an initial draft tally (offer), triggering notification to A
+7. Shared database is ready for writes by both parties; draft tally present. Negotiation proceeds outside the scope of this file
 
 Note: Full technical specification and implementation details pending.
 
 ---
+
+### 6. Role-Based Link Handshake (Consolidation of 1 and 5)
+**Status**: 🔄 Proposed consolidation (replaces 1 and 5 when adopted)
+**Details**: Rough Process Flow below
+
+**Summary**: A privately shared link (email/QR) conveys A’s contact node peerIDs (responders), an auth token, A’s intended role (stock/foil), and optional identity requirements. B connects to any A node, proves token possession, and discloses B’s identity and proposed cadre. After validation, A discloses the participating cadre. The builder is chosen by role: if A=stock, A builds; if A=foil, B builds. Ends with a shared DB ready for writes and a draft tally present.
+
+**Rough Process Flow**:
+1. A generates a private link containing: A’s contact node peerIDs (responders), authentication token (with expiry), A’s role (stock/foil), and optional identity requirements for B
+2. A shares the link privately with B (or multiple Bs via email/QR)
+3. B connects to any available A node and presents: token proof, B’s Party ID, B’s cadre peerIDs, and desired tally contents/offer metadata
+4. If A’s role is stock and B meets identity requirements: A instantiates the shared DB, inserts/verifies a minimal draft tally, and returns DB access info
+5. If A’s role is foil: A discloses A’s identity and participating cadre peerIDs along with offer metadata; if B proceeds, B instantiates the shared DB, inserts a minimal draft tally, and returns DB access info
+6. Both parties’ nominated nodes join; 50/50 governance established; shared DB is ready for writes by both parties; draft tally present
+
+Method 6 items to address in detailed design (numbered):
+1) Multi-use onboarding: message-based bootstrap implies no landing DB; provision a fresh per-respondent tally DB/namespace only after validation. Automate quotas and TTL cleanup for abandoned instances. Never reuse a single final tally DB across respondents
+2) Privacy of cadre data: addressed by sharing only responder node peerIDs in the link; disclose participating cadre peerIDs after token validation
+3) Identity requirements (deferred): specify proof formats (e.g., DID proofs) rather than free-form “requirements” in a later design phase
+4) End-state definition: explicitly require “DB Ready (draft tally present)” with confirmed write access for both parties
 
 #### Pre-Authenticated Handshake: Detailed Flow
 
@@ -140,11 +173,12 @@ This section captures the previously described message-based, pre-database boots
 7. Cluster Formation
    - Both parties' nodes join to establish the 50/50 consensus structure
 
-8. Chunk Negotiation Phase
-   - Shared database-based negotiation begins using chunk revisions and configuration signatures
+8. Initial Draft Tally and Handoff
+   - Ensure a minimal draft tally (identity/config prerequisites as needed) is present in the shared database and provide access information to both parties (no pre-flight read/write required)
+   - Handoff: Subsequent tally negotiation (chunk revisions, configuration signatures) is out of scope for this file
 
 Database State Transitions (for tracking):
-- Invitation Available → Contact Established → Validation Complete → Database Instantiated → Cluster Formed → Tally Active → Chunk Operability
+- Invitation Available → Contact Established → Validation Complete → Database Instantiated → Cluster Formed → DB Ready (draft tally present)
 
 ---
 
@@ -195,11 +229,12 @@ Creates the shared database before authentication/validation, then invites the r
    - Both parties’ nominated nodes join; enforce 50/50 governance parameters.
    - Confirm replication and availability across both parties’ nodes.
 
-7. Transition to Negotiation
-   - Begin chunk-based negotiation inside the shared database (identity, certificates, terms, contract reference, configuration signatures).
+7. Initial Draft Tally and Handoff
+   - Populate a minimal draft tally (identity/config prerequisites as needed) and provide access information to both parties (no pre-flight read/write required)
+   - Handoff: Subsequent tally negotiation is out of scope for this file
 
 State Transitions (for tracking):
-- Database Provisioned → Invitation Sent → Respondent Registered → Validation Complete → Access Upgraded → Cluster Formed → Tally Active
+- Database Provisioned → Invitation Sent → Respondent Registered → Validation Complete → Access Upgraded → Cluster Formed → DB Ready (draft tally present)
 
 Security and Operational Considerations:
 - Resource Commitment: Database exists prior to validation; mitigate with isolation (per-invite namespace), rate limits, quotas, TTL-based auto-cleanup. This may be heavier than a message-based prelude (Method 1).
@@ -214,6 +249,54 @@ Differences vs Pre-Authenticated Handshake:
 - Cons: Earlier resource commitment; larger attack surface if credentials leak; more emphasis on access control discipline; multi-use requires landing/template DB and per-respondent provisioning which can exceed the operational overhead of Method 1.
 
 Known Limitations:
+-
+---
+
+#### DHT-Based Discovery: Detailed Flow
+
+Uses the Kademlia DHT for invitation discovery and token-bound validation before shared database creation. Avoids centralized escrow; does not require prior knowledge of the respondent’s peerID.
+
+1. Invite Advertisement (Initiator → DHT)
+   - Publish an invite advert under a DHT key (e.g., CID of invite metadata) including:
+     - Initiator libp2p multiaddrs and a rendezvous topic
+     - Challenge parameters (nonce length, signature/HMAC scheme)
+     - Pointer to an encrypted offer capsule (e.g., DHT key or IPFS CID)
+     - Token policy (one-time or multi-use), expiry
+   - Only minimal metadata is public; sensitive content stays encrypted.
+
+2. Discovery and Contact (Respondent → Initiator)
+   - Respondent locates the advert (searches topic or is given the DHT key out of band)
+   - Connects to the rendezvous topic and requests a challenge
+
+3. Token-Bound Challenge/Response
+   - Initiator issues a random challenge nonce
+   - Respondent proves possession using HMAC(token, nonce) or a token-bound signature
+   - On failure: rate-limit and optionally require a computational puzzle to deter abuse
+
+4. Offer Capsule Disclosure
+   - If proof is valid, Initiator discloses:
+     - Encrypted offer capsule CID and salt
+     - Minimal cluster bootstrap info (bootstrap peers)
+   - Respondent derives decryption key from token (e.g., KDF(token, salt)) and decrypts the capsule
+
+5. Validation Material and Registration
+   - Capsule contains initiator’s proposed nodes, initial offer metadata, and expected respondent fields (Party ID, nodes)
+   - Respondent submits registration material back to Initiator (via libp2p), including Party ID and proposed nodes
+
+6. Decision and Shared DB Instantiation
+   - Initiator validates registration and either:
+     - Rejects: aborts; advert may remain for other respondents (multi-use) or be withdrawn (one-time)
+     - Approves: creates the shared database (Method 1 or 2 style instantiation) and prepares scoped credentials
+
+7. Access Grant and Cluster Formation
+   - Initiator sends DB access info and credentials; both parties’ nominated nodes join to establish 50/50 governance
+
+8. Initial Draft Tally and Handoff
+   - Ensure a minimal draft tally is present and provide access information to both parties (no pre-flight read/write required)
+   - Handoff: Subsequent negotiation occurs outside the scope of this file
+
+State Transitions (for tracking):
+- Advert Published → Contact Established → Token Proof Valid → Capsule Decrypted → Registration Received → DB Instantiated → Cluster Formed → DB Ready (draft tally present)
 - Not ideal for high-volume public onboarding (multi-use) without robust automation (provisioning, isolation, cleanup).
 - Harder to fully isolate responders in a single physical DB without complex ACLs; prefer separate DBs or strong namespaces.
 - Operational burden can be higher than the message-based prelude when many respondents are expected.
@@ -227,7 +310,7 @@ Additional approaches can be added as separate files and referenced here.
 |--------|------------|----------|-------------|-------------|----|--------------| 
 | Pre-Authenticated Handshake | Medium | High | High | Good | Good | Excellent |
 | Database-First | High | Medium | Medium | Excellent | Excellent | Good |
-| Escrow Service | High | Medium | High | Good | Excellent | Poor |
+| Escrow Service (N/A) | N/A | N/A | N/A | N/A | N/A | N/A |
 | DHT Discovery | Medium | Low | Medium | Excellent | Medium | Excellent |
 | Offer-Record Discovery | TBD | TBD | TBD | TBD | TBD | TBD |
 
