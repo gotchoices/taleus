@@ -1,151 +1,147 @@
 # Taleus Architecture
 
-This document outlines the architectural design of the Taleus library, describing the core components, models, and interactions.
+This document describes the Taleus library modules and how to interact with them. It is intentionally concise and focused on the current implementation plan.
 
-## System Overview
+## Naming note: “Bootstrap”
+- libp2p also uses the term “bootstrap” for peer discovery. To avoid confusion, our module is named `TallyBootstrapService` and refers to starting a tally negotiation between two parties.
 
-Taleus is a library for managing private credit relationships (tallies) between participants in a decentralized network. The architecture is designed to provide:
+## Module overview
 
-1. Secure, peer-to-peer communication
-2. Persistent, verifiable transaction records
-3. Consistent state management between parties
-4. Standard protocol implementation for applications
+- `TallyBootstrapService` (this document focuses here)
+  - Establishes a tally negotiation using libp2p messages (see `doc/design/bootstrap.md`, Method 6)
+  - Exposes APIs for the passive initiator (“listener”) and the active respondent
 
-### Core Components
+- `DatabaseProvisioner` (adapter)
+  - Single-purpose abstraction that will create a new shared DB instance and return access details
+  - Implemented later via Quereus/Optimystic
 
-The Taleus system consists of the following key components:
+- `IdentityService` (placeholder)
+  - Validates identity/certificate material supplied during bootstrap
 
-1. **Application Layer (Taleus)**: Manages tallies and credit relationships
-2. **Database Layer (Quereus)**: Provides SQL query parsing and database operations
-3. **Optimistic Layer (Optimystic)**: Implements optimistic database operations
-4. **DHT Layer (Kademlia)**: Provides distributed hash table functionality
-5. **Network Layer (libp2p)**: Handles peer discovery and communication
-6. **Identity Manager**: Handles cryptographic identities and signatures
-7. **Consensus Module**: Ensures consistent state between parties
+- `CadreManager` (placeholder)
+  - Manages nominated nodes and enforces 50/50 governance membership
 
-### Node Management
+- `TallyService` (placeholder)
+  - Creates the minimal draft tally that enables negotiation to begin
 
-The system uses a balanced node management approach:
+- `CryptoService` (placeholder)
+  - Centralized signing, digest and verification utilities
 
-- Each party nominates trusted nodes to participate in tally management
-- The nominated nodes form a network with equal voting power (50/50 split)
-- This ensures that neither party can unilaterally control the consensus
-- In case of disputes, parties maintain local copies of critical records
+Consensus and database behavior are handled by Quereus/Optimystic and are out of scope here.
 
+## TallyBootstrapService
 
-## Architecture Models
+### Protocol
+- Uses a dedicated libp2p protocol ID: `/taleus/bootstrap/1.0.0`
 
-Taleus implements a shared database model for tally management, building upon and improving the original MyCHIPs message-based approach:
+### Constructor
+```
+new TallyBootstrapService({
+  provisioner: DatabaseProvisioner,
+  identityService?: IdentityService,
+  cadreManager?: CadreManager,
+  tallyService?: TallyService,
+  cryptoService?: CryptoService,
+  config?: {
+    tokenTtlMs?: number
+  }
+})
+```
 
-### Shared Database Model
+### Types (simplified)
+```
+type PartyRole = 'stock' | 'foil'
 
-Taleus implements a shared database model that represents a significant evolution from the original MyCHIPs approach where each party maintained their own copy of the tally:
+interface BootstrapLinkPayload {
+  responderPeerAddrs: string[]
+  token: string
+  tokenExpiryUtc: string
+  initiatorRole: PartyRole
+  identityRequirements?: string
+}
 
-- Parties maintain a shared record in a distributed database hosted by nominated nodes
-- The database is built atop a Kademlia DHT using the Optimystic and Quereus layers
-- Consensus is handled at the distributed database level using a 50/50 voting power split
-- This provides a single source of truth for both parties
+interface ProvisionResult {
+  tally: { tallyId: string; createdBy: PartyRole }
+  dbConnectionInfo: { endpoint: string; credentialsRef: string }
+}
+```
 
-**Schema Design:**
-- Uses a mostly normalized SQL schema for efficient querying and relationships
-- JSON fields are used where flexibility is needed (e.g., certificates, contract references)
-- Maintains stock/foil party nomenclature for compatibility with MyCHIPs concepts
-- Separate tables for different record types (tallies, chits, credit terms, etc.)
+### Public API
+- `registerPassiveListener(peer: Libp2p, options: { role: PartyRole; validateIdentity?: (info) => Promise<boolean> }): () => void`
+  - Registers the libp2p protocol handler for inbound bootstrap messages
+  - Returns an unregister function to remove the handler
 
-**Implementation Details:**
-- Uses Kademlia DHT for node discovery and routing
-- Each party nominates trusted nodes with equal voting power (50/50 split)
-- Database consensus prevents unilateral control by either party
-- Cryptographic signatures ensure transaction integrity
-- Parties maintain local copies of critical records for dispute resolution
+- `initiateFromLink(link: BootstrapLinkPayload, peer: Libp2p): Promise<ProvisionResult | { approved: false; reason: string }>`
+  - Active (respondent) entrypoint: dials one of `link.responderPeerAddrs`, presents token and identity, and completes Method 6 flow
+  - If `link.initiatorRole === 'foil'`, the respondent will provision the DB via `provisioner` and return access details
+  - If `link.initiatorRole === 'stock'`, the initiator will provision and return access details
 
-## System Interactions
+### Consumer-provided hooks (integration surface)
+Taleus does not manage token storage or business policy. The application provides hooks used by `TallyBootstrapService`:
 
-### Tally Establishment Flow
+- `getTokenInfo(token) → { initiatorRole: 'stock'|'foil'; expiryUtc: string; identityRequirements?: any }`
+  - Determines token validity and role
+- `validateIdentity(identityBundle, identityRequirements) → Promise<boolean>`
+  - Verifies respondent identity against app policy
+- `markTokenUsed(token, context) → Promise<void>` (optional)
+  - Enables one-time token consumption and auditing
+- `provisionDatabase(createdBy, initiatorPeerId, respondentPeerId) → Promise<ProvisionResult>`
+  - Adapter to Quereus/Optimystic to create the shared DB and return access info
+- `recordProvisioning(idempotencyKey, result) / getProvisioning(idempotencyKey)` (optional)
+  - Supports idempotent retries without repeated side effects
 
-1. Party A proposes a tally to Party B
-2. Party B reviews and either accepts, rejects or modifies the proposal
-3. If accepted, both parties sign the tally
-4. The tally becomes active for transaction recording
+### Idempotency and state
+- Requests should include an `idempotencyKey` so repeated calls can return prior results
+- Service is mostly stateless; minimal persistence for idempotency mapping is recommended
 
-### Transaction Flow
+### Opaque application payloads
+- During bootstrap, Taleus treats identity bundles, certificates, and proposed tally terms as opaque application data
+- Validation and policy decisions for these payloads are performed via consumer-provided hooks; Taleus does not enforce structure or semantics here
 
-1. Party A creates a chit (transaction)
-2. Party A signs the chit
-3. The chit is transmitted to Party B
-4. The system ensures both parties have consistent records
+## Usage
 
-### Consensus Mechanism
+### Passive initiator (A)
+```
+import { createLibp2p } from 'libp2p'
+import { TallyBootstrapService } from 'taleus/bootstrap'
 
-Taleus implements database-level consensus for the shared database model:
+const node = await createLibp2p({ /* transports, encrypters, muxers */ })
+await node.start()
 
-**Database Consensus**:
-- Each party nominates trusted nodes to participate in tally management
-- Nominated nodes form a network with equal voting power (50/50 split between parties)
-- Database operations require consensus between the two party groups
-- Prevents either party from unilaterally modifying tally records
+const bootstrap = new TallyBootstrapService({ provisioner /* + optional services */ })
+const unregister = bootstrap.registerPassiveListener(node, {
+  role: 'stock',
+  validateIdentity: async (info) => true // plug in app policy later
+})
 
+// later: unregister() to remove the protocol handler
+```
 
-**Dispute Resolution**:
-- Parties maintain local copies of all records that protect their position
-- Cryptographically signed records serve as legally binding evidence
-- In case of disagreement, parties can present their records to arbitrators
+### Active respondent (B)
+```
+import { createLibp2p } from 'libp2p'
+import { TallyBootstrapService } from 'taleus/bootstrap'
 
-## Identity Management
+const node = await createLibp2p({ /* transports, encrypters, muxers */ })
+await node.start()
 
-Taleus handles identity through:
+const bootstrap = new TallyBootstrapService({ provisioner /* + optional services */ })
 
-1. **Party Identification**: Using libp2p PeerIDs or SSI (Self-Sovereign Identity)
-2. **Key Management**: Supporting key rotation, recovery, and multiple device access
-3. **Signatures**: Digital signatures for all transactions and changes
+const link: BootstrapLinkPayload = {
+  responderPeerAddrs: ["/ip4/127.0.0.1/tcp/34001/p2p/..."],
+  token: 'multi-use-qr',
+  tokenExpiryUtc: new Date(Date.now() + 10 * 60_000).toISOString(),
+  initiatorRole: 'foil'
+}
 
-## Architecture Decisions Made
+const result = await bootstrap.initiateFromLink(link, node)
+// result contains dbConnectionInfo and tally metadata or an approval failure reason
+```
 
-The following architectural decisions have been finalized:
+## Other modules (brief)
+- `IdentityService`: TBD – interface for verifying identity requirements
+- `CadreManager`: TBD – interface for disclosing/accepting cadre nodes
+- `TallyService`: TBD – interface for creating the minimal draft tally
+- `DatabaseProvisioner`: interface defined and used; implemented when Quereus/Optimystic are available
 
-1. **Database Structure**: ✅ Mostly normalized SQL schema with JSON fields where flexibility is needed
-2. **Party Nomenclature**: ✅ Stock/foil terminology (maintaining MyCHIPs compatibility)
-3. **Consensus Model**: ✅ Shared database with 50/50 voting power split between parties
-
-## Open Architecture Questions
-
-The following questions are still being researched and resolved:
-
-1. **Identity Framework**: Should we use SSI (Self-Sovereign Identity) or alternative approaches for secure, recoverable identities?
-2. **Additional Integrity Layers**: Are any supplemental integrity mechanisms needed beyond database consensus?
-3. **Node Selection**: What criteria should be used for selecting trusted nodes to maintain the shared database?
-4. **Key Management**: Should private keys be stored in device vaults or be exportable for device migration?
-
-## Interfaces
-
-Taleus will provide the following key interfaces:
-
-1. **Tally Management API**: For creating, negotiating, and maintaining tallies
-2. **Transaction API**: For recording and validating transactions
-3. **Network Management API**: For handling peer connections and discovery
-4. **Storage Interface**: For customizing the persistent storage layer
-5. **Identity Interface**: For plugging in different identity solutions
-
-## Security Considerations
-
-The Taleus architecture addresses several key security concerns:
-
-1. **Adversarial Resilience**: Handling potentially malicious actors; specific mechanism selection is out of scope here
-2. **Tamper-Proof Records**: Ensuring transaction integrity
-3. **Identity Security**: Preventing impersonation
-4. **Key Recovery**: Handling lost or compromised keys
-5. **Consensus Integrity**: Ensuring valid state transitions
-
-## Next Steps
-
-The architecture team is currently:
-
-1. Implementing the shared database model with Kademlia DHT
-2. Developing proof-of-concept implementations for critical components
-3. Documenting interface specifications
-4. Finalizing the security model and consensus mechanisms
-5. Defining node selection and trust criteria
-
----
-
-*Note: This architecture document is a working draft and will evolve as implementation decisions are finalized.*
+This document will be expanded as each module’s concrete interfaces are finalized.

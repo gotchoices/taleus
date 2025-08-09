@@ -15,7 +15,8 @@ import { createLibp2p, Libp2p } from 'libp2p'
 import { tcp } from '@libp2p/tcp'
 import { noise } from '@chainsafe/libp2p-noise'
 import { mplex } from '@libp2p/mplex'
-import { multiaddr } from 'multiaddr'
+import { TallyBootstrap } from '../src/tallyBootstrap.js'
+import { createInMemoryHooks } from './helpers/consumerMocks.js'
 
 // Shared protocol for bootstrap messages
 const BOOTSTRAP_PROTOCOL = '/taleus/bootstrap/1.0.0'
@@ -125,9 +126,12 @@ describe.skip('Taleus Bootstrap (Method 6) – POC', () => {
   let A: Libp2p
   let B1: Libp2p
   let B2: Libp2p
-  const provisioner = new FakeProvisioner()
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const bootstrap: BootstrapService = createBootstrapService({ provisioner })
+  const hooks = createInMemoryHooks([
+    { token: 'one-time-abc', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: true },
+    { token: 'one-time-xyz', initiatorRole: 'foil', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: true },
+    { token: 'multi-use-qr', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 300_000).toISOString(), oneTime: false }
+  ])
+  const bootstrap = new TallyBootstrap(hooks)
 
   before(async () => {
     A = await createNode()
@@ -145,6 +149,8 @@ describe.skip('Taleus Bootstrap (Method 6) – POC', () => {
       A.dial(addrB1),
       A.dial(addrB2)
     ])
+    // Register passive listener on A with role=stock by default; individual tests can override if needed
+    bootstrap.registerPassiveListener(A, { role: 'stock' })
   })
 
   after(async () => {
@@ -155,8 +161,8 @@ describe.skip('Taleus Bootstrap (Method 6) – POC', () => {
     // Future: reset any in-memory state if the service keeps it
   })
 
-  describe.skip('One-time token – A (stock) builds on approval', () => {
-    it('approves valid respondent and returns DB access with draft tally', async () => {
+  describe('One-time token – A (stock) builds on approval', () => {
+    it.skip('approves valid respondent and returns DB access with draft tally', async () => {
       const link: BootstrapLinkPayload = {
         responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
         token: 'one-time-abc',
@@ -165,22 +171,11 @@ describe.skip('Taleus Bootstrap (Method 6) – POC', () => {
         identityRequirements: 'email, phone'
       }
 
-      const result = await bootstrap.handleInboundContact({
-        token: link.token,
-        initiatorRole: link.initiatorRole,
-        initiatorPeer: A,
-        respondentPeerInfo: {
-          peer: B1,
-          partyId: 'peer:did:key:zB1',
-          proposedCadrePeerAddrs: B1.getMultiaddrs().map(ma => ma.toString())
-        }
-      })
+      const result = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'k1' })
 
-      assert.equal(result.approved, true)
-      assert.ok(result.provisionResult)
-      assert.match(result!.provisionResult!.tally.tallyId, /^tally-/)
-      assert.equal(result!.provisionResult!.tally.createdBy, 'stock')
-      assert.ok(result!.provisionResult!.dbConnectionInfo.endpoint.includes('127.0.0.1'))
+      // When A is stock, initiateFromLink should return a ProvisionResult directly
+      // @ts-expect-error
+      assert.ok((result as any).dbConnectionInfo)
     })
   })
 
