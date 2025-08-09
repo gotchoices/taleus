@@ -156,7 +156,9 @@ export class TallyBootstrap {
     if (link.initiatorRole === 'foil') {
       // B provisions and returns result to A
       const provision = await this.hooks.provisionDatabase('foil', String(res.initiatorPeerId ?? ''), peer.peerId.toString())
-      await writeJson(stream, {
+      // open a fresh stream to send the provisioning result
+      const stream2 = await (peer as any).dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
+      await writeJson(stream2, {
         type: 'provisioningResult',
         idempotencyKey: args?.idempotencyKey,
         ...provision

@@ -9,7 +9,7 @@ type TokenRecord = {
   used?: boolean
 }
 
-export function createInMemoryHooks(tokens: TokenRecord[]): Hooks {
+export function createInMemoryHooks(tokens: TokenRecord[], opts?: { validateIdentity?: (bundle: unknown, req?: unknown) => boolean | Promise<boolean> }): Hooks {
   const tokenMap = new Map(tokens.map(t => [t.token, { ...t }]))
   const provisionMap = new Map<string, ProvisionResult>()
   let nextId = 1
@@ -25,7 +25,10 @@ export function createInMemoryHooks(tokens: TokenRecord[]): Hooks {
         identityRequirements: rec.identityRequirements
       }
     },
-    async validateIdentity() {
+    async validateIdentity(bundle, req) {
+      if (opts?.validateIdentity !== undefined) {
+        return await Promise.resolve(opts.validateIdentity(bundle, req))
+      }
       return true
     },
     async markTokenUsed(token) {

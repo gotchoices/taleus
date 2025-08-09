@@ -132,6 +132,7 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
     { token: 'multi-use-qr', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 300_000).toISOString(), oneTime: false }
   ])
   const bootstrap = new TallyBootstrap(hooks)
+  let unregisterA: (() => void) | undefined
 
   before(async () => {
     A = await createNode()
@@ -150,7 +151,7 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
       A.dial(addrB2)
     ])
     // Register passive listener on A with role=stock by default; individual tests can override if needed
-    bootstrap.registerPassiveListener(A, { role: 'stock' })
+    unregisterA = bootstrap.registerPassiveListener(A, { role: 'stock' })
   })
 
   after(async () => {
@@ -179,8 +180,11 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
     })
   })
 
-  describe.skip('One-time token – B (foil) builds on approval', () => {
+  describe('One-time token – B (foil) builds on approval', () => {
     it('approves valid respondent and B provisions DB with draft tally', async () => {
+      // Switch A listener to foil role for this test
+      unregisterA?.()
+      unregisterA = bootstrap.registerPassiveListener(A, { role: 'foil' })
       const link: BootstrapLinkPayload = {
         responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
         token: 'one-time-xyz',
@@ -188,29 +192,12 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
         initiatorRole: 'foil'
       }
 
-      const approval = await bootstrap.handleInboundContact({
-        token: link.token,
-        initiatorRole: link.initiatorRole,
-        initiatorPeer: A,
-        respondentPeerInfo: {
-          peer: B1,
-          partyId: 'peer:did:key:zB1',
-          proposedCadrePeerAddrs: B1.getMultiaddrs().map(ma => ma.toString())
-        }
-      })
+      const provision = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'k2' })
 
-      assert.equal(approval.approved, true)
-      assert.ok(Array.isArray(approval.participatingCadrePeerAddrs))
-
-      const provision = await bootstrap.buildOnRespondent({
-        initiatorPeer: A,
-        respondentPeer: B1,
-        participatingCadrePeerAddrs: approval.participatingCadrePeerAddrs!
-      })
-
-      assert.match(provision.tally.tallyId, /^tally-/)
-      assert.equal(provision.tally.createdBy, 'foil')
-      assert.ok(provision.dbConnectionInfo.endpoint.includes('127.0.0.1'))
+      const pr = provision as unknown as ProvisionResult
+      assert.match(pr.tally.tallyId, /^tally-/)
+      assert.equal(pr.tally.createdBy, 'foil')
+      assert.ok(pr.dbConnectionInfo.endpoint.includes('127.0.0.1'))
     })
   })
 
@@ -250,7 +237,7 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
     })
   })
 
-  describe.skip('Rejection path – missing identity requirements', () => {
+  describe('Rejection path – missing identity requirements', () => {
     it('rejects with a clear reason if identity is insufficient', async () => {
       const link: BootstrapLinkPayload = {
         responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
@@ -260,19 +247,22 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
         identityRequirements: 'email, phone, selfie'
       }
 
-      const result = await bootstrap.handleInboundContact({
-        token: link.token,
-        initiatorRole: link.initiatorRole,
-        initiatorPeer: A,
-        respondentPeerInfo: {
-          peer: B1,
-          partyId: 'peer:did:key:zB1',
-          proposedCadrePeerAddrs: [] // intentionally empty to provoke rejection later if policy demands
-        }
-      })
+      // override hooks to fail identity
+      const failHooks = createInMemoryHooks([
+        { token: 'one-time-reject', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: true }
+      ], { validateIdentity: () => false })
+      const bootstrap2 = new TallyBootstrap(failHooks)
+      // Ensure we don't have duplicate handlers
+      unregisterA?.()
+      unregisterA = bootstrap2.registerPassiveListener(A, { role: 'stock' })
 
-      assert.equal(result.approved, false)
-      assert.ok(result.reason && result.reason.length > 0)
+      const result = await bootstrap2.initiateFromLink(link, B1, { idempotencyKey: 'k3' })
+
+      const rej = result as unknown as { approved: false; reason: string }
+      // @ts-expect-error
+      assert.equal(rej.approved, false)
+      // @ts-expect-error
+      assert.ok(rej.reason && (rej.reason as string).length > 0)
     })
   })
 })
