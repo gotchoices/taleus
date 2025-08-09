@@ -121,7 +121,7 @@ function createBootstrapService(_deps: { provisioner: DatabaseProvisioner }): Bo
   }
 }
 
-describe.skip('Taleus Bootstrap (Method 6) – POC', () => {
+describe('Taleus Bootstrap (Method 6) – POC', () => {
 
   let A: Libp2p
   let B1: Libp2p
@@ -162,7 +162,7 @@ describe.skip('Taleus Bootstrap (Method 6) – POC', () => {
   })
 
   describe('One-time token – A (stock) builds on approval', () => {
-    it.skip('approves valid respondent and returns DB access with draft tally', async () => {
+    it('approves valid respondent and returns DB access with draft tally', async () => {
       const link: BootstrapLinkPayload = {
         responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
         token: 'one-time-abc',
@@ -174,8 +174,8 @@ describe.skip('Taleus Bootstrap (Method 6) – POC', () => {
       const result = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'k1' })
 
       // When A is stock, initiateFromLink should return a ProvisionResult directly
-      // @ts-expect-error
-      assert.ok((result as any).dbConnectionInfo)
+      const pr = result as unknown as ProvisionResult
+      assert.ok(pr.dbConnectionInfo)
     })
   })
 

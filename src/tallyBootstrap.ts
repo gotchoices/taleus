@@ -1,4 +1,5 @@
 import type { Libp2p } from 'libp2p'
+import { multiaddr as toMultiaddr } from '@multiformats/multiaddr'
 
 export const BOOTSTRAP_PROTOCOL = '/taleus/bootstrap/1.0.0'
 
@@ -132,7 +133,8 @@ export class TallyBootstrap {
   }): Promise<ProvisionResult | { approved: false; reason: string }> {
     if (!link.responderPeerAddrs?.length) return { approved: false, reason: 'no_responder_addrs' }
     const maStr = link.responderPeerAddrs[0]
-    const stream = await (peer as any).dialProtocol(maStr, [BOOTSTRAP_PROTOCOL])
+    const maddr = toMultiaddr(maStr)
+    const stream = await (peer as any).dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
 
     // Send inbound contact
     await writeJson(stream, {
@@ -169,11 +171,18 @@ async function readJson(stream: any): Promise<any> {
   const decoder = new TextDecoder()
   let buf = ''
   for await (const chunk of stream.source) {
-    if (Array.isArray(chunk)) {
-      for (const sub of chunk) buf += decoder.decode(sub, { stream: true })
+    const anyChunk: any = chunk
+    let u8: Uint8Array
+    if (anyChunk && typeof anyChunk.subarray === 'function') {
+      // Uint8Array or Uint8ArrayList
+      u8 = anyChunk.subarray(0, anyChunk.byteLength ?? undefined)
+    } else if (anyChunk && typeof anyChunk.slice === 'function') {
+      // Fallback that often returns a Uint8Array
+      u8 = anyChunk.slice(0)
     } else {
-      buf += decoder.decode(chunk as Uint8Array, { stream: true })
+      u8 = anyChunk as Uint8Array
     }
+    buf += decoder.decode(u8, { stream: true })
   }
   try { return JSON.parse(buf) } catch { return null }
 }
@@ -182,6 +191,12 @@ async function writeJson(stream: any, obj: any): Promise<void> {
   const enc = new TextEncoder()
   const data = enc.encode(JSON.stringify(obj))
   await stream.sink([data])
+  if (typeof stream.closeWrite === 'function') {
+    await stream.closeWrite()
+  } else if (typeof stream.close === 'function') {
+    // Fallback
+    try { await stream.close() } catch {}
+  }
 }
 
 
