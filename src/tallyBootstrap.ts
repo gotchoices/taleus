@@ -67,19 +67,19 @@ export class TallyBootstrap {
         const { token, partyId, identityBundle, proposedCadrePeerAddrs, idempotencyKey } = req
         const prior = idempotencyKey && this.hooks.getProvisioning ? await this.hooks.getProvisioning(idempotencyKey) : null
         if (prior && options.role === 'stock') {
-          await writeJson(stream, { approved: true, provisionResult: prior, initiatorPeerId: peer.peerId.toString() })
+          await writeJson(stream, { approved: true, provisionResult: prior, initiatorPeerId: peer.peerId.toString() }, true)
           return
         }
         const tokenInfo = await this.hooks.getTokenInfo(token)
         if (!tokenInfo) {
-          await writeJson(stream, { approved: false, reason: 'invalid_token' })
+          await writeJson(stream, { approved: false, reason: 'invalid_token' }, true)
           return
         }
         // Optional identity validation
         if (this.hooks.validateIdentity) {
           const ok = await this.hooks.validateIdentity(identityBundle, tokenInfo.identityRequirements)
           if (!ok) {
-            await writeJson(stream, { approved: false, reason: 'identity_insufficient' })
+            await writeJson(stream, { approved: false, reason: 'identity_insufficient' }, true)
             return
           }
         }
@@ -102,25 +102,24 @@ export class TallyBootstrap {
             participatingCadrePeerAddrs,
             initiatorPeerId: peer.peerId.toString(),
             provisionResult: result
-          })
+          }, true)
           return
         } else {
           await writeJson(stream, {
             approved: true,
             participatingCadrePeerAddrs,
             initiatorPeerId: peer.peerId.toString()
-          })
+          }, true)
           return
         }
       }
 
       if (req.type === 'provisioningResult') {
-        // For completeness we could acknowledge; in this minimal design we just ack
-        await writeJson(stream, { ok: true })
+        // Dialer may have closed its write side immediately; avoid responding to prevent push-on-ended errors
         return
       }
 
-      await writeJson(stream, { approved: false, reason: 'unknown_type' })
+      await writeJson(stream, { approved: false, reason: 'unknown_type' }, true)
     }
 
     peer.handle(BOOTSTRAP_PROTOCOL, handler)
@@ -144,7 +143,7 @@ export class TallyBootstrap {
       proposedCadrePeerAddrs: peer.getMultiaddrs().map((a) => a.toString()),
       identityBundle: args?.identityBundle,
       idempotencyKey: args?.idempotencyKey
-    })
+    }, false)
 
     const res = await readJson(stream)
     if (!res || res.approved !== true) {
@@ -189,15 +188,17 @@ async function readJson(stream: any): Promise<any> {
   try { return JSON.parse(buf) } catch { return null }
 }
 
-async function writeJson(stream: any, obj: any): Promise<void> {
+async function writeJson(stream: any, obj: any, close = false): Promise<void> {
   const enc = new TextEncoder()
   const data = enc.encode(JSON.stringify(obj))
   await stream.sink([data])
-  if (typeof stream.closeWrite === 'function') {
-    await stream.closeWrite()
-  } else if (typeof stream.close === 'function') {
-    // Fallback
-    try { await stream.close() } catch {}
+  if (close) {
+    if (typeof stream.closeWrite === 'function') {
+      await stream.closeWrite()
+    } else if (typeof stream.close === 'function') {
+      // Fallback
+      try { await stream.close() } catch {}
+    }
   }
 }
 
