@@ -164,6 +164,9 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
 
   describe('One-time token – A (stock) builds on approval', () => {
     it('approves valid respondent and returns DB access with draft tally', async () => {
+      // Ensure A is registered as stock for this test
+      unregisterA?.()
+      unregisterA = bootstrap.registerPassiveListener(A, { role: 'stock' })
       const link: BootstrapLinkPayload = {
         responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
         token: 'one-time-abc',
@@ -201,8 +204,11 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
     })
   })
 
-  describe.skip('Multi-use token – provisions unique DB per respondent', () => {
+  describe('Multi-use token – provisions unique DB per respondent', () => {
     it('creates separate tallies for two respondents using the same token', async () => {
+      // Ensure A is registered as stock for this test
+      unregisterA?.()
+      unregisterA = bootstrap.registerPassiveListener(A, { role: 'stock' })
       const link: BootstrapLinkPayload = {
         responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
         token: 'multi-use-qr',
@@ -210,30 +216,10 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
         initiatorRole: 'stock'
       }
 
-      const approveB1 = await bootstrap.handleInboundContact({
-        token: link.token,
-        initiatorRole: link.initiatorRole,
-        initiatorPeer: A,
-        respondentPeerInfo: {
-          peer: B1,
-          partyId: 'peer:did:key:zB1',
-          proposedCadrePeerAddrs: B1.getMultiaddrs().map(ma => ma.toString())
-        }
-      })
-      const approveB2 = await bootstrap.handleInboundContact({
-        token: link.token,
-        initiatorRole: link.initiatorRole,
-        initiatorPeer: A,
-        respondentPeerInfo: {
-          peer: B2,
-          partyId: 'peer:did:key:zB2',
-          proposedCadrePeerAddrs: B2.getMultiaddrs().map(ma => ma.toString())
-        }
-      })
+      const pr1 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'k4' }) as unknown as ProvisionResult
+      const pr2 = await bootstrap.initiateFromLink(link, B2, { idempotencyKey: 'k5' }) as unknown as ProvisionResult
 
-      const t1 = approveB1.provisionResult!.tally.tallyId
-      const t2 = approveB2.provisionResult!.tally.tallyId
-      assert.ok(t1 && t2 && t1 !== t2)
+      assert.ok(pr1.tally.tallyId && pr2.tally.tallyId && pr1.tally.tallyId !== pr2.tally.tallyId)
     })
   })
 
