@@ -1,0 +1,32 @@
+{
+  "name": "taleus",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Taleus library and tests (bootstrap POC using libp2p, mocha, TypeScript)",
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.12.12",
+    "mocha": "^10.4.0",
+    "rimraf": "^5.0.5",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.1",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "@chainsafe/libp2p-noise": "^16.1.4",
+    "@libp2p/mplex": "^11.0.46",
+    "@libp2p/tcp": "^10.1.18",
+    "libp2p": "^2.9.0",
+    "multiaddr": "^10.0.1"
+  }
+}
+
+

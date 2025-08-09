@@ -11,6 +11,7 @@ This file tracks the development progress, issues to be resolved, and future enh
 - [ ] Complete protocol specification
 - [ ] Design SQL schema for shared database model
 - [ ] Resolve identity management questions
+ - [x] Bootstrap methods evaluated; leading candidate selected (Method 6: Role-Based Link Handshake)
 
 ## Document Review and Issues Found
 
@@ -118,7 +119,7 @@ Based on PROJECT.md, the following information needs clarification:
 
 15. **Optimystic Configuration**: What optimistic database settings are appropriate for tally operations?
 
-16. **Bootstrap and Discovery**: How should initial peer discovery work for tally establishment?
+16. **Bootstrap and Discovery**: ✅ **LEADING CANDIDATE SELECTED** — Method 6 (Role-Based Link Handshake). Pending POC validation; Methods 1 and 5 considered covered by 6
 
 ## Development Checklist
 
@@ -129,9 +130,13 @@ Based on PROJECT.md, the following information needs clarification:
 - [x] Document negotiation protocol details for shared database model ✅ COMPLETED
 - [ ] Design complete normalized SQL schema (ready to implement from tally.md)
 - [ ] Research and evaluate SSI vs alternative identity management approaches
+ - [x] Document bootstrap methods and consolidate on Method 6 as leading approach
 
 ### Phase 2: Core Implementation
 - [ ] Set up libp2p + Kademlia + Optimystic + Quereus stack
+- [ ] Define Taleus module boundaries and interfaces (see "Upcoming Architecture Work")
+- [ ] Implement Bootstrap module (Method 6): token parsing, responder-node handshake, role-based builder selection, error reporting
+- [ ] Provide `DatabaseProvisioner` interface (stub) to integrate Quereus/Optimystic when available
 - [ ] Implement tally record types
 - [ ] Implement party identification and certificates
 - [ ] Implement credit terms and trading variables
@@ -140,6 +145,7 @@ Based on PROJECT.md, the following information needs clarification:
 
 ### Phase 3: Testing and Validation
 - [ ] Create test suite for all record types
+- [ ] Test Bootstrap Method 6 flows: one-time token, multi-use token (merchant QR), rejection paths, approval paths
 - [ ] Test negotiation flows
 - [ ] Test consensus scenarios
 - [ ] Test key rotation and recovery
@@ -150,6 +156,17 @@ Based on PROJECT.md, the following information needs clarification:
 - [ ] Create standalone implementations
 - [ ] Documentation and examples
 - [ ] Performance optimization
+
+## Upcoming Architecture Work
+
+- [ ] Identify and document core Taleus modules and their interfaces:
+  - `BootstrapService` (Method 6 handshake, token, responder-node routing)
+  - `IdentityService` (party IDs, certificates, future DID proofs)
+  - `CadreManager` (node nomination, 50/50 governance orchestration)
+  - `DatabaseProvisioner` (abstraction for Quereus/Optimystic instantiation and access control)
+  - `TallyService` (draft tally creation; later: negotiation orchestration)
+  - `CryptoService` (signing, digest, verification utilities)
+  - `Config` (policy, timeouts, limits)
 
 ## Files Requiring Updates
 
