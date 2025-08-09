@@ -1,3 +1,3 @@
-export * from './bootstrap.js'
+export * from './auto/bootstrap.js'
 
 

@@ -1,4 +1,4 @@
-import type { Hooks, PartyRole, ProvisionResult } from '../../src/tallyBootstrap.js'
+import type { Hooks, PartyRole, ProvisionResult } from '../../../src/tallyBootstrap.js'
 
 type TokenRecord = {
   token: string
