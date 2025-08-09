@@ -9,7 +9,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "types": ["mocha", "node"]
+    "types": ["node"]
   },
   "include": ["test/**/*.ts", "src/**/*.ts"],
   "exclude": ["node_modules", "dist"]

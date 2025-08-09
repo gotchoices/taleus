@@ -1,7 +1,0 @@
-{
-  "extension": ["ts"],
-  "spec": ["test/**/*.ts"],
-  "timeout": 15000
-}
-
-
