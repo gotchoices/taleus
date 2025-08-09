@@ -22,7 +22,7 @@ The protocol implements a balanced node management approach:
 - The nominated nodes form a network with equal voting power (50/50 split)
 - This ensures that neither party can unilaterally control the consensus
 - In case of disputes, parties maintain local copies of critical records
-- The system supports Byzantine fault tolerance at the database level
+
 
 ## Shared Database Protocol
 
@@ -125,31 +125,20 @@ The shared database model implements consensus at the database level:
 
 1. **Database-Level Consensus**:
    - Uses distributed database consensus mechanisms
-   - Implements Byzantine fault tolerance
    - Ensures consistency across all participating nodes
 
 2. **Transaction Verification**:
    - Each chit is signed by the creating party
    - Signatures are verified before database updates
-   - Hash chains provide additional integrity verification
    - Database-level consensus ensures agreement on state changes
 
 3. **Node Participation**:
    - Small network of trusted nodes maintain the database
    - Nodes are selected based on trust criteria
    - Kademlia DHT provides efficient node discovery and routing
-   - Byzantine fault tolerance handles potentially malicious nodes
 
-## Credit Lifts
 
-While the primary focus of Taleus is tally management, it supports credit lifts through the database model:
 
-1. **Lift Coordination**: Multiple tallies coordinate lift operations through database transactions
-2. **Atomic Operations**: Database transactions ensure lift operations complete atomically across all involved tallies
-3. **Lift Chits**: Special chit records mark participation in multi-party credit lifts
-4. **Settlement**: Lift completion updates all involved tally balances simultaneously
-
-Credit lift coordination may involve external components for route discovery and network-wide optimization.
 
 ## Identity and Authentication
 
@@ -160,12 +149,7 @@ The protocol uses cryptographic identities:
 3. **Signatures**: All critical operations require digital signatures
 4. **Key Rotation**: The protocol supports updating keys without closing tallies
 
-## Protocol Versions
 
-The Taleus protocol is versioned to allow for future enhancements:
-
-- **Version 1.0**: Initial release based on MyCHIPs concepts
-- **Future Versions**: Will be documented with backward compatibility considerations
 
 ## Security Considerations
 

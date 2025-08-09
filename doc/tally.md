@@ -26,67 +26,7 @@ Taleus improves upon this by:
 
 ## Tally Bootstrap Process
 
-Before tally data chunks can be negotiated, a shared database environment must be established between the parties.
-
-### Message-Based Bootstrap Handshake (Preferred Approach)
-
-The bootstrap process uses message-based communication before shared database creation:
-
-1. **Invitation Creation**: The initiator creates an invitation containing:
-   - Initiator's Party ID and contact information (libp2p peer ID, addresses)
-   - Invitation token (one-time or multi-use) with expiration date
-   - Authentication requirements and expected response format
-
-2. **Token Types**:
-   - **One-time Token**: Becomes invalid after first use, for specific individual invitations
-   - **Multi-use Token**: Valid until expiration, enables multiple parties to create separate tallies (e.g., merchant QR codes)
-
-3. **Invitation Delivery**: 
-   - One-time: Communicated privately to intended specific respondent
-   - Multi-use: Published publicly (QR codes, websites, etc.)
-
-4. **Initial Contact Message**: Respondent contacts initiator via libp2p with:
-   - Their Party ID and authentication token
-   - List of their proposed nodes for the Kademlia cluster
-   - Any additional credentials or identity verification data
-
-5. **Validation Phase**: Initiator validates:
-   - Token authenticity and expiration
-   - Respondent's Party ID and credentials
-   - Proposed node list and technical capabilities
-   - Whether to proceed with this particular respondent
-
-6. **Database Instantiation**: If approved, initiator:
-   - Creates new shared database instance for this tally
-   - Pre-populates database with initial chunks (contract proposals, etc.)
-   - Establishes database access controls
-
-7. **Access Grant Message**: Initiator sends respondent:
-   - Database access credentials and connection information
-   - Initial chunk data or references
-   - Cluster formation instructions
-
-8. **Cluster Formation**: Both parties' nodes join to establish 50/50 consensus structure
-
-9. **Chunk Negotiation Phase**: Shared database-based negotiation begins
-
-### Alternative Bootstrap Approaches
-
-**Database-First Approach**: Initiator creates database immediately and includes access credentials in invitation. Simpler but requires pre-authentication mechanisms and resource commitment before validation.
-
-**Escrow Service Approach**: Third-party service facilitates initial handshake and database setup. Reduces peer-to-peer complexity but introduces dependency and potential centralization.
-
-**DHT-Based Discovery**: Use existing Kademlia DHT for initial contact and capability exchange. Leverages existing infrastructure but may complicate authentication and token validation.
-
-### Database State Transitions
-
-- **Invitation Available**: When initiator creates and distributes invitation tokens
-- **Contact Established**: When respondent successfully makes initial contact with valid token
-- **Validation Complete**: When initiator approves respondent's credentials and node proposals
-- **Database Instantiated**: When initiator creates new database instance and grants access
-- **Cluster Formed**: When both parties' nodes successfully join with 50/50 consensus established
-- **Tally Active**: When both parties have signed a complete, common set of required chunks
-- **Chunk Operability**: New chunk revisions become operative when both parties sign the same version
+Bootstrap details are maintained separately. See `doc/design/bootstrap.md`.
 
 ### Multi-Use Token Implications
 
@@ -203,7 +143,7 @@ In Taleus, tally data is organized into discrete chunks that can be negotiated i
 
 **Purpose**: Automated trading parameters that control credit lifts from each party's perspective
 
-**Content** (based on [mychips/schema/tallies.wmt](https://github.com/gotchoices/MyCHIPs/blob/master/schema/tallies.wms)):
+**Content** (based on [mychips/schema/tallies.wmt](https://github.com/gotchoices/MyCHIPs/blob/master/schema/tallies.wmt)):
 - **Bound**: Upper limit of credit that may be produced by any lift
 - **Target**: Ideal balance to be reached by lifting
 - **Margin**: Amount to charge for lifts exceeding target

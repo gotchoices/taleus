@@ -17,20 +17,20 @@ This file tracks the development progress, issues to be resolved, and future enh
 ### Accuracy Assessment of AI-Generated Files
 
 **README.md**: ✅ Accurate
-- Correctly reflects the shared database model choice from Brainstorm.md
+- Correctly reflects the shared database model choice from PROJECT.md
 - Accurately describes the libp2p stack (Taleus -> Quereus -> Optimystic -> Kademlia -> libp2p)
 - Properly references the 50/50 voting power concept
 
 **doc/architecture.md**: ⚠️ Mostly accurate but needs updates
 - Correctly describes shared database model
 - Contains some outdated references to "message-based model" comparisons that should be simplified
-- Missing details about stock/foil nomenclature preference from Brainstorm.md
+- Missing details about stock/foil nomenclature preference from PROJECT.md
 - Missing specific details about tally record types
 
 **doc/protocol.md**: ⚠️ Mostly accurate but needs updates
 - Correctly describes shared database protocol
 - Still contains message-based protocol references that should be removed/simplified
-- Missing detailed record type specifications from Brainstorm.md
+- Missing detailed record type specifications from PROJECT.md
 - Needs more detail on the specific SQL operations
 
 **doc/tally.md**: ✅ Mostly accurate
@@ -67,7 +67,7 @@ This file tracks the development progress, issues to be resolved, and future enh
 
 ### Missing Implementation Details Needed
 
-Based on Brainstorm.md, the following information needs clarification:
+Based on PROJECT.md, the following information needs clarification:
 
 ## Critical Questions for Implementation
 
@@ -84,7 +84,7 @@ Based on Brainstorm.md, the following information needs clarification:
    - [x] Clarify libp2p role as networking layer (not SSI alternative)
    - [x] Determine optimal SSI framework for master key + derived key validation
    - [x] Define key validation requirements for offline/distributed operation
-   - [x] Comprehensive SSI framework analysis documented in doc/SSI.md
+   - [x] Comprehensive SSI framework analysis documented in doc/design/SSI.md
 
 5. **Device Vault vs Exportable Keys**: 🔄 **RESEARCH NEEDED** - Need to evaluate options as part of overall key management strategy.
 

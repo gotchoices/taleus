@@ -13,8 +13,6 @@ Taleus is a library for managing private credit relationships (tallies) between 
 
 ### Core Components
 
-![Architecture Components](images/architecture-placeholder.png)
-
 The Taleus system consists of the following key components:
 
 1. **Application Layer (Taleus)**: Manages tallies and credit relationships
@@ -33,7 +31,7 @@ The system uses a balanced node management approach:
 - The nominated nodes form a network with equal voting power (50/50 split)
 - This ensures that neither party can unilaterally control the consensus
 - In case of disputes, parties maintain local copies of critical records
-- The system supports Byzantine fault tolerance at the database level
+
 
 ## Architecture Models
 
@@ -46,7 +44,7 @@ Taleus implements a shared database model that represents a significant evolutio
 - Parties maintain a shared record in a distributed database hosted by nominated nodes
 - The database is built atop a Kademlia DHT using the Optimystic and Quereus layers
 - Consensus is handled at the distributed database level using a 50/50 voting power split
-- This provides a single source of truth while maintaining Byzantine fault tolerance
+- This provides a single source of truth for both parties
 
 **Schema Design:**
 - Uses a mostly normalized SQL schema for efficient querying and relationships
@@ -86,7 +84,7 @@ Taleus implements database-level consensus for the shared database model:
 - Nominated nodes form a network with equal voting power (50/50 split between parties)
 - Database operations require consensus between the two party groups
 - Prevents either party from unilaterally modifying tally records
-- Hash chains may be integrated for additional integrity verification
+
 
 **Dispute Resolution**:
 - Parties maintain local copies of all records that protect their position
@@ -114,7 +112,7 @@ The following architectural decisions have been finalized:
 The following questions are still being researched and resolved:
 
 1. **Identity Framework**: Should we use SSI (Self-Sovereign Identity) or alternative approaches for secure, recoverable identities?
-2. **Hash Chain Integration**: How should hash chains be integrated with the distributed database for additional integrity verification?
+2. **Additional Integrity Layers**: Are any supplemental integrity mechanisms needed beyond database consensus?
 3. **Node Selection**: What criteria should be used for selecting trusted nodes to maintain the shared database?
 4. **Key Management**: Should private keys be stored in device vaults or be exportable for device migration?
 
@@ -132,7 +130,7 @@ Taleus will provide the following key interfaces:
 
 The Taleus architecture addresses several key security concerns:
 
-1. **Byzantine Fault Tolerance**: Handling potentially malicious actors
+1. **Adversarial Resilience**: Handling potentially malicious actors; specific mechanism selection is out of scope here
 2. **Tamper-Proof Records**: Ensuring transaction integrity
 3. **Identity Security**: Preventing impersonation
 4. **Key Recovery**: Handling lost or compromised keys
