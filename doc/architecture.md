@@ -155,4 +155,104 @@ const result = await bootstrap.initiateFromLink(link, node)
 - `TallyService`: TBD – interface for creating the minimal draft tally (currently handled via hooks)
 - `DatabaseProvisioner`: TBD – implemented when Quereus/Optimystic are available (currently handled via hooks)
 
-This document will be expanded as each module’s concrete interfaces are finalized.
+## Technical Implementation Details
+
+### Stream Usage Patterns
+
+Our libp2p protocol implementation uses specific stream patterns optimized for simple request-response flows:
+
+#### Single-Request-Response Pattern
+```typescript
+// Most common: B dials A, sends request, reads response, closes
+const stream = await peer.dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
+await writeJson(stream, request, false) // false = don't close, expect response
+const response = await readJson(stream)
+```
+
+#### Fire-and-Forget Pattern  
+```typescript
+// Less common: B sends notification to A, no response expected
+const stream = await peer.dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
+await writeJson(stream, notification, true) // true = close immediately
+```
+
+#### Fresh Streams Per Operation
+We create new streams for each logical operation rather than multiplexing:
+
+**Advantages:**
+- Simpler state management (no stream reuse complexity)
+- Clear error boundaries (stream failure affects only one operation)
+- Easier debugging (one operation = one stream = one log trace)
+- Natural idempotency (each retry gets fresh state)
+
+**Tradeoffs:**
+- Slightly higher connection overhead vs. stream reuse
+- More TCP handshakes for complex multi-step flows
+- Cannot leverage stream-level backpressure for large payloads
+
+### Stream Closure Semantics
+
+#### Half-Close Strategy
+```typescript
+await stream.closeWrite() // Signal "I'm done writing" 
+// Other peer can still send response before closing their side
+```
+
+We use half-close (`closeWrite()`) rather than full close to:
+- Allow response after request in request-response pattern
+- Signal completion without terminating bidirectional capability
+- Follow standard TCP half-close semantics
+
+#### "Ended Pushable" Prevention
+```typescript
+if (req.type === 'provisioningResult') {
+  // Dialer may have closed write side; avoid responding to prevent errors
+  return
+}
+```
+
+**The Problem:** When B sends `provisioningResult` and immediately closes its write side, A's attempt to acknowledge creates "Cannot push value onto an ended pushable" errors.
+
+**Our Solution:** Fire-and-forget semantics for `provisioningResult` - A receives but doesn't acknowledge.
+
+### Performance Characteristics
+
+#### Message Size Assumptions
+- **Small JSON payloads**: Typically < 1KB (tokens, peer addresses, minimal tally info)
+- **Single-buffer reads**: No streaming JSON parser needed
+- **Memory efficient**: Complete message fits in memory, no backpressure concerns
+
+#### Connection Reuse
+- **libp2p connection pooling**: Underlying TCP connections are reused automatically
+- **Fresh streams**: New stream per operation, but same underlying connection
+- **No connection management**: libp2p handles connection lifecycle
+
+#### Error Recovery
+- **Stream-level failures**: Retry creates fresh stream automatically
+- **No persistent state**: Each stream is independent, simplifying error handling
+- **Idempotency support**: `idempotencyKey` allows safe retries without side effects
+
+### Protocol Evolution Considerations
+
+#### Adding New Message Types
+```typescript
+if (req.type === 'newMessageType') {
+  // Handle new type
+} else if (req.type === 'existingType') {
+  // Existing logic
+} else {
+  await writeJson(stream, { approved: false, reason: 'unknown_type' })
+}
+```
+
+#### Version Compatibility
+- Protocol ID includes version: `/taleus/bootstrap/1.0.0`
+- New versions would use different protocol IDs
+- Peers can register multiple protocol versions simultaneously
+
+#### Error Handling Extensions
+- Standardized error response format: `{ approved: false, reason: string }`
+- Extensible via additional error fields
+- Consumer hooks can provide application-specific error context
+
+This document will be expanded as each module's concrete interfaces are finalized.
