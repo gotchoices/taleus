@@ -96,7 +96,7 @@ Each transition includes validation rules to ensure proper state progression.
 
 ## Tally Bootstrap (Tally Initiation) Protocol
 
-Naming note: libp2p also uses the term "bootstrap" for peer discovery. In Taleus, "bootstrap" refers to initiating a tally negotiation between two parties. The implementation module is named `TallyBootstrapService`.
+Naming note: libp2p also uses the term "bootstrap" for peer discovery. In Taleus, "bootstrap" refers to initiating a tally negotiation between two parties. The implementation module is named `TallyBootstrap`.
 
 ### Goals and scope
 - Establish a shared database and minimal draft tally so negotiation can begin
@@ -146,28 +146,29 @@ All messages should be treated as idempotent by the service.
 ### Consumer-provided hooks (integration surface)
 Taleus does not manage token storage or business policy. Instead, the application provides hooks:
 
-- `getTokenInfo(token) → { initiatorRole: 'stock'|'foil'; expiryUtc: string; identityRequirements?: any; /* app-defined */ }`
-  - Determines if the token is valid and which role applies
+- `getTokenInfo(token) → Promise<{ initiatorRole: 'stock'|'foil'; expiryUtc: string; identityRequirements?: unknown } | null>`
+  - Determines if the token is valid and which role applies; returns null for invalid tokens
 
-- `validateIdentity(identityBundle, identityRequirements) → Promise<boolean>`
+- `validateIdentity(identityBundle, identityRequirements) → Promise<boolean>` (optional)
   - Verifies the respondent's identity against app policy
 
 - `markTokenUsed(token, context) → Promise<void>` (optional; recommended for one-time tokens)
   - Lets the app enforce one-time consumption and audit usage
 
-- `provisionDatabase(createdBy, initiatorPeerId, respondentPeerId) → Promise<{ tally, dbConnectionInfo }>`
-  - Implemented via a `DatabaseProvisioner` adapter; creates the shared DB and returns access info
+- `provisionDatabase(createdBy, initiatorPeerId, respondentPeerId) → Promise<ProvisionResult>`
+  - Creates the shared DB and returns access info (to be implemented via Quereus/Optimystic)
 
 - `recordProvisioning(idempotencyKey, result) / getProvisioning(idempotencyKey)` (optional)
   - Enables idempotent retries to return prior results without side effects
 
 ### Service API (library shape)
 - Passive initiator:
-  - `registerPassiveListener(peer, { role, validateIdentity? })` → unregister function
+  - `registerPassiveListener(peer: Libp2p, options: RegisterOptions)` → unregister function
   - Registers `/taleus/bootstrap/1.0.0` and handles InboundContact requests using the hooks
+  - `RegisterOptions`: `{ role: PartyRole; getParticipatingCadrePeerAddrs?: () => Promise<string[]> | string[] }`
 
 - Active respondent:
-  - `initiateFromLink(link, peer)` → `ProvisionResult | { approved: false; reason: string }`
+  - `initiateFromLink(link: BootstrapLinkPayload, peer: Libp2p, args?: { identityBundle?: unknown; idempotencyKey?: string })` → `Promise<ProvisionResult | { approved: false; reason: string }>`
   - Dials one of `link.responderPeerAddrs`, presents token and identity, and follows the role-based flow
 
 ### Error handling and idempotency
