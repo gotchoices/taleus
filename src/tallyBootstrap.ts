@@ -7,8 +7,8 @@ export const BOOTSTRAP_PROTOCOL = '/taleus/bootstrap/1.0.0'
 interface LibP2PStream {
   source: AsyncIterable<StreamChunk>
   sink: (data: Uint8Array[]) => Promise<void>
-  closeWrite?: () => Promise<void>
-  close?: () => Promise<void>
+  closeWrite: () => Promise<void>  // Required in modern libp2p
+  close?: () => Promise<void>      // Fallback, but not needed for half-close
 }
 
 interface LibP2PPeer {
@@ -214,12 +214,7 @@ async function writeJson(stream: LibP2PStream, obj: unknown, close = false): Pro
   const data = enc.encode(JSON.stringify(obj))
   await stream.sink([data])
   if (close) {
-    if (typeof stream.closeWrite === 'function') {
-      await stream.closeWrite()
-    } else if (typeof stream.close === 'function') {
-      // Fallback
-      try { await stream.close() } catch {}
-    }
+    await stream.closeWrite()
   }
 }
 
