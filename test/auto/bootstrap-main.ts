@@ -15,7 +15,7 @@ import { createLibp2p, Libp2p } from 'libp2p'
 import { tcp } from '@libp2p/tcp'
 import { noise } from '@chainsafe/libp2p-noise'
 import { mplex } from '@libp2p/mplex'
-import { TallyBootstrap } from '../src/tallyBootstrap.js'
+import { TallyBootstrap } from '../../src/tallyBootstrap.js'
 import { createInMemoryHooks } from './helpers/consumerMocks.js'
 
 // Shared protocol for bootstrap messages

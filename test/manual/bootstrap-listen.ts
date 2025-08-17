@@ -97,7 +97,7 @@ async function main() {
   console.log('Link JSON:')
   console.log(JSON.stringify(link, null, 2))
 
-  const sample = `tsx test/manual/bootstrap-dial.ts --link ${outPath}`
+  const sample = `npx tsx test/manual/bootstrap-dial.ts --link ${outPath}`
   console.log('\nTo start the responder (B), run:')
   console.log(sample)
 

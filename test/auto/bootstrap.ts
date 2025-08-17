@@ -1,8 +1,12 @@
 /*
   Taleus Bootstrap POC tests (TDD scaffold)
-  - Runs real libp2p nodes locally (loopback) within vitest
+  - Runs real libp2p nodes locally (loopback) within mocha
   - Exercises Method 6 (Role-Based Link Handshake) flows at a high level
-  - Uses in-memory hooks until Quereus/Optimystic are available
+  - Uses a Fake DatabaseProvisioner until Quereus/Optimystic are available
+
+  Notes:
+  - These tests are initially skipped. Un-skip once the bootstrap module is implemented.
+  - Keep networking local to 127.0.0.1; avoid external discovery.
 */
 
 import { strict as assert } from 'assert'
@@ -17,20 +21,78 @@ import { createInMemoryHooks } from './helpers/consumerMocks.js'
 // Shared protocol for bootstrap messages
 const BOOTSTRAP_PROTOCOL = '/taleus/bootstrap/1.0.0'
 
+// Types (to be replaced by real Taleus interfaces)
 type PartyRole = 'stock' | 'foil'
 
 interface BootstrapLinkPayload {
-  responderPeerAddrs: string[]
+  responderPeerAddrs: string[] // multiaddrs of A's responder nodes (not full cadre)
   token: string
   tokenExpiryUtc: string
   initiatorRole: PartyRole
-  identityRequirements?: string
+  identityRequirements?: string // future: schema URI or plain description
 }
 
-interface DraftTallyInfo { tallyId: string; createdBy: PartyRole }
+interface DraftTallyInfo {
+  tallyId: string
+  createdBy: PartyRole
+}
+
 interface ProvisionResult {
   tally: DraftTallyInfo
-  dbConnectionInfo: { endpoint: string; credentialsRef: string }
+  dbConnectionInfo: {
+    endpoint: string
+    credentialsRef: string
+  }
+}
+
+interface DatabaseProvisioner {
+  provision(params: {
+    createdBy: PartyRole
+    initiatorPeerId: string
+    respondentPeerId: string
+  }): Promise<ProvisionResult>
+}
+
+interface BootstrapService {
+  // A-side: handle inbound contact from respondent (token + identity)
+  handleInboundContact(params: {
+    token: string
+    initiatorRole: PartyRole
+    initiatorPeer: Libp2p
+    respondentPeerInfo: {
+      peer: Libp2p
+      partyId: string
+      proposedCadrePeerAddrs: string[]
+    }
+  }): Promise<{
+    approved: boolean
+    reason?: string
+    participatingCadrePeerAddrs?: string[]
+    // If A builds (stock), include provisioned result
+    provisionResult?: ProvisionResult
+  }>
+
+  // B-side: build DB when A is foil
+  buildOnRespondent(params: {
+    initiatorPeer: Libp2p
+    respondentPeer: Libp2p
+    participatingCadrePeerAddrs: string[]
+  }): Promise<ProvisionResult>
+}
+
+// Fake provisioner for tests
+class FakeProvisioner implements DatabaseProvisioner {
+  private nextCounter = 1
+  async provision(params: { createdBy: PartyRole; initiatorPeerId: string; respondentPeerId: string }): Promise<ProvisionResult> {
+    const tallyId = `tally-${this.nextCounter++}`
+    return {
+      tally: { tallyId, createdBy: params.createdBy },
+      dbConnectionInfo: {
+        endpoint: `quereus://127.0.0.1/${tallyId}`,
+        credentialsRef: `cred-${tallyId}`
+      }
+    }
+  }
 }
 
 async function createNode(): Promise<Libp2p> {
@@ -44,6 +106,19 @@ async function createNode(): Promise<Libp2p> {
       denyDialMultiaddr: async (ma) => !ma.toString().includes('/ip4/127.0.0.1/')
     }
   })
+}
+
+// Placeholder factory to be replaced with real implementation import
+function createBootstrapService(_deps: { provisioner: DatabaseProvisioner }): BootstrapService {
+  // Return a stub that throws only when invoked (keeps suite definition safe)
+  return {
+    async handleInboundContact() {
+      throw new Error('BootstrapService.handleInboundContact not implemented')
+    },
+    async buildOnRespondent() {
+      throw new Error('BootstrapService.buildOnRespondent not implemented')
+    }
+  }
 }
 
 describe('Taleus Bootstrap (Method 6) – POC', () => {
@@ -75,6 +150,7 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
       A.dial(addrB1),
       A.dial(addrB2)
     ])
+    // Register passive listener on A with role=stock by default; individual tests can override if needed
     unregisterA = bootstrap.registerPassiveListener(A, { role: 'stock' })
   })
 
@@ -82,7 +158,9 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
     await Promise.allSettled([A?.stop(), B1?.stop(), B2?.stop()])
   })
 
-  beforeEach(() => {})
+  beforeEach(() => {
+    // Future: reset any in-memory state if the service keeps it
+  })
 
   describe('One-time token – A (stock) builds on approval', () => {
     it('approves valid respondent and returns DB access with draft tally', async () => {
@@ -99,6 +177,7 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
 
       const result = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'k1' })
 
+      // When A is stock, initiateFromLink should return a ProvisionResult directly
       const pr = result as unknown as ProvisionResult
       assert.ok(pr.dbConnectionInfo)
     })
@@ -106,6 +185,7 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
 
   describe('One-time token – B (foil) builds on approval', () => {
     it('approves valid respondent and B provisions DB with draft tally', async () => {
+      // Switch A listener to foil role for this test
       unregisterA?.()
       unregisterA = bootstrap.registerPassiveListener(A, { role: 'foil' })
       const link: BootstrapLinkPayload = {
@@ -126,6 +206,7 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
 
   describe('Multi-use token – provisions unique DB per respondent', () => {
     it('creates separate tallies for two respondents using the same token', async () => {
+      // Ensure A is registered as stock for this test
       unregisterA?.()
       unregisterA = bootstrap.registerPassiveListener(A, { role: 'stock' })
       const link: BootstrapLinkPayload = {
@@ -152,10 +233,12 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
         identityRequirements: 'email, phone, selfie'
       }
 
+      // override hooks to fail identity
       const failHooks = createInMemoryHooks([
         { token: 'one-time-reject', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: true }
       ], { validateIdentity: () => false })
       const bootstrap2 = new TallyBootstrap(failHooks)
+      // Ensure we don't have duplicate handlers
       unregisterA?.()
       unregisterA = bootstrap2.registerPassiveListener(A, { role: 'stock' })
 
