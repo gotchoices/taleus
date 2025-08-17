@@ -3,6 +3,25 @@ import { multiaddr as toMultiaddr } from '@multiformats/multiaddr'
 
 export const BOOTSTRAP_PROTOCOL = '/taleus/bootstrap/1.0.0'
 
+// Minimal interfaces for libp2p types to avoid 'any'
+interface LibP2PStream {
+  source: AsyncIterable<StreamChunk>
+  sink: (data: Uint8Array[]) => Promise<void>
+  closeWrite?: () => Promise<void>
+  close?: () => Promise<void>
+}
+
+interface LibP2PPeer {
+  peerId: { toString(): string }
+  getMultiaddrs(): { toString(): string }[]
+  dialProtocol(addr: any, protocol: string): Promise<LibP2PStream>
+  handle(protocol: string, handler: StreamHandler): void
+  unhandle(protocol: string): void
+}
+
+type StreamHandler = (data: { stream: LibP2PStream }) => Promise<void>
+type StreamChunk = Uint8Array | { subarray?: Function; slice?: Function; byteLength?: number }
+
 export type PartyRole = 'stock' | 'foil'
 
 export interface BootstrapLinkPayload {
@@ -56,15 +75,16 @@ export class TallyBootstrap {
   }
 
   registerPassiveListener(peer: Libp2p, options: RegisterOptions): () => void {
-    const handler = async ({ stream }: any) => {
+    const handler: StreamHandler = async ({ stream }) => {
       const req = await readJson(stream)
-      if (!req || typeof req !== 'object' || typeof req.type !== 'string') {
+      if (!req || typeof req !== 'object' || !('type' in req) || typeof (req as any).type !== 'string') {
         await writeJson(stream, { approved: false, reason: 'malformed_request' })
         return
       }
 
-      if (req.type === 'inboundContact') {
-        const { token, partyId, identityBundle, proposedCadrePeerAddrs, idempotencyKey } = req
+      const typedReq = req as any // Type assertion after validation
+      if (typedReq.type === 'inboundContact') {
+        const { token, partyId, identityBundle, proposedCadrePeerAddrs, idempotencyKey } = typedReq
         const prior = idempotencyKey && this.hooks.getProvisioning ? await this.hooks.getProvisioning(idempotencyKey) : null
         if (prior && options.role === 'stock') {
           await writeJson(stream, { approved: true, provisionResult: prior, initiatorPeerId: peer.peerId.toString() }, true)
@@ -114,7 +134,7 @@ export class TallyBootstrap {
         }
       }
 
-      if (req.type === 'provisioningResult') {
+      if (typedReq.type === 'provisioningResult') {
         // Dialer may have closed its write side immediately; avoid responding to prevent push-on-ended errors
         return
       }
@@ -133,7 +153,7 @@ export class TallyBootstrap {
     if (!link.responderPeerAddrs?.length) return { approved: false, reason: 'no_responder_addrs' }
     const maStr = link.responderPeerAddrs[0]
     const maddr = toMultiaddr(maStr)
-    const stream = await (peer as any).dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
+    const stream = await (peer as LibP2PPeer).dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
 
     // Send inbound contact
     await writeJson(stream, {
@@ -146,17 +166,18 @@ export class TallyBootstrap {
     }, false)
 
     const res = await readJson(stream)
-    if (!res || res.approved !== true) {
-      return { approved: false, reason: res?.reason ?? 'rejected' }
+    const typedRes = res as any // Type assertion after receiving response
+    if (!res || typedRes.approved !== true) {
+      return { approved: false, reason: typedRes?.reason ?? 'rejected' }
     }
-    if (res.provisionResult) {
-      return res.provisionResult as ProvisionResult
+    if (typedRes.provisionResult) {
+      return typedRes.provisionResult as ProvisionResult
     }
     if (link.initiatorRole === 'foil') {
       // B provisions and returns result to A
-      const provision = await this.hooks.provisionDatabase('foil', String(res.initiatorPeerId ?? ''), peer.peerId.toString())
+      const provision = await this.hooks.provisionDatabase('foil', String(typedRes.initiatorPeerId ?? ''), peer.peerId.toString())
       // open a fresh stream to send the provisioning result
-      const stream2 = await (peer as any).dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
+      const stream2 = await (peer as LibP2PPeer).dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
       await writeJson(stream2, {
         type: 'provisioningResult',
         idempotencyKey: args?.idempotencyKey,
@@ -168,27 +189,27 @@ export class TallyBootstrap {
   }
 }
 
-async function readJson(stream: any): Promise<any> {
+async function readJson(stream: LibP2PStream): Promise<unknown> {
   const decoder = new TextDecoder()
   let buf = ''
   for await (const chunk of stream.source) {
-    const anyChunk: any = chunk
+    const typedChunk: StreamChunk = chunk
     let u8: Uint8Array
-    if (anyChunk && typeof anyChunk.subarray === 'function') {
+    if (typedChunk && typeof typedChunk.subarray === 'function') {
       // Uint8Array or Uint8ArrayList
-      u8 = anyChunk.subarray(0, anyChunk.byteLength ?? undefined)
-    } else if (anyChunk && typeof anyChunk.slice === 'function') {
+      u8 = typedChunk.subarray(0, typedChunk.byteLength ?? undefined)
+    } else if (typedChunk && typeof typedChunk.slice === 'function') {
       // Fallback that often returns a Uint8Array
-      u8 = anyChunk.slice(0)
+      u8 = typedChunk.slice(0)
     } else {
-      u8 = anyChunk as Uint8Array
+      u8 = typedChunk as Uint8Array
     }
     buf += decoder.decode(u8, { stream: true })
   }
   try { return JSON.parse(buf) } catch { return null }
 }
 
-async function writeJson(stream: any, obj: any, close = false): Promise<void> {
+async function writeJson(stream: LibP2PStream, obj: unknown, close = false): Promise<void> {
   const enc = new TextEncoder()
   const data = enc.encode(JSON.stringify(obj))
   await stream.sink([data])
