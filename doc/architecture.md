@@ -81,18 +81,16 @@ interface ProvisionResult {
   - If `link.initiatorRole === 'stock'`, the initiator will provision and return access details
 
 ### Consumer-provided hooks (integration surface)
-Taleus does not manage token storage or business policy. The application provides hooks used by `TallyBootstrap`:
+Taleus does not manage token storage or business policy. The application provides hooks used by `TallyBootstrap`. **For complete implementation details, examples, and best practices, see `doc/bootstrap.md`.**
 
-- `getTokenInfo(token) → Promise<{ initiatorRole: 'stock'|'foil'; expiryUtc: string; identityRequirements?: unknown } | null>`
-  - Determines token validity and role; returns null for invalid tokens
-- `validateIdentity(identityBundle, identityRequirements) → Promise<boolean>` (optional)
-  - Verifies respondent identity against app policy
-- `markTokenUsed(token, context) → Promise<void>` (optional)
-  - Enables one-time token consumption and auditing
-- `provisionDatabase(createdBy, initiatorPeerId, respondentPeerId) → Promise<ProvisionResult>`
-  - Creates the shared DB and returns access info (to be implemented via Quereus/Optimystic)
-- `recordProvisioning(idempotencyKey, result) / getProvisioning(idempotencyKey)` (optional)
-  - Supports idempotent retries without repeated side effects
+**Required hooks:**
+- `getTokenInfo(token)` - Token validation and role determination
+- `provisionDatabase(createdBy, initiatorPeerId, respondentPeerId)` - Database creation and access provisioning
+
+**Optional hooks:**
+- `validateIdentity(identityBundle, identityRequirements)` - Custom identity verification
+- `markTokenUsed(token, context)` - Token consumption tracking and auditing
+- `recordProvisioning(idempotencyKey, result)` / `getProvisioning(idempotencyKey)` - Idempotency support
 
 ### Idempotency and state
 - Requests should include an `idempotencyKey` so repeated calls can return prior results
