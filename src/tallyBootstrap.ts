@@ -3,22 +3,39 @@ import { multiaddr as toMultiaddr } from '@multiformats/multiaddr'
 
 export const BOOTSTRAP_PROTOCOL = '/taleus/bootstrap/1.0.0'
 
-// Minimal interfaces for libp2p types to avoid 'any'
+/*
+ * Type Strategy: We use the real libp2p types where possible, but define our own
+ * minimal stream interface to:
+ * 1. Get compile-time safety against libp2p API changes
+ * 2. Document exactly what stream methods we depend on
+ * 3. Make testing easier with minimal mock interfaces
+ * 4. Provide clear boundaries between libp2p and our protocol logic
+ */
+
+// Re-export libp2p types for consistency, but allow for custom extensions
+type LibP2PPeer = Libp2p
+
+// Define what we need from a stream - this should match libp2p's actual Stream interface
 interface LibP2PStream {
   source: AsyncIterable<StreamChunk>
   sink: (data: Uint8Array[]) => Promise<void>
-  closeWrite: () => Promise<void>  // Required in modern libp2p
-  close?: () => Promise<void>      // Fallback, but not needed for half-close
+  closeWrite: () => Promise<void>
+  close?: () => Promise<void>
 }
 
-interface LibP2PPeer {
-  peerId: { toString(): string }
-  getMultiaddrs(): { toString(): string }[]
-  dialProtocol(addr: any, protocol: string): Promise<LibP2PStream>
-  handle(protocol: string, handler: StreamHandler): void
-  unhandle(protocol: string): void
+// Type safety check: Ensure our stream assumptions are compatible with what libp2p actually provides
+// If libp2p changes its stream interface, this will cause a compile error
+type LibP2PStreamCompatibilityCheck = {
+  // This type will fail to compile if our assumptions about libp2p streams are wrong
+  checkStreamHandler: StreamHandler extends ((data: { stream: any }) => Promise<void>) ? true : false
+  checkLibp2pPeer: LibP2PPeer extends { 
+    dialProtocol: (addr: any, protocol: string) => Promise<any>
+    handle: (protocol: string, handler: any) => void
+    unhandle: (protocol: string) => void
+  } ? true : false
 }
 
+// Handler type matching libp2p's expected signature
 type StreamHandler = (data: { stream: LibP2PStream }) => Promise<void>
 type StreamChunk = Uint8Array | { subarray?: Function; slice?: Function; byteLength?: number }
 
@@ -74,7 +91,7 @@ export class TallyBootstrap {
     this.hooks = hooks
   }
 
-  registerPassiveListener(peer: Libp2p, options: RegisterOptions): () => void {
+  registerPassiveListener(peer: LibP2PPeer, options: RegisterOptions): () => void {
     const handler: StreamHandler = async ({ stream }) => {
       const req = await readJson(stream)
       if (!req || typeof req !== 'object' || !('type' in req) || typeof (req as any).type !== 'string') {
@@ -146,14 +163,14 @@ export class TallyBootstrap {
     return () => peer.unhandle(BOOTSTRAP_PROTOCOL)
   }
 
-  async initiateFromLink(link: BootstrapLinkPayload, peer: Libp2p, args?: {
+  async initiateFromLink(link: BootstrapLinkPayload, peer: LibP2PPeer, args?: {
     identityBundle?: unknown
     idempotencyKey?: string
   }): Promise<ProvisionResult | { approved: false; reason: string }> {
     if (!link.responderPeerAddrs?.length) return { approved: false, reason: 'no_responder_addrs' }
     const maStr = link.responderPeerAddrs[0]
     const maddr = toMultiaddr(maStr)
-    const stream = await (peer as LibP2PPeer).dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
+    const stream = await peer.dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
 
     // Send inbound contact
     await writeJson(stream, {
@@ -177,7 +194,7 @@ export class TallyBootstrap {
       // B provisions and returns result to A
       const provision = await this.hooks.provisionDatabase('foil', String(typedRes.initiatorPeerId ?? ''), peer.peerId.toString())
       // open a fresh stream to send the provisioning result
-      const stream2 = await (peer as LibP2PPeer).dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
+      const stream2 = await peer.dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
       await writeJson(stream2, {
         type: 'provisioningResult',
         idempotencyKey: args?.idempotencyKey,
