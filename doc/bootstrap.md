@@ -401,6 +401,118 @@ async getProvisioning(idempotencyKey: string): Promise<ProvisionResult | null> {
 
 **Default Behavior**: If not provided, no idempotency caching (each request creates new resources).
 
+## Protocol Flow
+
+The bootstrap protocol follows Method 6 (Role-Based Link Handshake) from the design documents. The flow varies based on the initiator role specified in the bootstrap link.
+
+### Sequence Diagrams
+
+#### Stock Role Flow (Initiator Provisions Database)
+
+```mermaid
+sequenceDiagram
+    participant A as Party A (Initiator)
+    participant ANode as A's libp2p Node
+    participant BNode as B's libp2p Node  
+    participant B as Party B (Respondent)
+    participant AHooks as A's Hooks
+    participant BHooks as B's Hooks
+
+    Note over A,B: Link Generation (out-of-band)
+    A->>B: Send link with role='stock', token, responder addresses
+
+    Note over A,B: Bootstrap Protocol Start
+    B->>BNode: initiateFromLink(link, peer)
+    BNode->>ANode: dialProtocol('/taleus/bootstrap/1.0.0')
+    
+    Note over BNode,ANode: Stream 1: InboundContact
+    BNode->>ANode: InboundContact {token, partyId, proposedCadrePeerAddrs, identityBundle}
+    
+    ANode->>AHooks: getTokenInfo(token)
+    AHooks-->>ANode: {initiatorRole: 'stock', expiryUtc, identityRequirements}
+    
+    alt Identity validation required
+        ANode->>AHooks: validateIdentity(identityBundle, identityRequirements)
+        AHooks-->>ANode: true/false
+    end
+    
+    alt Token is one-time use
+        ANode->>AHooks: markTokenUsed(token, {partyId})
+        AHooks-->>ANode: void
+    end
+    
+    Note over ANode: A provisions database (role=stock)
+    ANode->>AHooks: provisionDatabase('stock', initiatorPeerId, respondentPeerId)
+    AHooks-->>ANode: {tally: {tallyId, createdBy}, dbConnectionInfo}
+    
+    alt Idempotency enabled
+        ANode->>AHooks: recordProvisioning(idempotencyKey, result)
+        AHooks-->>ANode: void
+    end
+    
+    ANode->>BNode: Response {approved: true, participatingCadrePeerAddrs, provisionResult}
+    BNode-->>B: Return provisionResult
+    
+    Note over A,B: Bootstrap Complete - Database ready for negotiation
+```
+
+#### Foil Role Flow (Respondent Provisions Database)
+
+```mermaid
+sequenceDiagram
+    participant A as Party A (Initiator)
+    participant ANode as A's libp2p Node
+    participant BNode as B's libp2p Node
+    participant B as Party B (Respondent)
+    participant AHooks as A's Hooks
+    participant BHooks as B's Hooks
+
+    Note over A,B: Link Generation (out-of-band)
+    A->>B: Send link with role='foil', token, responder addresses
+
+    Note over A,B: Bootstrap Protocol Start
+    B->>BNode: initiateFromLink(link, peer)
+    BNode->>ANode: dialProtocol('/taleus/bootstrap/1.0.0')
+    
+    Note over BNode,ANode: Stream 1: InboundContact
+    BNode->>ANode: InboundContact {token, partyId, proposedCadrePeerAddrs, identityBundle}
+    
+    ANode->>AHooks: getTokenInfo(token)
+    AHooks-->>ANode: {initiatorRole: 'foil', expiryUtc, identityRequirements}
+    
+    alt Identity validation required
+        ANode->>AHooks: validateIdentity(identityBundle, identityRequirements)
+        AHooks-->>ANode: true/false
+    end
+    
+    alt Token is one-time use
+        ANode->>AHooks: markTokenUsed(token, {partyId})
+        AHooks-->>ANode: void
+    end
+    
+    ANode->>BNode: Response {approved: true, participatingCadrePeerAddrs}
+    
+    Note over BNode: B provisions database (role=foil)
+    BNode->>BHooks: provisionDatabase('foil', initiatorPeerId, respondentPeerId)
+    BHooks-->>BNode: {tally: {tallyId, createdBy}, dbConnectionInfo}
+    
+    Note over BNode,ANode: Stream 2: ProvisioningResult
+    BNode->>ANode: dialProtocol('/taleus/bootstrap/1.0.0') [new stream]
+    BNode->>ANode: ProvisioningResult {tally, dbConnectionInfo}
+    
+    BNode-->>B: Return provisionResult
+    
+    Note over A,B: Bootstrap Complete - Database ready for negotiation
+```
+
+### Key Protocol Features
+
+1. **Role-Based Building**: The `initiatorRole` in the link determines who provisions the database
+2. **Two-Stream Pattern**: Foil role uses separate streams for approval and provisioning result
+3. **Hook Integration**: Consumer hooks handle token validation, identity verification, and database provisioning
+4. **Idempotency Support**: Optional hooks enable safe retries of the bootstrap process
+5. **Stateless Design**: Each message carries complete context; no session state required
+
 ## Integration Patterns
 
 ### Bootstrap Roles
