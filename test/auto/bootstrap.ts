@@ -129,7 +129,11 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
   const hooks = createInMemoryHooks([
     { token: 'one-time-abc', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: true },
     { token: 'one-time-xyz', initiatorRole: 'foil', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: true },
-    { token: 'multi-use-qr', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 300_000).toISOString(), oneTime: false }
+    { token: 'multi-use-qr', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 300_000).toISOString(), oneTime: false },
+    // Idempotency test tokens
+    { token: 'idempotent-stock', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: false },
+    { token: 'idempotent-foil', initiatorRole: 'foil', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: false },
+    { token: 'multi-provision', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: false }
   ])
   const bootstrap = new TallyBootstrap(hooks)
   let unregisterA: (() => void) | undefined
@@ -249,6 +253,110 @@ describe('Taleus Bootstrap (Method 6) – POC', () => {
       assert.equal(rej.approved, false)
       // @ts-expect-error
       assert.ok(rej.reason && (rej.reason as string).length > 0)
+    })
+  })
+
+  describe('Idempotency Testing', () => {
+    it('returns cached result for duplicate stock requests', async () => {
+      unregisterA?.()
+      unregisterA = bootstrap.registerPassiveListener(A, { role: 'stock' })
+      
+      const link: BootstrapLinkPayload = {
+        responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
+        token: 'idempotent-stock',
+        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
+        initiatorRole: 'stock'
+      }
+
+      // First request
+      const result1 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'duplicate-stock' })
+      // Second request with same idempotencyKey
+      const result2 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'duplicate-stock' })
+
+      const pr1 = result1 as unknown as ProvisionResult
+      const pr2 = result2 as unknown as ProvisionResult
+      
+      assert.equal(pr1.tally.tallyId, pr2.tally.tallyId)
+      assert.equal(pr1.dbConnectionInfo.endpoint, pr2.dbConnectionInfo.endpoint)
+    })
+
+    it('returns cached result for duplicate foil requests', async () => {
+      unregisterA?.()
+      unregisterA = bootstrap.registerPassiveListener(A, { role: 'foil' })
+      
+      const link: BootstrapLinkPayload = {
+        responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
+        token: 'idempotent-foil',
+        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
+        initiatorRole: 'foil'
+      }
+
+      // First request
+      const result1 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'duplicate-foil' })
+      // Second request with same idempotencyKey
+      const result2 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'duplicate-foil' })
+
+      const pr1 = result1 as unknown as ProvisionResult
+      const pr2 = result2 as unknown as ProvisionResult
+      
+      assert.equal(pr1.tally.tallyId, pr2.tally.tallyId)
+      assert.equal(pr1.dbConnectionInfo.endpoint, pr2.dbConnectionInfo.endpoint)
+    })
+
+    it('provisions separate resources for different idempotencyKeys', async () => {
+      unregisterA?.()
+      unregisterA = bootstrap.registerPassiveListener(A, { role: 'stock' })
+      
+      const link: BootstrapLinkPayload = {
+        responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
+        token: 'multi-provision',
+        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
+        initiatorRole: 'stock'
+      }
+
+      const result1 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'unique-1' })
+      const result2 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'unique-2' })
+
+      const pr1 = result1 as unknown as ProvisionResult
+      const pr2 = result2 as unknown as ProvisionResult
+      
+      assert.notEqual(pr1.tally.tallyId, pr2.tally.tallyId)
+    })
+  })
+
+  describe('Edge Cases', () => {
+    it('rejects invalid tokens', async () => {
+      const link: BootstrapLinkPayload = {
+        responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
+        token: 'invalid-token-xyz',
+        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
+        initiatorRole: 'stock'
+      }
+
+      const result = await bootstrap.initiateFromLink(link, B1)
+      const rej = result as unknown as { approved: false; reason: string }
+      
+      // @ts-expect-error
+      assert.equal(rej.approved, false)
+      // @ts-expect-error
+      assert.equal(rej.reason, 'invalid_token')
+    })
+
+    it('handles missing responder addresses', async () => {
+      const link: BootstrapLinkPayload = {
+        responderPeerAddrs: [],
+        token: 'any-token',
+        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
+        initiatorRole: 'stock'
+      }
+
+      const result = await bootstrap.initiateFromLink(link, B1)
+      const rej = result as unknown as { approved: false; reason: string }
+      
+      // @ts-expect-error
+      assert.equal(rej.approved, false)
+      // @ts-expect-error
+      assert.equal(rej.reason, 'no_responder_addrs')
     })
   })
 })
