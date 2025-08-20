@@ -102,53 +102,64 @@ export class TallyBootstrap {
       const typedReq = req as any // Type assertion after validation
       if (typedReq.type === 'inboundContact') {
         const { token, partyId, identityBundle, proposedCadrePeerAddrs, idempotencyKey } = typedReq
-        const prior = idempotencyKey && this.hooks.getProvisioning ? await this.hooks.getProvisioning(idempotencyKey) : null
-        if (prior && options.role === 'stock') {
-          await writeJson(stream, { approved: true, provisionResult: prior, initiatorPeerId: peer.peerId.toString() }, true)
-          return
-        }
-        const tokenInfo = await this.hooks.getTokenInfo(token)
-        if (!tokenInfo) {
-          await writeJson(stream, { approved: false, reason: 'invalid_token' }, true)
-          return
-        }
-        // Optional identity validation
-        if (this.hooks.validateIdentity) {
-          const ok = await this.hooks.validateIdentity(identityBundle, tokenInfo.identityRequirements)
-          if (!ok) {
-            await writeJson(stream, { approved: false, reason: 'identity_insufficient' }, true)
+
+        // Step 1: Check for cached result first
+        const cachedResult = idempotencyKey && this.hooks.getProvisioning ? 
+          await this.hooks.getProvisioning(idempotencyKey) : null
+
+        let provisionResult: ProvisionResult | null = null
+        let participatingCadrePeerAddrs: string[] = []
+
+        if (cachedResult) {
+          // Use cached data
+          provisionResult = options.role === 'stock' ? cachedResult : null
+          participatingCadrePeerAddrs = [] // Cached responses don't include cadre data
+        } else {
+          // Step 2: Validate request (only if not cached)
+          const tokenInfo = await this.hooks.getTokenInfo(token)
+          if (!tokenInfo) {
+            await writeJson(stream, { approved: false, reason: 'invalid_token' }, true)
             return
           }
-        }
-        // Mark token as used (optional, app-level policy)
-        if (this.hooks.markTokenUsed) {
-          await this.hooks.markTokenUsed(token, { partyId })
-        }
-        // disclose cadre after approval
-        const participatingCadrePeerAddrs = options.getParticipatingCadrePeerAddrs
-          ? await Promise.resolve(options.getParticipatingCadrePeerAddrs())
-          : []
 
-        if (options.role === 'stock') {
-          const result = await this.hooks.provisionDatabase('stock', peer.peerId.toString(), String(partyId))
-          if (idempotencyKey && this.hooks.recordProvisioning) {
-            await this.hooks.recordProvisioning(idempotencyKey, result)
+          // Optional identity validation
+          if (this.hooks.validateIdentity) {
+            const ok = await this.hooks.validateIdentity(identityBundle, tokenInfo.identityRequirements)
+            if (!ok) {
+              await writeJson(stream, { approved: false, reason: 'identity_insufficient' }, true)
+              return
+            }
           }
-          await writeJson(stream, {
-            approved: true,
-            participatingCadrePeerAddrs,
-            initiatorPeerId: peer.peerId.toString(),
-            provisionResult: result
-          }, true)
-          return
-        } else {
-          await writeJson(stream, {
-            approved: true,
-            participatingCadrePeerAddrs,
-            initiatorPeerId: peer.peerId.toString()
-          }, true)
-          return
+
+          // Mark token as used (optional, app-level policy)
+          if (this.hooks.markTokenUsed) {
+            await this.hooks.markTokenUsed(token, { partyId })
+          }
+
+          // Step 3: Provision resources (only if not cached and stock role)
+          if (options.role === 'stock') {
+            provisionResult = await this.hooks.provisionDatabase('stock', peer.peerId.toString(), String(partyId))
+            if (idempotencyKey && this.hooks.recordProvisioning) {
+              await this.hooks.recordProvisioning(idempotencyKey, provisionResult)
+            }
+          }
+
+          // Disclose cadre after approval (only for fresh requests)
+          participatingCadrePeerAddrs = options.getParticipatingCadrePeerAddrs
+            ? await Promise.resolve(options.getParticipatingCadrePeerAddrs())
+            : []
         }
+
+        // Step 4: Send unified response
+        const response = {
+          approved: true,
+          participatingCadrePeerAddrs,
+          initiatorPeerId: peer.peerId.toString(),
+          ...(provisionResult && { provisionResult })
+        }
+
+        await writeJson(stream, response, true)
+        return
       }
 
       if (typedReq.type === 'provisioningResult') {
@@ -192,7 +203,17 @@ export class TallyBootstrap {
     }
     if (link.initiatorRole === 'foil') {
       // B provisions and returns result to A
-      const provision = await this.hooks.provisionDatabase('foil', String(typedRes.initiatorPeerId ?? ''), peer.peerId.toString())
+      // Check for cached result first
+      const prior = args?.idempotencyKey && this.hooks.getProvisioning ? 
+        await this.hooks.getProvisioning(args.idempotencyKey) : null
+      
+      const provision = prior || await this.hooks.provisionDatabase('foil', String(typedRes.initiatorPeerId ?? ''), peer.peerId.toString())
+      
+      // Record provisioning result if not cached and recording is enabled
+      if (!prior && args?.idempotencyKey && this.hooks.recordProvisioning) {
+        await this.hooks.recordProvisioning(args.idempotencyKey, provision)
+      }
+      
       // open a fresh stream to send the provisioning result
       const stream2 = await peer.dialProtocol(maddr, BOOTSTRAP_PROTOCOL)
       await writeJson(stream2, {
