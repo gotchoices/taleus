@@ -81,7 +81,7 @@ MyCHIPs serves as the prototype implementation for a PCN, demonstrating the viab
 
 ## Contributing
 
-The Taleus project follows the principles outlined in the [Project Objectives](doc/PROJECT.md) file. When contributing:
+The Taleus project follows the principles outlined in the [Project Objectives](doc/design/PROJECT.md) file. When contributing:
 
 - Follow normalized coding practices
 - Use TypeScript
