@@ -136,22 +136,34 @@ Based on PROJECT.md, the following information needs clarification:
 
 ### Phase 2: Bootstrap Production Implementation (Current Priority)
 - [x] **Bootstrap Prototype**: Sequential handler POC validates Method 6 design ✅ COMPLETED
-- [ ] **State Machine Refactor**: Replace sequential handler with production-grade state machine
-  - [ ] Design `BootstrapSession` class with lifecycle management
-  - [ ] Implement state transitions (DIALING → READING → VALIDATING → PROVISIONING → RESPONDING)
-  - [ ] Add per-session timeout protection (configurable, default 30s)
-  - [ ] Add session resource cleanup and error isolation
-  - [ ] Add concurrent session processing (unlimited parallel bootstraps)
-  - [ ] Add comprehensive session audit logging
+- [ ] **State Machine Refactor**: Clean state machine architecture (no backwards compatibility)
+  - [ ] Design optimal `BootstrapSession` class with lifecycle management
+  - [ ] Implement clean state transitions (CREATED → READING → VALIDATING → PROVISIONING → RESPONDING → COMPLETED/FAILED)
+  - [ ] Design multi-level timeout protection (session + step timeouts)
+  - [ ] Implement session resource cleanup and error isolation
+  - [ ] Design concurrent session processing architecture
+  - [ ] Add comprehensive session audit logging and metrics
   - [ ] Add rate limiting and DoS protection
   - [ ] Add graceful shutdown with session draining
-- [ ] **Testing**: Multi-responder concurrent testing
+  - [ ] Design clean hook interfaces optimized for state machine
+  - [ ] Implement session-based consumer mocks
+  - [ ] Rewrite manual test apps for optimal state machine patterns
+- [ ] **Testing**: Clean state machine testing (rewrite from scratch)
+  - [ ] Design comprehensive session lifecycle tests
+  - [ ] Design session isolation and resource management tests  
+  - [ ] Design optimal concurrent session test patterns
   - [ ] Test multiple simultaneous responders (2, 5, 10+ concurrent)
   - [ ] Test timeout scenarios (network hangs, slow responses)
   - [ ] Test error isolation (one failed session doesn't affect others)
   - [ ] Test resource limits and cleanup
-  - [ ] Load testing for production readiness
-- [ ] **Documentation**: Update architecture docs for state machine approach
+  - [ ] Design concurrent session stress tests
+  - [ ] Load testing for production money system readiness
+- [ ] **Documentation**: Design-first approach with visual models
+  - [ ] Add state diagrams to `doc/bootstrap.md` (session lifecycle, transitions, error paths)
+  - [ ] Add sequence diagrams to `doc/bootstrap.md` (session management, concurrency, cleanup)  
+  - [ ] Update `doc/architecture.md` with session-based architecture details
+  - [ ] Update API documentation for session management patterns
+  - [ ] Add session monitoring and metrics interface documentation
 
 ### Phase 3: Core Implementation
 - [ ] Set up libp2p + Kademlia + Optimystic + Quereus stack

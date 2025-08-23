@@ -51,18 +51,8 @@ stateDiagram-v2
     TIMEOUT --> [*]: Cleanup & log
     COMPLETED --> [*]: Cleanup & log
     
-    note right of TIMEOUT
-        Multi-level timeouts:
-        - Overall session: 30s
-        - Per step: 5s
-    end note
-    
-    note right of FAILED
-        Error isolation:
-        - Stream cleanup
-        - Resource release
-        - Audit logging
-    end note
+    note right of TIMEOUT: Multi-level timeouts:<br/>- Overall session: 30s<br/>- Per step: 5s
+    note right of FAILED: Error isolation:<br/>- Stream cleanup<br/>- Resource release<br/>- Audit logging
 ```
 
 ---
