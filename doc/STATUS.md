@@ -119,7 +119,7 @@ Based on PROJECT.md, the following information needs clarification:
 
 15. **Optimystic Configuration**: What optimistic database settings are appropriate for tally operations?
 
-16. **Bootstrap and Discovery**: ✅ **LEADING CANDIDATE SELECTED** — Method 6 (Role-Based Link Handshake). Pending POC validation; Methods 1 and 5 considered covered by 6
+16. **Bootstrap and Discovery**: ✅ **PROTOTYPE COMPLETED** — Method 6 (Role-Based Link Handshake) implemented and tested. Sequential handler prototype validates design; production state machine implementation required for robustness
 
 ## Development Checklist
 
@@ -130,12 +130,32 @@ Based on PROJECT.md, the following information needs clarification:
 - [x] Document negotiation protocol details for shared database model ✅ COMPLETED
 - [ ] Design complete normalized SQL schema (ready to implement from tally.md)
 - [ ] Research and evaluate SSI vs alternative identity management approaches
- - [x] Document bootstrap methods and consolidate on Method 6 as leading approach
+ - [x] Document bootstrap methods and consolidate on Method 6 as leading approach ✅ COMPLETED
+ - [x] Create POC implementation of Method 6 with sequential handler ✅ COMPLETED  
+ - [x] Analyze concurrency and robustness requirements for production ✅ COMPLETED
 
-### Phase 2: Core Implementation
+### Phase 2: Bootstrap Production Implementation (Current Priority)
+- [x] **Bootstrap Prototype**: Sequential handler POC validates Method 6 design ✅ COMPLETED
+- [ ] **State Machine Refactor**: Replace sequential handler with production-grade state machine
+  - [ ] Design `BootstrapSession` class with lifecycle management
+  - [ ] Implement state transitions (DIALING → READING → VALIDATING → PROVISIONING → RESPONDING)
+  - [ ] Add per-session timeout protection (configurable, default 30s)
+  - [ ] Add session resource cleanup and error isolation
+  - [ ] Add concurrent session processing (unlimited parallel bootstraps)
+  - [ ] Add comprehensive session audit logging
+  - [ ] Add rate limiting and DoS protection
+  - [ ] Add graceful shutdown with session draining
+- [ ] **Testing**: Multi-responder concurrent testing
+  - [ ] Test multiple simultaneous responders (2, 5, 10+ concurrent)
+  - [ ] Test timeout scenarios (network hangs, slow responses)
+  - [ ] Test error isolation (one failed session doesn't affect others)
+  - [ ] Test resource limits and cleanup
+  - [ ] Load testing for production readiness
+- [ ] **Documentation**: Update architecture docs for state machine approach
+
+### Phase 3: Core Implementation
 - [ ] Set up libp2p + Kademlia + Optimystic + Quereus stack
 - [ ] Define Taleus module boundaries and interfaces (see "Upcoming Architecture Work")
-- [ ] Implement Bootstrap module (Method 6): token parsing, responder-node handshake, role-based builder selection, error reporting
 - [ ] Provide `DatabaseProvisioner` interface (stub) to integrate Quereus/Optimystic when available
 - [ ] Implement tally record types
 - [ ] Implement party identification and certificates
@@ -143,15 +163,16 @@ Based on PROJECT.md, the following information needs clarification:
 - [ ] Implement chit creation and validation
 - [ ] Implement consensus mechanism (50/50 voting)
 
-### Phase 3: Testing and Validation
+### Phase 4: Testing and Validation  
+- [x] Create test suite for bootstrap flows ✅ COMPLETED
+- [x] Test Bootstrap Method 6 flows: one-time token, multi-use token, rejection paths, approval paths ✅ COMPLETED
 - [ ] Create test suite for all record types
-- [ ] Test Bootstrap Method 6 flows: one-time token, multi-use token (merchant QR), rejection paths, approval paths
 - [ ] Test negotiation flows
 - [ ] Test consensus scenarios
 - [ ] Test key rotation and recovery
 - [ ] Test dispute resolution scenarios
 
-### Phase 4: Integration and Deployment
+### Phase 5: Integration and Deployment
 - [ ] Re-integrate with MyCHIPs engine
 - [ ] Create standalone implementations
 - [ ] Documentation and examples
@@ -180,6 +201,7 @@ Based on PROJECT.md, the following information needs clarification:
 ### New Files Needed
 - [ ] **doc/schema.md** - detailed SQL schema design
 - [x] **doc/SSI.md** - SSI framework analysis and key management specification ✅ COMPLETED
+- [x] **doc/design/bootstate.md** - bootstrap state management architecture analysis ✅ COMPLETED
 - [ ] **doc/negotiation.md** - detailed negotiation flow for shared database model
 
 ---

@@ -412,11 +412,11 @@ The bootstrap protocol follows Method 6 (Role-Based Link Handshake) from the des
 ```mermaid
 sequenceDiagram
     participant A as Party A (Initiator)
+    participant AHooks as A's Hooks
     participant ANode as A's libp2p Node
     participant BNode as B's libp2p Node  
-    participant B as Party B (Respondent)
-    participant AHooks as A's Hooks
     participant BHooks as B's Hooks
+    participant B as Party B (Respondent)
 
     Note over A,B: Link Generation (out-of-band)
     A->>B: Send link with role='stock', token, responder addresses
@@ -461,11 +461,11 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant A as Party A (Initiator)
+    participant AHooks as A's Hooks
     participant ANode as A's libp2p Node
     participant BNode as B's libp2p Node
-    participant B as Party B (Respondent)
-    participant AHooks as A's Hooks
     participant BHooks as B's Hooks
+    participant B as Party B (Respondent)
 
     Note over A,B: Link Generation (out-of-band)
     A->>B: Send link with role='foil', token, responder addresses
