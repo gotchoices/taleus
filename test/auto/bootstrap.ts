@@ -268,25 +268,7 @@ describe('Taleus Bootstrap State Machine', () => {
   })
 
   describe('ListenerSession State Transitions', () => {
-    it.skip('should follow correct state flow: L_PROCESS_CONTACT → L_SEND_RESPONSE → L_DONE (stock role)', async () => {
-      const mockStream = { sessionId: 'test-session' }
-      const session = new ListenerSession('test-session', mockStream, hooksA, DEFAULT_CONFIG)
-      
-      // Mock the state transitions and verify sequence
-      await session.execute()
-      
-      // Verify state progression was: L_PROCESS_CONTACT → L_SEND_RESPONSE → L_DONE
-      assert.fail('TODO: Test listener state transitions for stock role')
-    })
-    
-    it.skip('should follow extended state flow for foil role: L_PROCESS_CONTACT → L_SEND_RESPONSE → L_AWAIT_DATABASE → L_DONE', async () => {
-      const mockStream = { sessionId: 'test-session' }
-      const session = new ListenerSession('test-session', mockStream, hooksA, DEFAULT_CONFIG)
-      
-      await session.execute()
-      
-      assert.fail('TODO: Test listener state transitions for foil role')
-    })
+    // Note: Direct ListenerSession unit tests removed - comprehensive integration test coverage exists
     
     it('should transition to L_FAILED on validation errors', async () => {
       // Test error state transitions through end-to-end bootstrap flows
@@ -512,37 +494,7 @@ describe('Taleus Bootstrap State Machine', () => {
     }, 10000)
   })
 
-  describe('DialerSession State Transitions', () => {
-    it.skip('should follow correct state flow: D_SEND_CONTACT → D_AWAIT_RESPONSE → D_DONE (stock role)', async () => {
-      const link: BootstrapLink = {
-        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
-        token: 'stock-token',
-        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
-        initiatorRole: 'stock'
-      }
-      
-      const session = new DialerSession('test-session', link, nodeB, hooksB, DEFAULT_CONFIG)
-      
-      await session.execute()
-      
-      assert.fail('TODO: Test dialer state transitions for stock role')
-    })
-    
-    it.skip('should follow extended state flow for foil role: D_SEND_CONTACT → D_AWAIT_RESPONSE → D_PROVISION_DATABASE → D_DONE', async () => {
-      const link: BootstrapLink = {
-        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
-        token: 'foil-token', 
-        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
-        initiatorRole: 'foil'
-      }
-      
-      const session = new DialerSession('test-session', link, nodeB, hooksB, DEFAULT_CONFIG)
-      
-      await session.execute()
-      
-      assert.fail('TODO: Test dialer state transitions for foil role')
-    })
-  })
+  // Note: DialerSession unit tests removed - comprehensive integration test coverage exists
 
   describe('Message Flow Integration', () => {
     it('should execute complete stock role bootstrap (2 messages)', async () => {
