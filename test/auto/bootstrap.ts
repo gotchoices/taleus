@@ -87,26 +87,59 @@ describe('Taleus Bootstrap State Machine', () => {
       assert.equal(counts.dialers, 0)
     })
     
-    it.skip('should handle multiple concurrent sessions without blocking', async () => {
-      const manager = new SessionManager(hooksA, DEFAULT_CONFIG)
+    it('should handle multiple concurrent sessions without blocking', async () => {
+      const managerA = new SessionManager(hooksA, DEFAULT_CONFIG)
+      const managerB = new SessionManager(hooksB, DEFAULT_CONFIG)
       
-      // Simulate 3 concurrent incoming streams
-      const streams = [
-        { sessionId: 'session-1', data: 'stream-1' },
-        { sessionId: 'session-2', data: 'stream-2' },
-        { sessionId: 'session-3', data: 'stream-3' }
-      ]
+      // Register A as passive listener
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await managerA.handleNewStream(stream as any)
+      })
       
-      const promises = streams.map(stream => manager.handleNewStream(stream))
+      console.log('Testing concurrent session handling - 5 simultaneous bootstraps...')
+      
+      // Start 5 concurrent bootstrap sessions from different "customers"
+      const promises = []
+      for (let i = 0; i < 5; i++) {
+        const link: BootstrapLink = {
+          responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+          token: 'multi-use-token', // Allow multiple uses
+          tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+          initiatorRole: 'stock'
+        }
+        
+        // Each gets its own manager instance to simulate different clients
+        const clientManager = new SessionManager(hooksB, DEFAULT_CONFIG)
+        promises.push(clientManager.initiateBootstrap(link, nodeB))
+      }
       
       // All should process concurrently, not sequentially
       const startTime = Date.now()
-      await Promise.all(promises)
+      const results = await Promise.all(promises)
       const duration = Date.now() - startTime
       
-      // If processed concurrently, should be much faster than sequential
-      assert.ok(duration < 5000, 'Sessions should process concurrently')
-    })
+      // Verify all sessions completed successfully
+      assert.equal(results.length, 5, 'All concurrent sessions should complete')
+      assert.ok(results.every(r => r.tally && r.dbConnectionInfo), 'All sessions should succeed with valid results')
+      
+      // Verify unique tallies were created (no interference between sessions)
+      const tallyIds = results.map(r => r.tally.tallyId)
+      const uniqueTallies = new Set(tallyIds)
+      assert.equal(uniqueTallies.size, 5, 'Each session should get a unique tally')
+      
+      // If processed concurrently, should be much faster than sequential (< 2 seconds for 5 sessions)
+      assert.ok(duration < 2000, `Sessions should process concurrently (took ${duration}ms)`)
+      
+      console.log(`✅ All 5 concurrent sessions completed in ${duration}ms`)
+      console.log(`✅ Generated ${uniqueTallies.size} unique tallies`)
+      
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 8000)
     
     it('should clean up sessions after completion', async () => {
       // Test that completed sessions are properly removed from memory
