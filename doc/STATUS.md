@@ -3,15 +3,43 @@
 This file tracks the development progress, issues to be resolved, and future enhancements for the Taleus project.
 
 ## Current Development Phase
-**Design and Documentation Phase**
-- [x] Initial project setup
-- [x] Brainstorming core concepts and approaches
-- [x] Basic architecture documented
-- [ ] Finalize remaining architecture questions
+**Bootstrap Production Implementation** ✅ **CORE COMPLETED**
+- [x] Initial project setup ✅ COMPLETED
+- [x] Brainstorming core concepts and approaches ✅ COMPLETED
+- [x] Basic architecture documented ✅ COMPLETED  
+- [x] Bootstrap methods evaluated; leading candidate selected (Method 6: Role-Based Link Handshake) ✅ COMPLETED
+- [x] **State machine bootstrap implementation** ✅ COMPLETED
+- [x] **Core test suite (stock/foil roles)** ✅ COMPLETED
+- [ ] **NEXT PRIORITY**: Concurrent testing and advanced scenarios
 - [ ] Complete protocol specification
 - [ ] Design SQL schema for shared database model
 - [ ] Resolve identity management questions
- - [x] Bootstrap methods evaluated; leading candidate selected (Method 6: Role-Based Link Handshake)
+
+## 🚀 **Next Steps When Resuming Development**
+
+### **Immediate Next Actions:**
+1. **Enable Concurrent Tests**: Continue progressive test enablement in `test/auto/bootstrap.ts`
+   - Enable concurrent multi-use token test (`should handle multiple customers with same merchant token`)
+   - Enable session isolation test (`should handle multiple concurrent sessions without blocking`)
+   - Enable timeout and error recovery tests
+
+2. **Test Coverage Validation**: 
+   - Run full test suite: `npm test bootstrap.ts`
+   - Verify all critical paths are covered (both stock and foil bootstrap flows)
+   - Test rejection scenarios and error handling
+
+3. **Documentation Updates**: Update remaining core docs to reflect state machine implementation
+   - `doc/architecture.md` - replace TallyBootstrap with SessionManager/sessions
+   - `doc/protocol.md` - update bootstrap protocol section
+
+### **Current Implementation Status:**
+- ✅ **State Machine Core**: SessionManager, ListenerSession, DialerSession classes fully implemented
+- ✅ **Stream Lifecycle**: Fixed libp2p 3-message flow using new stream pattern for foil role
+- ✅ **Basic Tests**: Stock role (2-msg), Foil role (3-msg), SessionManager, SessionHooks tests all passing
+- ✅ **TypeScript/ESM Setup**: Full development environment working with Vitest
+
+### **Key Achievement:** 
+Successfully solved the libp2p stream lifecycle issue for 3-message bootstrap flows by using separate streams for multi-turn communication - a production-ready, non-hack solution that follows proper libp2p patterns.
 
 ## Document Review and Issues Found
 
@@ -134,37 +162,42 @@ Based on PROJECT.md, the following information needs clarification:
  - [x] Create POC implementation of Method 6 with sequential handler ✅ COMPLETED  
  - [x] Analyze concurrency and robustness requirements for production ✅ COMPLETED
 
-### Phase 2: Bootstrap Production Implementation (Current Priority)
+### Phase 2: Bootstrap Production Implementation ✅ **CORE COMPLETED** 
 - [x] **Bootstrap Prototype**: Sequential handler POC validates Method 6 design ✅ COMPLETED
-- [ ] **State Machine Implementation**: Separate ListenerSession and DialerSession classes
-  - [ ] Implement `SessionManager` class with dual session management
-  - [ ] Implement `ListenerSession` class (L_PROCESS_CONTACT → L_SEND_RESPONSE → [L_AWAIT_DATABASE] → L_DONE)
-  - [ ] Implement `DialerSession` class (D_SEND_CONTACT → D_AWAIT_RESPONSE → D_HANDLE_RESPONSE → [D_SEND_DATABASE] → D_DONE)
-  - [ ] Implement multi-level timeout protection (session + step timeouts)
-  - [ ] Implement session resource cleanup and error isolation
-  - [ ] Add comprehensive session audit logging and metrics
-  - [ ] Add rate limiting and DoS protection (per-peer limits)
-  - [ ] Add graceful shutdown with session draining
-  - [ ] Implement clean SessionHooks interface
-  - [ ] Create session-based consumer mocks for testing
-  - [ ] Create manual test apps demonstrating concurrent sessions
-  - [ ] Implement timeout management (SessionTimeouts class)
-  - [ ] Implement session audit logging (SessionAudit class)
-  - [ ] Implement session metrics collection (SessionMetrics class)
-  - [ ] Implement rate limiting (RateLimiter class)
-  - [ ] Define message types and serialization (InboundContact, ProvisioningResult, DatabaseResult)
-  - [ ] Implement libp2p stream utilities (readJson, writeJson with timeout protection)
-- [ ] **Testing**: Session-based testing architecture
-  - [ ] Implement `ListenerSession` lifecycle tests (L_PROCESS_CONTACT through L_DONE)
-  - [ ] Implement `DialerSession` lifecycle tests (D_SEND_CONTACT through D_DONE)
-  - [ ] Test session isolation (memory, timeouts, error boundaries)
-  - [ ] Test concurrent multi-use token scenarios (same token, different sessions)
-  - [ ] Test timeout scenarios (connection hangs, hook timeouts, response timeouts)
-  - [ ] Test error isolation (failed session doesn't affect other sessions)
-  - [ ] Test resource cleanup (sessions properly cleaned up on completion/failure)
-  - [ ] Test rate limiting (reject excessive connections from same peer)
-  - [ ] Test graceful shutdown (drain active sessions before termination)
-  - [ ] Load testing (100+ concurrent sessions, memory/performance validation)
+- [x] **State Machine Implementation**: Separate ListenerSession and DialerSession classes ✅ **COMPLETED**
+ - [x] Implement `SessionManager` class with dual session management ✅ COMPLETED
+ - [x] Implement `ListenerSession` class (L_PROCESS_CONTACT → L_SEND_RESPONSE → [L_AWAIT_DATABASE] → L_DONE) ✅ COMPLETED
+ - [x] Implement `DialerSession` class (D_SEND_CONTACT → D_AWAIT_RESPONSE → [D_PROVISION_DATABASE] → D_DONE) ✅ COMPLETED
+ - [x] Implement multi-level timeout protection (session + step timeouts) ✅ COMPLETED
+ - [x] Implement session resource cleanup and error isolation ✅ COMPLETED
+ - [x] Implement clean SessionHooks interface ✅ COMPLETED
+ - [x] Define message types and serialization (InboundContact, ProvisioningResult, DatabaseResult) ✅ COMPLETED
+ - [x] Implement libp2p stream utilities (readJson, writeJson with timeout protection) ✅ COMPLETED
+ - [x] **CRITICAL FIX**: Fixed libp2p stream lifecycle for 3-message foil bootstrap using new stream pattern ✅ COMPLETED
+ - [ ] Add comprehensive session audit logging and metrics (basic logging implemented)
+ - [ ] Add rate limiting and DoS protection (per-peer limits)
+ - [ ] Add graceful shutdown with session draining
+ - [ ] Create session-based consumer mocks for testing (basic mocks completed)
+ - [ ] Create manual test apps demonstrating concurrent sessions
+ - [ ] Implement timeout management (SessionTimeouts class) (basic timeouts implemented)
+ - [ ] Implement session audit logging (SessionAudit class) (basic logging implemented)
+ - [ ] Implement session metrics collection (SessionMetrics class)
+ - [ ] Implement rate limiting (RateLimiter class)
+- [x] **Testing**: Session-based testing architecture **FOUNDATION COMPLETED**
+ - [x] Implement `ListenerSession` lifecycle tests (L_PROCESS_CONTACT through L_DONE) ✅ COMPLETED
+ - [x] Implement `DialerSession` lifecycle tests (D_SEND_CONTACT through D_DONE) ✅ COMPLETED
+ - [x] **Test stock role bootstrap** (2-message flow: InboundContact → ProvisioningResult) ✅ PASSING
+ - [x] **Test foil role bootstrap** (3-message flow: InboundContact → ProvisioningResult → DatabaseResult) ✅ PASSING
+ - [x] **Test SessionManager creation and configuration** ✅ PASSING
+ - [x] **Test SessionHooks integration** ✅ PASSING
+ - [ ] **NEXT PRIORITY**: Test session isolation (memory, timeouts, error boundaries)
+ - [ ] **NEXT PRIORITY**: Test concurrent multi-use token scenarios (same token, different sessions)
+ - [ ] Test timeout scenarios (connection hangs, hook timeouts, response timeouts)
+ - [ ] Test error isolation (failed session doesn't affect other sessions)
+ - [ ] Test resource cleanup (sessions properly cleaned up on completion/failure)
+ - [ ] Test rate limiting (reject excessive connections from same peer)
+ - [ ] Test graceful shutdown (drain active sessions before termination)
+ - [ ] Load testing (100+ concurrent sessions, memory/performance validation)
 - [ ] **Documentation**: Session architecture documentation
   - [x] Add state diagrams to `doc/bootstrap.md` (ListenerSession and DialerSession states) ✅ COMPLETED
   - [x] Add sequence diagrams to `doc/bootstrap.md` (message flow, concurrent sessions) ✅ COMPLETED  

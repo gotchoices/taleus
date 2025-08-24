@@ -216,10 +216,37 @@ describe('Taleus Bootstrap State Machine', () => {
       nodeA.unhandle('/taleus/bootstrap/1.0.0')
     }, 15000)
     
-    it.skip('should execute complete foil role bootstrap (3 messages)', async () => {
+    it('should execute complete foil role bootstrap (3 messages)', async () => {
       // Test: B initiates, A approves, B provisions DB, sends info
-      assert.fail('TODO: Test complete foil role flow')
-    })
+      const debugConfig = { ...DEFAULT_CONFIG, enableDebugLogging: true }
+      const managerA = new SessionManager(hooksA, debugConfig)
+      const managerB = new SessionManager(hooksB, debugConfig)
+      
+      // A registers as passive listener on libp2p  
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await managerA.handleNewStream(stream as any)
+      })
+      
+      // B initiates bootstrap to A with foil role
+      const link: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'foil-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'foil'
+      }
+      
+      console.log('Starting foil bootstrap test...')
+      const result = await managerB.initiateBootstrap(link, nodeB)
+      console.log('Foil bootstrap completed:', result)
+      
+      // Verify successful bootstrap - foil role provisions the database
+      assert.ok(result.tally)
+      assert.ok(result.dbConnectionInfo)
+      assert.equal(result.tally.createdBy, 'foil')
+      
+      // Clean up
+      nodeA.unhandle('/taleus/bootstrap/1.0.0')
+    }, 15000)
     
     it.skip('should handle rejection scenarios gracefully', async () => {
       // Test token validation failures, identity failures

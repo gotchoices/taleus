@@ -252,6 +252,9 @@ export class ListenerSession {
         
         this.transitionTo('L_DONE')
         this.debugLog(`Completed successfully`)
+        
+        // Close stream when session completes
+        this.closeStream()
       })
     } catch (error) {
       this.transitionTo('L_FAILED', error)
@@ -318,10 +321,9 @@ export class ListenerSession {
       provisionResult: this.provisionResult || undefined
     }
     
-    const shouldClose = this.tokenInfo.role === 'stock'  // Stock role ends here
-    
+    // NEVER close the stream here - let the session state machine handle closure properly
     await this.withStepTimeout(async () => {
-      await writeJson(this.stream, response, shouldClose)
+      await writeJson(this.stream, response, false)  // Never close mid-conversation
     })
     
     this.debugLog(`Response sent`)
@@ -381,6 +383,19 @@ export class ListenerSession {
       console.log(`[ListenerSession:${this.sessionId}:${elapsed}ms] ${message}`, ...args)
     }
   }
+  
+  private closeStream(): void {
+    try {
+      if (this.stream?.closeWrite) {
+        this.stream.closeWrite()
+      } else if (this.stream?.close) {
+        this.stream.close()
+      }
+    } catch (error) {
+      // Stream might already be closed - this is fine
+      this.debugLog(`Stream close warning: ${error}`)
+    }
+  }
 }
 
 export class DialerSession {
@@ -416,6 +431,9 @@ export class DialerSession {
           
           this.transitionTo('D_DONE')
           this.debugLog(`Completed successfully`)
+          
+          // Close stream when session completes
+          this.closeStream()
           return this.responseMessage.provisionResult
         }
       })
@@ -498,22 +516,31 @@ export class DialerSession {
       )
     })
     
-    // Send database result back
+    // Send database result back via NEW stream (proper libp2p pattern)
     const databaseMessage: DatabaseResultMessage = {
       tally: provisionResult.tally,
       dbConnectionInfo: provisionResult.dbConnectionInfo
     }
     
-    if (!this.stream) {
-      throw new Error('No stream available')
-    }
+    this.debugLog(`Opening new stream for database result`)
+    // Use the first responder address from our original link
+    const responderAddr = this.link.responderPeerAddrs[0]
+    const newStream = await this.withStepTimeout(async () => {
+      // Convert string to Multiaddr object for dialProtocol
+      const { multiaddr } = await import('@multiformats/multiaddr')
+      const maddr = multiaddr(responderAddr)
+      return await this.node.dialProtocol(maddr, '/taleus/bootstrap/1.0.0')
+    })
     
     await this.withStepTimeout(async () => {
-      await writeJson(this.stream!, databaseMessage, true)  // Close after sending
+      await writeJson(newStream as any, databaseMessage, true)  // Close new stream after sending
     })
     
     this.transitionTo('D_DONE')
     this.debugLog(`Completed successfully`)
+    
+    // Close stream when session completes
+    this.closeStream()
     return provisionResult
   }
   
@@ -548,6 +575,19 @@ export class DialerSession {
     if (this.config.enableDebugLogging) {
       const elapsed = Date.now() - this.startTime
       console.log(`[DialerSession:${this.sessionId}:${elapsed}ms] ${message}`, ...args)
+    }
+  }
+  
+  private closeStream(): void {
+    try {
+      if (this.stream?.closeWrite) {
+        this.stream.closeWrite()
+      } else if (this.stream?.close) {
+        this.stream.close()
+      }
+    } catch (error) {
+      // Stream might already be closed - this is fine
+      this.debugLog(`Stream close warning: ${error}`)
     }
   }
 }
