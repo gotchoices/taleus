@@ -680,10 +680,85 @@ describe('Taleus Bootstrap State Machine', () => {
       }
     }, 15000)
     
-    it.skip('should maintain session isolation in multi-use scenarios', async () => {
+    it('should maintain session isolation in multi-use scenarios', async () => {
       // Test that concurrent sessions don't interfere with each other
-      assert.fail('TODO: Test multi-use session isolation')
-    })
+      const merchantManager = new SessionManager(hooksA, DEFAULT_CONFIG)
+      
+      // Merchant (A) registers as passive listener
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await merchantManager.handleNewStream(stream as any)
+      })
+      
+      const link: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'multi-use-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+      
+      console.log('Testing multi-use session isolation with mixed scenarios...')
+      
+      // Create different customer scenarios
+      const customer1Manager = new SessionManager(hooksB, DEFAULT_CONFIG)
+      const customer2Manager = new SessionManager(hooksB, DEFAULT_CONFIG)
+      const customer3Manager = new SessionManager(hooksB, DEFAULT_CONFIG)
+      const invalidCustomerManager = new SessionManager(hooksB, DEFAULT_CONFIG)
+      
+      // Mix valid and invalid requests to test isolation
+      const validLink1 = { ...link, tokenExpiryUtc: new Date(Date.now() + 300000).toISOString() }
+      const validLink2 = { ...link, tokenExpiryUtc: new Date(Date.now() + 300000).toISOString() }
+      const validLink3 = { ...link, tokenExpiryUtc: new Date(Date.now() + 300000).toISOString() }
+      const invalidLink = { ...link, token: 'invalid-token' }
+      
+      // Start all sessions simultaneously
+      const promises = [
+        customer1Manager.initiateBootstrap(validLink1, nodeB),
+        customer2Manager.initiateBootstrap(validLink2, nodeB),
+        invalidCustomerManager.initiateBootstrap(invalidLink, nodeB), // This will fail
+        customer3Manager.initiateBootstrap(validLink3, nodeB)
+      ]
+      
+      // Wait for all to complete/fail
+      const results = await Promise.allSettled(promises)
+      
+      // Analyze results
+      const successCount = results.filter(r => r.status === 'fulfilled').length
+      const failureCount = results.filter(r => r.status === 'rejected').length
+      
+      console.log(`Results: ${successCount} successful, ${failureCount} failed`)
+      
+      // Verify isolation: 3 should succeed, 1 should fail
+      assert.equal(successCount, 3, 'Three valid sessions should succeed')
+      assert.equal(failureCount, 1, 'One invalid session should fail')
+      
+      // Check that all successful sessions got unique tallies
+      const successfulResults = results
+        .filter(r => r.status === 'fulfilled')
+        .map(r => (r as any).value)
+      
+      const tallyIds = successfulResults.map(r => r.tally.tallyId)
+      const uniqueTallyIds = new Set(tallyIds)
+      assert.equal(uniqueTallyIds.size, 3, 'Each successful session should get unique tally')
+      
+      // Verify the failed session was properly rejected
+      const failedResult = results.find(r => r.status === 'rejected') as any
+      assert.ok(failedResult.reason.message.includes('Bootstrap rejected'), 'Invalid session should be rejected with meaningful error')
+      
+      // Check session cleanup
+      await new Promise(resolve => setTimeout(resolve, 100))
+      const finalSessions = Object.keys((merchantManager as any).activeSessions || {}).length
+      assert.equal(finalSessions, 0, 'All sessions should be cleaned up after completion')
+      
+      console.log('✅ Session isolation maintained in multi-use scenarios')
+      console.log(`✅ Generated ${uniqueTallyIds.size} unique tallies successfully`)
+      
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 8000)
   })
 
   describe('Timeout and Error Recovery', () => {
