@@ -811,10 +811,77 @@ describe('Taleus Bootstrap State Machine', () => {
       }
     }, 3000)
     
-    it.skip('should handle network failures during bootstrap', async () => {
+    it('should handle network failures during bootstrap', async () => {
       // Test connection drops, stream errors
-      assert.fail('TODO: Test network failure recovery')
-    })
+      const managerA = new SessionManager(hooksA, DEFAULT_CONFIG)
+      const managerB = new SessionManager(hooksB, DEFAULT_CONFIG)
+      
+      let connectionAttempts = 0
+      
+      // Create a handler that simulates network failure on first attempt
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        connectionAttempts++
+        console.log(`Connection attempt ${connectionAttempts}`)
+        
+        if (connectionAttempts === 1) {
+          // Simulate network failure by immediately closing the stream
+          console.log('Simulating network failure - closing stream')
+          try {
+            if ((stream as any).close) {
+              (stream as any).close()
+            }
+          } catch (error) {
+            // Stream might already be closed
+          }
+          throw new Error('Simulated network failure')
+        } else {
+          // Second attempt succeeds
+          await managerA.handleNewStream(stream as any)
+        }
+      })
+      
+      const link: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'stock-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+      
+      console.log('Testing network failure handling...')
+      
+      // First attempt should fail due to simulated network failure
+      try {
+        await managerB.initiateBootstrap(link, nodeB)
+        assert.fail('First attempt should fail due to network error')
+      } catch (error) {
+        console.log('✅ First attempt properly failed:', error.message)
+        assert.ok(error.message.includes('Simulated network failure') || 
+                 error.message.includes('timeout') || 
+                 error.message.includes('stream') ||
+                 error.message.includes('connection'), 
+                 'Should fail with network-related error')
+      }
+      
+      // Second attempt should succeed (simulates retry/recovery)
+      console.log('Attempting recovery...')
+      const managerB2 = new SessionManager(hooksB, DEFAULT_CONFIG)
+      
+      const result = await managerB2.initiateBootstrap(link, nodeB)
+      
+      // Verify recovery was successful
+      assert.ok(result.tally, 'Recovery attempt should succeed')
+      assert.ok(result.dbConnectionInfo, 'Should get database connection info')
+      
+      console.log('✅ Network failure recovery successful')
+      console.log(`✅ Total connection attempts: ${connectionAttempts}`)
+      
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 8000)
     
     it.skip('should recover from partial failures', async () => {
       // Test scenarios where some steps succeed but others fail
