@@ -292,10 +292,65 @@ describe('Taleus Bootstrap State Machine', () => {
   })
 
   describe('Cadre Disclosure Timing (Method 6 Compliance)', () => {
-    it.skip('should send B_cadre in InboundContact message', async () => {
+    it('should send B_cadre in InboundContact message', async () => {
       // Verify Message 1 contains cadrePeerAddrs from B (initiator)
-      assert.fail('TODO: Test B cadre disclosure first')
-    })
+      const managerA = new SessionManager(hooksA, DEFAULT_CONFIG)
+      const managerB = new SessionManager(hooksB, DEFAULT_CONFIG)
+      
+      let capturedContact: any = null
+      
+      // A registers as passive listener and captures the contact message
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        // Intercept and capture the contact message
+        const decoder = new TextDecoder()
+        let message = ''
+        for await (const chunk of stream.source) {
+          for (const subChunk of chunk) {
+            message += decoder.decode(subChunk, { stream: true })
+          }
+        }
+        capturedContact = JSON.parse(message)
+        console.log('📩 Captured InboundContact cadrePeerAddrs:', capturedContact.cadrePeerAddrs)
+        
+        // Send immediate rejection to end the test quickly
+        const rejection = { approved: false, reason: 'Test completed - captured message' }
+        const encoded = new TextEncoder().encode(JSON.stringify(rejection))
+        await stream.sink([encoded])
+      })
+      
+      const link: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'stock-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+      
+      console.log('Testing B cadre disclosure...')
+      
+      try {
+        // This will fail with rejection, but quickly
+        await managerB.initiateBootstrap(link, nodeB)
+        assert.fail('Should have been rejected')
+      } catch (error) {
+        // Expected rejection - test completed quickly
+        assert.ok(error.message.includes('Bootstrap rejected'), 'Should receive rejection')
+      }
+      
+      // Verify B's cadre was disclosed in InboundContact
+      assert.ok(capturedContact, 'Should have captured InboundContact message')
+      assert.ok(capturedContact.cadrePeerAddrs, 'InboundContact should contain cadrePeerAddrs')
+      assert.ok(Array.isArray(capturedContact.cadrePeerAddrs), 'cadrePeerAddrs should be an array')
+      assert.ok(capturedContact.cadrePeerAddrs.length > 0, 'B should disclose its cadre first')
+      
+      console.log('✅ B cadre properly disclosed in InboundContact')
+      
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 3000)
     
     it.skip('should send A_cadre in ProvisioningResult message (post-validation)', async () => {
       // Verify Message 2 contains cadrePeerAddrs from A (after validation)  
