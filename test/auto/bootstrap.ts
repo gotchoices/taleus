@@ -404,10 +404,74 @@ describe('Taleus Bootstrap State Machine', () => {
       }
     }, 5000)
     
-    it.skip('should allow A to reject without revealing A_cadre', async () => {
+    it('should allow A to reject without revealing A_cadre', async () => {
       // Test that rejection response doesn't include A's cadre information
-      assert.fail('TODO: Test cadre protection on rejection')
-    })
+      const managerA = new SessionManager(hooksA, DEFAULT_CONFIG)
+      
+      let capturedRejection: any = null
+      
+      // Create a simple capture handler that intercepts the rejection
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        // First, let A process normally and send rejection
+        await managerA.handleNewStream(stream as any)
+      })
+      
+      // Manually dial and capture the response without using SessionManager
+      const link: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'invalid-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+      
+      console.log('Testing A cadre protection on rejection...')
+      
+      // Connect directly to capture the rejection response
+      const { multiaddr } = await import('@multiformats/multiaddr')
+      const responderAddr = multiaddr(link.responderPeerAddrs[0])
+      const stream = await nodeB.dialProtocol(responderAddr, '/taleus/bootstrap/1.0.0')
+      
+      // Send invalid contact to trigger rejection
+      const contactMessage = {
+        token: 'invalid-token',
+        partyId: 'test-session',
+        identityBundle: { partyId: 'test-session', nodeInfo: 'basic-identity' },
+        cadrePeerAddrs: ['our-cadre-1.example.com', 'our-cadre-2.example.com']
+      }
+      
+      const encoded = new TextEncoder().encode(JSON.stringify(contactMessage))
+      await (stream as any).sink([encoded])
+      
+      // Read A's rejection response
+      const decoder = new TextDecoder()
+      let message = ''
+      for await (const chunk of (stream as any).source) {
+        for (const subChunk of chunk) {
+          message += decoder.decode(subChunk, { stream: true })
+        }
+      }
+      
+      capturedRejection = JSON.parse(message)
+      console.log('📩 Captured rejection response:', capturedRejection)
+      
+      // Verify A's cadre was NOT disclosed in rejection
+      assert.ok(capturedRejection, 'Should have captured rejection response')
+      assert.equal(capturedRejection.approved, false, 'Response should be rejected')
+      assert.ok(capturedRejection.reason, 'Rejection should include reason')
+      
+      // Key test: A should NOT reveal its cadre when rejecting
+      assert.ok(!capturedRejection.cadrePeerAddrs || capturedRejection.cadrePeerAddrs.length === 0, 
+               'A should NOT disclose cadre when rejecting')
+      
+      console.log('✅ A cadre properly protected on rejection - no cadrePeerAddrs in rejection')
+      
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 5000)
   })
 
   describe('Hook Integration', () => {
