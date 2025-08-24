@@ -1,52 +1,92 @@
-import type { Hooks, PartyRole, ProvisionResult } from '../../../src/tallyBootstrap.js'
+/*
+  Mock implementations for Taleus Bootstrap State Machine Testing
+  
+  Provides session-aware hooks that track activity per session
+  and simulate database provisioning for different scenarios.
+*/
 
-type TokenRecord = {
-  token: string
-  initiatorRole: PartyRole
-  expiryUtc: string
-  identityRequirements?: unknown
-  oneTime?: boolean
-  used?: boolean
+// Session-aware hooks interface for state machine architecture
+export interface SessionHooks {
+  validateToken(token: string, sessionId: string): Promise<{role: 'stock'|'foil', valid: boolean}>
+  validateIdentity(identity: any, sessionId: string): Promise<boolean>
+  provisionDatabase(role: 'stock'|'foil', partyA: string, partyB: string, sessionId: string): Promise<any>
+  validateResponse(response: any, sessionId: string): Promise<boolean>
+  validateDatabaseResult(result: any, sessionId: string): Promise<boolean>
 }
 
-export function createInMemoryHooks(tokens: TokenRecord[], opts?: { validateIdentity?: (bundle: unknown, req?: unknown) => boolean | Promise<boolean> }): Hooks {
-  const tokenMap = new Map(tokens.map(t => [t.token, { ...t }]))
-  const provisionMap = new Map<string, ProvisionResult>()
-  let nextId = 1
-
+// Session-aware hooks for state machine architecture
+export function createSessionAwareHooks(validTokens: string[] = ['test-token']): SessionHooks {
+  const tokenDatabase = new Map<string, any>()
+  const provisioningDatabase = new Map<string, any>()
+  const sessionLogs = new Map<string, any[]>()
+  
+  // Pre-populate with test tokens
+  validTokens.forEach(token => {
+    if (token === 'stock-token') {
+      tokenDatabase.set(token, { role: 'stock', valid: true, multiUse: false })
+    } else if (token === 'foil-token') {
+      tokenDatabase.set(token, { role: 'foil', valid: true, multiUse: false })
+    } else if (token === 'multi-use-token') {
+      tokenDatabase.set(token, { role: 'stock', valid: true, multiUse: true })
+    } else {
+      tokenDatabase.set(token, { role: 'stock', valid: true, multiUse: false })
+    }
+  })
+  
+  function logActivity(sessionId: string, activity: any) {
+    if (!sessionLogs.has(sessionId)) {
+      sessionLogs.set(sessionId, [])
+    }
+    sessionLogs.get(sessionId)!.push({ ...activity, timestamp: Date.now() })
+  }
+  
   return {
-    async getTokenInfo(token) {
-      const rec = tokenMap.get(token)
-      if (!rec) return null
-      if (rec.oneTime && rec.used) return null
-      return {
-        initiatorRole: rec.initiatorRole,
-        expiryUtc: rec.expiryUtc,
-        identityRequirements: rec.identityRequirements
+    async validateToken(token: string, sessionId: string) {
+      logActivity(sessionId, { action: 'validateToken', token })
+      
+      const tokenInfo = tokenDatabase.get(token)
+      if (!tokenInfo) {
+        return { role: 'stock', valid: false }
       }
+      
+      return { role: tokenInfo.role, valid: tokenInfo.valid }
     },
-    async validateIdentity(bundle, req) {
-      if (opts?.validateIdentity !== undefined) {
-        return await Promise.resolve(opts.validateIdentity(bundle, req))
+    
+    async validateIdentity(identity: any, sessionId: string) {
+      logActivity(sessionId, { action: 'validateIdentity', identity })
+      
+      // Simple validation: identity must have required fields
+      return identity && typeof identity === 'object' && identity.partyId
+    },
+    
+    async provisionDatabase(role: 'stock'|'foil', partyA: string, partyB: string, sessionId: string) {
+      logActivity(sessionId, { action: 'provisionDatabase', role, partyA, partyB })
+      
+      const tallyId = `tally-${partyA}-${partyB}-${Date.now()}`
+      const result = {
+        tally: { tallyId, createdBy: role },
+        dbConnectionInfo: {
+          endpoint: `wss://db-${tallyId}.example.com`,
+          credentialsRef: `creds-${tallyId}`
+        }
       }
-      return true
+      
+      provisioningDatabase.set(sessionId, result)
+      return result
     },
-    async markTokenUsed(token) {
-      const rec = tokenMap.get(token)
-      if (rec) rec.used = true
+    
+    async validateResponse(response: any, sessionId: string) {
+      logActivity(sessionId, { action: 'validateResponse', response })
+      
+      // Simple validation: response must have required structure  
+      return response && response.approved !== undefined
     },
-    async provisionDatabase(createdBy, initiatorPeerId, respondentPeerId) {
-      const tallyId = `tally-${nextId++}`
-      return {
-        tally: { tallyId, createdBy },
-        dbConnectionInfo: { endpoint: `quereus://127.0.0.1/${tallyId}`, credentialsRef: `cred-${tallyId}` }
-      }
-    },
-    async recordProvisioning(idempotencyKey, result) {
-      provisionMap.set(idempotencyKey, result)
-    },
-    async getProvisioning(idempotencyKey) {
-      return provisionMap.get(idempotencyKey) ?? null
+    
+    async validateDatabaseResult(result: any, sessionId: string) {
+      logActivity(sessionId, { action: 'validateDatabaseResult', result })
+      
+      // Simple validation: result must have tally and dbConnectionInfo
+      return result && result.tally && result.dbConnectionInfo
     }
   }
 }

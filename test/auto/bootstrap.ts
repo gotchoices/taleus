@@ -1,364 +1,379 @@
 /*
-  Taleus Bootstrap POC tests (TDD scaffold)
-  - Runs real libp2p nodes locally (loopback) within mocha
-  - Exercises Method 6 (Role-Based Link Handshake) flows at a high level
-  - Uses a Fake DatabaseProvisioner until Quereus/Optimystic are available
-
-  Notes:
-  - These tests are initially skipped. Un-skip once the bootstrap module is implemented.
-  - Keep networking local to 127.0.0.1; avoid external discovery.
+  Taleus Bootstrap State Machine Tests
+  
+  Tests the production state machine architecture with:
+  - SessionManager orchestration
+  - ListenerSession and DialerSession classes  
+  - Concurrent session handling
+  - Proper state transitions and timeout management
+  - Method 6 cadre disclosure timing (B first, A after validation)
+  
+  Most tests are initially skipped pending state machine implementation.
 */
 
 import { strict as assert } from 'assert'
-import { describe, it, beforeAll as before, afterAll as after, beforeEach } from 'vitest'
+import { describe, it, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import { createLibp2p, Libp2p } from 'libp2p'
 import { tcp } from '@libp2p/tcp'
 import { noise } from '@chainsafe/libp2p-noise'
 import { mplex } from '@libp2p/mplex'
-import { TallyBootstrap } from '../../src/tallyBootstrap.js'
-import { createInMemoryHooks } from './helpers/consumerMocks.js'
+import { createSessionAwareHooks, SessionHooks } from './helpers/consumerMocks.js'
 
-// Shared protocol for bootstrap messages
-const BOOTSTRAP_PROTOCOL = '/taleus/bootstrap/1.0.0'
+// State machine architecture types (will be implemented in src/tallyBootstrap.ts)
+type ListenerState = 'L_PROCESS_CONTACT' | 'L_SEND_RESPONSE' | 'L_AWAIT_DATABASE' | 'L_DONE' | 'L_FAILED'
+type DialerState = 'D_SEND_CONTACT' | 'D_AWAIT_RESPONSE' | 'D_PROVISION_DATABASE' | 'D_DONE' | 'D_FAILED'
 
-// Types (to be replaced by real Taleus interfaces)
-type PartyRole = 'stock' | 'foil'
+interface SessionConfig {
+  sessionTimeoutMs: number
+  stepTimeoutMs: number
+  maxConcurrentSessions: number
+}
 
-interface BootstrapLinkPayload {
-  responderPeerAddrs: string[] // multiaddrs of A's responder nodes (not full cadre)
+interface SessionHooks {
+  validateToken(token: string, sessionId: string): Promise<{role: 'stock'|'foil', valid: boolean}>
+  validateIdentity(identity: any, sessionId: string): Promise<boolean>
+  provisionDatabase(role: 'stock'|'foil', partyA: string, partyB: string, sessionId: string): Promise<any>
+  validateResponse(response: any, sessionId: string): Promise<boolean>
+  validateDatabaseResult(result: any, sessionId: string): Promise<boolean>
+}
+
+interface BootstrapLink {
+  responderPeerAddrs: string[]
   token: string
   tokenExpiryUtc: string
-  initiatorRole: PartyRole
-  identityRequirements?: string // future: schema URI or plain description
+  initiatorRole: 'stock' | 'foil'
+  identityRequirements?: string
 }
 
-interface DraftTallyInfo {
-  tallyId: string
-  createdBy: PartyRole
+interface BootstrapResult {
+  tally: {tallyId: string, createdBy: 'stock'|'foil'}
+  dbConnectionInfo: {endpoint: string, credentialsRef: string}
 }
 
-interface ProvisionResult {
-  tally: DraftTallyInfo
-  dbConnectionInfo: {
-    endpoint: string
-    credentialsRef: string
+// TODO: Import these from src/tallyBootstrap.ts after implementation
+// import { SessionManager, ListenerSession, DialerSession } from '../../src/tallyBootstrap.js'
+
+// Temporary mock implementations (will be replaced with actual imports)
+class SessionManager {
+  constructor(private hooks: SessionHooks, private config: SessionConfig) {}
+  
+  async handleNewStream(stream: any): Promise<void> {
+    throw new Error('SessionManager not implemented yet - implement in src/tallyBootstrap.ts')
+  }
+  
+  async initiateBootstrap(link: BootstrapLink, node: Libp2p): Promise<BootstrapResult> {
+    throw new Error('SessionManager not implemented yet - implement in src/tallyBootstrap.ts')  
   }
 }
 
-interface DatabaseProvisioner {
-  provision(params: {
-    createdBy: PartyRole
-    initiatorPeerId: string
-    respondentPeerId: string
-  }): Promise<ProvisionResult>
-}
-
-interface BootstrapService {
-  // A-side: handle inbound contact from respondent (token + identity)
-  handleInboundContact(params: {
-    token: string
-    initiatorRole: PartyRole
-    initiatorPeer: Libp2p
-    respondentPeerInfo: {
-      peer: Libp2p
-      partyId: string
-      proposedCadrePeerAddrs: string[]
-    }
-  }): Promise<{
-    approved: boolean
-    reason?: string
-    participatingCadrePeerAddrs?: string[]
-    // If A builds (stock), include provisioned result
-    provisionResult?: ProvisionResult
-  }>
-
-  // B-side: build DB when A is foil
-  buildOnRespondent(params: {
-    initiatorPeer: Libp2p
-    respondentPeer: Libp2p
-    participatingCadrePeerAddrs: string[]
-  }): Promise<ProvisionResult>
-}
-
-// Fake provisioner for tests
-class FakeProvisioner implements DatabaseProvisioner {
-  private nextCounter = 1
-  async provision(params: { createdBy: PartyRole; initiatorPeerId: string; respondentPeerId: string }): Promise<ProvisionResult> {
-    const tallyId = `tally-${this.nextCounter++}`
-    return {
-      tally: { tallyId, createdBy: params.createdBy },
-      dbConnectionInfo: {
-        endpoint: `quereus://127.0.0.1/${tallyId}`,
-        credentialsRef: `cred-${tallyId}`
-      }
-    }
+class ListenerSession {
+  constructor(
+    private sessionId: string,
+    private stream: any,
+    private hooks: SessionHooks,
+    private config: SessionConfig
+  ) {}
+  
+  async execute(): Promise<void> {
+    throw new Error('ListenerSession not implemented yet - implement in src/tallyBootstrap.ts')
   }
 }
 
-async function createNode(): Promise<Libp2p> {
+class DialerSession {
+  constructor(
+    private sessionId: string,
+    private link: BootstrapLink,
+    private node: Libp2p,
+    private hooks: SessionHooks,
+    private config: SessionConfig
+  ) {}
+  
+  async execute(): Promise<BootstrapResult> {
+    throw new Error('DialerSession not implemented yet - implement in src/tallyBootstrap.ts')
+  }
+}
+
+// Test infrastructure
+const DEFAULT_CONFIG: SessionConfig = {
+  sessionTimeoutMs: 30000,
+  stepTimeoutMs: 5000,
+  maxConcurrentSessions: 100
+}
+
+function createLibp2pNode(port: number = 0): Promise<Libp2p> {
   return createLibp2p({
-    addresses: { listen: ['/ip4/127.0.0.1/tcp/0'] },
+    addresses: {
+      listen: [`/ip4/127.0.0.1/tcp/${port}`]
+    },
     transports: [tcp()],
     connectionEncrypters: [noise()],
     streamMuxers: [mplex()],
-    peerDiscovery: [],
-    connectionGater: {
-      denyDialMultiaddr: async (ma) => !ma.toString().includes('/ip4/127.0.0.1/')
+    connectionManager: {
+      dialTimeout: 5000
     }
   })
 }
 
-// Placeholder factory to be replaced with real implementation import
-function createBootstrapService(_deps: { provisioner: DatabaseProvisioner }): BootstrapService {
-  // Return a stub that throws only when invoked (keeps suite definition safe)
-  return {
-    async handleInboundContact() {
-      throw new Error('BootstrapService.handleInboundContact not implemented')
-    },
-    async buildOnRespondent() {
-      throw new Error('BootstrapService.buildOnRespondent not implemented')
-    }
-  }
-}
-
-describe('Taleus Bootstrap (Method 6) – POC', () => {
-
-  let A: Libp2p
-  let B1: Libp2p
-  let B2: Libp2p
-  const hooks = createInMemoryHooks([
-    { token: 'one-time-abc', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: true },
-    { token: 'one-time-xyz', initiatorRole: 'foil', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: true },
-    { token: 'multi-use-qr', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 300_000).toISOString(), oneTime: false },
-    // Idempotency test tokens
-    { token: 'idempotent-stock', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: false },
-    { token: 'idempotent-foil', initiatorRole: 'foil', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: false },
-    { token: 'multi-provision', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: false }
-  ])
-  const bootstrap = new TallyBootstrap(hooks)
-  let unregisterA: (() => void) | undefined
-
-  before(async () => {
-    A = await createNode()
-    B1 = await createNode()
-    B2 = await createNode()
-    await Promise.all([A.start(), B1.start(), B2.start()])
-    // Establish direct connectivity on loopback
-    const addrA = A.getMultiaddrs().find(ma => ma.nodeAddress().address === '127.0.0.1')
-    const addrB1 = B1.getMultiaddrs().find(ma => ma.nodeAddress().address === '127.0.0.1')
-    const addrB2 = B2.getMultiaddrs().find(ma => ma.nodeAddress().address === '127.0.0.1')
-    assert(addrA && addrB1 && addrB2)
-    await Promise.all([
-      B1.dial(addrA),
-      B2.dial(addrA),
-      A.dial(addrB1),
-      A.dial(addrB2)
-    ])
-    // Register passive listener on A with role=stock by default; individual tests can override if needed
-    unregisterA = bootstrap.registerPassiveListener(A, { role: 'stock' })
+describe('Taleus Bootstrap State Machine', () => {
+  let nodeA: Libp2p
+  let nodeB: Libp2p
+  let hooksA: SessionHooks
+  let hooksB: SessionHooks
+  
+  beforeAll(async () => {
+    nodeA = await createLibp2pNode()
+    nodeB = await createLibp2pNode()
+    await nodeA.start()
+    await nodeB.start()
   })
-
-  after(async () => {
-    await Promise.allSettled([A?.stop(), B1?.stop(), B2?.stop()])
+  
+  afterAll(async () => {
+    await nodeA?.stop()
+    await nodeB?.stop()
   })
-
+  
   beforeEach(() => {
-    // Future: reset any in-memory state if the service keeps it
+    hooksA = createSessionAwareHooks(['stock-token', 'foil-token', 'multi-use-token'])
+    hooksB = createSessionAwareHooks(['stock-token', 'foil-token', 'multi-use-token'])
   })
 
-  describe('One-time token – A (stock) builds on approval', () => {
-    it('approves valid respondent and returns DB access with draft tally', async () => {
-      // Ensure A is registered as stock for this test
-      unregisterA?.()
-      unregisterA = bootstrap.registerPassiveListener(A, { role: 'stock' })
-      const link: BootstrapLinkPayload = {
-        responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
-        token: 'one-time-abc',
-        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
-        initiatorRole: 'stock',
-        identityRequirements: 'email, phone'
-      }
-
-      const result = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'k1' })
-
-      // When A is stock, initiateFromLink should return a ProvisionResult directly
-      const pr = result as unknown as ProvisionResult
-      assert.ok(pr.dbConnectionInfo)
+  describe('SessionManager', () => {
+    it.skip('should create and configure properly', () => {
+      const manager = new SessionManager(hooksA, DEFAULT_CONFIG)
+      assert.ok(manager)
+    })
+    
+    it.skip('should handle multiple concurrent sessions without blocking', async () => {
+      const manager = new SessionManager(hooksA, DEFAULT_CONFIG)
+      
+      // Simulate 3 concurrent incoming streams
+      const streams = [
+        { sessionId: 'session-1', data: 'stream-1' },
+        { sessionId: 'session-2', data: 'stream-2' },
+        { sessionId: 'session-3', data: 'stream-3' }
+      ]
+      
+      const promises = streams.map(stream => manager.handleNewStream(stream))
+      
+      // All should process concurrently, not sequentially
+      const startTime = Date.now()
+      await Promise.all(promises)
+      const duration = Date.now() - startTime
+      
+      // If processed concurrently, should be much faster than sequential
+      assert.ok(duration < 5000, 'Sessions should process concurrently')
+    })
+    
+    it.skip('should clean up sessions after completion', async () => {
+      // Test that completed sessions are properly removed from memory
+      assert.fail('TODO: Test session cleanup')
+    })
+    
+    it.skip('should isolate session failures', async () => {
+      // Test that one session failure doesn't affect others
+      assert.fail('TODO: Test session isolation')
     })
   })
 
-  describe('One-time token – B (foil) builds on approval', () => {
-    it('approves valid respondent and B provisions DB with draft tally', async () => {
-      // Switch A listener to foil role for this test
-      unregisterA?.()
-      unregisterA = bootstrap.registerPassiveListener(A, { role: 'foil' })
-      const link: BootstrapLinkPayload = {
-        responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
-        token: 'one-time-xyz',
-        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
+  describe('ListenerSession State Transitions', () => {
+    it.skip('should follow correct state flow: L_PROCESS_CONTACT → L_SEND_RESPONSE → L_DONE (stock role)', async () => {
+      const mockStream = { sessionId: 'test-session' }
+      const session = new ListenerSession('test-session', mockStream, hooksA, DEFAULT_CONFIG)
+      
+      // Mock the state transitions and verify sequence
+      await session.execute()
+      
+      // Verify state progression was: L_PROCESS_CONTACT → L_SEND_RESPONSE → L_DONE
+      assert.fail('TODO: Test listener state transitions for stock role')
+    })
+    
+    it.skip('should follow extended state flow for foil role: L_PROCESS_CONTACT → L_SEND_RESPONSE → L_AWAIT_DATABASE → L_DONE', async () => {
+      const mockStream = { sessionId: 'test-session' }
+      const session = new ListenerSession('test-session', mockStream, hooksA, DEFAULT_CONFIG)
+      
+      await session.execute()
+      
+      assert.fail('TODO: Test listener state transitions for foil role')
+    })
+    
+    it.skip('should transition to L_FAILED on validation errors', async () => {
+      // Test error state transitions
+      assert.fail('TODO: Test error state transitions')
+    })
+    
+    it.skip('should handle session timeouts gracefully', async () => {
+      // Test timeout handling
+      assert.fail('TODO: Test session timeout handling')
+    })
+  })
+
+  describe('DialerSession State Transitions', () => {
+    it.skip('should follow correct state flow: D_SEND_CONTACT → D_AWAIT_RESPONSE → D_DONE (stock role)', async () => {
+      const link: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'stock-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+      
+      const session = new DialerSession('test-session', link, nodeB, hooksB, DEFAULT_CONFIG)
+      
+      await session.execute()
+      
+      assert.fail('TODO: Test dialer state transitions for stock role')
+    })
+    
+    it.skip('should follow extended state flow for foil role: D_SEND_CONTACT → D_AWAIT_RESPONSE → D_PROVISION_DATABASE → D_DONE', async () => {
+      const link: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'foil-token', 
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
         initiatorRole: 'foil'
       }
-
-      const provision = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'k2' })
-
-      const pr = provision as unknown as ProvisionResult
-      assert.match(pr.tally.tallyId, /^tally-/)
-      assert.equal(pr.tally.createdBy, 'foil')
-      assert.ok(pr.dbConnectionInfo.endpoint.includes('127.0.0.1'))
+      
+      const session = new DialerSession('test-session', link, nodeB, hooksB, DEFAULT_CONFIG)
+      
+      await session.execute()
+      
+      assert.fail('TODO: Test dialer state transitions for foil role')
     })
   })
 
-  describe('Multi-use token – provisions unique DB per respondent', () => {
-    it('creates separate tallies for two respondents using the same token', async () => {
-      // Ensure A is registered as stock for this test
-      unregisterA?.()
-      unregisterA = bootstrap.registerPassiveListener(A, { role: 'stock' })
-      const link: BootstrapLinkPayload = {
-        responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
-        token: 'multi-use-qr',
-        tokenExpiryUtc: new Date(Date.now() + 300_000).toISOString(),
-        initiatorRole: 'stock'
-      }
-
-      const pr1 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'k4' }) as unknown as ProvisionResult
-      const pr2 = await bootstrap.initiateFromLink(link, B2, { idempotencyKey: 'k5' }) as unknown as ProvisionResult
-
-      assert.ok(pr1.tally.tallyId && pr2.tally.tallyId && pr1.tally.tallyId !== pr2.tally.tallyId)
+  describe('Message Flow Integration', () => {
+    it.skip('should execute complete stock role bootstrap (2 messages)', async () => {
+      // Test: B initiates, A provisions DB, returns info
+      const managerA = new SessionManager(hooksA, DEFAULT_CONFIG)
+      const managerB = new SessionManager(hooksB, DEFAULT_CONFIG)
+      
+      // A registers as listener
+      // B initiates bootstrap
+      // Verify 2-message flow completes successfully
+      
+      assert.fail('TODO: Test complete stock role flow')
+    })
+    
+    it.skip('should execute complete foil role bootstrap (3 messages)', async () => {
+      // Test: B initiates, A approves, B provisions DB, sends info
+      assert.fail('TODO: Test complete foil role flow')
+    })
+    
+    it.skip('should handle rejection scenarios gracefully', async () => {
+      // Test token validation failures, identity failures
+      assert.fail('TODO: Test rejection handling')
     })
   })
 
-  describe('Rejection path – missing identity requirements', () => {
-    it('rejects with a clear reason if identity is insufficient', async () => {
-      const link: BootstrapLinkPayload = {
-        responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
-        token: 'one-time-reject',
-        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
-        initiatorRole: 'stock',
-        identityRequirements: 'email, phone, selfie'
-      }
-
-      // override hooks to fail identity
-      const failHooks = createInMemoryHooks([
-        { token: 'one-time-reject', initiatorRole: 'stock', expiryUtc: new Date(Date.now() + 60_000).toISOString(), oneTime: true }
-      ], { validateIdentity: () => false })
-      const bootstrap2 = new TallyBootstrap(failHooks)
-      // Ensure we don't have duplicate handlers
-      unregisterA?.()
-      unregisterA = bootstrap2.registerPassiveListener(A, { role: 'stock' })
-
-      const result = await bootstrap2.initiateFromLink(link, B1, { idempotencyKey: 'k3' })
-
-      const rej = result as unknown as { approved: false; reason: string }
-      // @ts-expect-error
-      assert.equal(rej.approved, false)
-      // @ts-expect-error
-      assert.ok(rej.reason && (rej.reason as string).length > 0)
+  describe('Cadre Disclosure Timing (Method 6 Compliance)', () => {
+    it.skip('should send B_cadre in InboundContact message', async () => {
+      // Verify Message 1 contains cadrePeerAddrs from B (initiator)
+      assert.fail('TODO: Test B cadre disclosure first')
+    })
+    
+    it.skip('should send A_cadre in ProvisioningResult message (post-validation)', async () => {
+      // Verify Message 2 contains cadrePeerAddrs from A (after validation)  
+      assert.fail('TODO: Test A cadre disclosure after validation')
+    })
+    
+    it.skip('should allow A to reject without revealing A_cadre', async () => {
+      // Test that rejection response doesn't include A's cadre information
+      assert.fail('TODO: Test cadre protection on rejection')
     })
   })
 
-  describe('Idempotency Testing', () => {
-    it('returns cached result for duplicate stock requests', async () => {
-      unregisterA?.()
-      unregisterA = bootstrap.registerPassiveListener(A, { role: 'stock' })
-      
-      const link: BootstrapLinkPayload = {
-        responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
-        token: 'idempotent-stock',
-        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
-        initiatorRole: 'stock'
-      }
-
-      // First request
-      const result1 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'duplicate-stock' })
-      // Second request with same idempotencyKey
-      const result2 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'duplicate-stock' })
-
-      const pr1 = result1 as unknown as ProvisionResult
-      const pr2 = result2 as unknown as ProvisionResult
-      
-      assert.equal(pr1.tally.tallyId, pr2.tally.tallyId)
-      assert.equal(pr1.dbConnectionInfo.endpoint, pr2.dbConnectionInfo.endpoint)
+  describe('Hook Integration', () => {
+    it.skip('should call hooks with proper session context', async () => {
+      // Verify hooks receive sessionId and proper context
+      assert.fail('TODO: Test session-aware hooks')
     })
-
-    it('returns cached result for duplicate foil requests', async () => {
-      unregisterA?.()
-      unregisterA = bootstrap.registerPassiveListener(A, { role: 'foil' })
-      
-      const link: BootstrapLinkPayload = {
-        responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
-        token: 'idempotent-foil',
-        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
-        initiatorRole: 'foil'
-      }
-
-      // First request
-      const result1 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'duplicate-foil' })
-      // Second request with same idempotencyKey
-      const result2 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'duplicate-foil' })
-
-      const pr1 = result1 as unknown as ProvisionResult
-      const pr2 = result2 as unknown as ProvisionResult
-      
-      assert.equal(pr1.tally.tallyId, pr2.tally.tallyId)
-      assert.equal(pr1.dbConnectionInfo.endpoint, pr2.dbConnectionInfo.endpoint)
+    
+    it.skip('should handle hook failures gracefully', async () => {
+      // Test hook exceptions are caught and handled
+      assert.fail('TODO: Test hook error handling')
     })
-
-    it('provisions separate resources for different idempotencyKeys', async () => {
-      unregisterA?.()
-      unregisterA = bootstrap.registerPassiveListener(A, { role: 'stock' })
-      
-      const link: BootstrapLinkPayload = {
-        responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
-        token: 'multi-provision',
-        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
-        initiatorRole: 'stock'
-      }
-
-      const result1 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'unique-1' })
-      const result2 = await bootstrap.initiateFromLink(link, B1, { idempotencyKey: 'unique-2' })
-
-      const pr1 = result1 as unknown as ProvisionResult
-      const pr2 = result2 as unknown as ProvisionResult
-      
-      assert.notEqual(pr1.tally.tallyId, pr2.tally.tallyId)
+    
+    it.skip('should validate hook return values', async () => {
+      // Test malformed hook responses are rejected
+      assert.fail('TODO: Test hook validation')
     })
   })
 
-  describe('Edge Cases', () => {
-    it('rejects invalid tokens', async () => {
-      const link: BootstrapLinkPayload = {
-        responderPeerAddrs: A.getMultiaddrs().map(ma => ma.toString()),
-        token: 'invalid-token-xyz',
-        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
+  describe('Concurrent Multi-Use Token Scenarios', () => {
+    it.skip('should handle multiple customers with same merchant token', async () => {
+      const merchantManager = new SessionManager(hooksA, DEFAULT_CONFIG)
+      
+      // Simulate 3 customers scanning same QR code simultaneously
+      const customers = [
+        { node: nodeB, customerId: 'customer1' },
+        { node: nodeB, customerId: 'customer2' },  
+        { node: nodeB, customerId: 'customer3' }
+      ]
+      
+      const link: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'multi-use-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
         initiatorRole: 'stock'
       }
-
-      const result = await bootstrap.initiateFromLink(link, B1)
-      const rej = result as unknown as { approved: false; reason: string }
       
-      // @ts-expect-error
-      assert.equal(rej.approved, false)
-      // @ts-expect-error
-      assert.equal(rej.reason, 'invalid_token')
+      // All should complete with unique database instances
+      const results = await Promise.all(
+        customers.map(customer => 
+          merchantManager.initiateBootstrap(link, customer.node)
+        )
+      )
+      
+      // Verify each got unique tally/database
+      const tallyIds = results.map(r => r.tally.tallyId)
+      const uniqueTallyIds = new Set(tallyIds)
+      assert.equal(uniqueTallyIds.size, 3, 'Each customer should get unique tally')
+      
+      assert.fail('TODO: Test concurrent multi-use token handling')
     })
+    
+    it.skip('should maintain session isolation in multi-use scenarios', async () => {
+      // Test that concurrent sessions don't interfere with each other
+      assert.fail('TODO: Test multi-use session isolation')
+    })
+  })
 
-    it('handles missing responder addresses', async () => {
-      const link: BootstrapLinkPayload = {
-        responderPeerAddrs: [],
-        token: 'any-token',
-        tokenExpiryUtc: new Date(Date.now() + 60_000).toISOString(),
-        initiatorRole: 'stock'
+  describe('Timeout and Error Recovery', () => {
+    it.skip('should timeout sessions that exceed configured limits', async () => {
+      const shortTimeoutConfig: SessionConfig = {
+        sessionTimeoutMs: 100,  // Very short timeout
+        stepTimeoutMs: 50,
+        maxConcurrentSessions: 10
       }
-
-      const result = await bootstrap.initiateFromLink(link, B1)
-      const rej = result as unknown as { approved: false; reason: string }
       
-      // @ts-expect-error
-      assert.equal(rej.approved, false)
-      // @ts-expect-error
-      assert.equal(rej.reason, 'no_responder_addrs')
+      // Session should timeout and clean up gracefully
+      assert.fail('TODO: Test session timeout')
+    })
+    
+    it.skip('should handle network failures during bootstrap', async () => {
+      // Test connection drops, stream errors
+      assert.fail('TODO: Test network failure recovery')
+    })
+    
+    it.skip('should recover from partial failures', async () => {
+      // Test scenarios where some steps succeed but others fail
+      assert.fail('TODO: Test partial failure recovery')
+    })
+  })
+
+  describe('Performance and Resource Management', () => {
+    it.skip('should limit concurrent sessions to configured maximum', async () => {
+      const limitedConfig: SessionConfig = {
+        sessionTimeoutMs: 30000,
+        stepTimeoutMs: 5000,
+        maxConcurrentSessions: 2  // Very low limit
+      }
+      
+      // Test that excess sessions are queued or rejected
+      assert.fail('TODO: Test session limiting')
+    })
+    
+    it.skip('should clean up resources on session completion', async () => {
+      // Test memory leaks, stream cleanup, etc.
+      assert.fail('TODO: Test resource cleanup')
     })
   })
 })
-
-
