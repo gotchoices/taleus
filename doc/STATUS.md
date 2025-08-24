@@ -205,12 +205,16 @@ Based on PROJECT.md, the following information needs clarification:
   - [ ] Update `doc/architecture.md` with SessionManager and session classes
   - [ ] Add session monitoring and metrics interface documentation
   - [ ] **Review and Update Core Documentation for Consistency**:
+    - [ ] **CRITICAL**: Fix `doc/bootstrap.md` DialerSession state diagram - remove D_HANDLE_RESPONSE, show D_PROVISION_DATABASE
+    - [ ] **CRITICAL**: Document libp2p stream consumption issue - foil Message 3 requires NEW stream (dialProtocol)
+    - [ ] **CRITICAL**: Update sequence diagrams to show NodeB opens fresh stream for DatabaseResult message
     - [ ] Review `doc/architecture.md` - replace TallyBootstrap class with SessionManager/ListenerSession/DialerSession architecture
     - [ ] Review `doc/architecture.md` - update Hooks interface to SessionHooks with new structure (token.validate, database.provision, etc.)
     - [ ] Review `doc/architecture.md` - remove obsolete registerPassiveListener/initiateFromLink API references
     - [ ] Review `doc/protocol.md` - update TallyBootstrap protocol section with session-based message flows
     - [ ] Review `doc/protocol.md` - ensure protocol message types match bootstrap.md sequence diagrams
     - [ ] Review `doc/protocol.md` - remove obsolete sequential handler references
+    - [ ] Review `doc/protocol.md` - document libp2p stream lifecycle and new stream requirement for 3-message flows
     - [ ] Review `doc/tally.md` - update bootstrap process references to point to doc/bootstrap.md instead of doc/design/bootstrap.md
     - [ ] Review `doc/tally.md` - ensure tally data chunk descriptions align with current bootstrap implementation
     - [ ] Check for obsolete TallyBootstrap class references across all documentation

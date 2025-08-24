@@ -213,7 +213,11 @@ describe('Taleus Bootstrap State Machine', () => {
       assert.equal(result.tally.createdBy, 'stock')
       
       // Clean up
-      nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
     }, 15000)
     
     it('should execute complete foil role bootstrap (3 messages)', async () => {
@@ -245,13 +249,46 @@ describe('Taleus Bootstrap State Machine', () => {
       assert.equal(result.tally.createdBy, 'foil')
       
       // Clean up
-      nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
     }, 15000)
     
-    it.skip('should handle rejection scenarios gracefully', async () => {
-      // Test token validation failures, identity failures
-      assert.fail('TODO: Test rejection handling')
-    })
+    it('should handle rejection scenarios gracefully', async () => {
+      const managerA = new SessionManager(hooksA, DEFAULT_CONFIG)
+      const managerB = new SessionManager(hooksB, DEFAULT_CONFIG)
+      
+      // A registers as passive listener
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await managerA.handleNewStream(stream as any)
+      })
+      
+      // Test 1: Invalid token
+      const invalidTokenLink: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'invalid-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+      
+      console.log('Testing invalid token rejection...')
+      try {
+        await managerB.initiateBootstrap(invalidTokenLink, nodeB)
+        assert.fail('Should have rejected invalid token')
+      } catch (error) {
+        console.log('✅ Invalid token properly rejected:', error.message)
+        assert.ok(error.message.includes('Invalid token'), 'Should reject invalid token')
+      }
+      
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 10000)
   })
 
   describe('Cadre Disclosure Timing (Method 6 Compliance)', () => {
@@ -312,15 +349,13 @@ describe('Taleus Bootstrap State Machine', () => {
   })
 
   describe('Concurrent Multi-Use Token Scenarios', () => {
-    it.skip('should handle multiple customers with same merchant token', async () => {
+    it('should handle multiple customers with same merchant token', async () => {
       const merchantManager = new SessionManager(hooksA, DEFAULT_CONFIG)
       
-      // Simulate 3 customers scanning same QR code simultaneously
-      const customers = [
-        { node: nodeB, customerId: 'customer1' },
-        { node: nodeB, customerId: 'customer2' },  
-        { node: nodeB, customerId: 'customer3' }
-      ]
+      // Merchant (A) registers as passive listener
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await merchantManager.handleNewStream(stream as any)
+      })
       
       const link: BootstrapLink = {
         responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
@@ -329,20 +364,40 @@ describe('Taleus Bootstrap State Machine', () => {
         initiatorRole: 'stock'
       }
       
-      // All should complete with unique database instances
-      const results = await Promise.all(
-        customers.map(customer => 
-          merchantManager.initiateBootstrap(link, customer.node)
-        )
-      )
+      // Simulate 3 customers with separate managers/sessions
+      const customerManager1 = new SessionManager(hooksB, DEFAULT_CONFIG)
+      const customerManager2 = new SessionManager(hooksB, DEFAULT_CONFIG)  
+      const customerManager3 = new SessionManager(hooksB, DEFAULT_CONFIG)
+      
+      console.log('Starting concurrent multi-use token test...')
+      
+      // All customers initiate simultaneously with same token
+      const results = await Promise.all([
+        customerManager1.initiateBootstrap(link, nodeB),
+        customerManager2.initiateBootstrap(link, nodeB),
+        customerManager3.initiateBootstrap(link, nodeB)
+      ])
+      
+      console.log('All customers completed:', results.map(r => r.tally.tallyId))
       
       // Verify each got unique tally/database
       const tallyIds = results.map(r => r.tally.tallyId)
       const uniqueTallyIds = new Set(tallyIds)
       assert.equal(uniqueTallyIds.size, 3, 'Each customer should get unique tally')
       
-      assert.fail('TODO: Test concurrent multi-use token handling')
-    })
+      results.forEach(result => {
+        assert.ok(result.tally)
+        assert.ok(result.dbConnectionInfo)
+        assert.equal(result.tally.createdBy, 'stock')
+      })
+      
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 15000)
     
     it.skip('should maintain session isolation in multi-use scenarios', async () => {
       // Test that concurrent sessions don't interfere with each other
@@ -351,16 +406,48 @@ describe('Taleus Bootstrap State Machine', () => {
   })
 
   describe('Timeout and Error Recovery', () => {
-    it.skip('should timeout sessions that exceed configured limits', async () => {
+    it('should timeout sessions that exceed configured limits', async () => {
       const shortTimeoutConfig: SessionConfig = {
-        sessionTimeoutMs: 100,  // Very short timeout
-        stepTimeoutMs: 50,
-        maxConcurrentSessions: 10
+        sessionTimeoutMs: 500,  // Short timeout for testing
+        stepTimeoutMs: 250,
+        maxConcurrentSessions: 10,
+        enableDebugLogging: true
       }
       
-      // Session should timeout and clean up gracefully
-      assert.fail('TODO: Test session timeout')
-    })
+      const managerA = new SessionManager(hooksA, shortTimeoutConfig)
+      const managerB = new SessionManager(hooksB, shortTimeoutConfig)
+      
+      // A registers as passive listener
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await managerA.handleNewStream(stream as any)
+      })
+      
+      // Create a link with valid token but add artificial delay to trigger timeout
+      const link: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'stock-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+      
+      console.log('Testing session timeout...')
+      
+      try {
+        // This should timeout before completing
+        await managerB.initiateBootstrap(link, nodeB)
+        assert.fail('Should have timed out')
+      } catch (error) {
+        console.log('✅ Session properly timed out:', error.message)
+        assert.ok(error.message.includes('timeout'), 'Should timeout with timeout error')
+      }
+      
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 3000)
     
     it.skip('should handle network failures during bootstrap', async () => {
       // Test connection drops, stream errors

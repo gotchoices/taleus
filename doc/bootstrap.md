@@ -15,6 +15,18 @@ The Taleus bootstrap uses a **session-based state machine** architecture optimiz
 - **Resource Management**: Automatic cleanup and monitoring
 - **Audit Trail**: Complete logging for money system compliance
 
+## libp2p Stream Architecture
+
+**Critical Implementation Detail**: libp2p streams are **single-use** for multi-message patterns.
+
+- **Stock Role (2 messages)**: Uses one stream for Contact → Response
+- **Foil Role (3 messages)**: 
+  - Stream 1: Contact → Response
+  - **Stream 2**: DatabaseResult (NEW `dialProtocol()` call required)
+  - Once `stream.source` is consumed by reading the response, the original stream cannot be reused
+
+This is **not a limitation** - it's the **correct libp2p pattern** for multi-turn communication.
+
 ---
 
 ## Session State Diagrams
@@ -60,27 +72,27 @@ stateDiagram-v2
     D_SEND_CONTACT --> D_AWAIT_RESPONSE: InboundContact sent
     D_SEND_CONTACT --> D_FAILED: Send failed
     
-    D_AWAIT_RESPONSE --> D_HANDLE_RESPONSE: Response received
+    D_AWAIT_RESPONSE --> D_PROVISION_DATABASE: Valid response (foil role)
+    D_AWAIT_RESPONSE --> D_DONE: Valid response (stock role)
+    D_AWAIT_RESPONSE --> D_FAILED: Invalid/rejected response
     D_AWAIT_RESPONSE --> D_TIMEOUT: Response timeout
     
-    D_HANDLE_RESPONSE --> D_SEND_DATABASE: Valid (foil role)
-    D_HANDLE_RESPONSE --> D_DONE: Valid (stock role)
-    D_HANDLE_RESPONSE --> D_FAILED: Invalid response
-    
-    D_SEND_DATABASE --> D_DONE: DatabaseResult sent
-    D_SEND_DATABASE --> D_FAILED: Database send failed
-    
-    D_HANDLE_RESPONSE --> D_TIMEOUT: Hook timeout
-    D_SEND_DATABASE --> D_TIMEOUT: Send timeout
+    D_PROVISION_DATABASE --> D_DONE: Database provisioned & sent
+    D_PROVISION_DATABASE --> D_FAILED: Database provision failed
+    D_PROVISION_DATABASE --> D_TIMEOUT: Provision timeout
     
     D_FAILED --> [*]: Return error
     D_TIMEOUT --> [*]: Return timeout
     D_DONE --> [*]: Return success
     
-    note right of D_HANDLE_RESPONSE
+    note right of D_PROVISION_DATABASE
         Hook calls:
         - validateResponse()
-        - provisionDatabase() [foil role only]
+        - provisionDatabase() [foil role]
+        
+        libp2p:
+        - Opens NEW stream for DatabaseResult
+        - (Original stream consumed by response)
     end note
 ```
 
@@ -156,8 +168,9 @@ sequenceDiagram
     NodeB->>HooksB: provisionDatabase(foil, partyA, partyB)
     HooksB-->>NodeB: provisionResult {tally, dbConnectionInfo}
     
-    Note over NodeB,NodeA: Message 3: DatabaseResult<br/>B provides provisioned database access
+    Note over NodeB,NodeA: Message 3: DatabaseResult<br/>B provides provisioned database access<br/>(NEW libp2p stream required)
     
+    NodeB->>NodeA: dialProtocol('/taleus/bootstrap/1.0.0') [NEW STREAM]
     NodeB->>NodeA: DatabaseResult {tally, dbConnectionInfo}
     NodeA->>HooksA: validateDatabaseResult(result)
     HooksA-->>NodeA: resultValid

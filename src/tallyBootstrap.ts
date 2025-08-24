@@ -279,6 +279,8 @@ export class ListenerSession {
     })
     
     if (!this.tokenInfo.valid) {
+      // Send rejection response before failing
+      await this.sendRejection('Invalid token')
       throw new Error('Invalid token')
     }
     
@@ -288,6 +290,8 @@ export class ListenerSession {
     })
     
     if (!identityValid) {
+      // Send rejection response before failing
+      await this.sendRejection('Invalid identity')
       throw new Error('Invalid identity')
     }
     
@@ -381,6 +385,21 @@ export class ListenerSession {
     if (this.config.enableDebugLogging) {
       const elapsed = Date.now() - this.startTime
       console.log(`[ListenerSession:${this.sessionId}:${elapsed}ms] ${message}`, ...args)
+    }
+  }
+  
+  private async sendRejection(reason: string): Promise<void> {
+    const rejection: ProvisioningResultMessage = {
+      approved: false,
+      reason: reason
+    }
+    
+    try {
+      await writeJson(this.stream, rejection, true)  // Close after rejection
+      this.debugLog(`Sent rejection: ${reason}`)
+    } catch (error) {
+      this.debugLog(`Failed to send rejection: ${error}`)
+      // Continue with the error anyway
     }
   }
   
