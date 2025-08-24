@@ -19,79 +19,18 @@ import { noise } from '@chainsafe/libp2p-noise'
 import { mplex } from '@libp2p/mplex'
 import { createSessionAwareHooks, SessionHooks } from './helpers/consumerMocks.js'
 
-// State machine architecture types (will be implemented in src/tallyBootstrap.ts)
-type ListenerState = 'L_PROCESS_CONTACT' | 'L_SEND_RESPONSE' | 'L_AWAIT_DATABASE' | 'L_DONE' | 'L_FAILED'
-type DialerState = 'D_SEND_CONTACT' | 'D_AWAIT_RESPONSE' | 'D_PROVISION_DATABASE' | 'D_DONE' | 'D_FAILED'
+// Import types from implementation
 
-interface SessionConfig {
-  sessionTimeoutMs: number
-  stepTimeoutMs: number
-  maxConcurrentSessions: number
-}
-
-interface SessionHooks {
-  validateToken(token: string, sessionId: string): Promise<{role: 'stock'|'foil', valid: boolean}>
-  validateIdentity(identity: any, sessionId: string): Promise<boolean>
-  provisionDatabase(role: 'stock'|'foil', partyA: string, partyB: string, sessionId: string): Promise<any>
-  validateResponse(response: any, sessionId: string): Promise<boolean>
-  validateDatabaseResult(result: any, sessionId: string): Promise<boolean>
-}
-
-interface BootstrapLink {
-  responderPeerAddrs: string[]
-  token: string
-  tokenExpiryUtc: string
-  initiatorRole: 'stock' | 'foil'
-  identityRequirements?: string
-}
-
-interface BootstrapResult {
-  tally: {tallyId: string, createdBy: 'stock'|'foil'}
-  dbConnectionInfo: {endpoint: string, credentialsRef: string}
-}
-
-// TODO: Import these from src/tallyBootstrap.ts after implementation
-// import { SessionManager, ListenerSession, DialerSession } from '../../src/tallyBootstrap.js'
-
-// Temporary mock implementations (will be replaced with actual imports)
-class SessionManager {
-  constructor(private hooks: SessionHooks, private config: SessionConfig) {}
-  
-  async handleNewStream(stream: any): Promise<void> {
-    throw new Error('SessionManager not implemented yet - implement in src/tallyBootstrap.ts')
-  }
-  
-  async initiateBootstrap(link: BootstrapLink, node: Libp2p): Promise<BootstrapResult> {
-    throw new Error('SessionManager not implemented yet - implement in src/tallyBootstrap.ts')  
-  }
-}
-
-class ListenerSession {
-  constructor(
-    private sessionId: string,
-    private stream: any,
-    private hooks: SessionHooks,
-    private config: SessionConfig
-  ) {}
-  
-  async execute(): Promise<void> {
-    throw new Error('ListenerSession not implemented yet - implement in src/tallyBootstrap.ts')
-  }
-}
-
-class DialerSession {
-  constructor(
-    private sessionId: string,
-    private link: BootstrapLink,
-    private node: Libp2p,
-    private hooks: SessionHooks,
-    private config: SessionConfig
-  ) {}
-  
-  async execute(): Promise<BootstrapResult> {
-    throw new Error('DialerSession not implemented yet - implement in src/tallyBootstrap.ts')
-  }
-}
+// Import actual state machine classes
+import { 
+  SessionManager, 
+  ListenerSession, 
+  DialerSession,
+  createBootstrapManager,
+  type SessionConfig,
+  type BootstrapLink,
+  type BootstrapResult
+} from '../../src/tallyBootstrap.js'
 
 // Test infrastructure
 const DEFAULT_CONFIG: SessionConfig = {
