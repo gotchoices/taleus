@@ -104,9 +104,9 @@ sequenceDiagram
     B->>NodeB: initiateFromLink(link)
     NodeB->>NodeA: dialProtocol('/taleus/bootstrap/1.0.0')
     
-    Note over NodeB,NodeA: Message 1: InboundContact
+    Note over NodeB,NodeA: Message 1: InboundContact<br/>B discloses B's cadre first
     
-    NodeB->>NodeA: InboundContact {token, partyId, identityBundle, cadrePeerAddrs}
+    NodeB->>NodeA: InboundContact {token, partyId, identityBundle, cadrePeerAddrs: B_cadre}
     NodeA->>HooksA: validateToken(token)
     HooksA-->>NodeA: tokenInfo {role: 'stock', ...}
     NodeA->>HooksA: validateIdentity(identityBundle)
@@ -114,9 +114,9 @@ sequenceDiagram
     NodeA->>HooksA: provisionDatabase(stock, partyA, partyB)
     HooksA-->>NodeA: provisionResult {tally, dbConnectionInfo}
     
-    Note over NodeB,NodeA: Message 2: ProvisioningResult
+    Note over NodeB,NodeA: Message 2: ProvisioningResult<br/>A discloses A's cadre after validation
     
-    NodeA->>NodeB: ProvisioningResult {approved: true, provisionResult, cadrePeerAddrs}
+    NodeA->>NodeB: ProvisioningResult {approved: true, provisionResult, cadrePeerAddrs: A_cadre}
     NodeB->>HooksB: validateResponse(provisionResult)
     HooksB-->>NodeB: responseValid
     NodeB-->>B: Success {tally, dbConnectionInfo}
@@ -140,23 +140,23 @@ sequenceDiagram
     B->>NodeB: initiateFromLink(link)
     NodeB->>NodeA: dialProtocol('/taleus/bootstrap/1.0.0')
     
-    Note over NodeB,NodeA: Message 1: InboundContact
+    Note over NodeB,NodeA: Message 1: InboundContact<br/>B discloses B's cadre first
     
-    NodeB->>NodeA: InboundContact {token, partyId, identityBundle, cadrePeerAddrs}
+    NodeB->>NodeA: InboundContact {token, partyId, identityBundle, cadrePeerAddrs: B_cadre}
     NodeA->>HooksA: validateToken(token)
     HooksA-->>NodeA: tokenInfo {role: 'foil', ...}
     NodeA->>HooksA: validateIdentity(identityBundle)
     HooksA-->>NodeA: identityValid
     
-    Note over NodeB,NodeA: Message 2: ProvisioningResult (A's info)
+    Note over NodeB,NodeA: Message 2: ProvisioningResult<br/>A discloses A's cadre after validation
     
-    NodeA->>NodeB: ProvisioningResult {approved: true, partyId, cadrePeerAddrs}
+    NodeA->>NodeB: ProvisioningResult {approved: true, partyId, cadrePeerAddrs: A_cadre}
     NodeB->>HooksB: validateResponse(result)
     HooksB-->>NodeB: responseValid
     NodeB->>HooksB: provisionDatabase(foil, partyA, partyB)
     HooksB-->>NodeB: provisionResult {tally, dbConnectionInfo}
     
-    Note over NodeB,NodeA: Message 3: DatabaseResult
+    Note over NodeB,NodeA: Message 3: DatabaseResult<br/>B provides provisioned database access
     
     NodeB->>NodeA: DatabaseResult {tally, dbConnectionInfo}
     NodeA->>HooksA: validateDatabaseResult(result)
@@ -180,27 +180,27 @@ sequenceDiagram
     
     Note over C1,M: Multiple customers scan same QR code simultaneously
     
-    par Session 1
-        C1->>NodeM: InboundContact {token: 'merchant-qr'}
-        NodeM->>HooksM: validateToken('merchant-qr')
+    par Session 1 (C1 → M)
+        C1->>NodeM: InboundContact {token, cadrePeerAddrs: C1_cadre}
+        NodeM->>HooksM: validateToken(token)
         HooksM-->>NodeM: valid (multi-use)
         NodeM->>HooksM: provisionDatabase(stock, merchant, customer1)
         HooksM-->>NodeM: database1 {tallyId: 'merchant-customer1'}
-        NodeM-->>C1: Success (database1)
-    and Session 2
-        C2->>NodeM: InboundContact {token: 'merchant-qr'}
-        NodeM->>HooksM: validateToken('merchant-qr')
+        NodeM-->>C1: ProvisioningResult {approved: true, cadrePeerAddrs: M_cadre, database1}
+    and Session 2 (C2 → M)
+        C2->>NodeM: InboundContact {token, cadrePeerAddrs: C2_cadre}
+        NodeM->>HooksM: validateToken(token)
         HooksM-->>NodeM: valid (multi-use)
         NodeM->>HooksM: provisionDatabase(stock, merchant, customer2)
         HooksM-->>NodeM: database2 {tallyId: 'merchant-customer2'}
-        NodeM-->>C2: Success (database2)
-    and Session 3
-        C3->>NodeM: InboundContact {token: 'merchant-qr'}
-        NodeM->>HooksM: validateToken('merchant-qr')
+        NodeM-->>C2: ProvisioningResult {approved: true, cadrePeerAddrs: M_cadre, database2}
+    and Session 3 (C3 → M)
+        C3->>NodeM: InboundContact {token, cadrePeerAddrs: C3_cadre}
+        NodeM->>HooksM: validateToken(token)
         HooksM-->>NodeM: valid (multi-use)
         NodeM->>HooksM: provisionDatabase(stock, merchant, customer3)
         HooksM-->>NodeM: database3 {tallyId: 'merchant-customer3'}
-        NodeM-->>C3: Success (database3)
+        NodeM-->>C3: ProvisioningResult {approved: true, cadrePeerAddrs: M_cadre, database3}
     end
     
     Note over C1,M: All sessions process independently<br/>Each gets unique tally and database

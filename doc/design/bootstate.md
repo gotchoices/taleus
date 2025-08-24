@@ -1,8 +1,10 @@
-# Bootstrap State Management Architecture
+# Bootstrap State Management Architecture (Historical Reference)
+
+> **Note**: This document serves as historical reference for our architectural decision-making process. The actual implementation details are now specified in [`doc/bootstrap.md`](../bootstrap.md), which supersedes the technical examples shown here.
 
 ## Executive Summary
 
-This document analyzes two architectural approaches for handling libp2p stream connections in the Taleus bootstrap process: sequential await-based handlers versus event-driven state machines. Given Taleus's mission to provide robust infrastructure for replacing monetary systems, we recommend the state machine approach for production implementation.
+This document analyzes the architectural decision to move from sequential await-based handlers to event-driven state machines for the Taleus bootstrap process. Given Taleus's mission to provide robust infrastructure for replacing monetary systems, we chose the state machine approach for production implementation.
 
 ## Problem Statement
 
@@ -83,7 +85,7 @@ const handler: StreamHandler = ({ stream }) => {
 - ⚠️ Manual resource cleanup required
 - ⚠️ Adequate for small scale, insufficient for money infrastructure
 
-### Approach 3: Event-Driven State Machine (Recommended)
+### Approach 3: Event-Driven State Machine (Chosen)
 
 **Architecture:**
 - Each bootstrap attempt becomes an independent session
@@ -91,29 +93,7 @@ const handler: StreamHandler = ({ stream }) => {
 - Comprehensive session management and cleanup
 - Built-in timeout and error handling
 
-```typescript
-class BootstrapStateMachine {
-  private sessions = new Map<string, BootstrapSession>()
-  
-  onNewStream(stream: LibP2PStream) {
-    const sessionId = this.createSession(stream)
-    this.processSession(sessionId)  // Non-blocking
-  }
-  
-  private async processSession(sessionId: string) {
-    const session = this.sessions.get(sessionId)
-    try {
-      await this.transitionState(session, 'READING_REQUEST')
-      await this.transitionState(session, 'VALIDATING_TOKEN')
-      await this.transitionState(session, 'PROVISIONING_DATABASE')
-      await this.transitionState(session, 'SENDING_RESPONSE')
-      this.completeSession(sessionId, 'SUCCESS')
-    } catch (error) {
-      this.completeSession(sessionId, 'FAILED', error)
-    }
-  }
-}
-```
+> **Implementation Note**: The actual class architecture is detailed in [`doc/bootstrap.md`](../bootstrap.md), which shows separate `ListenerSession` and `DialerSession` classes rather than the single class illustrated here.
 
 **Advantages:**
 - ✅ **CRITICAL**: Natural concurrency - unlimited parallel sessions
@@ -164,21 +144,23 @@ Taleus aims to replace monetary systems, which demands infrastructure-grade reli
 | **Production Readiness** | ❌ Prototype | ⚠️ Small Scale | ✅ Enterprise |
 | **Money System Suitable** | ❌ No | ⚠️ Limited | ✅ Yes |
 
-## Implementation Strategy
+## Implementation Strategy (Historical)
 
-### Phase 1: State Machine Core
-1. **Session Management**: Create `BootstrapSession` class with lifecycle management
-2. **State Transitions**: Define clear states and transition logic
-3. **Timeout Framework**: Per-session timeout with configurable limits
+> **Current Status**: Phase 1 design completed and documented in [`doc/bootstrap.md`](../bootstrap.md). Implementation phases below represent the original planning framework.
+
+### Phase 1: State Machine Core (Completed in Design)
+1. **Session Management**: `SessionManager`, `ListenerSession`, and `DialerSession` classes
+2. **State Transitions**: Clean state diagrams with prefixed states (L_*, D_*)
+3. **Timeout Framework**: Multi-level timeout protection per session
 4. **Error Handling**: Comprehensive error isolation and reporting
 
-### Phase 2: Production Features
+### Phase 2: Production Features (Future)
 1. **Resource Monitoring**: Track active sessions, memory usage, connection counts
 2. **Rate Limiting**: Prevent DoS attacks and resource exhaustion
 3. **Circuit Breaker**: Automatic backoff under load
 4. **Metrics Collection**: Bootstrap success/failure rates, timing distributions
 
-### Phase 3: Operational Excellence
+### Phase 3: Operational Excellence (Future)
 1. **Graceful Shutdown**: Drain active sessions before termination
 2. **Health Checks**: Endpoint for monitoring system status
 3. **Configuration Management**: Runtime adjustment of timeouts and limits
@@ -194,7 +176,5 @@ For Taleus to serve as reliable money infrastructure, the state machine approach
 - Enables the observability and audit trails required for financial compliance
 - Scales to handle real-world transaction volumes
 
-**Implementation Recommendation:**
-Proceed directly with state machine architecture. Do not implement intermediate "v1" solutions that would be inadequate for production money systems.
-
-The sequential handler approach was useful for prototyping and validating the Method 6 design, but must be replaced with production-grade architecture before deployment in monetary applications.
+**Historical Outcome:**
+We proceeded directly with state machine architecture design. The sequential handler approach served its purpose for prototyping and validating the Method 6 design, but was replaced with production-grade state machine architecture documented in [`doc/bootstrap.md`](../bootstrap.md).
