@@ -108,10 +108,62 @@ describe('Taleus Bootstrap State Machine', () => {
       assert.ok(duration < 5000, 'Sessions should process concurrently')
     })
     
-    it.skip('should clean up sessions after completion', async () => {
+    it('should clean up sessions after completion', async () => {
       // Test that completed sessions are properly removed from memory
-      assert.fail('TODO: Test session cleanup')
-    })
+      const manager = new SessionManager(hooksA, DEFAULT_CONFIG)
+      
+      // Register handler
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await manager.handleNewStream(stream as any)
+      })
+      
+      // Check initial state - no active sessions
+      const initialSessionCount = Object.keys((manager as any).activeSessions || {}).length
+      console.log('Initial session count:', initialSessionCount)
+      assert.equal(initialSessionCount, 0, 'Should start with no active sessions')
+      
+      // Create a test bootstrap that will complete successfully
+      const managerB = new SessionManager(hooksB, DEFAULT_CONFIG)
+      const link: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'stock-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+      
+      console.log('Starting bootstrap to test cleanup...')
+      
+      // During bootstrap, there should be an active session
+      const bootstrapPromise = managerB.initiateBootstrap(link, nodeB)
+      
+      // Wait a moment for session to be created
+      await new Promise(resolve => setTimeout(resolve, 50))
+      
+      // Complete the bootstrap
+      const result = await bootstrapPromise
+      
+      console.log('Bootstrap completed, checking cleanup...')
+      
+      // Wait a moment for cleanup to complete
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Check that sessions were cleaned up
+      const finalSessionCount = Object.keys((manager as any).activeSessions || {}).length
+      console.log('Final session count:', finalSessionCount)
+      assert.equal(finalSessionCount, 0, 'Should clean up all sessions after completion')
+      
+      // Verify bootstrap was successful
+      assert.ok(result.tally, 'Bootstrap should have completed successfully')
+      
+      console.log('✅ Sessions properly cleaned up after completion')
+      
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 5000)
     
     it.skip('should isolate session failures', async () => {
       // Test that one session failure doesn't affect others
