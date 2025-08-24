@@ -77,9 +77,14 @@ describe('Taleus Bootstrap State Machine', () => {
   })
 
   describe('SessionManager', () => {
-    it.skip('should create and configure properly', () => {
+    it('should create and configure properly', () => {
       const manager = new SessionManager(hooksA, DEFAULT_CONFIG)
       assert.ok(manager)
+      
+      // Test default configuration
+      const counts = manager.getActiveSessionCounts()
+      assert.equal(counts.listeners, 0)
+      assert.equal(counts.dialers, 0)
     })
     
     it.skip('should handle multiple concurrent sessions without blocking', async () => {
@@ -179,17 +184,37 @@ describe('Taleus Bootstrap State Machine', () => {
   })
 
   describe('Message Flow Integration', () => {
-    it.skip('should execute complete stock role bootstrap (2 messages)', async () => {
+    it('should execute complete stock role bootstrap (2 messages)', async () => {
       // Test: B initiates, A provisions DB, returns info
-      const managerA = new SessionManager(hooksA, DEFAULT_CONFIG)
-      const managerB = new SessionManager(hooksB, DEFAULT_CONFIG)
+      const debugConfig = { ...DEFAULT_CONFIG, enableDebugLogging: true }
+      const managerA = new SessionManager(hooksA, debugConfig)
+      const managerB = new SessionManager(hooksB, debugConfig)
       
-      // A registers as listener
-      // B initiates bootstrap
-      // Verify 2-message flow completes successfully
+      // A registers as passive listener on libp2p  
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await managerA.handleNewStream(stream as any)
+      })
       
-      assert.fail('TODO: Test complete stock role flow')
-    })
+      // B initiates bootstrap to A
+      const link: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'stock-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+      
+      console.log('Starting bootstrap test...')
+      const result = await managerB.initiateBootstrap(link, nodeB)
+      console.log('Bootstrap completed:', result)
+      
+      // Verify successful bootstrap
+      assert.ok(result.tally)
+      assert.ok(result.dbConnectionInfo)
+      assert.equal(result.tally.createdBy, 'stock')
+      
+      // Clean up
+      nodeA.unhandle('/taleus/bootstrap/1.0.0')
+    }, 15000)
     
     it.skip('should execute complete foil role bootstrap (3 messages)', async () => {
       // Test: B initiates, A approves, B provisions DB, sends info
@@ -220,9 +245,32 @@ describe('Taleus Bootstrap State Machine', () => {
   })
 
   describe('Hook Integration', () => {
-    it.skip('should call hooks with proper session context', async () => {
-      // Verify hooks receive sessionId and proper context
-      assert.fail('TODO: Test session-aware hooks')
+    it('should call hooks with proper session context', async () => {
+      // Test that our session-aware hooks work properly
+      const hooks = createSessionAwareHooks(['test-token'])
+      
+      // Test validateToken with sessionId
+      const tokenResult = await hooks.validateToken('test-token', 'session-123')
+      assert.equal(tokenResult.valid, true)
+      assert.equal(tokenResult.role, 'stock')
+      
+      // Test validateIdentity with sessionId
+      const identityResult = await hooks.validateIdentity(
+        { partyId: 'party-123' }, 
+        'session-123'
+      )
+      assert.equal(identityResult, true)
+      
+      // Test provisionDatabase with sessionId
+      const dbResult = await hooks.provisionDatabase(
+        'stock', 
+        'partyA', 
+        'partyB', 
+        'session-123'
+      )
+      assert.ok(dbResult.tally)
+      assert.ok(dbResult.dbConnectionInfo)
+      assert.equal(dbResult.tally.createdBy, 'stock')
     })
     
     it.skip('should handle hook failures gracefully', async () => {

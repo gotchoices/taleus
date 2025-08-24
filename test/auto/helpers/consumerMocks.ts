@@ -56,7 +56,7 @@ export function createSessionAwareHooks(validTokens: string[] = ['test-token']):
       logActivity(sessionId, { action: 'validateIdentity', identity })
       
       // Simple validation: identity must have required fields
-      return identity && typeof identity === 'object' && identity.partyId
+      return !!(identity && typeof identity === 'object' && identity.partyId)
     },
     
     async provisionDatabase(role: 'stock'|'foil', partyA: string, partyB: string, sessionId: string) {

@@ -91,16 +91,16 @@ export interface BootstrapResult {
   dbConnectionInfo: {endpoint: string, credentialsRef: string}
 }
 
-// Utility functions for stream handling
+// Utility functions for stream handling (corrected libp2p usage)
 async function writeJson(stream: LibP2PStream, obj: unknown, closeAfter: boolean = false): Promise<void> {
   const jsonData = JSON.stringify(obj)
-  const chunks = [new TextEncoder().encode(jsonData)]
+  console.log('[writeJson] Sending data:', JSON.stringify(jsonData))
+  const encoded = new TextEncoder().encode(jsonData)
+  console.log('[writeJson] Encoded bytes:', encoded.length)
   
-  await stream.sink(async function* () {
-    for (const chunk of chunks) {
-      yield chunk
-    }
-  }())
+  // Correct libp2p stream writing
+  const writer = stream.sink
+  await writer([encoded])
   
   if (closeAfter) {
     if (stream.closeWrite) {
@@ -112,21 +112,28 @@ async function writeJson(stream: LibP2PStream, obj: unknown, closeAfter: boolean
 }
 
 async function readJson(stream: LibP2PStream): Promise<unknown> {
-  const chunks: Uint8Array[] = []
+  const decoder = new TextDecoder()
+  let message = ''
   
+  console.log('[readJson] Starting to read from stream...')
   for await (const chunk of stream.source) {
-    chunks.push(chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk))
+    console.log('[readJson] Received chunk with', chunk.length, 'subchunks')
+    for (const subChunk of chunk) {
+      message += decoder.decode(subChunk, { stream: true })
+    }
   }
   
-  const combined = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0))
-  let offset = 0
-  for (const chunk of chunks) {
-    combined.set(chunk, offset)
-    offset += chunk.length
+  console.log('[readJson] Decoded text:', JSON.stringify(message))
+  
+  if (!message.trim()) {
+    throw new Error('Received empty data from stream')
   }
   
-  const jsonText = new TextDecoder().decode(combined)
-  return JSON.parse(jsonText)
+  try {
+    return JSON.parse(message)
+  } catch (error) {
+    throw new Error(`Failed to parse JSON: "${message}" - ${error}`)
+  }
 }
 
 // Session Management Classes
