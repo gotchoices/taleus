@@ -1092,10 +1092,129 @@ describe('Taleus Bootstrap State Machine', () => {
       }
     }, 8000)
     
-    it.skip('should recover from partial failures', async () => {
+    it('should recover from partial failures', async () => {
       // Test scenarios where some steps succeed but others fail
-      assert.fail('TODO: Test partial failure recovery')
-    })
+      const partialFailureHooksA: SessionHooks = {
+        async validateToken(token: string, sessionId: string) {
+          return { valid: true, role: 'stock' as 'stock' | 'foil' }
+        },
+        async validateIdentity(identity: any, sessionId: string) {
+          // Fail identity validation on second attempt for this session ID pattern
+          if (sessionId.includes('fail-identity')) {
+            return false
+          }
+          return true
+        },
+        async provisionDatabase(role: 'stock' | 'foil', partyA: string, partyB: string, sessionId: string) {
+          return {
+            tally: { tallyId: `tally-${partyA}-${partyB}-${Date.now()}`, createdBy: role },
+            dbConnectionInfo: { endpoint: `wss://db-${partyA}-${partyB}.example.com`, credentialsRef: `creds-${partyA}-${partyB}` }
+          }
+        },
+        async validateResponse(response: any, sessionId: string) {
+          return true
+        },
+        async validateDatabaseResult(result: any, sessionId: string) {
+          return true
+        }
+      }
+
+      const managerA = new SessionManager(partialFailureHooksA, DEFAULT_CONFIG)
+      const managerB = new SessionManager(hooksB, DEFAULT_CONFIG)
+
+      // Register A as passive listener
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await managerA.handleNewStream(stream as any)
+      })
+
+      console.log('Testing partial failure recovery...')
+
+      // Test 1: First attempt fails due to identity validation
+      const firstAttemptLink: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'stock-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+
+      // Create hooks that will fail on first call, succeed on second
+      let identityValidationCalls = 0
+      const transientFailureHooksA: SessionHooks = {
+        async validateToken(token: string, sessionId: string) {
+          return { valid: true, role: 'stock' as 'stock' | 'foil' }
+        },
+        async validateIdentity(identity: any, sessionId: string) {
+          identityValidationCalls++
+          console.log(`Identity validation call #${identityValidationCalls}`)
+          
+          // Fail on first call, succeed on subsequent calls (simulates transient failure)
+          if (identityValidationCalls === 1) {
+            console.log('Simulating transient identity validation failure')
+            return false
+          }
+          return true
+        },
+        async provisionDatabase(role: 'stock' | 'foil', partyA: string, partyB: string, sessionId: string) {
+          return {
+            tally: { tallyId: `tally-${partyA}-${partyB}-${Date.now()}`, createdBy: role },
+            dbConnectionInfo: { endpoint: `wss://db-${partyA}-${partyB}.example.com`, credentialsRef: `creds-${partyA}-${partyB}` }
+          }
+        },
+        async validateResponse(response: any, sessionId: string) {
+          return true
+        },
+        async validateDatabaseResult(result: any, sessionId: string) {
+          return true
+        }
+      }
+
+      // Update handler to use transient failure hooks
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+        await new Promise(resolve => setTimeout(resolve, 100)) // Brief delay for cleanup
+      } catch (e) { /* ignore */ }
+
+      const transientFailureManagerA = new SessionManager(transientFailureHooksA, DEFAULT_CONFIG)
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await transientFailureManagerA.handleNewStream(stream as any)
+      })
+
+      const failureManagerB = new SessionManager(hooksB, DEFAULT_CONFIG)
+      
+      try {
+        await failureManagerB.initiateBootstrap(firstAttemptLink, nodeB)
+        assert.fail('First attempt should fail due to transient identity validation failure')
+      } catch (error) {
+        console.log('✅ First attempt failed as expected (transient failure):', error.message)
+        assert.ok(
+          error.message.includes('rejected') || 
+          error.message.includes('Invalid') || 
+          error.message.includes('timeout') ||
+          error.message.includes('empty'),
+          'Should fail due to transient identity validation failure'
+        )
+      }
+
+      // Test 2: Second attempt succeeds (uses normal session ID)
+      console.log('Testing recovery...')
+      const recoveryManagerB = new SessionManager(hooksB, DEFAULT_CONFIG)
+      
+      const secondAttemptResult = await recoveryManagerB.initiateBootstrap(firstAttemptLink, nodeB)
+      
+      // Verify recovery was successful
+      assert.ok(secondAttemptResult.tally, 'Recovery attempt should succeed')
+      assert.ok(secondAttemptResult.dbConnectionInfo, 'Should get database connection info')
+      
+      console.log('✅ Partial failure recovery successful')
+      console.log('✅ System demonstrated resilience to transient failures')
+
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 6000)
   })
 
   describe('Performance and Resource Management', () => {
