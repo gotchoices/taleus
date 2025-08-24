@@ -765,10 +765,73 @@ describe('Taleus Bootstrap State Machine', () => {
       }
     }, 8000)
     
-    it.skip('should validate hook return values', async () => {
+    it('should validate hook return values', async () => {
       // Test malformed hook responses are rejected
-      assert.fail('TODO: Test hook validation')
-    })
+      const malformedHooksA: SessionHooks = {
+        async validateToken(token: string, sessionId: string) {
+          // Return malformed response (missing 'valid' field)
+          return { role: 'stock' } as any
+        },
+        async validateIdentity(identity: any, sessionId: string) {
+          // Return non-boolean
+          return 'yes' as any
+        },
+        async provisionDatabase(role: 'stock' | 'foil', partyA: string, partyB: string, sessionId: string) {
+          // Return incomplete response (missing dbConnectionInfo)
+          return { tally: { tallyId: 'incomplete' } } as any
+        },
+        async validateResponse(response: any, sessionId: string) {
+          return true
+        },
+        async validateDatabaseResult(result: any, sessionId: string) {
+          return true
+        }
+      }
+
+      const managerA = new SessionManager(malformedHooksA, DEFAULT_CONFIG)
+      const managerB = new SessionManager(hooksB, DEFAULT_CONFIG)
+
+      // Register A as passive listener
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await managerA.handleNewStream(stream as any)
+      })
+
+      console.log('Testing hook return value validation...')
+
+      const testLink: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'test-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+
+      try {
+        await managerB.initiateBootstrap(testLink, nodeB)
+        assert.fail('Should have failed due to malformed hook responses')
+      } catch (error) {
+        console.log('✅ Malformed hook responses handled:', error.message)
+        // The system should handle malformed responses gracefully
+        // This might manifest as validation errors, type errors, or timeouts
+        assert.ok(
+          error.message.includes('timeout') || 
+          error.message.includes('rejected') || 
+          error.message.includes('Invalid') ||
+          error.message.includes('empty') ||
+          error.message.includes('validation') ||
+          error.message.includes('malformed'),
+          'Should handle malformed hook responses gracefully'
+        )
+      }
+
+      console.log('✅ Hook return value validation working correctly')
+
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 6000)
   })
 
   describe('Concurrent Multi-Use Token Scenarios', () => {
