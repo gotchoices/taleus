@@ -136,34 +136,52 @@ Based on PROJECT.md, the following information needs clarification:
 
 ### Phase 2: Bootstrap Production Implementation (Current Priority)
 - [x] **Bootstrap Prototype**: Sequential handler POC validates Method 6 design ✅ COMPLETED
-- [ ] **State Machine Refactor**: Clean state machine architecture (no backwards compatibility)
-  - [ ] Design optimal `BootstrapSession` class with lifecycle management
-  - [ ] Implement clean state transitions (CREATED → READING → VALIDATING → PROVISIONING → RESPONDING → COMPLETED/FAILED)
-  - [ ] Design multi-level timeout protection (session + step timeouts)
+- [ ] **State Machine Implementation**: Separate ListenerSession and DialerSession classes
+  - [ ] Implement `SessionManager` class with dual session management
+  - [ ] Implement `ListenerSession` class (L_PROCESS_CONTACT → L_SEND_RESPONSE → [L_AWAIT_DATABASE] → L_DONE)
+  - [ ] Implement `DialerSession` class (D_SEND_CONTACT → D_AWAIT_RESPONSE → D_HANDLE_RESPONSE → [D_SEND_DATABASE] → D_DONE)
+  - [ ] Implement multi-level timeout protection (session + step timeouts)
   - [ ] Implement session resource cleanup and error isolation
-  - [ ] Design concurrent session processing architecture
   - [ ] Add comprehensive session audit logging and metrics
-  - [ ] Add rate limiting and DoS protection
+  - [ ] Add rate limiting and DoS protection (per-peer limits)
   - [ ] Add graceful shutdown with session draining
-  - [ ] Design clean hook interfaces optimized for state machine
-  - [ ] Implement session-based consumer mocks
-  - [ ] Rewrite manual test apps for optimal state machine patterns
-- [ ] **Testing**: Clean state machine testing (rewrite from scratch)
-  - [ ] Design comprehensive session lifecycle tests
-  - [ ] Design session isolation and resource management tests  
-  - [ ] Design optimal concurrent session test patterns
-  - [ ] Test multiple simultaneous responders (2, 5, 10+ concurrent)
-  - [ ] Test timeout scenarios (network hangs, slow responses)
-  - [ ] Test error isolation (one failed session doesn't affect others)
-  - [ ] Test resource limits and cleanup
-  - [ ] Design concurrent session stress tests
-  - [ ] Load testing for production money system readiness
-- [ ] **Documentation**: Design-first approach with visual models
-  - [ ] Add state diagrams to `doc/bootstrap.md` (session lifecycle, transitions, error paths)
-  - [ ] Add sequence diagrams to `doc/bootstrap.md` (session management, concurrency, cleanup)  
-  - [ ] Update `doc/architecture.md` with session-based architecture details
-  - [ ] Update API documentation for session management patterns
+  - [ ] Implement clean SessionHooks interface
+  - [ ] Create session-based consumer mocks for testing
+  - [ ] Create manual test apps demonstrating concurrent sessions
+  - [ ] Implement timeout management (SessionTimeouts class)
+  - [ ] Implement session audit logging (SessionAudit class)
+  - [ ] Implement session metrics collection (SessionMetrics class)
+  - [ ] Implement rate limiting (RateLimiter class)
+  - [ ] Define message types and serialization (InboundContact, ProvisioningResult, DatabaseResult)
+  - [ ] Implement libp2p stream utilities (readJson, writeJson with timeout protection)
+- [ ] **Testing**: Session-based testing architecture
+  - [ ] Implement `ListenerSession` lifecycle tests (L_PROCESS_CONTACT through L_DONE)
+  - [ ] Implement `DialerSession` lifecycle tests (D_SEND_CONTACT through D_DONE)
+  - [ ] Test session isolation (memory, timeouts, error boundaries)
+  - [ ] Test concurrent multi-use token scenarios (same token, different sessions)
+  - [ ] Test timeout scenarios (connection hangs, hook timeouts, response timeouts)
+  - [ ] Test error isolation (failed session doesn't affect other sessions)
+  - [ ] Test resource cleanup (sessions properly cleaned up on completion/failure)
+  - [ ] Test rate limiting (reject excessive connections from same peer)
+  - [ ] Test graceful shutdown (drain active sessions before termination)
+  - [ ] Load testing (100+ concurrent sessions, memory/performance validation)
+- [ ] **Documentation**: Session architecture documentation
+  - [x] Add state diagrams to `doc/bootstrap.md` (ListenerSession and DialerSession states) ✅ COMPLETED
+  - [x] Add sequence diagrams to `doc/bootstrap.md` (message flow, concurrent sessions) ✅ COMPLETED  
+  - [x] Add class architecture and usage examples to `doc/bootstrap.md` ✅ COMPLETED
+  - [ ] Update `doc/architecture.md` with SessionManager and session classes
   - [ ] Add session monitoring and metrics interface documentation
+  - [ ] **Review and Update Core Documentation for Consistency**:
+    - [ ] Review `doc/architecture.md` - replace TallyBootstrap class with SessionManager/ListenerSession/DialerSession architecture
+    - [ ] Review `doc/architecture.md` - update Hooks interface to SessionHooks with new structure (token.validate, database.provision, etc.)
+    - [ ] Review `doc/architecture.md` - remove obsolete registerPassiveListener/initiateFromLink API references
+    - [ ] Review `doc/protocol.md` - update TallyBootstrap protocol section with session-based message flows
+    - [ ] Review `doc/protocol.md` - ensure protocol message types match bootstrap.md sequence diagrams
+    - [ ] Review `doc/protocol.md` - remove obsolete sequential handler references
+    - [ ] Review `doc/tally.md` - update bootstrap process references to point to doc/bootstrap.md instead of doc/design/bootstrap.md
+    - [ ] Review `doc/tally.md` - ensure tally data chunk descriptions align with current bootstrap implementation
+    - [ ] Check for obsolete TallyBootstrap class references across all documentation
+    - [ ] Ensure consistent terminology (SessionManager, ListenerSession, DialerSession) across all docs
 
 ### Phase 3: Core Implementation
 - [ ] Set up libp2p + Kademlia + Optimystic + Quereus stack

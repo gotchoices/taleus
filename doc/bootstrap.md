@@ -17,390 +17,441 @@ The Taleus bootstrap uses a **session-based state machine** architecture optimiz
 
 ---
 
-## Session State Diagram
+## Session State Diagrams
+
+### ListenerSession Class (Party A - Receives Connections)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CREATED: New stream arrives
+    [*] --> L_PROCESS_CONTACT: InboundContact received
     
-    CREATED --> READING_REQUEST: Start processing
-    READING_REQUEST --> VALIDATING_TOKEN: Request received
-    VALIDATING_TOKEN --> VALIDATING_IDENTITY: Token valid
-    VALIDATING_TOKEN --> FAILED: Invalid token
+    L_PROCESS_CONTACT --> L_SEND_RESPONSE: Hooks complete
+    L_PROCESS_CONTACT --> L_FAILED: Token/identity rejected
     
-    VALIDATING_IDENTITY --> PROVISIONING_DB: Identity valid
-    VALIDATING_IDENTITY --> FAILED: Identity rejected
-    VALIDATING_IDENTITY --> PROVISIONING_DB: No identity required
+    L_SEND_RESPONSE --> L_AWAIT_DATABASE: Response sent (foil role)
+    L_SEND_RESPONSE --> L_DONE: Response sent (stock role)
     
-    PROVISIONING_DB --> SENDING_RESPONSE: Database created
-    PROVISIONING_DB --> FAILED: Provisioning failed
+    L_AWAIT_DATABASE --> L_DONE: DatabaseResult received
+    L_AWAIT_DATABASE --> L_TIMEOUT: Database timeout
+    L_AWAIT_DATABASE --> L_FAILED: Database provision failed
     
-    SENDING_RESPONSE --> AWAITING_ACK: Response sent (foil role)
-    SENDING_RESPONSE --> COMPLETED: Response sent (stock role)
+    L_PROCESS_CONTACT --> L_TIMEOUT: Hook timeout
+    L_SEND_RESPONSE --> L_TIMEOUT: Send timeout
     
-    AWAITING_ACK --> COMPLETED: Ack received
-    AWAITING_ACK --> TIMEOUT: Ack timeout
+    L_FAILED --> [*]: Cleanup & log error
+    L_TIMEOUT --> [*]: Cleanup & log timeout
+    L_DONE --> [*]: Cleanup & log success
     
-    READING_REQUEST --> TIMEOUT: Read timeout
-    VALIDATING_TOKEN --> TIMEOUT: Validation timeout
-    VALIDATING_IDENTITY --> TIMEOUT: Identity timeout
-    PROVISIONING_DB --> TIMEOUT: Provisioning timeout
-    SENDING_RESPONSE --> TIMEOUT: Send timeout
-    
-    FAILED --> [*]: Cleanup & log
-    TIMEOUT --> [*]: Cleanup & log
-    COMPLETED --> [*]: Cleanup & log
-    
-    note right of TIMEOUT
-        Multi-level timeouts:
-        - Overall session: 30s
-        - Per step: 5s
+    note right of L_PROCESS_CONTACT
+        Hook calls:
+        - validateToken()
+        - validateIdentity()
+        - provisionDatabase() [stock role only]
     end note
+```
+
+### DialerSession Class (Party B - Initiates Connection)
+
+```mermaid
+stateDiagram-v2
+    [*] --> D_SEND_CONTACT: Connect & send InboundContact
+    [*] --> D_FAILED: Connection failed
     
-    note right of FAILED
-        Error isolation:
-        - Stream cleanup
-        - Resource release
-        - Audit logging
+    D_SEND_CONTACT --> D_AWAIT_RESPONSE: InboundContact sent
+    D_SEND_CONTACT --> D_FAILED: Send failed
+    
+    D_AWAIT_RESPONSE --> D_HANDLE_RESPONSE: Response received
+    D_AWAIT_RESPONSE --> D_TIMEOUT: Response timeout
+    
+    D_HANDLE_RESPONSE --> D_SEND_DATABASE: Valid (foil role)
+    D_HANDLE_RESPONSE --> D_DONE: Valid (stock role)
+    D_HANDLE_RESPONSE --> D_FAILED: Invalid response
+    
+    D_SEND_DATABASE --> D_DONE: DatabaseResult sent
+    D_SEND_DATABASE --> D_FAILED: Database send failed
+    
+    D_HANDLE_RESPONSE --> D_TIMEOUT: Hook timeout
+    D_SEND_DATABASE --> D_TIMEOUT: Send timeout
+    
+    D_FAILED --> [*]: Return error
+    D_TIMEOUT --> [*]: Return timeout
+    D_DONE --> [*]: Return success
+    
+    note right of D_HANDLE_RESPONSE
+        Hook calls:
+        - validateResponse()
+        - provisionDatabase() [foil role only]
     end note
 ```
 
 ---
 
-## Session Management Architecture
+## Protocol Message Flow
+
+### Stock Role Bootstrap (A provisions database)
 
 ```mermaid
 sequenceDiagram
-    participant Stream as libp2p Stream
-    participant SM as SessionManager
-    participant Session as BootstrapSession
-    participant Hooks as SessionHooks
-    participant Timeout as TimeoutManager
-    participant Audit as AuditLogger
+    participant B as Party B
+    participant HooksB as Hooks B
+    participant NodeB as Dialer Node B
+    participant NodeA as Listener Node A
+    participant HooksA as Hooks A
+    participant A as Party A
     
-    Note over Stream,Audit: New Bootstrap Request
+    Note over B,A: Bootstrap Initiation
     
-    Stream->>SM: New stream connection
-    SM->>Session: createSession(stream, sessionId)
-    SM->>Timeout: startSessionTimeout(sessionId, 30s)
-    SM->>Audit: logSessionStart(sessionId)
+    B->>NodeB: initiateFromLink(link)
+    NodeB->>NodeA: dialProtocol('/taleus/bootstrap/1.0.0')
     
-    Note over Session,Hooks: Session Processing (Parallel)
+    Note over NodeB,NodeA: Message 1: InboundContact
     
-    Session->>Timeout: startStepTimeout('READING', 5s)
-    Session->>Session: transitionTo('READING_REQUEST')
-    Session->>Stream: readJson()
-    Stream-->>Session: request data
-    Session->>Timeout: clearStepTimeout()
+    NodeB->>NodeA: InboundContact {token, partyId, identityBundle, cadrePeerAddrs}
+    NodeA->>HooksA: validateToken(token)
+    HooksA-->>NodeA: tokenInfo {role: 'stock', ...}
+    NodeA->>HooksA: validateIdentity(identityBundle)
+    HooksA-->>NodeA: identityValid
+    NodeA->>HooksA: provisionDatabase(stock, partyA, partyB)
+    HooksA-->>NodeA: provisionResult {tally, dbConnectionInfo}
     
-    Session->>Timeout: startStepTimeout('VALIDATING', 5s) 
-    Session->>Session: transitionTo('VALIDATING_TOKEN')
-    Session->>Hooks: validateToken(token)
-    Hooks-->>Session: tokenInfo
-    Session->>Timeout: clearStepTimeout()
+    Note over NodeB,NodeA: Message 2: ProvisioningResult
     
-    Session->>Timeout: startStepTimeout('PROVISIONING', 10s)
-    Session->>Session: transitionTo('PROVISIONING_DB')
-    Session->>Hooks: provisionDatabase(...)
-    Hooks-->>Session: provisionResult
-    Session->>Timeout: clearStepTimeout()
+    NodeA->>NodeB: ProvisioningResult {approved: true, provisionResult, cadrePeerAddrs}
+    NodeB->>HooksB: validateResponse(provisionResult)
+    HooksB-->>NodeB: responseValid
+    NodeB-->>B: Success {tally, dbConnectionInfo}
     
-    Session->>Session: transitionTo('COMPLETED')
-    Session->>SM: sessionComplete(sessionId, result)
-    SM->>Timeout: clearSessionTimeout(sessionId)
-    SM->>Audit: logSessionSuccess(sessionId, result)
-    SM->>Session: cleanup()
-    
-    Note over Stream,Audit: Session Cleanup
+    Note over B,A: Bootstrap Complete - Shared database ready
 ```
 
----
-
-## Concurrent Session Handling
+### Foil Role Bootstrap (B provisions database)
 
 ```mermaid
 sequenceDiagram
-    participant A1 as Responder A1
-    participant A2 as Responder A2  
-    participant A3 as Responder A3
-    participant SM as SessionManager
-    participant S1 as Session 1
-    participant S2 as Session 2
-    participant S3 as Session 3
-    participant Hooks as SharedHooks
+    participant B as Party B
+    participant HooksB as Hooks B
+    participant NodeB as Dialer Node B
+    participant NodeA as Listener Node A
+    participant HooksA as Hooks A
+    participant A as Party A
     
-    Note over A1,Hooks: Multiple Simultaneous Bootstrap Attempts
+    Note over B,A: Bootstrap Initiation
+    
+    B->>NodeB: initiateFromLink(link)
+    NodeB->>NodeA: dialProtocol('/taleus/bootstrap/1.0.0')
+    
+    Note over NodeB,NodeA: Message 1: InboundContact
+    
+    NodeB->>NodeA: InboundContact {token, partyId, identityBundle, cadrePeerAddrs}
+    NodeA->>HooksA: validateToken(token)
+    HooksA-->>NodeA: tokenInfo {role: 'foil', ...}
+    NodeA->>HooksA: validateIdentity(identityBundle)
+    HooksA-->>NodeA: identityValid
+    
+    Note over NodeB,NodeA: Message 2: ProvisioningResult (A's info)
+    
+    NodeA->>NodeB: ProvisioningResult {approved: true, partyId, cadrePeerAddrs}
+    NodeB->>HooksB: validateResponse(result)
+    HooksB-->>NodeB: responseValid
+    NodeB->>HooksB: provisionDatabase(foil, partyA, partyB)
+    HooksB-->>NodeB: provisionResult {tally, dbConnectionInfo}
+    
+    Note over NodeB,NodeA: Message 3: DatabaseResult
+    
+    NodeB->>NodeA: DatabaseResult {tally, dbConnectionInfo}
+    NodeA->>HooksA: validateDatabaseResult(result)
+    HooksA-->>NodeA: resultValid
+    NodeA-->>A: Success {tally, dbConnectionInfo}
+    NodeB-->>B: Success {tally, dbConnectionInfo}
+    
+    Note over B,A: Bootstrap Complete - Shared database ready
+```
+
+### Concurrent Multi-Use Token Handling
+
+```mermaid
+sequenceDiagram
+    participant C1 as Customer 1
+    participant C2 as Customer 2
+    participant C3 as Customer 3
+    participant NodeM as Merchant Node
+    participant HooksM as Merchant Hooks
+    participant M as Merchant
+    
+    Note over C1,M: Multiple customers scan same QR code simultaneously
     
     par Session 1
-        A1->>SM: Connect (multi-use token)
-        SM->>S1: createSession(session1)
-        S1->>Hooks: validateToken(token)
-        Hooks-->>S1: valid (multi-use)
-        S1->>Hooks: provisionDatabase(session1)
-        Hooks-->>S1: database1 created
-        S1-->>A1: Success (database1)
-    and Session 2  
-        A2->>SM: Connect (same token)
-        SM->>S2: createSession(session2)
-        S2->>Hooks: validateToken(token)
-        Hooks-->>S2: valid (multi-use)
-        S2->>Hooks: provisionDatabase(session2)
-        Hooks-->>S2: database2 created
-        S2-->>A2: Success (database2)
+        C1->>NodeM: InboundContact {token: 'merchant-qr'}
+        NodeM->>HooksM: validateToken('merchant-qr')
+        HooksM-->>NodeM: valid (multi-use)
+        NodeM->>HooksM: provisionDatabase(stock, merchant, customer1)
+        HooksM-->>NodeM: database1 {tallyId: 'merchant-customer1'}
+        NodeM-->>C1: Success (database1)
+    and Session 2
+        C2->>NodeM: InboundContact {token: 'merchant-qr'}
+        NodeM->>HooksM: validateToken('merchant-qr')
+        HooksM-->>NodeM: valid (multi-use)
+        NodeM->>HooksM: provisionDatabase(stock, merchant, customer2)
+        HooksM-->>NodeM: database2 {tallyId: 'merchant-customer2'}
+        NodeM-->>C2: Success (database2)
     and Session 3
-        A3->>SM: Connect (same token)
-        SM->>S3: createSession(session3)
-        S3->>Hooks: validateToken(token)
-        Hooks-->>S3: valid (multi-use)
-        S3->>Hooks: provisionDatabase(session3)
-        Hooks-->>S3: database3 created
-        S3-->>A3: Success (database3)
+        C3->>NodeM: InboundContact {token: 'merchant-qr'}
+        NodeM->>HooksM: validateToken('merchant-qr')
+        HooksM-->>NodeM: valid (multi-use)
+        NodeM->>HooksM: provisionDatabase(stock, merchant, customer3)
+        HooksM-->>NodeM: database3 {tallyId: 'merchant-customer3'}
+        NodeM-->>C3: Success (database3)
     end
     
-    Note over A1,Hooks: All sessions process independently<br/>No blocking, complete isolation
+    Note over C1,M: All sessions process independently<br/>Each gets unique tally and database
 ```
 
 ---
 
-## Session Timeout and Error Handling
+## Class Architecture
 
-```mermaid
-sequenceDiagram
-    participant Session as BootstrapSession
-    participant Timeout as TimeoutManager
-    participant Hooks as SessionHooks
-    participant Audit as AuditLogger
-    participant Resources as ResourceManager
-    
-    Note over Session,Resources: Normal Flow vs Timeout/Error Scenarios
-    
-    par Normal Flow
-        Session->>Timeout: startStepTimeout('READING', 5s)
-        Session->>Session: readJson()
-        Note right of Session: Completes in 2s
-        Session->>Timeout: clearStepTimeout()
-        Session->>Session: Continue to next state...
-    and Timeout Scenario
-        Session->>Timeout: startStepTimeout('PROVISIONING', 10s)
-        Session->>Hooks: provisionDatabase(...)
-        Note right of Hooks: Hangs for 15s (DB issue)
-        Timeout->>Session: timeoutExpired('PROVISIONING')
-        Session->>Session: transitionTo('TIMEOUT')
-        Session->>Audit: logTimeout(sessionId, 'PROVISIONING')
-        Session->>Resources: cleanup(sessionId)
-        Session->>Session: terminate()
-    and Error Scenario
-        Session->>Hooks: validateIdentity(invalidData)
-        Hooks-->>Session: ValidationError
-        Session->>Session: transitionTo('FAILED')
-        Session->>Audit: logError(sessionId, error)
-        Session->>Resources: cleanup(sessionId)
-        Session->>Session: terminate()
-    end
-    
-    Note over Session,Resources: All scenarios guarantee cleanup<br/>No resource leaks or zombie sessions
-```
+### SessionManager Class
 
----
-
-## Production Architecture Overview
-
-### SessionManager Class Design
+The `SessionManager` coordinates all bootstrap operations, managing both listener and dialer sessions.
 
 ```typescript
 class SessionManager {
-  private sessions = new Map<string, BootstrapSession>()
-  private metrics = new SessionMetrics()
-  private rateLimiter = new RateLimiter()
+  private listenerSessions = new Map<string, ListenerSession>()
+  private dialerSessions = new Map<string, DialerSession>()
+  private hooks: SessionHooks
+  private config: SessionManagerConfig
   
+  constructor(hooks: SessionHooks, config?: SessionManagerConfig) {
+    this.hooks = hooks
+    this.config = { sessionTimeoutMs: 30000, maxConcurrentSessions: 100, ...config }
+  }
+  
+  // Handle incoming streams (passive listener)
   async handleNewStream(stream: LibP2PStream): Promise<void> {
-    // Rate limiting check
-    if (!this.rateLimiter.allowConnection(stream.remotePeer)) {
-      await this.rejectConnection(stream, 'rate_limited')
-      return
-    }
-    
-    // Create isolated session
     const sessionId = this.generateSessionId()
-    const session = new BootstrapSession(sessionId, stream, this.hooks)
+    const session = new ListenerSession(sessionId, stream, this.hooks, this.config)
     
-    this.sessions.set(sessionId, session)
-    this.metrics.trackSessionStart(sessionId)
+    this.listenerSessions.set(sessionId, session)
     
     // Process session independently (non-blocking)
-    this.processSession(sessionId).finally(() => {
-      this.cleanupSession(sessionId)
+    session.execute().finally(() => {
+      this.listenerSessions.delete(sessionId)
     })
   }
-}
-```
-
-### BootstrapSession Class Design
-
-```typescript
-class BootstrapSession {
-  private state: SessionState = 'CREATED'
-  private timeouts = new SessionTimeouts()
-  private audit = new SessionAudit(this.sessionId)
   
-  async processSession(): Promise<SessionResult> {
+  // Initiate bootstrap (active dialer)
+  async initiateBootstrap(link: BootstrapLink, node: LibP2P): Promise<BootstrapResult> {
+    const sessionId = this.generateSessionId()
+    const session = new DialerSession(sessionId, link, node, this.hooks, this.config)
+    
+    this.dialerSessions.set(sessionId, session)
+    
     try {
-      await this.transitionTo('READING_REQUEST')
-      const request = await this.readRequest()
-      
-      await this.transitionTo('VALIDATING_TOKEN') 
-      const tokenInfo = await this.validateToken(request.token)
-      
-      if (tokenInfo.identityRequirements) {
-        await this.transitionTo('VALIDATING_IDENTITY')
-        await this.validateIdentity(request.identityBundle)
-      }
-      
-      await this.transitionTo('PROVISIONING_DB')
-      const dbResult = await this.provisionDatabase(tokenInfo, request)
-      
-      await this.transitionTo('SENDING_RESPONSE')
-      await this.sendResponse(dbResult)
-      
-      if (this.needsAcknowledgment(tokenInfo.role)) {
-        await this.transitionTo('AWAITING_ACK')
-        await this.awaitAcknowledgment()
-      }
-      
-      return this.transitionTo('COMPLETED')
-    } catch (error) {
-      return this.transitionTo('FAILED', error)
+      return await session.execute()
+    } finally {
+      this.dialerSessions.delete(sessionId)
     }
   }
 }
 ```
 
-### SessionHooks Interface (Clean Design)
+### ListenerSession Class
+
+Handles incoming bootstrap requests from other parties.
+
+```typescript
+class ListenerSession {
+  private state: ListenerState = 'L_PROCESS_CONTACT'
+  
+  constructor(
+    private sessionId: string,
+    private stream: LibP2PStream,
+    private hooks: SessionHooks,
+    private config: SessionConfig
+  ) {}
+  
+  async execute(): Promise<void> {
+    try {
+      await this.processContact()
+      await this.sendResponse()
+      
+      if (this.tokenInfo.role === 'foil') {
+        await this.awaitDatabase()
+      }
+      
+      this.transitionTo('L_DONE')
+    } catch (error) {
+      this.transitionTo('L_FAILED', error)
+    }
+  }
+}
+```
+
+### DialerSession Class
+
+Initiates bootstrap requests to other parties.
+
+```typescript
+class DialerSession {
+  private state: DialerState = 'D_SEND_CONTACT'
+  
+  constructor(
+    private sessionId: string,
+    private link: BootstrapLink,
+    private node: LibP2P,
+    private hooks: SessionHooks,
+    private config: SessionConfig
+  ) {}
+  
+  async execute(): Promise<BootstrapResult> {
+    try {
+      const stream = await this.connectAndSend()
+      const response = await this.awaitResponse(stream)
+      
+      if (this.tokenInfo.role === 'foil') {
+        await this.sendDatabase(stream)
+      }
+      
+      this.transitionTo('D_DONE')
+      return this.result
+    } catch (error) {
+      this.transitionTo('D_FAILED', error)
+      throw error
+    }
+  }
+}
+```
+
+### SessionHooks Interface
+
+Applications implement these hooks to provide business logic.
 
 ```typescript
 interface SessionHooks {
-  token: {
-    validate(token: string): Promise<TokenInfo>
-    markUsed(token: string, sessionId: string): Promise<void>
-  }
+  // Token validation and management
+  validateToken(token: string): Promise<TokenInfo>
+  markTokenUsed?(token: string, sessionId: string): Promise<void>
   
-  identity: {
-    validate(bundle: unknown, requirements: unknown): Promise<boolean>
-  }
+  // Identity validation  
+  validateIdentity?(bundle: unknown, requirements?: unknown): Promise<boolean>
   
-  database: {
-    provision(
-      createdBy: PartyRole,
-      initiatorPeerId: string, 
-      respondentPeerId: string,
-      sessionId: string
-    ): Promise<DatabaseResult>
-  }
+  // Database provisioning
+  provisionDatabase(
+    role: PartyRole,
+    initiatorPeerId: string,
+    respondentPeerId: string,
+    sessionId: string
+  ): Promise<DatabaseResult>
   
-  audit: {
-    logSession(sessionId: string, event: SessionEvent): Promise<void>
-  }
+  // Response validation (for dialers)
+  validateResponse?(response: ProvisioningResult): Promise<boolean>
+  
+  // Audit logging
+  logSessionEvent?(sessionId: string, event: SessionEvent): Promise<void>
 }
 ```
 
 ---
 
-## Integration Guide
+## Basic Usage
 
-### Quick Start
+### Setting Up the Bootstrap Service
 
 ```typescript
-import { SessionManager, SessionHooks } from 'taleus/bootstrap'
+import { SessionManager } from 'taleus/bootstrap'
 import { createLibp2p } from 'libp2p'
 
-// 1. Implement session hooks
+// 1. Implement hooks for your application
 const hooks: SessionHooks = {
-  token: {
-    async validate(token) {
-      // Your token validation logic
-      return { initiatorRole: 'stock', expiryUtc: '...', identityRequirements: null }
-    },
-    async markUsed(token, sessionId) {
-      // Mark token as used (for one-time tokens)
+  async validateToken(token: string) {
+    const tokenData = await yourTokenStore.get(token)
+    if (!tokenData || tokenData.expires < Date.now()) {
+      return null
+    }
+    return {
+      role: tokenData.role,
+      expiryUtc: tokenData.expires.toISOString(),
+      identityRequirements: tokenData.identityRequirements
     }
   },
   
-  database: {
-    async provision(createdBy, initiatorPeerId, respondentPeerId, sessionId) {
-      // Your database creation logic
-      return { tally: { tallyId: 'tally-123', createdBy }, dbConnectionInfo: { ... } }
+  async provisionDatabase(role, initiatorPeerId, respondentPeerId, sessionId) {
+    const tallyId = generateTallyId(initiatorPeerId, respondentPeerId)
+    const database = await yourDatabaseService.create(tallyId, role)
+    
+    return {
+      tally: {
+        tallyId,
+        createdBy: role,
+        initiatorPeerId,
+        respondentPeerId,
+        createdAt: new Date().toISOString()
+      },
+      dbConnectionInfo: {
+        nodes: database.nodeAddresses,
+        credentials: database.accessToken
+      }
     }
-  },
-  
-  // ... other hooks
+  }
 }
 
 // 2. Create session manager
 const sessionManager = new SessionManager(hooks, {
   sessionTimeoutMs: 30000,
-  stepTimeoutMs: 5000,
-  maxConcurrentSessions: 100,
-  rateLimitPerPeer: 10
+  maxConcurrentSessions: 50
 })
 
-// 3. Register with libp2p
-const node = await createLibp2p({ /* config */ })
-sessionManager.registerWithLibP2P(node)
+// 3. Set up libp2p node and register bootstrap protocol
+const node = await createLibp2p({
+  addresses: { listen: ['/ip4/0.0.0.0/tcp/9000'] },
+  // ... other libp2p config
+})
 
-// 4. For initiating bootstraps
-const result = await sessionManager.initiateBootstrap(link, node)
+node.handle('/taleus/bootstrap/1.0.0', ({ stream }) => {
+  sessionManager.handleNewStream(stream)
+})
+
+await node.start()
 ```
 
-### Configuration Options
+### Passive Listening (Receiving Bootstrap Requests)
 
 ```typescript
-interface SessionManagerConfig {
-  // Timeout settings
-  sessionTimeoutMs: number        // Total session timeout (default: 30000)
-  stepTimeoutMs: number          // Per-step timeout (default: 5000)
+// The session manager automatically handles incoming streams
+// Each stream becomes a new ListenerSession that processes independently
+
+console.log('Bootstrap service listening on /taleus/bootstrap/1.0.0')
+console.log('Ready to accept incoming bootstrap requests')
+
+// Monitor active sessions
+setInterval(() => {
+  console.log(`Active listener sessions: ${sessionManager.getActiveListenerCount()}`)
+}, 5000)
+```
+
+### Active Initiation (Starting Bootstrap Requests)
+
+```typescript
+// Create a bootstrap link (typically done out-of-band)
+const bootstrapLink: BootstrapLink = {
+  token: 'your-bootstrap-token',
+  responderPeerAddrs: ['/ip4/192.168.1.100/tcp/9000/p2p/12D3KooW...'],
+  role: 'stock', // or 'foil'
+  identityRequirements: { email: true }
+}
+
+// Initiate bootstrap to another party
+try {
+  const result = await sessionManager.initiateBootstrap(bootstrapLink, node)
   
-  // Concurrency limits  
-  maxConcurrentSessions: number  // Max parallel sessions (default: 100)
-  rateLimitPerPeer: number      // Max sessions per peer/minute (default: 10)
+  console.log('Bootstrap successful!')
+  console.log('Tally ID:', result.tally.tallyId)
+  console.log('Database nodes:', result.dbConnectionInfo.nodes)
   
-  // Resource management
-  cleanupIntervalMs: number     // Session cleanup frequency (default: 10000)
-  maxSessionHistory: number     // Audit log retention (default: 1000)
-  
-  // Monitoring
-  metricsEnabled: boolean       // Enable metrics collection (default: true)
-  auditLevel: 'minimal' | 'full' // Audit detail level (default: 'full')
+  // Now you can connect to the shared database and begin tally negotiation
+} catch (error) {
+  console.error('Bootstrap failed:', error.message)
 }
 ```
 
----
-
-## Testing Strategy
-
-The state machine architecture enables comprehensive testing:
-
-### Session Lifecycle Tests
-- Session creation and initialization
-- State transition validation  
-- Timeout handling at each state
-- Resource cleanup verification
-
-### Concurrent Session Tests
-- Multiple simultaneous sessions
-- Session isolation verification
-- Resource contention testing
-- Load testing with 100+ concurrent sessions
-
-### Error Handling Tests
-- Network failures and hangs
-- Hook timeouts and errors
-- Malformed message handling
-- Resource exhaustion scenarios
-
-### Production Readiness Tests
-- Rate limiting effectiveness
-- Graceful shutdown behavior
-- Memory leak detection
-- Performance under load
-
-This architecture provides the robust, concurrent, fault-tolerant bootstrap infrastructure required for a production money system.
+This architecture provides **clean separation** between the two session types while maintaining **simple APIs** for integration into applications.
