@@ -94,92 +94,100 @@ Each transition includes validation rules to ensure proper state progression.
 
 ---
 
-## Tally Bootstrap (Tally Initiation) Protocol
+## Tally Bootstrap Protocol
 
-Naming note: libp2p also uses the term "bootstrap" for peer discovery. In Taleus, "bootstrap" refers to initiating a tally negotiation between two parties. The implementation module is named `TallyBootstrap`.
+**Protocol ID**: `/taleus/bootstrap/1.0.0`
 
-### Goals and scope
-- Establish a shared database and minimal draft tally so negotiation can begin
-- Keep the network flow simple, idempotent, and mostly stateless on the Taleus side
-- Delegate token storage/policy and provisioning side effects to consumer-provided hooks
+The bootstrap protocol establishes shared databases between parties to enable tally negotiation. It uses a state machine architecture with session-based message flows.
 
-Database consensus and subsequent tally negotiation are handled outside this protocol (by Quereus/Optimystic and the negotiation layer).
+### Message Format Specifications
 
-### libp2p protocol
-- Protocol ID: `/taleus/bootstrap/1.0.0`
-- Actors: Initiator (A) exposes a passive listener; Respondent (B) dials using a private link payload
+The bootstrap protocol uses three message types for establishment flows:
 
-### Roles and builder selection
-- The invitation link declares the initiator role: `stock` or `foil`
-  - `stock`: A provisions the shared DB on approval
-  - `foil`: B provisions the shared DB on approval, then informs A
+#### InboundContact Message
+**Purpose**: Initial contact from initiator to responder.
 
-### Message shapes (conceptual)
+```typescript
+interface InboundContactMessage {
+  token: string                    // Application-specific tally intent
+  partyId: string                  // Initiator's libp2p peer ID
+  identityBundle: any              // Identity credentials (opaque to protocol)
+  cadrePeerAddrs: string[]         // Initiator's nominated nodes
+}
+```
 
-1) InboundContact (B → A)
-- Request fields:
-  - `token`: string (opaque)
-  - `partyId`: string (respondent identity)
-  - `proposedCadrePeerAddrs`: string[] (B's nominated nodes)
-  - `identityBundle?`: any (app-defined identity/certificate material)
-  - `idempotencyKey?`: string (caller-set; used to deduplicate retries)
-- Response fields:
-  - `approved`: boolean
-  - `reason?`: string (if rejected)
-  - `participatingCadrePeerAddrs?`: string[] (disclosed on approval)
-  - `provisionResult?`: { `tally`, `dbConnectionInfo` } (present if A=stock)
+#### ProvisioningResult Message  
+**Purpose**: Responder's response with approval/rejection and cadre disclosure.
 
-2) ProvisioningResult (B → A, only if A=foil)
-- Request fields:
-  - `idempotencyKey?`: string
-  - `tally`: { `tallyId`: string, `createdBy`: 'foil' }
-  - `dbConnectionInfo`: { `endpoint`: string, `credentialsRef`: string }
-- Response fields: ack or error
+```typescript
+interface ProvisioningResultMessage {
+  approved: boolean
+  reason?: string                  // If rejected
+  partyId?: string                 // Responder's libp2p peer ID (if approved)
+  cadrePeerAddrs?: string[]        // Responder's nominated nodes (if approved)
+  provisionResult?: ProvisionResult // Database access (stock role only)
+}
+```
 
-All messages should be treated as idempotent by the service.
+#### DatabaseResult Message
+**Purpose**: Database provisioning information (foil role only).
 
-### Stateless by design
-- No per-connection session state is required; each RPC carries complete inputs
-- Minimal persistence is recommended for idempotency (mapping `idempotencyKey` → result)
-- Token status (one-time vs multi-use) and usage tracking are handled by consumer hooks (see below)
+```typescript
+interface DatabaseResultMessage {
+  tally: { tallyId: string; createdBy: 'foil' }
+  dbConnectionInfo: { endpoint: string; credentialsRef: string }
+}
+```
 
-### Consumer-provided hooks (integration surface)
-Taleus does not manage token storage or business policy. Instead, the application provides hooks:
+### libp2p Stream Lifecycle
 
-- `getTokenInfo(token) → Promise<{ initiatorRole: 'stock'|'foil'; expiryUtc: string; identityRequirements?: unknown } | null>`
-  - Determines if the token is valid and which role applies; returns null for invalid tokens
+**Critical Implementation Detail**: Bootstrap messages use single-use libp2p streams.
 
-- `validateIdentity(identityBundle, identityRequirements) → Promise<boolean>` (optional)
-  - Verifies the respondent's identity against app policy
+- **Stock Role (2 messages)**: Single stream for InboundContact → ProvisioningResult
+- **Foil Role (3 messages)**: 
+  - Stream 1: InboundContact → ProvisioningResult
+  - **Stream 2**: DatabaseResult (requires NEW `dialProtocol()` call)
+  - Once `stream.source` is consumed, the original stream cannot be reused
 
-- `markTokenUsed(token, context) → Promise<void>` (optional; recommended for one-time tokens)
-  - Lets the app enforce one-time consumption and audit usage
+This follows proper libp2p patterns for multi-turn communication.
 
-- `provisionDatabase(createdBy, initiatorPeerId, respondentPeerId) → Promise<ProvisionResult>`
-  - Creates the shared DB and returns access info (to be implemented via Quereus/Optimystic)
+### Protocol Flows
 
-- `recordProvisioning(idempotencyKey, result) / getProvisioning(idempotencyKey)` (optional)
-  - Enables idempotent retries to return prior results without side effects
+The bootstrap protocol implements three message flows based on role assignment:
 
-### Service API (library shape)
-- Passive initiator:
-  - `registerPassiveListener(peer: Libp2p, options: RegisterOptions)` → unregister function
-  - Registers `/taleus/bootstrap/1.0.0` and handles InboundContact requests using the hooks
-  - `RegisterOptions`: `{ role: PartyRole; getParticipatingCadrePeerAddrs?: () => Promise<string[]> | string[] }`
+#### Stock Role Flow (2 messages)
+1. **InboundContact** (B → A): Initiator requests bootstrap with token and credentials
+2. **ProvisioningResult** (A → B): Responder provisions database and returns access details
 
-- Active respondent:
-  - `initiateFromLink(link: BootstrapLinkPayload, peer: Libp2p, args?: { identityBundle?: unknown; idempotencyKey?: string })` → `Promise<ProvisionResult | { approved: false; reason: string }>`
-  - Dials one of `link.responderPeerAddrs`, presents token and identity, and follows the role-based flow
+#### Foil Role Flow (3 messages)  
+1. **InboundContact** (B → A): Initiator requests bootstrap with token and credentials
+2. **ProvisioningResult** (A → B): Responder approves and discloses cadre information
+3. **DatabaseResult** (B → A): Initiator provisions database and sends access details (new stream)
 
-### Error handling and idempotency
-- All requests should supply an `idempotencyKey` so repeated calls (network retries) can safely return prior results
-- Errors should be explicit and actionable (e.g., token expired, identity insufficient)
-  - Policy decisions are the responsibility of consumer code via hooks
+#### Rejection Flow (1 message)
+1. **InboundContact** (B → A): Initiator requests bootstrap with token and credentials
+2. **ProvisioningResult** (A → B): Responder rejects with reason
 
-### Security and policy
-- Token TTLs, rate limiting, and abuse controls are application responsibilities (enforced via hooks)
-- Only responder-node peer addrs need to be disclosed in the invitation link; participating cadre is disclosed after approval
-- Identity bundles, certificates, and proposed tally terms are opaque to Taleus during bootstrap; validation and acceptance are handled by consumer hooks
+Database consensus and subsequent tally negotiation are handled outside this protocol by Quereus/Optimystic and the negotiation layer.
+
+---
+
+### Security Considerations
+
+#### Cadre Disclosure Timing (Method 6 Compliance)
+- **InboundContact**: Initiator discloses their cadre nodes immediately
+- **ProvisioningResult**: Responder discloses their cadre only after token/identity validation
+- **Rejection**: Responder does NOT disclose cadre in rejection responses
+
+#### Token Security
+- Tokens contain application-specific tally intent and role assignment
+- Token expiration enforced at application level
+- One-time vs multi-use token behavior determined by application policy
+
+#### Identity Validation
+- Identity bundles are protocol-opaque (application-defined structure)
+- Validation performed by application-provided hooks
+- Identity requirements specified in invitation tokens
 
 
 ## Transaction Protocol Flow

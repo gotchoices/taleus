@@ -26,7 +26,15 @@ Taleus improves upon this by:
 
 ## Tally Bootstrap Process
 
-Bootstrap details are maintained separately. See `doc/design/bootstrap.md`.
+Bootstrap creates minimal draft tallies containing only essential identity information to enable negotiation. The complete tally structure (chunks, terms, configuration) is built through subsequent negotiation processes. See `doc/bootstrap.md` for complete implementation details.
+
+### Minimal Draft Tally
+During bootstrap, the provisioning party creates a minimal tally containing:
+- **Tally ID**: Unique identifier for the relationship
+- **Created By**: Which party ('stock' or 'foil') provisioned the database
+- **Party IDs**: libp2p peer IDs of both parties
+
+This minimal structure enables negotiation to begin while the full tally chunks and terms are negotiated separately.
 
 ### Multi-Use Token Implications
 

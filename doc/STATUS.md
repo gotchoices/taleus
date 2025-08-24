@@ -49,9 +49,10 @@ This file tracks the development progress, issues to be resolved, and future enh
 - ✅ **Production Performance**: Sub-200ms operations, 5+ concurrent sessions
 
 ### **Next Development Priorities:**
-1. **Documentation Sync**: Update core docs to reflect final implementation
-   - `doc/protocol.md` - replace TallyBootstrap class refs with SessionManager/sessions
-   - `doc/architecture.md` - update bootstrap architecture section
+1. **Documentation Sync**: Update core docs to reflect final implementation ✅ **COMPLETED**
+   - `doc/protocol.md` - replace TallyBootstrap class refs with SessionManager/sessions ✅ **COMPLETED**
+   - `doc/architecture.md` - update bootstrap architecture section ✅ **COMPLETED**
+   - `doc/tally.md` - fix bootstrap references ✅ **COMPLETED**
 
 2. **Schema Design Phase**: Begin shared database schema implementation
    - Design normalized SQL schema from `doc/tally.md` specifications
@@ -237,17 +238,17 @@ Based on PROJECT.md, the following information needs clarification:
   - [x] **CRITICAL**: Document libp2p stream consumption issue - foil Message 3 requires NEW stream (dialProtocol) ✅ **COMPLETED**
   - [x] **CRITICAL**: Update sequence diagrams to show NodeB opens fresh stream for DatabaseResult message ✅ **COMPLETED**
   - [x] Clean test suite: Remove internal unit tests, maintain integration coverage ✅ **COMPLETED**
-    - [ ] Review `doc/architecture.md` - replace TallyBootstrap class with SessionManager/ListenerSession/DialerSession architecture
-    - [ ] Review `doc/architecture.md` - update Hooks interface to SessionHooks with new structure (token.validate, database.provision, etc.)
-    - [ ] Review `doc/architecture.md` - remove obsolete registerPassiveListener/initiateFromLink API references
-    - [ ] Review `doc/protocol.md` - update TallyBootstrap protocol section with session-based message flows
-    - [ ] Review `doc/protocol.md` - ensure protocol message types match bootstrap.md sequence diagrams
-    - [ ] Review `doc/protocol.md` - remove obsolete sequential handler references
-    - [ ] Review `doc/protocol.md` - document libp2p stream lifecycle and new stream requirement for 3-message flows
-    - [ ] Review `doc/tally.md` - update bootstrap process references to point to doc/bootstrap.md instead of doc/design/bootstrap.md
-    - [ ] Review `doc/tally.md` - ensure tally data chunk descriptions align with current bootstrap implementation
-    - [ ] Check for obsolete TallyBootstrap class references across all documentation
-    - [ ] Ensure consistent terminology (SessionManager, ListenerSession, DialerSession) across all docs
+    - [x] Review `doc/architecture.md` - replace TallyBootstrap class with SessionManager/ListenerSession/DialerSession architecture ✅ **COMPLETED**
+    - [x] Review `doc/architecture.md` - update Hooks interface to SessionHooks with new structure ✅ **COMPLETED**
+    - [x] Review `doc/architecture.md` - remove obsolete registerPassiveListener/initiateFromLink API references ✅ **COMPLETED**
+    - [x] Review `doc/protocol.md` - update TallyBootstrap protocol section with session-based message flows ✅ **COMPLETED**
+    - [x] Review `doc/protocol.md` - ensure protocol message types match bootstrap.md sequence diagrams ✅ **COMPLETED**
+    - [x] Review `doc/protocol.md` - remove obsolete sequential handler references ✅ **COMPLETED**
+    - [x] Review `doc/protocol.md` - document libp2p stream lifecycle and new stream requirement for 3-message flows ✅ **COMPLETED**
+    - [x] Review `doc/tally.md` - update bootstrap process references to point to doc/bootstrap.md instead of doc/design/bootstrap.md ✅ **COMPLETED**
+    - [x] Review `doc/tally.md` - ensure tally data chunk descriptions align with current bootstrap implementation ✅ **COMPLETED**
+    - [x] Check for obsolete TallyBootstrap class references across all documentation ✅ **COMPLETED**
+    - [x] Ensure consistent terminology (SessionManager, ListenerSession, DialerSession) across all docs ✅ **COMPLETED**
 
 ### Phase 3: Core Implementation
 - [ ] Set up libp2p + Kademlia + Optimystic + Quereus stack
