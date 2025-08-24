@@ -165,10 +165,73 @@ describe('Taleus Bootstrap State Machine', () => {
       }
     }, 5000)
     
-    it.skip('should isolate session failures', async () => {
+    it('should isolate session failures', async () => {
       // Test that one session failure doesn't affect others
-      assert.fail('TODO: Test session isolation')
-    })
+      const manager = new SessionManager(hooksA, DEFAULT_CONFIG)
+      
+      // Register handler
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await manager.handleNewStream(stream as any)
+      })
+      
+      const managerB1 = new SessionManager(hooksB, DEFAULT_CONFIG)
+      const managerB2 = new SessionManager(hooksB, DEFAULT_CONFIG)
+      
+      // Create two links - one valid, one invalid
+      const validLink: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'stock-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+      
+      const invalidLink: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'invalid-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+      
+      console.log('Testing session isolation with valid and invalid requests...')
+      
+      // Start both sessions simultaneously
+      const validPromise = managerB1.initiateBootstrap(validLink, nodeB)
+      const invalidPromise = managerB2.initiateBootstrap(invalidLink, nodeB)
+      
+      // Wait for both to complete
+      const results = await Promise.allSettled([validPromise, invalidPromise])
+      
+      // Check results
+      const validResult = results[0]
+      const invalidResult = results[1]
+      
+      // Valid session should succeed
+      assert.equal(validResult.status, 'fulfilled', 'Valid session should succeed')
+      if (validResult.status === 'fulfilled') {
+        assert.ok(validResult.value.tally, 'Valid session should return tally')
+        console.log('✅ Valid session completed successfully')
+      }
+      
+      // Invalid session should fail
+      assert.equal(invalidResult.status, 'rejected', 'Invalid session should fail')
+      if (invalidResult.status === 'rejected') {
+        assert.ok(invalidResult.reason.message.includes('Bootstrap rejected'), 'Invalid session should be rejected')
+        console.log('✅ Invalid session properly rejected')
+      }
+      
+      // Key test: failure isolation - check no sessions remain active
+      const finalSessionCount = Object.keys((manager as any).activeSessions || {}).length
+      assert.equal(finalSessionCount, 0, 'All sessions should be cleaned up, including failed ones')
+      
+      console.log('✅ Session failures properly isolated - no impact on other sessions')
+      
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 6000)
   })
 
   describe('ListenerSession State Transitions', () => {
