@@ -824,16 +824,19 @@ describe('Taleus Bootstrap State Machine', () => {
         console.log(`Connection attempt ${connectionAttempts}`)
         
         if (connectionAttempts === 1) {
-          // Simulate network failure by immediately closing the stream
-          console.log('Simulating network failure - closing stream')
+          // Simulate network failure by immediately closing the stream (realistic failure)
+          console.log('Simulating network failure - closing stream immediately')
           try {
             if ((stream as any).close) {
               (stream as any).close()
+            } else if ((stream as any).closeWrite) {
+              (stream as any).closeWrite()
             }
           } catch (error) {
-            // Stream might already be closed
+            // Stream might already be closed - that's fine
           }
-          throw new Error('Simulated network failure')
+          // Exit cleanly without throwing - simulates network drop
+          return
         } else {
           // Second attempt succeeds
           await managerA.handleNewStream(stream as any)
@@ -855,10 +858,11 @@ describe('Taleus Bootstrap State Machine', () => {
         assert.fail('First attempt should fail due to network error')
       } catch (error) {
         console.log('✅ First attempt properly failed:', error.message)
-        assert.ok(error.message.includes('Simulated network failure') || 
-                 error.message.includes('timeout') || 
+        assert.ok(error.message.includes('timeout') || 
                  error.message.includes('stream') ||
-                 error.message.includes('connection'), 
+                 error.message.includes('connection') ||
+                 error.message.includes('empty data') ||
+                 error.message.includes('closed'), 
                  'Should fail with network-related error')
       }
       
