@@ -759,9 +759,71 @@ describe('Taleus Bootstrap State Machine', () => {
       assert.fail('TODO: Test session limiting')
     })
     
-    it.skip('should clean up resources on session completion', async () => {
+    it('should clean up resources on session completion', async () => {
       // Test memory leaks, stream cleanup, etc.
-      assert.fail('TODO: Test resource cleanup')
-    })
+      const manager = new SessionManager(hooksA, DEFAULT_CONFIG)
+      
+      // Register handler
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await manager.handleNewStream(stream as any)
+      })
+      
+      const managerB = new SessionManager(hooksB, DEFAULT_CONFIG)
+      
+      // Track resource usage before
+      const initialMemory = process.memoryUsage()
+      const initialSessions = Object.keys((manager as any).activeSessions || {}).length
+      
+      console.log('Testing resource cleanup - running multiple bootstraps...')
+      
+      // Run multiple bootstrap operations to test cleanup
+      const promises = []
+      for (let i = 0; i < 5; i++) {
+        const link: BootstrapLink = {
+          responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+          token: 'stock-token',
+          tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+          initiatorRole: 'stock'
+        }
+        
+        const testManager = new SessionManager(hooksB, DEFAULT_CONFIG)
+        promises.push(testManager.initiateBootstrap(link, nodeB))
+      }
+      
+      // Wait for all to complete
+      const results = await Promise.all(promises)
+      
+      // Give cleanup time to complete
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      // Check resource cleanup
+      const finalSessions = Object.keys((manager as any).activeSessions || {}).length
+      const finalMemory = process.memoryUsage()
+      
+      // Verify all sessions cleaned up
+      assert.equal(finalSessions, initialSessions, 'All sessions should be cleaned up')
+      
+      // Verify all bootstraps succeeded
+      results.forEach((result, i) => {
+        assert.ok(result.tally, `Bootstrap ${i} should have succeeded`)
+      })
+      
+      // Memory should not have grown significantly (allow for some variation)
+      const memoryGrowth = finalMemory.heapUsed - initialMemory.heapUsed
+      const memoryGrowthMB = memoryGrowth / (1024 * 1024)
+      
+      console.log(`Memory growth: ${memoryGrowthMB.toFixed(2)}MB`)
+      assert.ok(memoryGrowthMB < 50, 'Memory growth should be reasonable (< 50MB)')
+      
+      console.log('✅ Resources properly cleaned up after multiple sessions')
+      console.log(`✅ Completed ${results.length} bootstraps successfully`)
+      
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 8000)
   })
 })
