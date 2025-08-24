@@ -352,10 +352,57 @@ describe('Taleus Bootstrap State Machine', () => {
       }
     }, 3000)
     
-    it.skip('should send A_cadre in ProvisioningResult message (post-validation)', async () => {
-      // Verify Message 2 contains cadrePeerAddrs from A (after validation)  
-      assert.fail('TODO: Test A cadre disclosure after validation')
-    })
+    it('should send A_cadre in ProvisioningResult message (post-validation)', async () => {
+      // Verify Message 2 contains cadrePeerAddrs from A (after validation)
+      const managerA = new SessionManager(hooksA, DEFAULT_CONFIG)
+      const managerB = new SessionManager(hooksB, DEFAULT_CONFIG)
+      
+      let capturedResponse: any = null
+      
+      // Override B's validateResponse to capture A's response
+      const originalValidateResponse = hooksB.validateResponse
+      hooksB.validateResponse = async (response: any, sessionId: string) => {
+        capturedResponse = response
+        console.log('📩 Captured ProvisioningResult cadrePeerAddrs:', response.cadrePeerAddrs)
+        return originalValidateResponse(response, sessionId)
+      }
+      
+      // A registers as passive listener
+      nodeA.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+        await managerA.handleNewStream(stream as any)
+      })
+      
+      const link: BootstrapLink = {
+        responderPeerAddrs: [nodeA.getMultiaddrs()[0].toString()],
+        token: 'stock-token',
+        tokenExpiryUtc: new Date(Date.now() + 300000).toISOString(),
+        initiatorRole: 'stock'
+      }
+      
+      console.log('Testing A cadre disclosure after validation...')
+      
+      // This should complete successfully for stock role
+      const result = await managerB.initiateBootstrap(link, nodeB)
+      
+      // Verify A's cadre was disclosed in ProvisioningResult (after validation)
+      assert.ok(capturedResponse, 'Should have captured ProvisioningResult message')
+      assert.ok(capturedResponse.approved, 'Response should be approved')
+      assert.ok(capturedResponse.cadrePeerAddrs, 'ProvisioningResult should contain cadrePeerAddrs')
+      assert.ok(Array.isArray(capturedResponse.cadrePeerAddrs), 'cadrePeerAddrs should be an array')
+      assert.ok(capturedResponse.cadrePeerAddrs.length > 0, 'A should disclose its cadre after validation')
+      
+      console.log('✅ A cadre properly disclosed in ProvisioningResult after validation')
+      
+      // Restore original hook
+      hooksB.validateResponse = originalValidateResponse
+      
+      // Clean up
+      try {
+        nodeA.unhandle('/taleus/bootstrap/1.0.0')
+      } catch (error) {
+        // Handler might already be removed - that's ok
+      }
+    }, 5000)
     
     it.skip('should allow A to reject without revealing A_cadre', async () => {
       // Test that rejection response doesn't include A's cadre information
