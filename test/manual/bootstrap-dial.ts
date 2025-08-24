@@ -15,7 +15,8 @@ import { createLibp2p } from 'libp2p'
 import { tcp } from '@libp2p/tcp'
 import { noise } from '@chainsafe/libp2p-noise'
 import { mplex } from '@libp2p/mplex'
-import { TallyBootstrap } from '../../src/tallyBootstrap.js'
+import { SessionManager, type BootstrapLink } from '../../src/tallyBootstrap.js'
+import { type SessionHooks } from '../auto/helpers/consumerMocks.js'
 
 function parseArgs(): { linkPath: string; identity?: unknown } {
   const argv = process.argv.slice(2)
@@ -31,7 +32,7 @@ function parseArgs(): { linkPath: string; identity?: unknown } {
 
 async function main() {
   const { linkPath, identity } = parseArgs()
-  const link = JSON.parse(readFileSync(linkPath, 'utf-8'))
+  const link: BootstrapLink = JSON.parse(readFileSync(linkPath, 'utf-8'))
   console.log('Loaded link:', link)
 
   console.log('Starting libp2p dialer...')
@@ -45,11 +46,18 @@ async function main() {
   await node.start()
   console.log(`Node started: ${node.peerId.toString()}`)
 
-  // Minimal hooks for dialer
-  const bootstrap = new TallyBootstrap({
-    async getTokenInfo() { return null }, // not used on dialer side
-    async provisionDatabase(createdBy, initiatorPeerId, respondentPeerId) {
-      console.log(`[B] provisionDatabase by ${createdBy}:`, { initiatorPeerId, respondentPeerId })
+  // SessionManager with hooks for dialer
+  const hooks: SessionHooks = {
+    async validateToken(token, sessionId) {
+      // Not used on dialer side
+      return { valid: false, role: 'stock' }
+    },
+    async validateIdentity(identity, sessionId) {
+      console.log(`[B] validateIdentity: ${JSON.stringify(identity)} (session: ${sessionId})`)
+      return true
+    },
+    async provisionDatabase(createdBy, partyA, partyB, sessionId) {
+      console.log(`[B] provisionDatabase by ${createdBy}: ${partyA} ↔ ${partyB} (session: ${sessionId})`)
       const tallyId = `demo-${Date.now()}`
       const result = {
         tally: { tallyId, createdBy },
@@ -57,11 +65,28 @@ async function main() {
       }
       console.log('[B] provisioning complete:', result)
       return result
+    },
+    async validateResponse(response, sessionId) {
+      console.log(`[B] validateResponse (session: ${sessionId}):`, response)
+      return true
+    },
+    async validateDatabaseResult(result, sessionId) {
+      console.log(`[B] validateDatabaseResult (session: ${sessionId}):`, result)
+      return true
     }
-  } as any)
+  }
 
-  const res = await bootstrap.initiateFromLink(link, node, { identityBundle: identity, idempotencyKey: 'manual-1' })
-  console.log('Bootstrap result:', res)
+  const sessionManager = new SessionManager(hooks, { 
+    enableDebugLogging: true,
+    sessionTimeoutMs: 30000,
+    stepTimeoutMs: 10000,
+    maxConcurrentSessions: 5
+  })
+
+  console.log('[B] Initiating bootstrap...')
+  const res = await sessionManager.initiateBootstrap(link, node)
+  console.log('[B] ✅ Bootstrap successful!')
+  console.log('Result:', JSON.stringify(res, null, 2))
 
   process.exit(0)
 }

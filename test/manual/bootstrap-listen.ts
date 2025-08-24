@@ -18,9 +18,11 @@ import { createLibp2p } from 'libp2p'
 import { tcp } from '@libp2p/tcp'
 import { noise } from '@chainsafe/libp2p-noise'
 import { mplex } from '@libp2p/mplex'
-import { TallyBootstrap, type PartyRole, type ProvisionResult } from '../../src/tallyBootstrap.js'
+import { SessionManager, type BootstrapLink, type ProvisionResult } from '../../src/tallyBootstrap.js'
+import { createSessionAwareHooks, type SessionHooks } from '../auto/helpers/consumerMocks.js'
 import { writeFileSync } from 'node:fs'
 
+type PartyRole = 'stock' | 'foil'
 type Args = { role: PartyRole; token: string; ttlMs: number; outPath: string }
 
 function parseArgs(): Args {
@@ -53,24 +55,20 @@ async function main() {
   console.log('Listening multiaddrs:')
   node.getMultiaddrs().forEach(ma => console.log(' -', ma.toString()))
 
-  // In-memory hooks for demo
+  // SessionManager with hooks for demo
   let used = false
-  const bootstrap = new TallyBootstrap({
-    async getTokenInfo(tok) {
-      if (tok !== token) return null
-      const expiryUtc = new Date(Date.now() + ttlMs).toISOString()
-      return { initiatorRole: role, expiryUtc }
+  const hooks: SessionHooks = {
+    async validateToken(tok, sessionId) {
+      if (tok !== token) return { valid: false, role: 'stock' }
+      console.log(`[A] validateToken: ${tok} (session: ${sessionId})`)
+      return { valid: true, role }
     },
-    async validateIdentity(identity) {
-      console.log('[A] validateIdentity:', identity)
+    async validateIdentity(identity, sessionId) {
+      console.log(`[A] validateIdentity: ${JSON.stringify(identity)} (session: ${sessionId})`)
       return true
     },
-    async markTokenUsed(tok) {
-      if (tok === token) used = true
-      console.log('[A] markTokenUsed:', tok, 'used =', used)
-    },
-    async provisionDatabase(createdBy, initiatorPeerId, respondentPeerId) {
-      console.log(`[A] provisionDatabase by ${createdBy}:`, { initiatorPeerId, respondentPeerId })
+    async provisionDatabase(createdBy, partyA, partyB, sessionId) {
+      console.log(`[A] provisionDatabase by ${createdBy}: ${partyA} ↔ ${partyB} (session: ${sessionId})`)
       // Demo DB record
       const tallyId = `demo-${Date.now()}`
       const result: ProvisionResult = {
@@ -79,13 +77,33 @@ async function main() {
       }
       console.log('[A] provisioning complete:', result)
       return result
+    },
+    async validateResponse(response, sessionId) {
+      console.log(`[A] validateResponse (session: ${sessionId}):`, response)
+      return true
+    },
+    async validateDatabaseResult(result, sessionId) {
+      console.log(`[A] validateDatabaseResult (session: ${sessionId}):`, result)
+      return true
     }
+  }
+
+  const sessionManager = new SessionManager(hooks, { 
+    enableDebugLogging: true,
+    sessionTimeoutMs: 30000,
+    stepTimeoutMs: 10000,
+    maxConcurrentSessions: 5
   })
 
-  bootstrap.registerPassiveListener(node, { role, getParticipatingCadrePeerAddrs: () => node.getMultiaddrs().map(a => a.toString()) })
+  // Register the bootstrap protocol handler
+  node.handle('/taleus/bootstrap/1.0.0', async ({ stream }) => {
+    console.log('[A] Incoming bootstrap request...')
+    await sessionManager.handleNewStream(stream as any)
+    console.log('[A] Bootstrap session completed')
+  })
 
   // Compose link and emit for dialer
-  const link = {
+  const link: BootstrapLink = {
     responderPeerAddrs: node.getMultiaddrs().map(a => a.toString()),
     token,
     tokenExpiryUtc: new Date(Date.now() + ttlMs).toISOString(),

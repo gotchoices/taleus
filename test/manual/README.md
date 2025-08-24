@@ -1,6 +1,6 @@
 # Manual Bootstrap Tests
 
-This directory contains interactive demo applications for testing the `TallyBootstrap` service manually with real libp2p nodes.
+This directory contains interactive demo applications for testing the `SessionManager` bootstrap service manually with real libp2p nodes.
 
 ## Overview
 
@@ -18,6 +18,7 @@ npx tsx test/manual/bootstrap-listen.ts --role stock
 
 This will:
 - Start a libp2p node
+- Create a SessionManager with demo hooks
 - Register the bootstrap protocol handler
 - Generate a link file (`/tmp/tally-link.json`)
 - Print a ready-to-copy command for the responder
@@ -30,7 +31,8 @@ npx tsx test/manual/bootstrap-dial.ts /tmp/tally-link.json
 
 This will:
 - Read the link file
-- Connect to the listener
+- Create a SessionManager for the dialer role
+- Connect to the listener using the new bootstrap protocol
 - Complete the bootstrap handshake
 - Print the provisioning result
 
@@ -135,10 +137,12 @@ Result: {
 
 ### Terminal 1 (Listener - shows activity)
 ```bash
-[A] validateIdentity: undefined
-[A] markTokenUsed: demo-abc used = true
-[A] provisionDatabase called: createdBy=stock initiator=12D3... respondent=12D3...
-✅ Bootstrap completed successfully
+[A] Incoming bootstrap request...
+[A] validateToken: demo-abc (session: session-123...)
+[A] validateIdentity: undefined (session: session-123...)
+[A] provisionDatabase by stock: 12D3... ↔ 12D3... (session: session-123...)
+[A] provisioning complete: { tally: {...}, dbConnectionInfo: {...} }
+[A] Bootstrap session completed
 ```
 
 ## Troubleshooting
@@ -149,8 +153,8 @@ Result: {
 - Verify the link file path is correct
 
 ### Token/Identity Issues
-- The demo uses mock hooks that accept any token/identity
-- For custom validation, modify the hooks in the source files
+- The demo uses SessionHooks that accept any valid token/identity
+- For custom validation, modify the SessionHooks implementations in the source files
 
 ### Network Ports
 - libp2p will choose random available ports
@@ -162,10 +166,12 @@ Result: {
 These manual tests demonstrate:
 - **Real libp2p networking** (not mocked)
 - **Complete bootstrap flow** (Method 6: Role-Based Link Handshake)
+- **SessionManager state machine architecture** (production implementation)
 - **Both role variations** (stock and foil)
 - **Error handling** (invalid tokens, connection failures)
-- **Stream management** (proper open/close cycles)
-- **Hook integration** (consumer-provided validation and provisioning)
+- **Stream management** (proper libp2p stream lifecycle)
+- **SessionHooks integration** (consumer-provided validation and provisioning)
+- **Session isolation** (concurrent session support)
 
 ## Integration with Automated Tests
 
