@@ -374,9 +374,16 @@ create table TallyContract (
     -- the plain and committed.* views coincide here (a later revision is never inserted in the same
     -- transaction as revision 1). Ties immutability to revision 1 (not the immediately-prior revision)
     -- so the whole chain is anchored to the first accepted contract, per feat-denomination-argument.
+    -- The `exists` guard is LOAD-BEARING: a Quereus CHECK passes when its expression is NULL (only a
+    -- definite FALSE rejects -- see quereus runtime/emit/constraint-check.ts). Without the guard, if
+    -- revision 1 is absent (TallyContract has no Number-monotonicity, so a first insert at Number > 1
+    -- is possible) the `= (empty subquery)` comparisons are NULL, the whole expression is NULL, and the
+    -- constraint would ACCEPT an unanchored later revision with an arbitrary denomination -- silently
+    -- defeating the lock. The guard forces a definite FALSE (reject) whenever revision 1 does not exist.
     constraint DenominationImmutable check (
         New.Number = 1
-        or (New.Denomination = (select Denomination from TallyContract where Number = 1)
+        or (exists (select 1 from TallyContract where Number = 1)
+            and New.Denomination = (select Denomination from TallyContract where Number = 1)
             and New.DenominationScale = (select DenominationScale from TallyContract where Number = 1))
     ) on insert,
     constraint InsertOnly check (0) on delete, update
