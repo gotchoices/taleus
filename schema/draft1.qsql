@@ -253,6 +253,56 @@ create view AuthorizedKey as
     from RegisteredKey RK
     where not exists (select 1 from PartyKeyRevocation R where R.Sid = RK.Sid and R.PublicKey = RK.PublicKey);
 
+-- Tally identity record (feat-schema-tally-core). The founding facts of the tally, whose digest IS the
+-- tally CID -- the per-strand anchor every Cid-bound signature (contracts, chits, pledges) binds to, so a
+-- row signed for this tally can never be replayed into another. Single row, insert-only, created once at
+-- formation. Created AFTER seating (both Stock and Foil rows exist) and BEFORE negotiation: no Cid-bound
+-- table is written until negotiation, and the seating tables (Stock/Foil/PartyKey/PartyCertificate)
+-- deliberately do NOT bind to Cid, so the invitee's Sid is already known when this row is needed. Folding
+-- FoilSid into the Cid makes the identity commit to BOTH parties -- see the replay NOTE.
+--
+-- Cid = Digest(StockSid, FoilSid, ProtocolVersion, CreatedAt). The stored Cid must equal that digest
+-- (CidCorrect); StockSid/FoilSid must be the actually-seated parties (StockSeated/FoilSeated pin them to
+-- the single-row Stock/Foil tables), so even a malicious initiator cannot name a counterparty who never
+-- seated. Signed by an authorized key of the STOCK (initiator) party -- "created by the initiator".
+--
+-- NOTE (replay): both party Sids are folded into the Cid, so the tally identity cryptographically commits
+-- to WHICH two parties it binds. A chit/contract/pledge digest binding this Cid cannot validate in any
+-- tally with a different party pair. Excluding FoilSid (the provision-time alternative) would commit only
+-- to the initiator + timestamp, weakening cross-tally replay protection -- rejected.
+-- NOTE (CreatedAt trust): CreatedAt is chosen by the inserting (stock) party. A dishonest value only
+-- changes the Cid, which both parties observe before binding any negotiation signature to it -- disputable,
+-- not silently exploitable. Not gated against now() (that would make the insert volatile/non-deterministic,
+-- same reasoning as CreditTerms.Date at schema/draft1.qsql:433-438).
+create table TallyCore (
+    Cid text,              -- tally id: digest of the founding fields below; the per-strand signature anchor
+    StockSid text,         -- initiator (stock) party identity
+    FoilSid text,          -- invitee (foil) party identity
+    ProtocolVersion text,  -- Taleus tally protocol version in force at formation
+    CreatedAt text,        -- formation timestamp
+    SignerKey text,        -- authorized PartyKey of StockSid that signed this row
+    Signature text,
+
+    primary key (/* 1 row */),
+    -- Cid is the content address of the founding fields: the stored value must equal their digest.
+    constraint CidCorrect check on insert (New.Cid = Digest(StockSid, FoilSid, ProtocolVersion, CreatedAt)),
+    -- StockSid/FoilSid must name the actually-seated parties (both tables are single-row), so the identity
+    -- cannot be minted against a counterparty who never seated. Requiring the Foil row also pins creation
+    -- to AFTER the invitee seats.
+    constraint StockSeated check on insert (New.StockSid in (select Sid from Stock)),
+    constraint FoilSeated check on insert (New.FoilSid in (select Sid from Foil)),
+    constraint ProtocolVersionPresent check on insert (New.ProtocolVersion is not null and New.ProtocolVersion <> ''),
+    constraint CreatedAtValid check on insert (ValidDate(New.CreatedAt)),
+    -- Initiator (stock) creates the identity: SignerKey resolves against the STOCK party's authorized set.
+    constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.StockSid)),
+    constraint SignatureValid check on insert (SignatureValid(
+        Digest(StockSid, FoilSid, ProtocolVersion, CreatedAt),
+        Signature,
+        New.SignerKey
+    )),
+    constraint InsertOnly check on delete, update (0)
+);
+
 create table PartyCertificate (
     PartySid text,
     Revision integer,
