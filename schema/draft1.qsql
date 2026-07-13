@@ -171,11 +171,15 @@ create table PartyKeyRevocation (
 -- re-admission is a sequencing dependency, not a schema constraint, and is NOT modeled here
 -- (see docs/architecture.md "Key recovery").
 --
--- NOTE: the counterparty IS the recovery trust root. A malicious counterparty colluding to adopt
--- a key it controls is INHERENT to a two-party human-trust root and is OUT OF SCOPE by design:
--- SelfSigValid still forces the real party to have generated the key and handed it over out of
--- band, so the counterparty ALONE cannot forge an adoption, but genuine collusion is not
--- preventable at this layer.
+-- NOTE: the counterparty IS the recovery trust root, and its honest attestation is the ONLY thing
+-- authenticating the recovering party here. SelfSigValid proves the adopted key is a real keypair
+-- whose private-key holder consented -- it does NOT prove WHICH party generated it. A malicious
+-- counterparty can therefore unilaterally re-key the other party: it generates (or reuses) a key it
+-- controls, self-signs Digest(Sid, PublicKey) with it, and attests with its own authorized key,
+-- satisfying every guard alone. This is INHERENT and unpreventable at this layer -- in total loss
+-- the recovering party retains NO secret inside the tally, so there is no cryptographic material it
+-- could present that the counterparty could not fabricate. OUT OF SCOPE by design; the app must
+-- surface counterparty attestation as the trust decision it is.
 -- NOTE: Digest(Sid, PublicKey) is not tally-bound (follows PartyKey precedent, not the chit
 -- tables' Cid-bound digests). A self-signature is valid for this Sid in any tally the party holds,
 -- but confers nothing without THAT tally's counterparty attesting with a locally-authorized key,
@@ -237,6 +241,13 @@ create view RegisteredKey as
 -- exercising a view inside a CHECK. If a future runner rejects a view here, the fallback is to
 -- inline the body -- RegisteredKey (PartyKey union PartyKeyAdoption) minus PartyKeyRevocation --
 -- directly into each referencing constraint.
+-- NOTE: NEW here vs the sibling key-multi-and-revoke ticket -- PartyKeyAdoption.CounterpartyIsOther
+-- references AuthorizedKey, while AuthorizedKey (via RegisteredKey) references PartyKeyAdoption: a
+-- table<->view definitional CYCLE. It is unbreakable by reordering (each side names the other), so
+-- the table is created before these views and relies on Quereus resolving view names at
+-- statement-build time, not DDL-creation order. The committed.* forward table references already in
+-- this schema resolve the same way; a view forward-reference is the same class, unexercised by any
+-- runner.
 create view AuthorizedKey as
     select RK.Sid, RK.PublicKey
     from RegisteredKey RK
