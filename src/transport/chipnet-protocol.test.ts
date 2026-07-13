@@ -299,6 +299,12 @@ describe('ChipNetTransport', () => {
 		expect(n1).toMatch(/^[A-Za-z0-9+/]+=*$/)
 	})
 
+	it('does not collide when the session/link boundary shifts (unambiguous concat)', () => {
+		// A bare delimiter would hash ("a b","c") and ("a","b c") identically.
+		expect(computeNonce('a b', 'c')).not.toBe(computeNonce('a', 'b c'))
+		expect(computeNonce('ab', '')).not.toBe(computeNonce('a', 'b'))
+	})
+
 	it('start() and stop() are idempotent', async () => {
 		const { b } = twoNodes()
 		const transportB = new ChipNetTransport(makeHost(b))

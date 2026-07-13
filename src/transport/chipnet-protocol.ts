@@ -215,10 +215,19 @@ function base64(bytes: Uint8Array): string {
  * NOTE: The exact byte layout of the `sessionCode ‖ linkId` concatenation must be
  * reconciled with ChipNet's own `AnonymityService` when `chipnet` is installable
  * (blocked/chipnet-npm-publish-needed); both Taleus sides agree regardless, since
- * they run this same function. A separator keeps the concat unambiguous.
+ * they run this same function. The session length prefix keeps the boundary unambiguous - a
+ * bare delimiter (space or NUL) collides ("a b","c") with ("a","b c"),
+ * and a nonce collision would let a peer conflate two tallies.
  */
 export function computeNonce(sessionCode: string, linkId: string): string {
-	return base64(sha256(new TextEncoder().encode(`${sessionCode} ${linkId}`)))
+	const enc = new TextEncoder()
+	const session = enc.encode(sessionCode)
+	const link = enc.encode(linkId)
+	const buf = new Uint8Array(4 + session.length + link.length)
+	new DataView(buf.buffer).setUint32(0, session.length, false)
+	buf.set(session, 4)
+	buf.set(link, 4 + session.length)
+	return base64(sha256(buf))
 }
 
 /**
@@ -362,6 +371,11 @@ export class ChipNetTransport {
 			await this.pushRecord(target.addrs, frame)
 			return
 		} catch (dialErr) {
+			// NOTE: this catch fires on ANY push failure, including an application-level
+			// ack rejection (participant threw), not only an unreachable dial — so the
+			// push-wake retry below can re-deliver a record the participant already saw.
+			// The registered RecordParticipant (feat-lift-referee-commit) must therefore
+			// be idempotent (correlate by transactionCode) and not double-apply.
 			this.log('updatePeer initial dial failed for %s: %o', target.peerId, dialErr)
 			const woke = await this.tryPushWake(target)
 			if (!woke) {

@@ -71,7 +71,13 @@ export interface TransportNode {
 	dialProtocol(addr: DialAddr, protocol: string, options?: DialOptions): Promise<CommsStream>
 }
 
-/** Write a value as a single 4-byte big-endian length-prefixed JSON frame. */
+/**
+ * Write a value as a single 4-byte big-endian length-prefixed JSON frame.
+ *
+ * NOTE: `send()`'s backpressure return is ignored. Fine for ChipNet's small
+ * discovery/commit frames (well under `maxFrameBytes`); if frames ever approach
+ * that cap, honor the return (await drain) rather than over-buffering the stream.
+ */
 export function writeFrame(stream: CommsStream, value: unknown): void {
 	const body = new TextEncoder().encode(JSON.stringify(value))
 	const prefix = new Uint8Array(4)
