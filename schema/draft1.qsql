@@ -544,6 +544,12 @@ create table Ledger (
     -- the permissive one, once effective, has the higher revision and supersedes. Pending lift chits
     -- fold in by construction -- once written as Ledger rows they are in Balance, so this counts them
     -- with no extra machinery.
+    -- NOTE: gate keys off the issuer-signed New.Date, which is unconstrained (no Date/Number
+    -- monotonicity on Ledger) and chits are unilateral (issuer-signed only -- this CHECK is the SOLE
+    -- enforcement, no counterparty countersignature). An issuer can therefore backdate a chit to a
+    -- pre-reduction date to select an older, higher effective limit and exceed the limit now in force,
+    -- defeating restrictive-change notice. Design decision tracked in
+    -- backlog/debt-credit-gate-chit-date-backdating (bound Date, gate on now(), or accept as disputable).
     constraint WithinCreditLimits check (
         Balance <= coalesce((
             select CT.CreditLimit from CreditTerms CT
