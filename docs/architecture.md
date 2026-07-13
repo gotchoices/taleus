@@ -73,7 +73,7 @@ Formation reuses Sereus strand formation end-to-end (the pre-Sereus "Method 6" b
 2. **Formation handshake.** The invitee dials `/sereus/formation/1.0.0` with the token and its identity disclosure. The responder validates, records `FormationUsage`, and returns the strand ID plus membership key. Both parties' cadres add the strand and begin participating.
 3. **Party seating (Taleus schema).** Inside the strand, the parties bind their tally identities:
    - The initiator inserts its `Stock` row: its `Sid` and the invitation *public* key, signed by its party key.
-   - The invitee proves possession of the invitation secret by signing its `Foil` row with it, and registers its `PartyKey` revision 1 (also validated against the invitation key).
+   - The invitee proves possession of the invitation secret by signing its `Foil` row with it, and registers its `PartyKey` revision 1 — the genesis of its authorized-key set (also validated against the invitation key).
    - Each party publishes a `PartyCertificate` (identity disclosure — progressively enriched by revision).
 4. **Negotiation.** Either party proposes a contract (`TallyContractProposal`) with its arguments — denomination, credit terms; the tally becomes operative when both signatures land on the same contract revision (`TallyContract`).
 5. **Open.** Ledger entries are now accepted.
@@ -85,7 +85,8 @@ Progressive disclosure: certificates are revisioned, so a party can start minima
 The schema ([`schema/`](../schema/)) follows a few uniform rules:
 
 - **Insert-only.** Tally tables carry `constraint InsertOnly check (0) on delete, update`. History is never rewritten; state advances by appending revisions.
-- **Signature-gated inserts.** Every row's validity constraint recomputes a digest over the row's semantic fields and verifies the signature against the correct key — resolved *from the database itself* (latest `PartyKey` revision, the invitation key, or the prior revision's signature for key chaining). A row that doesn't verify never commits, on any honest node.
+- **Signature-gated inserts.** Every row's validity constraint recomputes a digest over the row's semantic fields and verifies the signature against the correct key. Because a party recognizes a *set* of authorized keys (not one "current" key), each signed row names the key that signed it in a `SignerKey` column; the constraint checks that `SignerKey` is in that party's authorized set (the `AuthorizedKey` view) at insert, then verifies the signature against it. The set's roots are resolved *from the database itself* — the invitation key for the genesis `PartyKey`, and an already-authorized key for every later add. A row that doesn't verify never commits, on any honest node.
+- **Deferred-constraint snapshots.** A CHECK that contains a subquery is evaluated at commit (Quereus auto-defers it), where a plain table reference sees the transaction's own new rows and `committed.<table>` sees the pre-transaction snapshot. Constraints that assert "before this change" facts — the monotonic revision counter, and the rule that a key cannot authorize *itself* into the set — read `committed.*` so the row being inserted is excluded.
 - **Monotonic revisions.** Revisioned tables enforce `Revision = max(prior) + 1` at insert.
 - **Balance chaining.** Each `Ledger` row states the running `Balance`; a constraint verifies it equals the prior row's balance plus this row's signed `Units`. This replaces the MyCHIPs chit hash-chain — the chain lives in the shared, consensus-replicated table rather than being reconciled between two databases.
 
@@ -96,19 +97,29 @@ Tables:
 | `TallyCore` | Tally identity: the founding fields (party `Sid`s, protocol version, creation time) whose hash is the tally CID that all other signatures bind to. Single row. |
 | `Stock` | Initiator's binding: `Sid` + invitation public key, self-signed. Single row. |
 | `Foil` | Invitee's binding: `Sid` signed with the out-of-band invitation secret. Single row. |
-| `PartyKey` | Per-party key registry, revisioned; revision 1 validates against the invitation key, later revisions chain from the prior one (rotation without closing the tally). |
-| `PartyCertificate` | Revisioned identity disclosure per party, signed with the party's current key. |
+| `PartyKey` | Per-party **authorized-key set**, recorded as add-events: revision 1 (genesis) validates against the invitation key and its public-key hash *is* the party's `Sid`; every later revision is a new key authorized by an already-authorized one. Identity is stable; the set of keys evolves. |
+| `PartyKeyRevocation` | Forward-only revocation: names a key to remove from a party's authorized set, signed by an authorized key. Past rows signed by the revoked key stay valid; only future inserts by it are rejected. A guard forbids emptying the set. |
+| `PartyCertificate` | Revisioned identity disclosure per party, signed with an authorized key of the party. |
 | `TallyContractProposal` | Either party's proposal of a contract CID + arguments (denomination, credit terms) — the negotiation cursor. |
 | `TallyContract` | Bilaterally signed contract acceptances, numbered; the highest fully-signed number governs. |
 | `TradingVariable` | Each party's published lift policy, revisioned: `Target` (ideal balance to accumulate via lifts), `Bound` (maximum to accrue), `Reward` (fee ratio for accumulation above target), `Clutch` (fee ratio for drops). MyCHIPs semantics, expressed from the issuing party's perspective. |
 | `Invoice` | Signed payment requests; answered by a matching chit from the payer. |
 | `Ledger` | Chits: issuer, units (positive integer, smallest denomination unit), date, reference/memo, issuer signature, chained balance. Distinguishes direct chits from lift chits, including the pending-lift state. |
 
-Alongside the tables, the schema defines views that compute lift capacity in place: `PerspectiveBalance` (the chained balance as each party sees it — positive means accumulated value) and `LiftLading` (per direction: units movable free up to the receiver's target, further units to its bound at the receiver's `Reward`, with the releasing party's `Clutch` applied to the whole amount). Trading variables live in the shared strand deliberately — they are signed, unilateral policy the counterparty's lift agent must read to advertise route capacity. Exchange rates, by contrast, span multiple tallies and stay in the party's private portfolio.
+Alongside the tables, the schema defines views. `AuthorizedKey` is the authoritative "who may sign for this party right now" set — every `PartyKey` add minus every `PartyKeyRevocation` — that all signature-gated tables resolve their `SignerKey` against. The rest compute lift capacity in place: `PerspectiveBalance` (the chained balance as each party sees it — positive means accumulated value) and `LiftLading` (per direction: units movable free up to the receiver's target, further units to its bound at the receiver's `Reward`, with the releasing party's `Clutch` applied to the whole amount). Trading variables live in the shared strand deliberately — they are signed, unilateral policy the counterparty's lift agent must read to advertise route capacity. Exchange rates, by contrast, span multiple tallies and stay in the party's private portfolio.
 
 ### Why constraints instead of a consensus protocol
 
 In MyCHIPs, the two copies of a tally could diverge, so a chit consensus protocol existed to reconcile them. In Taleus there is one logical database; Optimystic's transaction layer orders writes, and Quereus constraints decide validity identically on every node. A malicious party can refuse to participate (liveness), but cannot commit a row the schema rejects (safety). Each party's cadre retains a full replica, so either party can always prove the tally's signed state in a dispute — the same evidentiary property MyCHIPs' hash chains provided.
+
+### Key recovery
+
+A party signs its tally rows with keys from its `PartyKey` authorized set, not a single "current" key. That set is what makes losing a device survivable, and it deliberately mirrors the way a Sereus **cadre** recognizes a *set* of `AuthorityKey`s rather than one key (see [`../../sereus/docs/architecture.md`](../../sereus/docs/architecture.md), *AuthorityKey* / multi-authority cadres). Two recovery paths follow:
+
+- **Cadre-assisted recovery (device loss — the common case).** Each of a party's cadre nodes (phone, plus any cloud/NAS node) can register its own key on a tally. If the phone is lost, a surviving node's key is still authorized: it signs a `PartyKeyRevocation` for the lost key and registers the replacement device's key, with no counterparty involvement. This is the tally-layer counterpart of Sereus's "a surviving cadre node re-enrolls a fresh device" after an enclave loss (see *Reinstall & recovery behavior* in the Sereus docs). Where each key's *secret* actually lives — one key per device enclave, versus a single key replicated across the cadre's control network — is a Sereus-layer concern, not modeled in the tally schema.
+- **Total loss (every authorized key gone).** The set is empty and nothing inside the tally can sign a new key into it; the `NotLastKey` guard on revocation deliberately keeps a party from revoking its way into this state. Recovery then needs the human trust between the two parties: a bilateral **counterparty re-key ceremony** in which the other party attests a replacement key. That ceremony is specified separately (ticket `key-counterparty-rekey`) and layers on top of Sereus re-admitting the party's fresh cadre into the strand first.
+
+Because a stolen key's *past* signatures were checked once at insert and are never re-validated, revocation is forward-only: it cannot retroactively invalidate history, only stop future signatures. The gap between a key being compromised and its revocation committing is an inherent race in a two-party unilateral-chit ledger — bounded in practice by fast revocation, tally close, and the counterparty ceremony.
 
 ## Denominations and Exchange
 

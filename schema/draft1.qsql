@@ -1,16 +1,18 @@
 create table Stock (
     Sid text,
     InvitationKey text,    --public key of sk sent to invited party
+    SignerKey text,        -- authorized PartyKey of Sid that signed this row
     Signature text null,    -- Signed using party key
-    
+
     primary key (/* 1 row */),
+    constraint SignerAuthorized check (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)) on insert,
     constraint SignatureValid check (SignatureValid(
         Digest(
-            Sid, 
+            Sid,
             InvitationKey
-        ), 
-        Signature, 
-        (select PublicKey from PartyKey PK where PK.Sid = New.Sid order by Revision desc limit 1)
+        ),
+        Signature,
+        New.SignerKey
     )) on insert,
     constraint InsertOnly check (0) on delete, update
 );
@@ -29,35 +31,126 @@ create table Foil (
     constraint InsertOnly check (0) on delete, update
 );
 
+-- PartyKey is an authorized-key SET with revocation, not a sole-authority chain.
+-- The party's identity (Sid) is the hash of the genesis (Revision 1) public key and
+-- never changes; the authorized set of keys evolves under it. Any currently-authorized,
+-- non-revoked key may authorize (add) another; any authorized key may revoke another
+-- (see PartyKeyRevocation). This mirrors Sereus's multi-authority cadre AuthorityKey
+-- model rather than inventing a parallel scheme.
+--
+-- Deferred-constraint semantics matter here. A CHECK containing a subquery is evaluated
+-- at COMMIT (Quereus auto-defers it). A plain `from PartyKey` there reads the
+-- buffered+committed view, so it INCLUDES the row being inserted; `from committed.PartyKey`
+-- reads the pre-transaction snapshot, so it EXCLUDES it. Each constraint below picks the
+-- snapshot its logic requires.
 create table PartyKey (
-    Sid text,  -- Cid hash of first revision
-    Revision integer,
-    PublicKey text,
-    Signature text null,    -- Signed using prior if this is revision > 1
-    
+    Sid text,               -- party identity: Cid hash of the genesis (Revision 1) public key; never changes
+    Revision integer,       -- per-Sid monotonic sequence of key-add events (ordering, not a sole-authority chain)
+    PublicKey text,         -- the key being authorized
+    AuthKey text null,      -- currently-authorized PublicKey that authorized this add; null for Revision 1 (genesis)
+    Signature text,         -- Revision 1: signed by the invitation key; else: signed by AuthKey
+
     primary key (Sid, Revision),
-    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from PartyKey PK where PK.Sid = New.Sid), 0) + 1) on insert,
+    -- Prior max comes from committed.* so the row being inserted is excluded -- a plain
+    -- self-reference would see this same new row and make `Revision = max + 1` unsatisfiable.
+    -- Concurrent adds from two surviving devices both read the same committed max and both
+    -- compute Revision N+1; the (Sid, Revision) primary key + Optimystic write ordering then
+    -- serialize them, rejecting the loser. No constraint assumes a single writer.
+    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from committed.PartyKey PK where PK.Sid = New.Sid), 0) + 1) on insert,
+    -- The new row IS visible here (plain ref), so a genuinely-unique PublicKey yields exactly
+    -- one match. A revoked key can never be re-added: its PartyKey row is insert-only and
+    -- stays, so a re-add of the same PublicKey makes the count 2 and fails.
+    constraint UniqueKey check ((select count(*) from PartyKey PK where PK.Sid = New.Sid and PK.PublicKey = New.PublicKey) = 1) on insert,
+    -- The authorizing key must have been in the party's authorized set as of the
+    -- pre-transaction snapshot (registered in committed.PartyKey and not revoked by a
+    -- committed revocation). Using committed.* rather than the live AuthorizedKey view is a
+    -- SECURITY requirement: the live view already contains this new row, so a self-authorizing
+    -- add (AuthKey = New.PublicKey) would validate itself and mint authority from nothing.
+    constraint AuthKeyAuthorized check (
+        New.Revision = 1
+        or (New.AuthKey in (select PK.PublicKey from committed.PartyKey PK where PK.Sid = New.Sid)
+            and not exists (select 1 from committed.PartyKeyRevocation R where R.Sid = New.Sid and R.PublicKey = New.AuthKey))
+    ) on insert,
+    -- Genesis validates against the invitation key (via Stock); every later add against the
+    -- key that authorized it. Reuses the single-key SignatureValid primitive -- no new crypto.
     constraint SignatureValid check (SignatureValid(
-        Digest(Sid, Revision, PublicKey),
+        Digest(Sid, Revision, PublicKey, AuthKey),
         Signature,
-        (select case when Revision = 1 then (select InvitationKey from Stock) else (select Signature from PartyKey PK where PK.Sid = Sid and PK.Revision = Revision - 1) end PriorSignature from PartyKey PK where PK.Sid = Sid and PK.Revision = Revision)
+        case when Revision = 1 then (select InvitationKey from Stock) else AuthKey end
     )) on insert,
     constraint InsertOnly check (0) on delete, update,
-    constraint TwoParities check ((select count(distinct Sid) from PartyKey) = 2)) on insert
+    -- Never introduce a third party. The new row's Sid is counted (plain ref).
+    constraint TwoParties check ((select count(distinct Sid) from PartyKey) <= 2) on insert
 );
+
+-- Forward-only revocation of an authorized key. Rows already committed under the key stay
+-- valid -- they are insert-only, their signature was checked once at their own insert against
+-- the then-authorized set, and nothing re-validates them. Only FUTURE inserts signed by the
+-- revoked key are rejected, because every authorized-set lookup excludes revoked keys. This
+-- is the compromise-vs-loss requirement: a stolen key's past signatures stand, its future
+-- ones are rejected.
+--
+-- NOTE: stolen-key race window. Between a key's theft and this revocation committing, the
+-- thief can still insert rows (chits, key-adds) signed by the stolen key; anything that
+-- commits before the revocation stays valid, anything after is rejected. This window is
+-- inherent to a two-party, unilateral-chit ledger under distributed (Optimystic) ordering
+-- and is NOT closed here -- backstops are fast revocation, tally close, and the counterparty
+-- re-key ceremony (ticket key-counterparty-rekey).
+create table PartyKeyRevocation (
+    Sid text,
+    PublicKey text,         -- key being revoked (must be a registered key of the party)
+    RevokedBy text,         -- currently-authorized key performing the revoke
+    Signature text,         -- signed by RevokedBy
+
+    primary key (Sid, PublicKey),   -- also blocks double-revocation of the same key
+    -- Target must be a registered key of this party. "Not already revoked" is enforced by the
+    -- primary key (a second revocation of the same (Sid, PublicKey) is rejected), so this need
+    -- only confirm registration. It reads PartyKey (not the AuthorizedKey view) because the
+    -- view already excludes the target once this in-flight revocation row is buffered.
+    constraint TargetAuthorized check (New.PublicKey in (select PK.PublicKey from PartyKey PK where PK.Sid = New.Sid)) on insert,
+    -- Revoker must be currently authorized. The live view is correct here: for a normal
+    -- revoke (revoker <> target) the view still contains the revoker, and a revoked key can
+    -- never itself revoke (the view excludes it). A key naming itself as RevokedBy is excluded
+    -- by the same in-flight row, so self-revocation is not a supported path -- retire a device
+    -- from another surviving device.
+    constraint RevokerAuthorized check (New.RevokedBy in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)) on insert,
+    constraint SignatureValid check (SignatureValid(Digest(Sid, PublicKey, RevokedBy), Signature, RevokedBy)) on insert,
+    -- Self-lockout guard. The AuthorizedKey view already reflects this in-flight revocation
+    -- (plain ref = buffered+committed), so this count is the POST-revoke authorized set; we
+    -- require >= 1 key to remain. This is the correct realization of the ticket's "prevent
+    -- revoking the last key" -- and it is strictly safer than a pre-revoke `> 1`, because a
+    -- batch of revocations that would empty the set is also visible here and rejected. A
+    -- fully-compromised party (all keys stolen) therefore cannot revoke its way to an empty
+    -- set; it must first adopt a fresh key via the counterparty ceremony (key-counterparty-rekey).
+    constraint NotLastKey check ((select count(*) from AuthorizedKey AK where AK.Sid = New.Sid) >= 1) on insert,
+    constraint InsertOnly check (0) on delete, update
+);
+
+-- The party's currently-authorized signing keys: every registered key minus revoked ones.
+-- Signature-gated tables resolve their SignerKey against this set. Reads current
+-- (buffered+committed) state; constraints that must exclude the row being inserted
+-- (PartyKey.RevisionMonotonicInt, PartyKey.AuthKeyAuthorized) use committed.* directly
+-- instead of this view. The counterparty re-key ceremony (key-counterparty-rekey) unions
+-- adopted keys into this same view.
+create view AuthorizedKey as
+    select PK.Sid, PK.PublicKey
+    from PartyKey PK
+    where not exists (select 1 from PartyKeyRevocation R where R.Sid = PK.Sid and R.PublicKey = PK.PublicKey);
 
 create table PartyCertificate (
     PartySid text,
     Revision integer,
     Certificate text,
+    SignerKey text,        -- authorized PartyKey of PartySid that signed this revision
     Signature text,
-    
+
     primary key (PartySid, Revision),
     constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from PartyCertificate PC where PC.PartySid = New.PartySid), 0) + 1) on insert,
+    constraint SignerAuthorized check (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.PartySid)) on insert,
     constraint SignatureValid check (SignatureValid(
         Digest(PartySid, Revision, Certificate),
         Signature,
-        (select PublicKey from PartyKey PK where PK.Sid = New.Sid order by Revision desc limit 1)
+        New.SignerKey
     )) on insert,
     constraint InsertOnly check (0) on delete, update
 );
@@ -66,13 +159,20 @@ create table TallyContractProposal (
     SequenceNumber integer,
     ContractCid text,
     Proposer text check Proposer in ('S', 'F'),
+    SignerKey text,        -- authorized PartyKey of the proposing party that signed
     Signature text,
 
     primary key (/* 1 row */),
+    -- SignerKey resolves against the proposing side's own authorized set. This also fixes the
+    -- draft placeholder that passed ProposerSid (a party id) as the public-key argument.
+    constraint SignerAuthorized check (New.SignerKey in (
+        select PublicKey from AuthorizedKey AK
+        where AK.Sid = (select case when New.Proposer = 'S' then StockSid else FoilSid end from TallyCore)
+    )) on insert, update,
     constraint SignatureValid check (SignatureValid(
-        Digest((select Cid from TallyCore), SequenceNumber, ContractCid, Proposer), 
-        Signature, 
-        (select case when Proposer = 'S' then StockSid else FoilSid end ProposerSid from TallyCore)
+        Digest((select Cid from TallyCore), SequenceNumber, ContractCid, Proposer),
+        Signature,
+        New.SignerKey
     )) on insert, update
 );
 
@@ -81,19 +181,24 @@ create table TallyContract (
     Number integer,
     ContractCid text,
     -- TODO: Credit terms (limit, call) - arguments to contract
+    StockSignerKey text,   -- authorized PartyKey of StockSid that signed StockSignature
     StockSignature text,
+    FoilSignerKey text,    -- authorized PartyKey of FoilSid that signed FoilSignature
     FoilSignature text,
 
     primary key (Number),
+    -- Each side's SignerKey resolves against ITS OWN party's authorized set, independently.
+    constraint StockSignerAuthorized check (New.StockSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = StockSid)) on insert, update,
     constraint StockSignatureValid check (SignatureValid(
         Digest((select Cid from TallyCore), Number, ContractCid),
         StockSignature,
-        (select PublicKey from PartyKey PK where PK.Sid = StockSid order by Revision desc limit 1)
+        New.StockSignerKey
     )) on insert, update,
+    constraint FoilSignerAuthorized check (New.FoilSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = FoilSid)) on insert, update,
     constraint FoilSignatureValid check (SignatureValid(
         Digest((select Cid from TallyCore), Number, ContractCid),
         FoilSignature,
-        (select PublicKey from PartyKey PK where PK.Sid = FoilSid order by Revision desc limit 1)
+        New.FoilSignerKey
     )) on insert, update,
     constraint InsertOnly check (0) on delete, update
 );
@@ -114,15 +219,17 @@ create table TradingVariable (
     Bound integer default 0 check (Bound >= Target),
     Reward integer default 0,   -- ppm
     Clutch integer default 0,   -- ppm
+    SignerKey text,        -- authorized PartyKey of Sid that signed this revision
     Signature text,
 
     primary key (Sid, Revision),
     constraint PartyOfTally check (Sid in (select StockSid from TallyCore union select FoilSid from TallyCore)) on insert,
     constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from TradingVariable TV where TV.Sid = New.Sid), 0) + 1) on insert,
+    constraint SignerAuthorized check (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)) on insert,
     constraint SignatureValid check (SignatureValid(
         Digest((select Cid from TallyCore), Sid, Revision, Target, Bound, Reward, Clutch),
         Signature,
-        (select PublicKey from PartyKey PK where PK.Sid = New.Sid order by Revision desc limit 1)
+        New.SignerKey
     )) on insert,
     constraint InsertOnly check (0) on delete, update
 );
@@ -184,22 +291,29 @@ create table Ledger (
     Date text check ValidDate(Date),
     Reference text, -- JSON object
     Memo text,
+    SignerKey text,        -- authorized PartyKey of the issuing party that signed this chit
     Signature text,
     Balance integer,
     -- TODO: lift vs manual
     -- TODO: pending lift
 
     primary key (Number),
+    -- SignerKey resolves against the issuing party's own authorized set. This also fixes the
+    -- draft placeholder that passed IssuerSid (a party id) as the public-key argument.
+    constraint SignerAuthorized check (New.SignerKey in (
+        select PublicKey from AuthorizedKey AK
+        where AK.Sid = (select case when New.Issuer = 'S' then StockSid else FoilSid end from TallyCore)
+    )) on insert,
     constraint SignatureValid check (SignatureValid(
         Digest(
-            Id, 
-            Issuer, 
-            (select case when Issuer = 'F' then FoilSid else StockSid end RecipientSid from TallyCore), 
-            Units, 
-            Date, 
-            Reference, 
+            Id,
+            Issuer,
+            (select case when Issuer = 'F' then FoilSid else StockSid end RecipientSid from TallyCore),
+            Units,
+            Date,
+            Reference,
             Memo
-        ), Signature, IssuerSid)
+        ), Signature, New.SignerKey)
     ) on insert,
     constraint BalanceCorrect check (
         Coalesce((select Balance from Ledger where Number = Number - 1), 0) 
