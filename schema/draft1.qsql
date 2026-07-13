@@ -273,7 +273,12 @@ create view AuthorizedKey as
 -- NOTE (CreatedAt trust): CreatedAt is chosen by the inserting (stock) party. A dishonest value only
 -- changes the Cid, which both parties observe before binding any negotiation signature to it -- disputable,
 -- not silently exploitable. Not gated against now() (that would make the insert volatile/non-deterministic,
--- same reasoning as CreditTerms.Date at schema/draft1.qsql:433-438).
+-- same reasoning as CreditTerms.Date at schema/draft1.qsql:486-495).
+-- NOTE: StockSeated/FoilSeated pin each Sid independently; a self-tally (StockSid = FoilSid) is not
+-- rejected here. Fine now -- honest two-party seating cannot produce it (Foil requires the invitee to
+-- sign with Stock's out-of-band invitation secret). If a formation path ever lets one party hold both
+-- roles, add a StockSid <> FoilSid check here (PerspectiveBalance et al. union the two Sids and would
+-- collapse to one party).
 create table TallyCore (
     Cid text,              -- tally id: digest of the founding fields below; the per-strand signature anchor
     StockSid text,         -- initiator (stock) party identity
