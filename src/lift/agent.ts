@@ -34,8 +34,14 @@ import type { LiftPlan, RefereeSlot, RouteEdge, SourceCost } from './terms.js'
 
 /* ── Portfolio LiftJournal backing (ChipNet-injected originator state) ────────── */
 
-/** LiftJournal lifecycle states this ticket drives; commit/void states are the next ticket's. */
-export type LiftState = 'proposed' | 'discovering' | 'selected' | 'aborted'
+/**
+ * LiftJournal lifecycle states (schema/portfolio.qsql `LiftJournal.State`). Discovery drives
+ * `proposed`/`discovering`/`selected`/`aborted`; the commit half (src/lift/commit.ts) adds
+ * `pending` (pledges written), `committed` (route finalized), and `timedout` (referee never
+ * resolved → voided). The journal is private correlation bookkeeping — the authoritative
+ * per-edge state is each strand's `PendingLift`/`Ledger`, so a lost journal is rebuildable.
+ */
+export type LiftState = 'proposed' | 'discovering' | 'selected' | 'pending' | 'committed' | 'aborted' | 'timedout'
 
 /** The originator's seat in a lift. Discovery is always run by the originator ('O'). */
 export type LiftRole = 'O' | 'I' | 'P'
