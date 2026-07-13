@@ -30,7 +30,7 @@ create table PortfolioCore (
     Version integer,      -- portfolio schema/protocol version
     Created text,
     primary key (/* 1 row */),
-    constraint InsertOnly check (0) on delete, update
+    constraint InsertOnly check on delete, update (0)
 );
 
 -- One logical entry per tally the party holds; revisioned. This is a *cache/index*
@@ -39,7 +39,7 @@ create table PortfolioCore (
 create table TallyRegistry (
     StrandId text,                       -- the tally strand's id
     Revision integer,
-    Role text check Role in ('S', 'F'),  -- this party's seat: Stock or Foil
+    Role text check (Role in ('S', 'F')),  -- this party's seat: Stock or Foil
     CounterpartySid text,
     Denomination text,                   -- cached from the tally's accepted contract
     DenominationScale integer,
@@ -51,8 +51,8 @@ create table TallyRegistry (
     BalanceCache integer null,           -- last-known perspective balance (display only)
     Updated text,
     primary key (StrandId, Revision),
-    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from committed.TallyRegistry T where T.StrandId = New.StrandId), 0) + 1) on insert,
-    constraint InsertOnly check (0) on delete, update
+    constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.TallyRegistry T where T.StrandId = New.StrandId), 0) + 1),
+    constraint InsertOnly check on delete, update (0)
 );
 create view CurrentTallyRegistry as
     select R.* from TallyRegistry R
@@ -65,14 +65,14 @@ create view CurrentTallyRegistry as
 create table LiftJournal (
     LiftId text,
     Revision integer,
-    Role text check Role in ('O', 'I', 'P'),   -- Originator | Intermediary | Payee
+    Role text check (Role in ('O', 'I', 'P')),   -- Originator | Intermediary | Payee
     State text,                                 -- proposed|discovering|pending|committed|aborted|timedout
     Edges text,                                 -- JSON: [{ strandId, denom, units, direction }]
     Referee text null,
     Updated text,
     primary key (LiftId, Revision),
-    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from committed.LiftJournal J where J.LiftId = New.LiftId), 0) + 1) on insert,
-    constraint InsertOnly check (0) on delete, update
+    constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.LiftJournal J where J.LiftId = New.LiftId), 0) + 1),
+    constraint InsertOnly check on delete, update (0)
 );
 create view CurrentLift as
     select J.* from LiftJournal J
@@ -85,8 +85,8 @@ create table AppPreference (
     Value text,
     Updated text,
     primary key (Key, Revision),
-    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from committed.AppPreference P where P.Key = New.Key), 0) + 1) on insert,
-    constraint InsertOnly check (0) on delete, update
+    constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.AppPreference P where P.Key = New.Key), 0) + 1),
+    constraint InsertOnly check on delete, update (0)
 );
 create view CurrentPreference as
     select P.* from AppPreference P
@@ -120,9 +120,9 @@ create table ExchangeRateQuote (
     ValidUntil text,                          -- date; quote usable until (inclusive)
     Updated text,
     primary key (FromDenom, ToDenom, Revision),
-    constraint ValidWindow check (ValidUntil >= ValidFrom) on insert,
-    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from committed.ExchangeRateQuote Q where Q.FromDenom = New.FromDenom and Q.ToDenom = New.ToDenom), 0) + 1) on insert,
-    constraint InsertOnly check (0) on delete, update
+    constraint ValidWindow check on insert (ValidUntil >= ValidFrom),
+    constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.ExchangeRateQuote Q where Q.FromDenom = New.FromDenom and Q.ToDenom = New.ToDenom), 0) + 1),
+    constraint InsertOnly check on delete, update (0)
 );
 -- Latest revision per direction. The lift agent then filters by validity window at decision
 -- time (ValidFrom <= now <= ValidUntil): a pair whose latest revision is out of window has no

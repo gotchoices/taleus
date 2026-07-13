@@ -5,16 +5,16 @@ create table Stock (
     Signature text null,    -- Signed using party key
 
     primary key (/* 1 row */),
-    constraint SignerAuthorized check (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)) on insert,
-    constraint SignatureValid check (SignatureValid(
+    constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)),
+    constraint SignatureValid check on insert (SignatureValid(
         Digest(
             Sid,
             InvitationKey
         ),
         Signature,
         New.SignerKey
-    )) on insert,
-    constraint InsertOnly check (0) on delete, update
+    )),
+    constraint InsertOnly check on delete, update (0)
 );
 
 create table Foil (
@@ -22,13 +22,13 @@ create table Foil (
     Signature text,  -- signed using the out of band exchanged private key
     
     primary key (Sid),
-    constraint InvitationSignatureValid check (SignatureValid(
+    constraint InvitationSignatureValid check on insert (SignatureValid(
         Digest(Sid), 
         Signature, 
         (select InvitationKey from Stock)
-    )) on insert,
-    constraint PartyExists check (select count(*) from PartyKey PK where PK.Sid = New.Sid) on insert,
-    constraint InsertOnly check (0) on delete, update
+    )),
+    constraint PartyExists check on insert ((select count(*) from PartyKey PK where PK.Sid = New.Sid)),
+    constraint InsertOnly check on delete, update (0)
 );
 
 -- PartyKey is an authorized-key SET with revocation, not a sole-authority chain.
@@ -56,11 +56,11 @@ create table PartyKey (
     -- Concurrent adds from two surviving devices both read the same committed max and both
     -- compute Revision N+1; the (Sid, Revision) primary key + Optimystic write ordering then
     -- serialize them, rejecting the loser. No constraint assumes a single writer.
-    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from committed.PartyKey PK where PK.Sid = New.Sid), 0) + 1) on insert,
+    constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.PartyKey PK where PK.Sid = New.Sid), 0) + 1),
     -- The new row IS visible here (plain ref), so a genuinely-unique PublicKey yields exactly
     -- one match. A revoked key can never be re-added: its PartyKey row is insert-only and
     -- stays, so a re-add of the same PublicKey makes the count 2 and fails.
-    constraint UniqueKey check ((select count(*) from PartyKey PK where PK.Sid = New.Sid and PK.PublicKey = New.PublicKey) = 1) on insert,
+    constraint UniqueKey check on insert ((select count(*) from PartyKey PK where PK.Sid = New.Sid and PK.PublicKey = New.PublicKey) = 1),
     -- The authorizing key must have been in the party's authorized set as of the
     -- pre-transaction snapshot -- registered either as a normal add (committed.PartyKey) OR as a
     -- counterparty adoption (committed.PartyKeyAdoption), and not revoked by a committed
@@ -72,24 +72,24 @@ create table PartyKey (
     -- contains this new row, so a self-authorizing add (AuthKey = New.PublicKey) would validate
     -- itself and mint authority from nothing. committed.* also excludes an adoption inserted in the
     -- SAME transaction, so an add cannot bootstrap off an adoption that has not itself committed.
-    constraint AuthKeyAuthorized check (
+    constraint AuthKeyAuthorized check on insert (
         New.Revision = 1
         or (
             (New.AuthKey in (select PK.PublicKey from committed.PartyKey PK where PK.Sid = New.Sid)
              or New.AuthKey in (select A.PublicKey from committed.PartyKeyAdoption A where A.Sid = New.Sid))
             and not exists (select 1 from committed.PartyKeyRevocation R where R.Sid = New.Sid and R.PublicKey = New.AuthKey)
         )
-    ) on insert,
+    ),
     -- Genesis validates against the invitation key (via Stock); every later add against the
     -- key that authorized it. Reuses the single-key SignatureValid primitive -- no new crypto.
-    constraint SignatureValid check (SignatureValid(
+    constraint SignatureValid check on insert (SignatureValid(
         Digest(Sid, Revision, PublicKey, AuthKey),
         Signature,
         case when Revision = 1 then (select InvitationKey from Stock) else AuthKey end
-    )) on insert,
-    constraint InsertOnly check (0) on delete, update,
+    )),
+    constraint InsertOnly check on delete, update (0),
     -- Never introduce a third party. The new row's Sid is counted (plain ref).
-    constraint TwoParties check ((select count(distinct Sid) from PartyKey) <= 2) on insert
+    constraint TwoParties check on insert ((select count(distinct Sid) from PartyKey) <= 2)
 );
 
 -- Forward-only revocation of an authorized key. Rows already committed under the key stay
@@ -118,14 +118,14 @@ create table PartyKeyRevocation (
     -- adoptions -- not the AuthorizedKey view: the view already excludes the target once this
     -- in-flight revocation row is buffered, and reading RegisteredKey (rather than PartyKey
     -- alone) is what makes an ADOPTED key revocable exactly like a normal add.
-    constraint TargetAuthorized check (New.PublicKey in (select RK.PublicKey from RegisteredKey RK where RK.Sid = New.Sid)) on insert,
+    constraint TargetAuthorized check on insert (New.PublicKey in (select RK.PublicKey from RegisteredKey RK where RK.Sid = New.Sid)),
     -- Revoker must be currently authorized. The live view is correct here: for a normal
     -- revoke (revoker <> target) the view still contains the revoker, and a revoked key can
     -- never itself revoke (the view excludes it). A key naming itself as RevokedBy is excluded
     -- by the same in-flight row, so self-revocation is not a supported path -- retire a device
     -- from another surviving device.
-    constraint RevokerAuthorized check (New.RevokedBy in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)) on insert,
-    constraint SignatureValid check (SignatureValid(Digest(Sid, PublicKey, RevokedBy), Signature, RevokedBy)) on insert,
+    constraint RevokerAuthorized check on insert (New.RevokedBy in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)),
+    constraint SignatureValid check on insert (SignatureValid(Digest(Sid, PublicKey, RevokedBy), Signature, RevokedBy)),
     -- Self-lockout guard. The AuthorizedKey view already reflects this in-flight revocation
     -- (plain ref = buffered+committed), so this count is the POST-revoke authorized set; we
     -- require >= 1 key to remain. This is the correct realization of the ticket's "prevent
@@ -144,8 +144,8 @@ create table PartyKeyRevocation (
     -- If Optimystic instead validates only against a transaction's original read snapshot, both
     -- could commit and lock the party out. Confirm the isolation model when a runner exists; if
     -- it does not re-validate, this needs a stronger guard (e.g. serialize revocations per Sid).
-    constraint NotLastKey check ((select count(*) from AuthorizedKey AK where AK.Sid = New.Sid) >= 1) on insert,
-    constraint InsertOnly check (0) on delete, update
+    constraint NotLastKey check on insert ((select count(*) from AuthorizedKey AK where AK.Sid = New.Sid) >= 1),
+    constraint InsertOnly check on delete, update (0)
 );
 
 -- Counterparty re-key ceremony (ticket key-counterparty-rekey). The ONLY path that introduces a
@@ -195,24 +195,24 @@ create table PartyKeyAdoption (
     primary key (Sid, PublicKey),   -- also blocks re-adopting the same key for the same party
     -- No new party: adoption re-keys one of the two existing parties, never bootstraps a Sid.
     -- (A party only comes into existence via a PartyKey genesis row, so PartyKey is the party set.)
-    constraint SidIsParty check (New.Sid in (select distinct Sid from PartyKey)) on insert,
+    constraint SidIsParty check on insert (New.Sid in (select distinct Sid from PartyKey)),
     -- The attesting key must belong to the OTHER party and be currently authorized (non-revoked).
     -- Reads the live AuthorizedKey view: freshness matters (a stale/revoked counterparty key must
     -- fail), and the `<> New.Sid` filter excludes this very adoption row (whose Sid = New.Sid,
     -- now unioned into the view) from vouching for itself -- no self-attestation is possible.
-    constraint CounterpartyIsOther check (New.CounterpartyKey in (select PublicKey from AuthorizedKey AK where AK.Sid <> New.Sid)) on insert,
+    constraint CounterpartyIsOther check on insert (New.CounterpartyKey in (select PublicKey from AuthorizedKey AK where AK.Sid <> New.Sid)),
     -- Possession proof: the adopted key signs its own adoption. This is what stops the counterparty
     -- from adopting a key it alone controls.
-    constraint SelfSigValid check (SignatureValid(Digest(Sid, PublicKey), SelfSignature, PublicKey)) on insert,
+    constraint SelfSigValid check on insert (SignatureValid(Digest(Sid, PublicKey), SelfSignature, PublicKey)),
     -- Attestation: the counterparty's authorized key signs the same digest.
-    constraint CounterpartySigValid check (SignatureValid(Digest(Sid, PublicKey), CounterpartySignature, CounterpartyKey)) on insert,
+    constraint CounterpartySigValid check on insert (SignatureValid(Digest(Sid, PublicKey), CounterpartySignature, CounterpartyKey)),
     -- Replay/dup guard: the key must not already be a registered add (PartyKey) for this party, and
     -- this must be the sole adoption row for it (plain ref includes the buffered new row -> 1).
-    constraint UniqueKey check (
+    constraint UniqueKey check on insert (
         (select count(*) from PartyKey PK where PK.Sid = New.Sid and PK.PublicKey = New.PublicKey) = 0
         and (select count(*) from PartyKeyAdoption A where A.Sid = New.Sid and A.PublicKey = New.PublicKey) = 1
-    ) on insert,
-    constraint InsertOnly check (0) on delete, update
+    ),
+    constraint InsertOnly check on delete, update (0)
 );
 
 -- Every key ever introduced for a party, revocation-agnostic: normal adds (PartyKey) plus
@@ -261,14 +261,14 @@ create table PartyCertificate (
     Signature text,
 
     primary key (PartySid, Revision),
-    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from PartyCertificate PC where PC.PartySid = New.PartySid), 0) + 1) on insert,
-    constraint SignerAuthorized check (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.PartySid)) on insert,
-    constraint SignatureValid check (SignatureValid(
+    constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from PartyCertificate PC where PC.PartySid = New.PartySid), 0) + 1),
+    constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.PartySid)),
+    constraint SignatureValid check on insert (SignatureValid(
         Digest(PartySid, Revision, Certificate),
         Signature,
         New.SignerKey
-    )) on insert,
-    constraint InsertOnly check (0) on delete, update
+    )),
+    constraint InsertOnly check on delete, update (0)
 );
 
 -- ValidDenomination(id): prefix-dispatch validity check for a tally's denomination identifier
@@ -292,7 +292,7 @@ create table PartyCertificate (
 create table TallyContractProposal (
     SequenceNumber integer,
     ContractCid text,
-    Proposer text check Proposer in ('S', 'F'),
+    Proposer text check (Proposer in ('S', 'F')),
     -- Terms revisions this proposal expects the accepted contract to lock (folded into Signature).
     -- Load-bearing coverage is on TallyContract; the proposal carries them for a complete offer.
     StockCreditTermsRevision integer,
@@ -302,7 +302,7 @@ create table TallyContractProposal (
     -- The load-bearing bilateral-signature coverage + life-of-tally immutability live on TallyContract.
     -- Defaults to CHIP at scale 0 -- an offer that omits the argument reproduces today's implicit
     -- single-denomination behavior with no ceremony.
-    Denomination text default 'CHIP' check ValidDenomination(Denomination),
+    Denomination text default 'CHIP' check (ValidDenomination(Denomination)),
     DenominationScale integer default 0 check (DenominationScale >= 0),
     SignerKey text,        -- authorized PartyKey of the proposing party that signed
     Signature text,
@@ -310,15 +310,15 @@ create table TallyContractProposal (
     primary key (/* 1 row */),
     -- SignerKey resolves against the proposing side's own authorized set. This also fixes the
     -- draft placeholder that passed ProposerSid (a party id) as the public-key argument.
-    constraint SignerAuthorized check (New.SignerKey in (
+    constraint SignerAuthorized check on insert, update (New.SignerKey in (
         select PublicKey from AuthorizedKey AK
         where AK.Sid = (select case when New.Proposer = 'S' then StockSid else FoilSid end from TallyCore)
-    )) on insert, update,
-    constraint SignatureValid check (SignatureValid(
+    )),
+    constraint SignatureValid check on insert, update (SignatureValid(
         Digest((select Cid from TallyCore), SequenceNumber, ContractCid, Proposer, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         Signature,
         New.SignerKey
-    )) on insert, update
+    ))
 );
 
 
@@ -344,7 +344,7 @@ create table TallyContract (
     -- iso4217 it is NOT cross-checked against a currency table. Defaults to CHIP at scale 0 -- a tally
     -- created with no denomination argument behaves exactly as today (Ledger math is scale-independent,
     -- so the default is a true regression). ValidDenomination rejects malformed identifiers.
-    Denomination text default 'CHIP' check ValidDenomination(Denomination),
+    Denomination text default 'CHIP' check (ValidDenomination(Denomination)),
     DenominationScale integer default 0 check (DenominationScale >= 0),
     StockSignerKey text,   -- authorized PartyKey of StockSid that signed StockSignature
     StockSignature text,
@@ -353,21 +353,21 @@ create table TallyContract (
 
     primary key (Number),
     -- Each named terms revision must exist for its grantor.
-    constraint StockTermsExist check (New.StockCreditTermsRevision in (select Revision from CreditTerms CT where CT.Sid = StockSid)) on insert, update,
-    constraint FoilTermsExist  check (New.FoilCreditTermsRevision  in (select Revision from CreditTerms CT where CT.Sid = FoilSid))  on insert, update,
+    constraint StockTermsExist check on insert, update (New.StockCreditTermsRevision in (select Revision from CreditTerms CT where CT.Sid = StockSid)),
+    constraint FoilTermsExist  check on insert, update (New.FoilCreditTermsRevision  in (select Revision from CreditTerms CT where CT.Sid = FoilSid)),
     -- Each side's SignerKey resolves against ITS OWN party's authorized set, independently.
-    constraint StockSignerAuthorized check (New.StockSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = StockSid)) on insert, update,
-    constraint StockSignatureValid check (SignatureValid(
+    constraint StockSignerAuthorized check on insert, update (New.StockSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = StockSid)),
+    constraint StockSignatureValid check on insert, update (SignatureValid(
         Digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         StockSignature,
         New.StockSignerKey
-    )) on insert, update,
-    constraint FoilSignerAuthorized check (New.FoilSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = FoilSid)) on insert, update,
-    constraint FoilSignatureValid check (SignatureValid(
+    )),
+    constraint FoilSignerAuthorized check on insert, update (New.FoilSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = FoilSid)),
+    constraint FoilSignatureValid check on insert, update (SignatureValid(
         Digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         FoilSignature,
         New.FoilSignerKey
-    )) on insert, update,
+    )),
     -- Denomination + scale are FIXED for the tally's life: every revision after the first must match
     -- revision 1's, so a revision-2 contract naming a different denomination or scale is rejected.
     -- Reads `Number = 1` directly -- the filter excludes the row being inserted (whose Number > 1), so
@@ -380,13 +380,13 @@ create table TallyContract (
     -- is possible) the `= (empty subquery)` comparisons are NULL, the whole expression is NULL, and the
     -- constraint would ACCEPT an unanchored later revision with an arbitrary denomination -- silently
     -- defeating the lock. The guard forces a definite FALSE (reject) whenever revision 1 does not exist.
-    constraint DenominationImmutable check (
+    constraint DenominationImmutable check on insert (
         New.Number = 1
         or (exists (select 1 from TallyContract where Number = 1)
             and New.Denomination = (select Denomination from TallyContract where Number = 1)
             and New.DenominationScale = (select DenominationScale from TallyContract where Number = 1))
-    ) on insert,
-    constraint InsertOnly check (0) on delete, update
+    ),
+    constraint InsertOnly check on delete, update (0)
 );
 
 -- Trading variables: each party's published lift policy for this tally, revisioned.
@@ -409,15 +409,15 @@ create table TradingVariable (
     Signature text,
 
     primary key (Sid, Revision),
-    constraint PartyOfTally check (Sid in (select StockSid from TallyCore union select FoilSid from TallyCore)) on insert,
-    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from TradingVariable TV where TV.Sid = New.Sid), 0) + 1) on insert,
-    constraint SignerAuthorized check (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)) on insert,
-    constraint SignatureValid check (SignatureValid(
+    constraint PartyOfTally check on insert (Sid in (select StockSid from TallyCore union select FoilSid from TallyCore)),
+    constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from TradingVariable TV where TV.Sid = New.Sid), 0) + 1),
+    constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)),
+    constraint SignatureValid check on insert (SignatureValid(
         Digest((select Cid from TallyCore), Sid, Revision, Target, Bound, Reward, Clutch),
         Signature,
         New.SignerKey
-    )) on insert,
-    constraint InsertOnly check (0) on delete, update
+    )),
+    constraint InsertOnly check on delete, update (0)
 );
 
 -- Credit one party (Sid = grantor) extends to the counterparty. UNILATERAL: only the grantor
@@ -442,13 +442,13 @@ create table CreditTerms (
     CreditLimit integer default 0 check (CreditLimit >= 0),  -- CreditLimit not Limit (reserved word)
     CallDays integer default 0 check (CallDays >= 0),
     Args text,              -- optional JSON, contract-specific params
-    Date text check ValidDate(Date),                    -- grantor-signed issuance timestamp
-    EffectiveDate text check ValidDate(EffectiveDate),
+    Date text check (ValidDate(Date)),                    -- grantor-signed issuance timestamp
+    EffectiveDate text check (ValidDate(EffectiveDate)),
     SignerKey text,         -- authorized PartyKey of Sid that signed this revision
     Signature text,
 
     primary key (Sid, Revision),
-    constraint PartyOfTally check (Sid in (select StockSid from TallyCore union select FoilSid from TallyCore)) on insert,
+    constraint PartyOfTally check on insert (Sid in (select StockSid from TallyCore union select FoilSid from TallyCore)),
     -- NOTE: committed.* vs plain ref. This table reads committed.CreditTerms for the monotonic and
     -- prior-revision lookups, following PartyKey's carefully-reasoned rule (schema/draft1.qsql:54-59):
     -- committed.* excludes the row being inserted so `Revision = max + 1` is satisfiable. The sibling
@@ -456,13 +456,13 @@ create table CreditTerms (
     -- PLAIN ref for the same monotonic check -- an apparent inconsistency in the existing schema.
     -- Confirm the correct choice against the Quereus deferral model when a runner exists; do NOT
     -- "fix" the siblings inside this ticket (tripwire, not a task).
-    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from committed.CreditTerms CT where CT.Sid = New.Sid), 0) + 1) on insert,
-    constraint SignerAuthorized check (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)) on insert,
-    constraint SignatureValid check (SignatureValid(
+    constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.CreditTerms CT where CT.Sid = New.Sid), 0) + 1),
+    constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)),
+    constraint SignatureValid check on insert (SignatureValid(
         Digest((select Cid from TallyCore), Sid, Revision, CreditLimit, CallDays, Args, Date, EffectiveDate),
         Signature,
         New.SignerKey
-    )) on insert,
+    )),
     -- Notice rule. Prior = immediately preceding revision for this grantor (committed).
     --   Revision 1 (no prior): effective immediately.
     --   Permissive (CreditLimit non-decreasing AND CallDays non-decreasing): immediate.
@@ -470,7 +470,7 @@ create table CreditTerms (
     --   the PRIOR revision's CallDays of notice -> EffectiveDate >= Date + prior.CallDays.
     -- Shortening CallDays is itself restrictive: otherwise a grantor could instantly shorten notice,
     -- then yank the limit. A revision that raises CreditLimit but shortens CallDays is restrictive.
-    constraint EffectiveDateValid check (
+    constraint EffectiveDateValid check on insert (
         (New.Revision = 1 and julianday(New.EffectiveDate) = julianday(New.Date))
         or (New.Revision > 1 and
             case
@@ -480,8 +480,8 @@ create table CreditTerms (
                 else julianday(New.EffectiveDate) >= julianday(New.Date)
                      + (select CallDays from committed.CreditTerms CT where CT.Sid = New.Sid and CT.Revision = New.Revision - 1)
             end)
-    ) on insert,
-    constraint InsertOnly check (0) on delete, update
+    ),
+    constraint InsertOnly check on delete, update (0)
 );
 
 -- Effective (latest-revision) trading variables per party.
@@ -618,9 +618,9 @@ create view OpenInvoice as
 -- insert stays deterministic/non-volatile. State (open/declined/expired/paid) is DERIVED, never stored.
 create table Invoice (
     Id text default RandomUUID(),
-    Requester text check Requester in ('S', 'F'),  -- party requesting payment (future recipient)
-    Units integer check Units > 0,                 -- smallest denomination unit, exact-match by the answering chit
-    Date text check ValidDate(Date),
+    Requester text check (Requester in ('S', 'F')),  -- party requesting payment (future recipient)
+    Units integer check (Units > 0),                 -- smallest denomination unit, exact-match by the answering chit
+    Date text check (ValidDate(Date)),
     ExpiryDate text null,                           -- null = never expires
     Reference text,                                 -- machine-readable JSON (stored as text, no parser -- house rule)
     Memo text,
@@ -629,20 +629,20 @@ create table Invoice (
 
     primary key (Id),
     -- SignerKey resolves against the REQUESTING side's own authorized set.
-    constraint SignerAuthorized check (New.SignerKey in (
+    constraint SignerAuthorized check on insert (New.SignerKey in (
         select PublicKey from AuthorizedKey AK
         where AK.Sid = (select case when New.Requester = 'S' then StockSid else FoilSid end from TallyCore)
-    )) on insert,
-    constraint SignatureValid check (SignatureValid(
+    )),
+    constraint SignatureValid check on insert (SignatureValid(
         Digest((select Cid from TallyCore), Id, Requester, Units, Date, ExpiryDate, Reference, Memo),
         Signature, New.SignerKey
-    )) on insert,
+    )),
     -- ExpiryDate, when present, must be a valid date at or after Date.
-    constraint ExpiryValid check (
+    constraint ExpiryValid check on insert (
         New.ExpiryDate is null
         or (ValidDate(New.ExpiryDate) and julianday(New.ExpiryDate) >= julianday(New.Date))
-    ) on insert,
-    constraint InsertOnly check (0) on delete, update
+    ),
+    constraint InsertOnly check on delete, update (0)
 );
 
 -- A signed decline of an invoice by the PAYER (the counterparty of the requester). Expiry needs no row
@@ -650,37 +650,37 @@ create table Invoice (
 -- invoice, and only before the invoice is answered by a chit.
 create table InvoiceDecline (
     InvoiceId text,
-    DeclinedBy text check DeclinedBy in ('S', 'F'),  -- must be the payer (counterparty of requester)
+    DeclinedBy text check (DeclinedBy in ('S', 'F')),  -- must be the payer (counterparty of requester)
     SignerKey text,
     Signature text,
 
     primary key (InvoiceId),                         -- at most one decline per invoice
-    constraint InvoiceExists check (New.InvoiceId in (select Id from Invoice)) on insert,
+    constraint InvoiceExists check on insert (New.InvoiceId in (select Id from Invoice)),
     -- Only the payer may decline: DeclinedBy is the side that is NOT the requester.
-    constraint DeclinerIsPayer check (
+    constraint DeclinerIsPayer check on insert (
         New.DeclinedBy <> (select Requester from Invoice where Id = New.InvoiceId)
-    ) on insert,
-    constraint SignerAuthorized check (New.SignerKey in (
+    ),
+    constraint SignerAuthorized check on insert (New.SignerKey in (
         select PublicKey from AuthorizedKey AK
         where AK.Sid = (select case when New.DeclinedBy = 'S' then StockSid else FoilSid end from TallyCore)
-    )) on insert,
-    constraint SignatureValid check (SignatureValid(
+    )),
+    constraint SignatureValid check on insert (SignatureValid(
         Digest((select Cid from TallyCore), InvoiceId, DeclinedBy),
         Signature, New.SignerKey
-    )) on insert,
+    )),
     -- Cannot decline an invoice already answered by a chit. Mirror of Ledger.InvoiceLink's
     -- not-declined guard; both are commit-time subqueries with the SAME isolation caveat noted there.
-    constraint NotPaid check (not exists (select 1 from Ledger L where L.InvoiceId = New.InvoiceId)) on insert,
-    constraint InsertOnly check (0) on delete, update
+    constraint NotPaid check on insert (not exists (select 1 from Ledger L where L.InvoiceId = New.InvoiceId)),
+    constraint InsertOnly check on delete, update (0)
 );
 
 create table Ledger (
     Number integer, -- Sequential, monotonically increasing
     ContractNumber integer,
     Id text default RandomUUID(),
-    Issuer text check Issuer in ('S', 'F'), -- S = Stock, F = Foil
-    Units integer check Units > 0,
-    Date text check ValidDate(Date),
+    Issuer text check (Issuer in ('S', 'F')), -- S = Stock, F = Foil
+    Units integer check (Units > 0),
+    Date text check (ValidDate(Date)),
     Reference text, -- JSON object
     Memo text,
     InvoiceId text null,   -- set when this chit answers an invoice (see InvoiceLink)
@@ -690,7 +690,7 @@ create table Ledger (
     -- Lift chits (feat-schema-lift-chits). A direct chit is issuer-signed; a lift chit is a FINALIZE of a
     -- PendingLift pledge, authorized by the referee's commit signature + the pre-signed pledge (no fresh
     -- issuer signature). See KindColumnsConsistent for the per-Kind null pattern and LiftFinalize for the gate.
-    Kind text check Kind in ('direct','lift') default 'direct',  -- direct chit vs finalized lift chit
+    Kind text check (Kind in ('direct','lift')) default 'direct',  -- direct chit vs finalized lift chit
     LiftId text null,            -- Kind='lift' only: the PendingLift being finalized
     RefereeSignature text null,  -- Kind='lift' only: referee commit signature over the lift-terms digest
 
@@ -698,16 +698,16 @@ create table Ledger (
     -- Kind='direct' only: SignerKey resolves against the issuing party's own authorized set. A finalize
     -- (Kind='lift') carries no fresh issuer signature -- it is authorized by LiftFinalize (referee commit +
     -- pre-signed pledge). This also fixes the draft placeholder that passed IssuerSid as the key argument.
-    constraint SignerAuthorized check (
+    constraint SignerAuthorized check on insert (
         New.Kind = 'lift'
         or New.SignerKey in (
             select PublicKey from AuthorizedKey AK
             where AK.Sid = (select case when New.Issuer = 'S' then StockSid else FoilSid end from TallyCore)
         )
-    ) on insert,
+    ),
     -- Kind='direct' only: issuer chit signature over the chit digest. (Kind='lift' verifies the referee
     -- signature in LiftFinalize instead.)
-    constraint SignatureValid check (
+    constraint SignatureValid check on insert (
         New.Kind = 'lift'
         or SignatureValid(
             Digest(
@@ -720,13 +720,13 @@ create table Ledger (
                 Memo,
                 InvoiceId
             ), Signature, New.SignerKey)
-    ) on insert,
+    ),
     -- Applies to EVERY Ledger row (direct + finalized lift both carry a real signed delta): the running
     -- Balance chains contiguously off the prior row.
-    constraint BalanceCorrect check (
+    constraint BalanceCorrect check on insert (
         Coalesce((select Balance from Ledger where Number = Number - 1), 0)
             + (Units * case when Issuer = 'F' then 1 else -1 end) = Balance
-    ) on insert,
+    ),
     -- Credit gate. The prospective (stock-perspective) Balance must sit within the credit each
     -- party extended, effective as of THIS chit's own signed Date -- deterministic, no now().
     -- Stock-granted limit caps how far Balance may RISE (foil's debt to stock); foil-granted limit
@@ -750,7 +750,7 @@ create table Ledger (
     -- pre-reduction date to select an older, higher effective limit and exceed the limit now in force,
     -- defeating restrictive-change notice. Design decision tracked in
     -- backlog/debt-credit-gate-chit-date-backdating (bound Date, gate on now(), or accept as disputable).
-    constraint WithinCreditLimits check (
+    constraint WithinCreditLimits check on insert (
         New.Kind = 'lift'
         or (
             Balance <= coalesce((
@@ -764,13 +764,13 @@ create table Ledger (
                   and julianday(CT.EffectiveDate) <= julianday(New.Date)
                 order by CT.Revision desc limit 1), 0)
         )
-    ) on insert,
+    ),
     -- Reserved-credit gate (Kind='direct' only): the prospective RESERVED balance -- settled Balance (this
     -- chit included, it is the latest Ledger row) + every open pending-lift delta -- must also sit within
     -- both parties' limits as of New.Date, so a direct chit cannot consume capacity an open pledge reserved.
     -- ReservedBalance is read with a plain ref, so the buffered new row is already in its settled term. Same
     -- limit lookup as WithinCreditLimits. Kind='lift' is exempt (the finalize is authoritative, see above).
-    constraint WithinReservedCredit check (
+    constraint WithinReservedCredit check on insert (
         New.Kind = 'lift'
         or (
             (select Balance from ReservedBalance) <= coalesce((
@@ -784,12 +784,12 @@ create table Ledger (
                   and julianday(CT.EffectiveDate) <= julianday(New.Date)
                 order by CT.Revision desc limit 1), 0)
         )
-    ) on insert,
+    ),
     -- Kind='direct' only.
     -- NOTE (pre-existing, unrelated to lifts): this references IssuerSid, but the column is Issuer ('S'/'F')
     -- and there is no IssuerSid column -- looks like a draft placeholder. NOT touched by this ticket (out of
     -- scope for lift chits); flagged in the feat-schema-lift-chits review handoff for separate triage.
-    constraint ValidIssuer check (New.Kind = 'lift' or IssuerSid in (select StockSid from TallyCore)) on insert,
+    constraint ValidIssuer check on insert (New.Kind = 'lift' or IssuerSid in (select StockSid from TallyCore)),
     -- If this chit answers an invoice: the invoice must exist, the chit must be issued by the PAYER
     -- (opposite side from the requester -- a foil-issued chit raises Balance toward stock, so if Stock
     -- requested payment Foil must issue), pledge EXACTLY the invoiced Units (partial payment is
@@ -810,7 +810,7 @@ create table Ledger (
     -- agents finalizing one lift, or a finalize racing a void, only reject if the CHECK re-evaluates
     -- against the latest committed snapshot). Same question, not re-solved here.
     -- Kind='direct' only (a finalize carries InvoiceId null and never answers an invoice).
-    constraint InvoiceLink check (
+    constraint InvoiceLink check on insert (
         New.Kind = 'lift'
         or New.InvoiceId is null
         or (
@@ -820,7 +820,7 @@ create table Ledger (
             and (select count(*) from Ledger where InvoiceId = New.InvoiceId) = 1
             and not exists (select 1 from InvoiceDecline where InvoiceId = New.InvoiceId)
         )
-    ) on insert,
+    ),
     -- Finalize gate (Kind='lift' only): a referee commit signature settles a PendingLift pledge as this
     -- fresh Ledger row. The leading `exists` guard is LOAD-BEARING -- a Quereus CHECK passes when its
     -- expression is NULL (only a definite FALSE rejects; see TallyContract.DenominationImmutable and
@@ -836,7 +836,7 @@ create table Ledger (
     --       this self-count (plain ref = buffered+committed -> 1 for a valid first finalize) rejects the second.
     -- Kind='lift' is EXEMPT from both credit gates above (decision 3): a referee-committed finalize must
     -- always settle. Isolation caveat on the NotVoided / single-finalize clauses: see the InvoiceLink note.
-    constraint LiftFinalize check (
+    constraint LiftFinalize check on insert (
         New.Kind = 'direct'
         or (
             exists (select 1 from PendingLift where LiftId = New.LiftId)
@@ -859,20 +859,20 @@ create table Ledger (
             and not exists (select 1 from LiftVoid V where V.LiftId = New.LiftId)
             and (select count(*) from Ledger L where L.LiftId = New.LiftId and L.Kind = 'lift') = 1
         )
-    ) on insert,
+    ),
     -- Null-hygiene across Kind. A direct chit carries a fresh issuer signature and no lift fields; a
     -- finalize carries the lift fields, no issuer signature, and never answers an invoice. Written as a
     -- disjunction so a NULL Kind (which the column-level `Kind in (...)` check would let pass, since a CHECK
     -- passes on NULL) makes BOTH arms FALSE -> definite reject; a malformed row of either kind is rejected.
-    constraint KindColumnsConsistent check (
+    constraint KindColumnsConsistent check on insert (
         (New.Kind = 'direct'
             and New.LiftId is null and New.RefereeSignature is null
             and New.SignerKey is not null and New.Signature is not null)
         or (New.Kind = 'lift'
             and New.LiftId is not null and New.RefereeSignature is not null
             and New.SignerKey is null and New.Signature is null and New.InvoiceId is null)
-    ) on insert,
-    constraint InsertOnly check (0) on delete, update
+    ),
+    constraint InsertOnly check on delete, update (0)
 );
 
 -- Conditional lift pledge on this edge (feat-schema-lift-chits). A lift clears credit around a cycle (or
@@ -893,38 +893,38 @@ create table Ledger (
 create table PendingLift (
     LiftId text,           -- globally-unique lift id (from the ChipNet route); one pending chit per lift per strand
     RefereeKey text,       -- agreed referee's public key; every resolution signature verifies against THIS key
-    Issuer text check Issuer in ('S','F'),  -- side pledging value on this edge (foil +Units, stock -Units, per BalanceCorrect)
-    Units integer check Units > 0,           -- edge amount in THIS tally's denomination (per the committed route's rates)
-    Date text check ValidDate(Date),         -- pledge timestamp; the date the reserved-credit gate keys off
-    Expiry text check ValidDate(Expiry),     -- advisory staleness bound + signed term; NOT a per-strand finalize gate (decision 2)
+    Issuer text check (Issuer in ('S','F')),  -- side pledging value on this edge (foil +Units, stock -Units, per BalanceCorrect)
+    Units integer check (Units > 0),           -- edge amount in THIS tally's denomination (per the committed route's rates)
+    Date text check (ValidDate(Date)),         -- pledge timestamp; the date the reserved-credit gate keys off
+    Expiry text check (ValidDate(Expiry)),     -- advisory staleness bound + signed term; NOT a per-strand finalize gate (decision 2)
     SignerKey text,        -- authorized PartyKey of the issuing party
     Signature text,        -- issuer signs Digest(Cid, LiftId, RefereeKey, Issuer, Units, Date, Expiry)
 
     primary key (LiftId),
     -- SignerKey resolves against the issuing side's own authorized set (mirror Ledger.SignerAuthorized).
-    constraint SignerAuthorized check (New.SignerKey in (
+    constraint SignerAuthorized check on insert (New.SignerKey in (
         select PublicKey from AuthorizedKey AK
         where AK.Sid = (select case when New.Issuer = 'S' then StockSid else FoilSid end from TallyCore)
-    )) on insert,
+    )),
     -- Issuer pledge signature over the lift-terms digest.
     -- NOTE (protocol contract): this digest field order -- Cid, LiftId, RefereeKey, Issuer, Units, Date,
     -- Expiry -- is the SAME lift-terms digest the ChipNet referee signs at commit (see Ledger.LiftFinalize).
     -- It is a cross-component contract: feat-chipnet-integration MUST NOT drift from this order, or a valid
     -- referee commit will fail to verify against the pledge. The void digest is DISTINCT -- Digest(Cid,
     -- LiftId, 'void') (LiftVoid) -- so a commit signature can never be replayed as a void or vice versa.
-    constraint SignatureValid check (SignatureValid(
+    constraint SignatureValid check on insert (SignatureValid(
         Digest((select Cid from TallyCore), LiftId, RefereeKey, Issuer, Units, Date, Expiry),
         Signature,
         New.SignerKey
-    )) on insert,
-    constraint ExpiryValid check (julianday(Expiry) >= julianday(Date)) on insert,
+    )),
+    constraint ExpiryValid check on insert (julianday(Expiry) >= julianday(Date)),
     -- Reserved-credit gate: the prospective RESERVED balance (settled + all open pending, INCLUDING this new
     -- pledge -- a plain ref to ReservedBalance already buffers it in) must sit within both parties' limits as
     -- of New.Date. Same limit lookup as Ledger.WithinCreditLimits (highest-Revision CreditTerms row whose
     -- EffectiveDate <= New.Date, per grantor; absent -> 0). This is the reserved-capacity gate that stops
     -- concurrent lifts from collectively over-committing. Soft under concurrency -- see the isolation NOTE
     -- shared with Ledger.LiftFinalize / PartyKeyRevocation.NotLastKey; a committed finalize is never re-gated.
-    constraint WithinReservedCredit check (
+    constraint WithinReservedCredit check on insert (
         (select Balance from ReservedBalance) <= coalesce((
             select CT.CreditLimit from CreditTerms CT
             where CT.Sid = (select StockSid from TallyCore)
@@ -935,8 +935,8 @@ create table PendingLift (
             where CT.Sid = (select FoilSid from TallyCore)
               and julianday(CT.EffectiveDate) <= julianday(New.Date)
             order by CT.Revision desc limit 1), 0)
-    ) on insert,
-    constraint InsertOnly check (0) on delete, update
+    ),
+    constraint InsertOnly check on delete, update (0)
 );
 
 -- Referee-signed void of a pending lift (feat-schema-lift-chits): an explicit abort OR a post-timeout void
@@ -952,18 +952,18 @@ create table LiftVoid (
     primary key (LiftId),
     -- The pledge being voided must exist. `in (subquery)` over a non-null PK column yields a definite FALSE
     -- (not NULL) when absent, so this rejects a void with no pledge and shields RefereeVoidValid's sub-select.
-    constraint PendingExists check (New.LiftId in (select LiftId from PendingLift)) on insert,
+    constraint PendingExists check on insert (New.LiftId in (select LiftId from PendingLift)),
     -- Mutual exclusion with finalize: no settled lift row may already exist for this LiftId. Commit-time
     -- deferred CHECK; same Optimystic isolation caveat as Ledger.LiftFinalize / InvoiceLink / NotLastKey.
-    constraint NotFinalized check (not exists (select 1 from Ledger L where L.LiftId = New.LiftId and L.Kind = 'lift')) on insert,
+    constraint NotFinalized check on insert (not exists (select 1 from Ledger L where L.LiftId = New.LiftId and L.Kind = 'lift')),
     -- Referee void signature over the DISTINCT void digest, verified against the pledge's RefereeKey. The
     -- distinct digest is what makes a commit signature un-replayable as a void (and vice versa). PendingExists
     -- guarantees the RefereeKey sub-select is a definite value here.
-    constraint RefereeVoidValid check (SignatureValid(
+    constraint RefereeVoidValid check on insert (SignatureValid(
         Digest((select Cid from TallyCore), New.LiftId, 'void'),
         New.RefereeSignature,
         (select RefereeKey from PendingLift where LiftId = New.LiftId)
-    )) on insert,
-    constraint InsertOnly check (0) on delete, update
+    )),
+    constraint InsertOnly check on delete, update (0)
 );
 
