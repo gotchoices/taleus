@@ -512,17 +512,51 @@ create view CurrentCreditLimit as
                   order by CT.Revision desc limit 1), 0) as CreditLimit
     from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
 
--- Tally balance from each party's perspective (positive = value that party has accumulated).
+-- Tally balance from each party's perspective (positive = value that party has accumulated), SETTLED
+-- only: direct chits + FINALIZED lifts -- the Ledger.Balance chain. This is the authoritative signed
+-- balance and stays the value reports/PerspectiveBalance consumers read.
 -- Ledger convention: foil-issued chits increment Balance, so raw Balance is already
 -- the stock holder's perspective; the foil holder sees its negation.
--- TODO: fold in pending (unresolved) lift chits once modeled in Ledger, so concurrent
--- lifts reserve capacity. Open invoices (payment requests) are already surfaced to the lift
--- agent via the OpenInvoice view (below) as an advisory signal of upcoming balance movement;
--- they are deliberately NOT folded into this Balance, LiftLading capacity math, or the hard
--- WithinCreditLimits gate -- weighting them is discretionary policy in the application layer.
+-- Pending (unresolved) lift chits are deliberately NOT folded in here: a pledge reserves capacity via
+-- the separate ReservedBalance / ReservedPerspectiveBalance views (below) and only enters this settled
+-- chain when it FINALIZES. LiftLading advertises free capacity from the RESERVED views, so open pending
+-- lifts shrink advertised capacity without moving the signed balance -- this realizes the former "fold in
+-- pending lift chits" plan item (the pending-aware view is ReservedPerspectiveBalance, not this one). Open
+-- invoices are likewise advisory-only (OpenInvoice), not folded into this Balance or the hard credit gate.
 create view PerspectiveBalance as
     select P.Sid,
         coalesce((select Balance from Ledger order by Number desc limit 1), 0)
+            * (case when P.Sid = (select StockSid from TallyCore) then 1 else -1 end) as Balance
+    from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
+
+-- Open (unresolved) pending lifts: a PendingLift row with NEITHER a Ledger finalize (Kind='lift') NOR a
+-- LiftVoid for its LiftId. This is the reservation set -- ReservedBalance sums it. A finalize or a void
+-- drops the row out immediately (its capacity moves to the settled chain, or is released), so the reserved
+-- gate counts open pledges only.
+create view OpenPendingLift as
+    select PL.LiftId, PL.RefereeKey, PL.Issuer, PL.Units, PL.Date, PL.Expiry, PL.SignerKey, PL.Signature
+    from PendingLift PL
+    where not exists (select 1 from Ledger L where L.LiftId = PL.LiftId and L.Kind = 'lift')
+      and not exists (select 1 from LiftVoid V where V.LiftId = PL.LiftId);
+
+-- Reserved balance = settled signed balance + every OPEN pending-lift delta, stock-perspective (same sign
+-- convention as raw Ledger.Balance: foil-issued +Units, stock-issued -Units, matching BalanceCorrect).
+-- Single row (TallyCore is one row). New PendingLift pledges and new direct chits gate against THIS via
+-- WithinReservedCredit so concurrent lifts cannot collectively over-commit; LiftLading advertises net of it.
+-- Because the gate reads this with a plain (buffered+committed) ref, the row being inserted is already
+-- reflected -- see WithinReservedCredit on PendingLift and Ledger.
+create view ReservedBalance as
+    select
+        coalesce((select Balance from Ledger order by Number desc limit 1), 0)
+        + coalesce((select sum(Units * case when Issuer = 'F' then 1 else -1 end) from OpenPendingLift), 0)
+            as Balance
+    from TallyCore;
+
+-- Per-party reserved balance -- mirrors PerspectiveBalance but off ReservedBalance (settled + open
+-- pending), negated for the foil side. LiftLading advertises from this; PerspectiveBalance stays SETTLED.
+create view ReservedPerspectiveBalance as
+    select P.Sid,
+        (select Balance from ReservedBalance)
             * (case when P.Sid = (select StockSid from TallyCore) then 1 else -1 end) as Balance
     from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
 
@@ -539,7 +573,9 @@ create view PerspectiveBalance as
 -- counterparty: a lift raises the receiver's perspective balance (the counterparty's debt to
 -- the receiver), bounded by CurrentCreditLimit. Cap = min(Bound, receiver's effective
 -- CreditLimit); Balance + moved <= Cap. Advisory only -- the hard safety gate is the
--- deterministic, chit-dated Ledger.WithinCreditLimits.
+-- deterministic, chit-dated Ledger.WithinCreditLimits / WithinReservedCredit.
+-- Balance here is the RESERVED perspective balance (settled + open pending lifts), so an open pledge
+-- already subtracts from advertised free capacity -- concurrent lifts do not double-advertise the same room.
 create view LiftLading as
     select
         RV.Sid as ReceiverSid,
@@ -548,7 +584,7 @@ create view LiftLading as
         RV.Reward,
         CV.Clutch
     from CurrentTradingVariable RV
-        join PerspectiveBalance PB on PB.Sid = RV.Sid
+        join ReservedPerspectiveBalance PB on PB.Sid = RV.Sid
         join CurrentCreditLimit CCL on CCL.Sid = RV.Sid
         join CurrentTradingVariable CV on CV.Sid <> RV.Sid;
 
@@ -648,31 +684,45 @@ create table Ledger (
     Reference text, -- JSON object
     Memo text,
     InvoiceId text null,   -- set when this chit answers an invoice (see InvoiceLink)
-    SignerKey text,        -- authorized PartyKey of the issuing party that signed this chit
-    Signature text,
+    SignerKey text,        -- authorized PartyKey of the issuing party (Kind='direct' only; null for a finalize)
+    Signature text,        -- issuer chit signature (Kind='direct' only; null for a finalize)
     Balance integer,
-    -- TODO: lift vs manual
-    -- TODO: pending lift
+    -- Lift chits (feat-schema-lift-chits). A direct chit is issuer-signed; a lift chit is a FINALIZE of a
+    -- PendingLift pledge, authorized by the referee's commit signature + the pre-signed pledge (no fresh
+    -- issuer signature). See KindColumnsConsistent for the per-Kind null pattern and LiftFinalize for the gate.
+    Kind text check Kind in ('direct','lift') default 'direct',  -- direct chit vs finalized lift chit
+    LiftId text null,            -- Kind='lift' only: the PendingLift being finalized
+    RefereeSignature text null,  -- Kind='lift' only: referee commit signature over the lift-terms digest
 
     primary key (Number),
-    -- SignerKey resolves against the issuing party's own authorized set. This also fixes the
-    -- draft placeholder that passed IssuerSid (a party id) as the public-key argument.
-    constraint SignerAuthorized check (New.SignerKey in (
-        select PublicKey from AuthorizedKey AK
-        where AK.Sid = (select case when New.Issuer = 'S' then StockSid else FoilSid end from TallyCore)
-    )) on insert,
-    constraint SignatureValid check (SignatureValid(
-        Digest(
-            Id,
-            Issuer,
-            (select case when Issuer = 'F' then FoilSid else StockSid end RecipientSid from TallyCore),
-            Units,
-            Date,
-            Reference,
-            Memo,
-            InvoiceId
-        ), Signature, New.SignerKey)
+    -- Kind='direct' only: SignerKey resolves against the issuing party's own authorized set. A finalize
+    -- (Kind='lift') carries no fresh issuer signature -- it is authorized by LiftFinalize (referee commit +
+    -- pre-signed pledge). This also fixes the draft placeholder that passed IssuerSid as the key argument.
+    constraint SignerAuthorized check (
+        New.Kind = 'lift'
+        or New.SignerKey in (
+            select PublicKey from AuthorizedKey AK
+            where AK.Sid = (select case when New.Issuer = 'S' then StockSid else FoilSid end from TallyCore)
+        )
     ) on insert,
+    -- Kind='direct' only: issuer chit signature over the chit digest. (Kind='lift' verifies the referee
+    -- signature in LiftFinalize instead.)
+    constraint SignatureValid check (
+        New.Kind = 'lift'
+        or SignatureValid(
+            Digest(
+                Id,
+                Issuer,
+                (select case when Issuer = 'F' then FoilSid else StockSid end RecipientSid from TallyCore),
+                Units,
+                Date,
+                Reference,
+                Memo,
+                InvoiceId
+            ), Signature, New.SignerKey)
+    ) on insert,
+    -- Applies to EVERY Ledger row (direct + finalized lift both carry a real signed delta): the running
+    -- Balance chains contiguously off the prior row.
     constraint BalanceCorrect check (
         Coalesce((select Balance from Ledger where Number = Number - 1), 0)
             + (Units * case when Issuer = 'F' then 1 else -1 end) = Balance
@@ -685,9 +735,15 @@ create table Ledger (
     -- (MyCHIPs zero-credit default -- a party must publish a CreditTerms revision before the first
     -- nonzero chit can move against it). Picking max-Revision among effective rows is correct even
     -- when a future-dated restrictive revision and a later immediate permissive revision coexist:
-    -- the permissive one, once effective, has the higher revision and supersedes. Pending lift chits
-    -- fold in by construction -- once written as Ledger rows they are in Balance, so this counts them
-    -- with no extra machinery.
+    -- the permissive one, once effective, has the higher revision and supersedes.
+    -- This gate sees only SETTLED value. Pending lift chits are NO LONGER "in Balance by construction":
+    -- a pledge reserves capacity in the separate ReservedBalance view and does not enter this settled
+    -- chain until it FINALIZES -- concurrent pending lifts are gated separately by WithinReservedCredit
+    -- (below, and on PendingLift). A referee-committed FINALIZE (Kind='lift') is EXEMPT from this gate
+    -- (decision 3): once the referee has committed, the finalize row must always settle, or a per-strand
+    -- credit check could reject a finalize the other strands accept -- breaking cross-strand atomicity.
+    -- The pledge was already reserved-gated at insert; the referee commit is authoritative. This can push
+    -- the settled Balance past the nominal limit (soft-limit NOTE) -- accepted: a committed lift is binding.
     -- NOTE: gate keys off the issuer-signed New.Date, which is unconstrained (no Date/Number
     -- monotonicity on Ledger) and chits are unilateral (issuer-signed only -- this CHECK is the SOLE
     -- enforcement, no counterparty countersignature). An issuer can therefore backdate a chit to a
@@ -695,18 +751,45 @@ create table Ledger (
     -- defeating restrictive-change notice. Design decision tracked in
     -- backlog/debt-credit-gate-chit-date-backdating (bound Date, gate on now(), or accept as disputable).
     constraint WithinCreditLimits check (
-        Balance <= coalesce((
-            select CT.CreditLimit from CreditTerms CT
-            where CT.Sid = (select StockSid from TallyCore)
-              and julianday(CT.EffectiveDate) <= julianday(New.Date)
-            order by CT.Revision desc limit 1), 0)
-        and Balance >= -coalesce((
-            select CT.CreditLimit from CreditTerms CT
-            where CT.Sid = (select FoilSid from TallyCore)
-              and julianday(CT.EffectiveDate) <= julianday(New.Date)
-            order by CT.Revision desc limit 1), 0)
+        New.Kind = 'lift'
+        or (
+            Balance <= coalesce((
+                select CT.CreditLimit from CreditTerms CT
+                where CT.Sid = (select StockSid from TallyCore)
+                  and julianday(CT.EffectiveDate) <= julianday(New.Date)
+                order by CT.Revision desc limit 1), 0)
+            and Balance >= -coalesce((
+                select CT.CreditLimit from CreditTerms CT
+                where CT.Sid = (select FoilSid from TallyCore)
+                  and julianday(CT.EffectiveDate) <= julianday(New.Date)
+                order by CT.Revision desc limit 1), 0)
+        )
     ) on insert,
-    constraint ValidIssuer check (IssuerSid in (select StockSid from TallyCore)) on insert,
+    -- Reserved-credit gate (Kind='direct' only): the prospective RESERVED balance -- settled Balance (this
+    -- chit included, it is the latest Ledger row) + every open pending-lift delta -- must also sit within
+    -- both parties' limits as of New.Date, so a direct chit cannot consume capacity an open pledge reserved.
+    -- ReservedBalance is read with a plain ref, so the buffered new row is already in its settled term. Same
+    -- limit lookup as WithinCreditLimits. Kind='lift' is exempt (the finalize is authoritative, see above).
+    constraint WithinReservedCredit check (
+        New.Kind = 'lift'
+        or (
+            (select Balance from ReservedBalance) <= coalesce((
+                select CT.CreditLimit from CreditTerms CT
+                where CT.Sid = (select StockSid from TallyCore)
+                  and julianday(CT.EffectiveDate) <= julianday(New.Date)
+                order by CT.Revision desc limit 1), 0)
+            and (select Balance from ReservedBalance) >= -coalesce((
+                select CT.CreditLimit from CreditTerms CT
+                where CT.Sid = (select FoilSid from TallyCore)
+                  and julianday(CT.EffectiveDate) <= julianday(New.Date)
+                order by CT.Revision desc limit 1), 0)
+        )
+    ) on insert,
+    -- Kind='direct' only.
+    -- NOTE (pre-existing, unrelated to lifts): this references IssuerSid, but the column is Issuer ('S'/'F')
+    -- and there is no IssuerSid column -- looks like a draft placeholder. NOT touched by this ticket (out of
+    -- scope for lift chits); flagged in the feat-schema-lift-chits review handoff for separate triage.
+    constraint ValidIssuer check (New.Kind = 'lift' or IssuerSid in (select StockSid from TallyCore)) on insert,
     -- If this chit answers an invoice: the invoice must exist, the chit must be issued by the PAYER
     -- (opposite side from the requester -- a foil-issued chit raises Balance toward stock, so if Stock
     -- requested payment Foil must issue), pledge EXACTLY the invoiced Units (partial payment is
@@ -722,8 +805,14 @@ create table Ledger (
     -- Both racing actions are the payer's own, so it only ever produces self-inflicted ambiguity, and
     -- InvoiceState resolves it deterministically (paid > declined). Not solved here; confirm the isolation
     -- model when a runner exists, same as the NotLastKey note.
+    -- Lift resolution joins this SAME open isolation list: LiftFinalize's NotVoided / single-finalize
+    -- clauses and LiftVoid.NotFinalized are commit-time deferred CHECKs with the identical shape (two
+    -- agents finalizing one lift, or a finalize racing a void, only reject if the CHECK re-evaluates
+    -- against the latest committed snapshot). Same question, not re-solved here.
+    -- Kind='direct' only (a finalize carries InvoiceId null and never answers an invoice).
     constraint InvoiceLink check (
-        New.InvoiceId is null
+        New.Kind = 'lift'
+        or New.InvoiceId is null
         or (
             exists (select 1 from Invoice where Id = New.InvoiceId)
             and New.Issuer <> (select Requester from Invoice where Id = New.InvoiceId)
@@ -732,6 +821,149 @@ create table Ledger (
             and not exists (select 1 from InvoiceDecline where InvoiceId = New.InvoiceId)
         )
     ) on insert,
+    -- Finalize gate (Kind='lift' only): a referee commit signature settles a PendingLift pledge as this
+    -- fresh Ledger row. The leading `exists` guard is LOAD-BEARING -- a Quereus CHECK passes when its
+    -- expression is NULL (only a definite FALSE rejects; see TallyContract.DenominationImmutable and
+    -- quereus runtime/emit/constraint-check.ts). Without it, a finalize naming a non-existent LiftId leaves
+    -- every `pending.*` sub-select NULL and the whole check NULL -> ACCEPT; the guard forces a definite FALSE.
+    --   (a) a matching PendingLift pledge exists for New.LiftId;
+    --   (b) Issuer/Units/Date equal the pledge's, so the settled delta AND the referee digest match it;
+    --   (c) the referee commit signature verifies against the pledge's RefereeKey over the lift-terms digest
+    --       (field order per the PendingLift.SignatureValid protocol-contract NOTE) -- binding Cid + LiftId
+    --       makes a commit signed for another tally or another lift impossible to replay here;
+    --   (d) NotVoided: no LiftVoid for this LiftId (finalize-after-void rejected), AND no prior finalize:
+    --       Ledger's PK is Number, so a second 'lift' row for the same LiftId does NOT collide on the PK --
+    --       this self-count (plain ref = buffered+committed -> 1 for a valid first finalize) rejects the second.
+    -- Kind='lift' is EXEMPT from both credit gates above (decision 3): a referee-committed finalize must
+    -- always settle. Isolation caveat on the NotVoided / single-finalize clauses: see the InvoiceLink note.
+    constraint LiftFinalize check (
+        New.Kind = 'direct'
+        or (
+            exists (select 1 from PendingLift where LiftId = New.LiftId)
+            and New.Issuer = (select Issuer from PendingLift where LiftId = New.LiftId)
+            and New.Units  = (select Units  from PendingLift where LiftId = New.LiftId)
+            and New.Date   = (select Date   from PendingLift where LiftId = New.LiftId)
+            and SignatureValid(
+                Digest(
+                    (select Cid from TallyCore),
+                    New.LiftId,
+                    (select RefereeKey from PendingLift where LiftId = New.LiftId),
+                    New.Issuer,
+                    New.Units,
+                    New.Date,
+                    (select Expiry from PendingLift where LiftId = New.LiftId)
+                ),
+                New.RefereeSignature,
+                (select RefereeKey from PendingLift where LiftId = New.LiftId)
+            )
+            and not exists (select 1 from LiftVoid V where V.LiftId = New.LiftId)
+            and (select count(*) from Ledger L where L.LiftId = New.LiftId and L.Kind = 'lift') = 1
+        )
+    ) on insert,
+    -- Null-hygiene across Kind. A direct chit carries a fresh issuer signature and no lift fields; a
+    -- finalize carries the lift fields, no issuer signature, and never answers an invoice. Written as a
+    -- disjunction so a NULL Kind (which the column-level `Kind in (...)` check would let pass, since a CHECK
+    -- passes on NULL) makes BOTH arms FALSE -> definite reject; a malformed row of either kind is rejected.
+    constraint KindColumnsConsistent check (
+        (New.Kind = 'direct'
+            and New.LiftId is null and New.RefereeSignature is null
+            and New.SignerKey is not null and New.Signature is not null)
+        or (New.Kind = 'lift'
+            and New.LiftId is not null and New.RefereeSignature is not null
+            and New.SignerKey is null and New.Signature is null and New.InvoiceId is null)
+    ) on insert,
+    constraint InsertOnly check (0) on delete, update
+);
+
+-- Conditional lift pledge on this edge (feat-schema-lift-chits). A lift clears credit around a cycle (or
+-- along a chain) in the tally graph: every participant pays one neighbor and is paid by another, net zero,
+-- but balances move back toward each party's target. Each tally on the route is one edge; ChipNet
+-- coordinates the whole route under a single agreed referee whose commit signature is the atomic-commit
+-- trigger. There is NO cross-strand transaction -- atomicity comes from every strand independently
+-- verifying the SAME referee signature. So this row is a CONDITIONAL, issuer-signed pledge: it RESERVES
+-- capacity (via ReservedBalance) while open but does not move the settled Balance; it enters the settled
+-- Ledger only if the referee commits (a fresh Ledger row, Kind='lift'), or is voided by LiftVoid. Pending
+-- pledge and its resolution are the "pending row + resolution row" pattern -- BalanceCorrect never sees a
+-- pending delta, so the settled chain stays contiguous and every Ledger row carries real settled value.
+-- NOTE (liveness gap): if the chosen referee becomes permanently unreachable, an open PendingLift reserves
+-- capacity forever -- no party can void it alone without breaking atomicity (one edge voiding while
+-- referee-committed others finalize). Inherent to a referee-arbitrated, no-cross-strand-transaction model;
+-- referee reliability is the mitigation. A bounded party-driven release is parked in
+-- backlog/feat-lift-timeout-release -- do NOT add a unilateral party void here.
+create table PendingLift (
+    LiftId text,           -- globally-unique lift id (from the ChipNet route); one pending chit per lift per strand
+    RefereeKey text,       -- agreed referee's public key; every resolution signature verifies against THIS key
+    Issuer text check Issuer in ('S','F'),  -- side pledging value on this edge (foil +Units, stock -Units, per BalanceCorrect)
+    Units integer check Units > 0,           -- edge amount in THIS tally's denomination (per the committed route's rates)
+    Date text check ValidDate(Date),         -- pledge timestamp; the date the reserved-credit gate keys off
+    Expiry text check ValidDate(Expiry),     -- advisory staleness bound + signed term; NOT a per-strand finalize gate (decision 2)
+    SignerKey text,        -- authorized PartyKey of the issuing party
+    Signature text,        -- issuer signs Digest(Cid, LiftId, RefereeKey, Issuer, Units, Date, Expiry)
+
+    primary key (LiftId),
+    -- SignerKey resolves against the issuing side's own authorized set (mirror Ledger.SignerAuthorized).
+    constraint SignerAuthorized check (New.SignerKey in (
+        select PublicKey from AuthorizedKey AK
+        where AK.Sid = (select case when New.Issuer = 'S' then StockSid else FoilSid end from TallyCore)
+    )) on insert,
+    -- Issuer pledge signature over the lift-terms digest.
+    -- NOTE (protocol contract): this digest field order -- Cid, LiftId, RefereeKey, Issuer, Units, Date,
+    -- Expiry -- is the SAME lift-terms digest the ChipNet referee signs at commit (see Ledger.LiftFinalize).
+    -- It is a cross-component contract: feat-chipnet-integration MUST NOT drift from this order, or a valid
+    -- referee commit will fail to verify against the pledge. The void digest is DISTINCT -- Digest(Cid,
+    -- LiftId, 'void') (LiftVoid) -- so a commit signature can never be replayed as a void or vice versa.
+    constraint SignatureValid check (SignatureValid(
+        Digest((select Cid from TallyCore), LiftId, RefereeKey, Issuer, Units, Date, Expiry),
+        Signature,
+        New.SignerKey
+    )) on insert,
+    constraint ExpiryValid check (julianday(Expiry) >= julianday(Date)) on insert,
+    -- Reserved-credit gate: the prospective RESERVED balance (settled + all open pending, INCLUDING this new
+    -- pledge -- a plain ref to ReservedBalance already buffers it in) must sit within both parties' limits as
+    -- of New.Date. Same limit lookup as Ledger.WithinCreditLimits (highest-Revision CreditTerms row whose
+    -- EffectiveDate <= New.Date, per grantor; absent -> 0). This is the reserved-capacity gate that stops
+    -- concurrent lifts from collectively over-committing. Soft under concurrency -- see the isolation NOTE
+    -- shared with Ledger.LiftFinalize / PartyKeyRevocation.NotLastKey; a committed finalize is never re-gated.
+    constraint WithinReservedCredit check (
+        (select Balance from ReservedBalance) <= coalesce((
+            select CT.CreditLimit from CreditTerms CT
+            where CT.Sid = (select StockSid from TallyCore)
+              and julianday(CT.EffectiveDate) <= julianday(New.Date)
+            order by CT.Revision desc limit 1), 0)
+        and (select Balance from ReservedBalance) >= -coalesce((
+            select CT.CreditLimit from CreditTerms CT
+            where CT.Sid = (select FoilSid from TallyCore)
+              and julianday(CT.EffectiveDate) <= julianday(New.Date)
+            order by CT.Revision desc limit 1), 0)
+    ) on insert,
+    constraint InsertOnly check (0) on delete, update
+);
+
+-- Referee-signed void of a pending lift (feat-schema-lift-chits): an explicit abort OR a post-timeout void
+-- -- the SAME mechanism (decision 2). The referee is the sole arbiter; parties NEVER unilaterally void, so
+-- one referee signature resolves every strand the same way and cross-strand atomicity holds with no
+-- cross-strand transaction. Voiding writes NO settled Ledger row -- the pledge simply drops out of
+-- OpenPendingLift, releasing its reserved capacity. Mutual exclusion with finalize is enforced both ways
+-- (NotFinalized here; LiftFinalize.NotVoided there); double-void collides on the primary key.
+create table LiftVoid (
+    LiftId text,             -- one void per lift; PK also blocks double-void
+    RefereeSignature text,   -- referee signs Digest(Cid, LiftId, 'void') -- DISTINCT from the commit digest
+
+    primary key (LiftId),
+    -- The pledge being voided must exist. `in (subquery)` over a non-null PK column yields a definite FALSE
+    -- (not NULL) when absent, so this rejects a void with no pledge and shields RefereeVoidValid's sub-select.
+    constraint PendingExists check (New.LiftId in (select LiftId from PendingLift)) on insert,
+    -- Mutual exclusion with finalize: no settled lift row may already exist for this LiftId. Commit-time
+    -- deferred CHECK; same Optimystic isolation caveat as Ledger.LiftFinalize / InvoiceLink / NotLastKey.
+    constraint NotFinalized check (not exists (select 1 from Ledger L where L.LiftId = New.LiftId and L.Kind = 'lift')) on insert,
+    -- Referee void signature over the DISTINCT void digest, verified against the pledge's RefereeKey. The
+    -- distinct digest is what makes a commit signature un-replayable as a void (and vice versa). PendingExists
+    -- guarantees the RefereeKey sub-select is a definite value here.
+    constraint RefereeVoidValid check (SignatureValid(
+        Digest((select Cid from TallyCore), New.LiftId, 'void'),
+        New.RefereeSignature,
+        (select RefereeKey from PendingLift where LiftId = New.LiftId)
+    )) on insert,
     constraint InsertOnly check (0) on delete, update
 );
 
