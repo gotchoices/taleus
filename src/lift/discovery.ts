@@ -353,6 +353,13 @@ export function isViable(candidate: CandidateRoute): candidate is CandidateRoute
  * `null` when no candidate is viable. Deliberately does not over-search once a
  * satisfactory route is in hand (§ query economics) — selection is over what the
  * bounded search already returned, never a driver for more rounds.
+ *
+ * NOTE: `sourceUnits` is compared as a raw integer, which assumes every candidate
+ * shares one source denomination — true today (a payment originates on the payer's
+ * single chosen tally). If discovery ever returns candidates that originate on tallies
+ * of DIFFERENT denominations (payer holds heterogeneous outbound tallies), comparing
+ * their `sourceUnits` by `<` is meaningless (300 USD-cents vs 30 gold-units) and picks
+ * the wrong route; selection would then need a common valuation across source denoms.
  */
 export function selectRoute(candidates: CandidateRoute[]): (CandidateRoute & { result: AccumulatedRoute }) | null {
 	const viable = candidates.filter(isViable)
