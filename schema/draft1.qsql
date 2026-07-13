@@ -119,9 +119,20 @@ create table PartyKeyRevocation (
     -- (plain ref = buffered+committed), so this count is the POST-revoke authorized set; we
     -- require >= 1 key to remain. This is the correct realization of the ticket's "prevent
     -- revoking the last key" -- and it is strictly safer than a pre-revoke `> 1`, because a
-    -- batch of revocations that would empty the set is also visible here and rejected. A
-    -- fully-compromised party (all keys stolen) therefore cannot revoke its way to an empty
-    -- set; it must first adopt a fresh key via the counterparty ceremony (key-counterparty-rekey).
+    -- batch of revocations that would empty the set within ONE transaction is also visible
+    -- here and rejected. A fully-compromised party (all keys stolen) therefore cannot revoke
+    -- its way to an empty set; it must first adopt a fresh key via the counterparty ceremony
+    -- (key-counterparty-rekey).
+    -- NOTE: the last-key guarantee across two CONCURRENT, independent revocation transactions
+    -- (device A revokes B's key while device B revokes A's key -- each alone leaves >= 1, together
+    -- they empty the set) is NOT provided by this constraint alone. Unlike concurrent PartyKey
+    -- adds -- which collide on the (Sid, Revision) primary key -- two revocations of different
+    -- keys share no key and do not conflict at the PK. Safety then depends on Optimystic
+    -- re-evaluating this deferred CHECK against the latest committed snapshot at each commit
+    -- (so the second committer sees the first's revocation and its count drops to 0 -> reject).
+    -- If Optimystic instead validates only against a transaction's original read snapshot, both
+    -- could commit and lock the party out. Confirm the isolation model when a runner exists; if
+    -- it does not re-validate, this needs a stronger guard (e.g. serialize revocations per Sid).
     constraint NotLastKey check ((select count(*) from AuthorizedKey AK where AK.Sid = New.Sid) >= 1) on insert,
     constraint InsertOnly check (0) on delete, update
 );
@@ -132,6 +143,12 @@ create table PartyKeyRevocation (
 -- (PartyKey.RevisionMonotonicInt, PartyKey.AuthKeyAuthorized) use committed.* directly
 -- instead of this view. The counterparty re-key ceremony (key-counterparty-rekey) unions
 -- adopted keys into this same view.
+-- NOTE: every SignerAuthorized / RevokerAuthorized / NotLastKey check references THIS view
+-- from inside a CHECK sub-query. Confirmed against Quereus source (planner/building/select.ts
+-- buildFrom inlines a view wherever a base table is accepted, including constraint sub-queries,
+-- with no base-table-only guard) -- but Quereus has NO test exercising a view inside a CHECK.
+-- If a future runner rejects a view here, the fallback is to inline this view's body
+-- (PartyKey minus PartyKeyRevocation) directly into each referencing constraint.
 create view AuthorizedKey as
     select PK.Sid, PK.PublicKey
     from PartyKey PK

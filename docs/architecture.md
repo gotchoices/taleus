@@ -136,7 +136,7 @@ Consequences for payments and lifts:
 
 ## Ledger Operation
 
-- **Direct payment**: issuer inserts a `Ledger` row pledging `Units` to the other party, signed with their current `PartyKey`. Balance convention: foil-issued chits increment, stock-issued decrement (see `BalanceCorrect`).
+- **Direct payment**: issuer inserts a `Ledger` row pledging `Units` to the other party, signed with one of the issuer's authorized `PartyKey`s (named in the row's `SignerKey`). Balance convention: foil-issued chits increment, stock-issued decrement (see `BalanceCorrect`).
 - **Invoice**: requester signs an `Invoice` row; the payer answers with a chit referencing it.
 - **Lift chit**: inserted in a pending state during a lift, bound to the lift ID and referee; finalized by the referee's commit signature or voided by its timeout/abort. Pending chits reserve capacity — trading variables and credit checks see them.
 
