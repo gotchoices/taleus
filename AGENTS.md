@@ -4,8 +4,8 @@ Focus: Taleus — MyCHIPs reboot on Sereus. Tallies (private credit relationship
 
 - `docs/` — design docs. [`docs/architecture.md`](docs/architecture.md) is the entry point; read it before any non-trivial work.
 - `docs/old/` — legacy docs from the pre-Sereus prototype (bespoke bootstrap protocol, chunk negotiation design). Reference only; do **not** treat as current design. The old `src/`/`test/` bootstrap module is retired — Sereus strand formation replaces it.
-- `schema/` — Quereus sApp schema drafts (`draft1.sql`). Docs are timeless (describe the intended system); outstanding work lives in `tickets/`, not in doc TODO sections.
-- No package/build scaffolding yet — design phase. TypeScript + Svelte Native planned.
+- Yarn-workspaces monorepo under `packages/`: `taleus` (core library + Quereus sApp schema in `packages/taleus/schema/`, `draft1.qsql`), `taleus-node` (always-on trading service, a client of the cadre), `taleus-app` (Svelte Native mobile client, placeholder). Root scripts `yarn build` / `yarn test` / `yarn lint` delegate to workspaces.
+- Docs are timeless (describe the intended system); outstanding work lives in `tickets/`, not in doc TODO sections.
 
 ## Sibling workspaces (reference/debug)
 

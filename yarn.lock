@@ -3681,9 +3681,52 @@ __metadata:
   languageName: node
   linkType: hard
 
-"taleus@workspace:.":
+"taleus-app@workspace:packages/taleus-app":
   version: 0.0.0-use.local
-  resolution: "taleus@workspace:."
+  resolution: "taleus-app@workspace:packages/taleus-app"
+  languageName: unknown
+  linkType: soft
+
+"taleus-monorepo@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "taleus-monorepo@workspace:."
+  dependencies:
+    "@eslint/js": "npm:10.0.1"
+    "@types/jest": "npm:30.0.0"
+    "@types/node": "npm:26.1.1"
+    cross-env: "npm:7.0.3"
+    eslint: "npm:10.7.0"
+    globals: "npm:17.7.0"
+    jest: "npm:30.4.2"
+    ts-jest: "npm:29.4.11"
+    typescript: "npm:6.0.3"
+    typescript-eslint: "npm:8.63.0"
+  languageName: unknown
+  linkType: soft
+
+"taleus-node@workspace:packages/taleus-node":
+  version: 0.0.0-use.local
+  resolution: "taleus-node@workspace:packages/taleus-node"
+  dependencies:
+    "@eslint/js": "npm:10.0.1"
+    "@types/jest": "npm:30.0.0"
+    "@types/node": "npm:26.1.1"
+    cross-env: "npm:7.0.3"
+    eslint: "npm:10.7.0"
+    globals: "npm:17.7.0"
+    jest: "npm:30.4.2"
+    taleus: "workspace:^"
+    ts-jest: "npm:29.4.11"
+    typescript: "npm:6.0.3"
+    typescript-eslint: "npm:8.63.0"
+  bin:
+    taleus-node: ./dist/cli.js
+  languageName: unknown
+  linkType: soft
+
+"taleus@workspace:^, taleus@workspace:packages/taleus":
+  version: 0.0.0-use.local
+  resolution: "taleus@workspace:packages/taleus"
   dependencies:
     "@eslint/js": "npm:10.0.1"
     "@noble/curves": "npm:2.2.0"

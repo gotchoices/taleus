@@ -1,9 +1,9 @@
 ----
 description: The tally schema draft references several core tables and fields that were never actually defined, so it does not stand on its own yet.
-files: schema/draft1.qsql
+files: packages/taleus/schema/draft1.qsql
 ----
 
-`schema/draft1.qsql` is an early draft. Several constraints reference symbols that no table in the file defines:
+`packages/taleus/schema/draft1.qsql` is an early draft. Several constraints reference symbols that no table in the file defines:
 
 - `TallyCore` (the founding-fields table whose hash is the tally CID) — referenced by `TallyContractProposal`, `TallyContract`, `TradingVariable`, `Ledger`, and implied by `Stock`/`Foil`.
 - `StockSid` / `FoilSid` — referenced as if columns of `TallyCore`.

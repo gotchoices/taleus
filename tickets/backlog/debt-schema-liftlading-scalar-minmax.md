@@ -1,11 +1,11 @@
 ----
 description: One of the schema's capacity views uses a two-argument min/max the query engine doesn't actually have, so that view won't load.
-files: schema/draft1.qsql
+files: packages/taleus/schema/draft1.qsql
 ----
 
 # LiftLading uses scalar 2-arg min()/max() — unsupported by Quereus
 
-The `LiftLading` view in `schema/draft1.qsql` computes advertised lift capacity with
+The `LiftLading` view in `packages/taleus/schema/draft1.qsql` computes advertised lift capacity with
 **scalar** two-argument `max(...)` / `min(...)`:
 
 ```sql
@@ -50,4 +50,4 @@ Target)`, floored at 0.
 - Dormant for now: the schema cannot be exercised with data at all until the missing core tables
   land (`backlog/debt-schema-core-tables`, `backlog/debt-schema-tallycore-table`), so nothing
   reads `LiftLading` yet. This is schema-correctness debt, not a live bug.
-- A signpost `NOTE:` comment sits at the `LiftLading` definition in `schema/draft1.qsql`.
+- A signpost `NOTE:` comment sits at the `LiftLading` definition in `packages/taleus/schema/draft1.qsql`.

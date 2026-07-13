@@ -1,0 +1,13 @@
+{
+	"name": "taleus-app",
+	"version": "0.0.0",
+	"description": "Taleus mobile client (TypeScript + Svelte Native): embeds a Sereus cadre node and the taleus library.",
+	"license": "MIT",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "echo \"taleus-app not scaffolded yet — see feat-taleus-app-shell\"",
+		"test": "echo \"taleus-app: no tests yet\"",
+		"lint": "echo \"taleus-app: nothing to lint yet\""
+	}
+}

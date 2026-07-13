@@ -1,13 +1,13 @@
 ----
 description: Several schema rules that mean "compare against the previous row" are written in a way that accidentally compares against the row being inserted, so they can never pass — the schema needs a consistent fix.
-files: schema/draft1.qsql
+files: packages/taleus/schema/draft1.qsql
 ----
 
 # Deferred self-referential constraints read the wrong snapshot
 
 ## Background (plain language)
 
-The tally schema (`schema/draft1.qsql`) enforces its rules as SQL `CHECK` constraints. The database engine (Quereus) runs any `CHECK` that contains a sub-query **at commit time**, and at that moment a plain reference to a table (e.g. `select max(Revision) from PartyCertificate`) already **includes the row currently being inserted**. To read the state *before* this insert you must reference the pre-transaction snapshot instead: `committed.PartyCertificate`. (Verified against Quereus's own `43-transition-constraints.sqllogic` test and the `committed.<table>` pseudo-schema documented in `../quereus/docs/architecture.md`.)
+The tally schema (`packages/taleus/schema/draft1.qsql`) enforces its rules as SQL `CHECK` constraints. The database engine (Quereus) runs any `CHECK` that contains a sub-query **at commit time**, and at that moment a plain reference to a table (e.g. `select max(Revision) from PartyCertificate`) already **includes the row currently being inserted**. To read the state *before* this insert you must reference the pre-transaction snapshot instead: `committed.PartyCertificate`. (Verified against Quereus's own `43-transition-constraints.sqllogic` test and the `committed.<table>` pseudo-schema documented in `../quereus/docs/architecture.md`.)
 
 Because of this, any constraint of the form "my value must equal the previous row's value + 1" that references its own table with a *plain* reference can never be satisfied — the sub-query sees the new row, so "previous max" is the new row itself.
 

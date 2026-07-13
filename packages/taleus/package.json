@@ -1,0 +1,48 @@
+{
+	"name": "taleus",
+	"version": "0.1.0",
+	"description": "Taleus core library: tally logic, negotiation, schema, and the lift agent.",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"schema"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./crypto": {
+			"types": "./dist/crypto/index.d.ts",
+			"default": "./dist/crypto/index.js"
+		},
+		"./schema/*": "./schema/*"
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+		"lint": "eslint ./src"
+	},
+	"dependencies": {
+		"@noble/curves": "2.2.0",
+		"@noble/hashes": "2.2.0"
+	},
+	"devDependencies": {
+		"@eslint/js": "10.0.1",
+		"@types/jest": "30.0.0",
+		"@types/node": "26.1.1",
+		"cross-env": "7.0.3",
+		"eslint": "10.7.0",
+		"globals": "17.7.0",
+		"jest": "30.4.2",
+		"ts-jest": "29.4.11",
+		"typescript": "6.0.3",
+		"typescript-eslint": "8.63.0"
+	}
+}

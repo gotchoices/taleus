@@ -1,0 +1,36 @@
+{
+	"name": "taleus-node",
+	"version": "0.0.0",
+	"description": "Taleus always-on trading service: headless lift agent and /taleus/chipnet/1.0.0 endpoint, run as a client of the party's Sereus cadre.",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"bin": "./dist/cli.js",
+	"files": [
+		"dist"
+	],
+	"engines": {
+		"node": ">=18"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests",
+		"lint": "eslint ./src"
+	},
+	"dependencies": {
+		"taleus": "workspace:^"
+	},
+	"devDependencies": {
+		"@eslint/js": "10.0.1",
+		"@types/jest": "30.0.0",
+		"@types/node": "26.1.1",
+		"cross-env": "7.0.3",
+		"eslint": "10.7.0",
+		"globals": "17.7.0",
+		"jest": "30.4.2",
+		"ts-jest": "29.4.11",
+		"typescript": "6.0.3",
+		"typescript-eslint": "8.63.0"
+	}
+}

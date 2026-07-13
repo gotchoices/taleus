@@ -1,11 +1,11 @@
 description: A party can dodge a credit-limit reduction by dating a payment as if it were signed before the reduction took effect — decide how to stop that.
 prereq:
-files: schema/draft1.qsql
+files: packages/taleus/schema/draft1.qsql
 difficulty: medium
 ----
 ## Problem
 
-The credit gate (`Ledger.WithinCreditLimits`, `schema/draft1.qsql`) decides how much a
+The credit gate (`Ledger.WithinCreditLimits`, `packages/taleus/schema/draft1.qsql`) decides how much a
 party may owe by looking up the credit limit **in force as of the chit's own signed
 `Date`**. That date was chosen deliberately to keep the check deterministic (no `now()`),
 but it is asserted by the party issuing the chit and is otherwise unconstrained:

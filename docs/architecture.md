@@ -27,7 +27,10 @@ What carries over unchanged: the stock/foil tally model, chit semantics (signed 
 
 ```mermaid
 graph TD
-    App["Taleus App (Svelte Native)"] --> Lib["Taleus library<br/>tally logic, negotiation, lift agent"]
+    App["taleus-app (Svelte Native)<br/>mobile client, best-effort agent"] --> Lib["taleus library<br/>tally logic, negotiation, lift agent, schema"]
+    Node["taleus-node<br/>always-on trading service"] --> Lib
+    App --> Sereus
+    Node -. client of .-> Sereus
     Lib --> CN["ChipNet<br/>route discovery + lift consensus"]
     Lib --> Sereus["Sereus (@serfab/cadre-core, quereus-plugin-sereus)<br/>cadres, strands, formation, hibernation"]
     CN --> Sereus
@@ -36,6 +39,10 @@ graph TD
     Q --> O
     O --> L["libp2p<br/>transport, NAT traversal, relays, encryption"]
 ```
+
+Taleus ships as a small monorepo (`packages/`): the platform-neutral **`taleus`** library plus two assemblies that consume it — the **`taleus-app`** mobile client (embeds a cadre node directly) and the **`taleus-node`** always-on trading service. Both are peers built on the same library; neither is a fork of Sereus's own node packages.
+
+Taleus is more than a passive sApp. A pure sApp is a schema plus a client UI over generic strands; Taleus additionally runs **node-resident** logic — the always-on lift agent and the `/taleus/chipnet/1.0.0` peer protocol — that the platform does not model. That extra logic lives in `taleus-node`. For v1 it runs as a **client of the party's Sereus cadre** (it connects to a running cadre node to reach the tally/portfolio strands and opens the ChipNet transport itself), *not* as an embedded cadre plugin. Folding the agent into the cadre process as a Sereus plugin needs a plugin runtime Sereus does not yet expose, so it is deferred; keeping the service a separate client removes that dependency. The phone (`taleus-app`) embeds a cadre node and runs the agent best-effort while awake; a party wanting reliable lift participation adds a `taleus-node` to its cadre.
 
 - **Sereus** provides invitation-based formation, per-strand libp2p networks, membership/RBAC, multi-device cadres, hibernation, and mobile wake. See [`../../sereus/docs/architecture.md`](../../sereus/docs/architecture.md).
 - **Quereus** executes the Taleus sApp schema. Its `verify()`-gated CHECK constraints are the enforcement point for all tally cryptography — every insert must carry a valid signature or the distributed transaction fails.
@@ -59,7 +66,7 @@ graph TD
 Each tally maps to exactly one Sereus strand:
 
 - **Closed strand, two members.** The strand carries a membership key; only the two parties (and their cadre nodes) can read or write it. The cohort is the union of both parties' cadres, so the tally survives any single device being offline.
-- **sApp schema.** The strand applies the Taleus schema ([`schema/`](../schema/)) alongside the standard Sereus `Strand` membership schema. All tally rules live in the schema as constraints — there is no trusted server to enforce them.
+- **sApp schema.** The strand applies the Taleus schema ([`packages/taleus/schema/`](../packages/taleus/schema/)) alongside the standard Sereus `Strand` membership schema. All tally rules live in the schema as constraints — there is no trusted server to enforce them.
 - **Latency hint `interactive`.** A party may hold hundreds of tallies; nearly all hibernate nearly all the time. Sereus's hibernation system (check-in wake, push wake to suspended phones) brings a tally strand online when a chit, negotiation step, or lift touches it.
 - **50/50 governance.** Both parties' cadres participate in the strand's Optimystic cohort. Neither party can unilaterally rewrite history: rows are insert-only and every mutation is signature-gated by the schema, so even a party whose nodes outnumber the other's cannot forge the other's signature.
 
@@ -82,7 +89,7 @@ Progressive disclosure: certificates are revisioned, so a party can start minima
 
 ## Schema and Integrity Model
 
-The schema ([`schema/`](../schema/)) follows a few uniform rules:
+The schema ([`packages/taleus/schema/`](../packages/taleus/schema/)) follows a few uniform rules:
 
 - **Insert-only.** Tally tables carry `constraint InsertOnly check (0) on delete, update`. History is never rewritten; state advances by appending revisions.
 - **Signature-gated inserts.** Every row's validity constraint recomputes a digest over the row's semantic fields and verifies the signature against the correct key. Because a party recognizes a *set* of authorized keys (not one "current" key), each signed row names the key that signed it in a `SignerKey` column; the constraint checks that `SignerKey` is in that party's authorized set (the `AuthorizedKey` view) at insert, then verifies the signature against it. The set's roots are resolved *from the database itself* — the invitation key for the genesis `PartyKey`, and an already-authorized key for every later add. A row that doesn't verify never commits, on any honest node.
@@ -135,11 +142,11 @@ The **portfolio** is a party's private financial state — the list of tallies i
 
 ### Why a single-party strand
 
-The portfolio lives in its own **single-party Sereus strand** — a closed strand whose only member is this party, carrying the Taleus portfolio schema ([`schema/portfolio.qsql`](../schema/portfolio.qsql)). A single-member closed strand is a supported Sereus configuration (the founder-bootstrap / solo path), and its cohort is just this party's own cadre, so ordinary strand replication carries the portfolio to every one of the party's nodes, including the always-on lift-agent node.
+The portfolio lives in its own **single-party Sereus strand** — a closed strand whose only member is this party, carrying the Taleus portfolio schema ([`packages/taleus/schema/portfolio.qsql`](../packages/taleus/schema/portfolio.qsql)). A single-member closed strand is a supported Sereus configuration (the founder-bootstrap / solo path), and its cohort is just this party's own cadre, so ordinary strand replication carries the portfolio to every one of the party's nodes, including the always-on lift-agent node.
 
 The alternative — stuffing this state into the Sereus **control network** (the private Optimystic network of only the party's own cadre nodes) — was rejected: the control network's schema is platform-owned (`Strand`, `AuthorityKey`, `CadrePeer`, …; see the Sereus docs, *Control Network*), and Sereus's own guidance keeps application data in an sApp strand, not the control schema. A single-party sApp strand cleanly separates app state, reuses strand replication + hibernation, and is naturally caught by the phone's existing `sAppId:taleus` strand filter.
 
-**Same `sAppId`, two schemas.** The phone runs one cadre node with one strand filter (`sAppId:taleus`), so both the portfolio strand and every tally strand share `sAppId = taleus` to be picked up. `sAppId` is a filter tag, not a schema identity — each `Strand` row names its own sApp schema, so one `taleus` sAppId hosts both the two-party tally schema ([`schema/draft1.qsql`](../schema/draft1.qsql)) and the single-party portfolio schema. The app tells a portfolio strand from a tally strand by the `PortfolioCore` marker row (below), not by member count — a tally mid-formation is also briefly one member.
+**Same `sAppId`, two schemas.** The phone runs one cadre node with one strand filter (`sAppId:taleus`), so both the portfolio strand and every tally strand share `sAppId = taleus` to be picked up. `sAppId` is a filter tag, not a schema identity — each `Strand` row names its own sApp schema, so one `taleus` sAppId hosts both the two-party tally schema ([`packages/taleus/schema/draft1.qsql`](../packages/taleus/schema/draft1.qsql)) and the single-party portfolio schema. The app tells a portfolio strand from a tally strand by the `PortfolioCore` marker row (below), not by member count — a tally mid-formation is also briefly one member.
 
 ### Tables
 
@@ -192,7 +199,7 @@ A denomination is named by a **namespaced identifier** — a string dispatched b
 - **`iso4217:<AAA>`** — a national currency, where `<AAA>` is a three-uppercase-letter [ISO 4217](https://en.wikipedia.org/wiki/ISO_4217) code (`iso4217:USD`, `iso4217:EUR`). The code is validated by *shape only* (three uppercase letters), never against a currency table, so a private or future code still passes.
 - **`cid:<contentaddress>`** — a custom or open-ended unit, identified by the content address (CID) of a **denomination descriptor** document. The address must be non-empty.
 
-The `ValidDenomination` check (see [`schema/draft1.qsql`](../schema/draft1.qsql)) enforces exactly these three shapes at proposal and at acceptance; malformed identifiers (`usd`, `iso4217:US`, `iso4217:usd`, an empty `cid:`) are rejected.
+The `ValidDenomination` check (see [`packages/taleus/schema/draft1.qsql`](../packages/taleus/schema/draft1.qsql)) enforces exactly these three shapes at proposal and at acceptance; malformed identifiers (`usd`, `iso4217:US`, `iso4217:usd`, an empty `cid:`) are rejected.
 
 **Custom-unit collisions are impossible by construction.** Content-addressing makes a `cid:` identifier globally unique: two parties who reference the same descriptor reference the same CID, and two different descriptors cannot produce the same CID. The descriptor is minimal — `{ name, symbol, description, canonicalUnit }` — stored content-addressed (Optimystic). Both parties fetch it by CID *during negotiation* to confirm they mean the same unit; if either cannot fetch it or disagrees, the tally negotiation fails. This is a negotiation-time concern, not a runtime ledger constraint — the schema never fetches a CID. The descriptor's human-readable label is display-only, so label collisions are harmless.
 
@@ -202,7 +209,7 @@ The `ValidDenomination` check (see [`schema/draft1.qsql`](../schema/draft1.qsql)
 
 ### Exchange rate quotes
 
-A party that holds tallies in more than one denomination stores its conversion policy as **exchange rate quotes** in its portfolio ([`schema/portfolio.qsql`](../schema/portfolio.qsql), `ExchangeRateQuote`). A quote is *private* — read only by the party's own lift agent at decision time, never shared into a tally strand. This is the key distinction from a **trading variable** (`TradingVariable`), which a party publishes *into the shared tally strand* for the counterparty to read: an exchange rate is the party's own internal cost of crossing between two of its denominations, so no counterparty ever sees it.
+A party that holds tallies in more than one denomination stores its conversion policy as **exchange rate quotes** in its portfolio ([`packages/taleus/schema/portfolio.qsql`](../packages/taleus/schema/portfolio.qsql), `ExchangeRateQuote`). A quote is *private* — read only by the party's own lift agent at decision time, never shared into a tally strand. This is the key distinction from a **trading variable** (`TradingVariable`), which a party publishes *into the shared tally strand* for the counterparty to read: an exchange rate is the party's own internal cost of crossing between two of its denominations, so no counterparty ever sees it.
 
 Each quote is **directional**: a pair needs two rows (`From→To` and `To→From`) because the spread is asymmetric. `RateNum/RateDen` is the effective rate — a rational for integer-exact math — with the party's conversion cost (spread) already folded in, the multi-denomination generalization of a trading variable's `reward`. Optional `Mid*`/`SpreadPpm` fields record the mid-market rate and applied spread for display and for re-deriving the effective rate; a negative spread (a subsidy) is permitted, mirroring `reward`'s signed semantics.
 
@@ -222,7 +229,7 @@ Discovery accumulates `req` across every boundary end-to-end; the value at the o
 
 **Who absorbs the rounding dust: the originator** — the payer for a linear lift or payment, the initiator for a circular clearing lift. Every intermediary and the payee receive at least their exact integer due; the per-edge ceiling dust accrues upstream to the originator and is disclosed as part of the exact source cost during discovery. A route of N conversion boundaries can therefore add up to N sub-units of extra originator cost — bounded and acceptable. Commit then binds each edge's integer units in that edge's own denomination (the ceiled values), so no participant bears rate movement after signing; a quote that expires between discovery and commit still binds the discovered terms, the quoting party bearing the movement within the window it chose.
 
-**Overflow.** `req_out × RateNum × 10^(s_in)` overflows 64 bits on a large amount × large rate × large scale, so the conversion helper reduces `RateNum/RateDen` to lowest terms and computes the intermediate product with **BigInt** (cross-platform), taking the ceiling via integer division. This is a fixed decision, recorded as a `NOTE:` at the rate definition in [`schema/portfolio.qsql`](../schema/portfolio.qsql) and implemented at [`src/lift/convert.ts`](../src/lift/convert.ts) (`convertBoundary`) — a pure function with no ChipNet or network dependency, so it does not regress to a native 64-bit multiply. The lift agent (`feat-chipnet-integration`) is its consumer, not its home.
+**Overflow.** `req_out × RateNum × 10^(s_in)` overflows 64 bits on a large amount × large rate × large scale, so the conversion helper reduces `RateNum/RateDen` to lowest terms and computes the intermediate product with **BigInt** (cross-platform), taking the ceiling via integer division. This is a fixed decision, recorded as a `NOTE:` at the rate definition in [`packages/taleus/schema/portfolio.qsql`](../packages/taleus/schema/portfolio.qsql) and implemented at [`packages/taleus/src/lift/convert.ts`](../packages/taleus/src/lift/convert.ts) (`convertBoundary`) — a pure function with no ChipNet or network dependency, so it does not regress to a native 64-bit multiply. The lift agent (`feat-chipnet-integration`) is its consumer, not its home.
 
 A **missing or expired quote** at a boundary means that edge cannot convert, so discovery prunes the route — the agent never fabricates a rate.
 
@@ -282,10 +289,10 @@ Which cadre node speaks for a party: the **always-on lift-agent node** by defaul
 Discovery walks **backward from the payee** (§ [Cross-denomination conversion](#cross-denomination-conversion)). ChipNet carries the mechanics; Taleus fills the `L`-intent terms and the negotiate callbacks:
 
 - Each hop's `L` terms advertise, for that edge: **denomination + scale** (from the tally's `TallyContract`), **movable capacity and fee** (from the strand's `LiftLading` view, computed off the *reserved* balance so an open pledge already shrinks the advertised room), and the intermediary's **exchange-rate quote** for the conversion boundary it straddles (from its private portfolio `ExchangeRateQuote`; never shared into a strand).
-- `NegotiateIntentFunc`/`NegotiatePlanFunc` (Taleus code) accumulate the **conversion product** end-to-end using the exact integer formula `req_in = ceil( req_out · RateNum · 10^(s_in) / ( RateDen · 10^(s_out) ) )` — one ceiling per boundary, BigInt intermediate (§ [Cross-denomination conversion](#cross-denomination-conversion); the reduce-to-lowest-terms overflow rule is a `NOTE:` in `schema/portfolio.qsql`). Trading-variable fees compose per the existing `LiftLading` rule alongside the conversion. A **missing or expired quote** at a boundary prunes the route — the agent never fabricates a rate.
+- `NegotiateIntentFunc`/`NegotiatePlanFunc` (Taleus code) accumulate the **conversion product** end-to-end using the exact integer formula `req_in = ceil( req_out · RateNum · 10^(s_in) / ( RateDen · 10^(s_out) ) )` — one ceiling per boundary, BigInt intermediate (§ [Cross-denomination conversion](#cross-denomination-conversion); the reduce-to-lowest-terms overflow rule is a `NOTE:` in `packages/taleus/schema/portfolio.qsql`). Trading-variable fees compose per the existing `LiftLading` rule alongside the conversion. A **missing or expired quote** at a boundary prunes the route — the agent never fabricates a rate.
 - The value at the originator's own edge is the exact source-denomination cost, presented before commit. The **originator absorbs the per-edge rounding dust** (payer for a payment, initiator for a circular clearing lift). A single-denomination circular lift is the degenerate case: all rates 1, exactly MyCHIPs behavior.
 
-Landed in [`src/lift/`](../src/lift/): `terms.ts` (L/C term population from `TallyContract`/`LiftLading`/`ExchangeRateQuote`), `discovery.ts` (the pure backward conversion-product + fee accumulator and negotiate callbacks), and `agent.ts` (the unidirectional driver, `LiftJournal`-backed originator state, route selection, source-cost surfacing). As with the transport, the ChipNet **search engine** itself is an injected port (`DiscoveryEngine`) rather than a bound dependency — `chipnet` is still unpublished (`blocked/chipnet-npm-publish-needed`) and its bidirectional search is unimplemented upstream regardless — so production wraps ChipNet's unidirectional search over `/taleus/chipnet/1.0.0`, while the accumulation/selection/costing logic is bound and tested now.
+Landed in [`packages/taleus/src/lift/`](../packages/taleus/src/lift/): `terms.ts` (L/C term population from `TallyContract`/`LiftLading`/`ExchangeRateQuote`), `discovery.ts` (the pure backward conversion-product + fee accumulator and negotiate callbacks), and `agent.ts` (the unidirectional driver, `LiftJournal`-backed originator state, route selection, source-cost surfacing). As with the transport, the ChipNet **search engine** itself is an injected port (`DiscoveryEngine`) rather than a bound dependency — `chipnet` is still unpublished (`blocked/chipnet-npm-publish-needed`) and its bidirectional search is unimplemented upstream regardless — so production wraps ChipNet's unidirectional search over `/taleus/chipnet/1.0.0`, while the accumulation/selection/costing logic is bound and tested now.
 
 ### Referee model and the commit seam
 
@@ -317,7 +324,7 @@ ChipNet injects all persistence, so Taleus backs its state interfaces with exist
 - **Originator/agent discovery + correlation state** → the portfolio `LiftJournal` (which lift, which edges, what phase). This is the private map the agent drives discovery and commit from; it is reconstructible only as bookkeeping, so it is not authoritative for settlement.
 - **Per-edge participant/commit state** (`TrxParticipantState`) → the tally strand's `PendingLift` (the pledge) and `Ledger` (the finalize), plus `LiftVoid`. The authoritative, consensus-replicated, signature-gated state lives here — the schema, not the agent, is the source of truth for whether an edge settled.
 
-Landed in [`src/lift/`](../src/lift/): `digest.ts` (the cross-primitive lift-terms/void digest — the byte-parity contract with the schema's `Digest()`, plus the hex key/signature codec), `referee.ts` (the single-referee dual signature: ChipNet record signature + per-edge Taleus signatures), and `commit.ts` (the pledge writer, the `EdgeStrand`/`ConsensusEngine` ports backing `TrxParticipantState`/`TrxParticipantResource`, the idempotent signature-verifying `LiftParticipant`, and the originator `LiftCommit` driver). As with discovery and the transport, ChipNet's consensus and the Quereus strand are **injected ports** — `chipnet` is still unpublished (`blocked/chipnet-npm-publish-needed`) and no Quereus runner is wired yet — so the settlement logic (digest parity, dual-signature, finalize/void exclusion, idempotency, reserved-gate interaction) is bound and tested now against in-memory, schema-emulating doubles; the referee whole-record commit-digest preimage and the live Quereus insert land when those dependencies do.
+Landed in [`packages/taleus/src/lift/`](../packages/taleus/src/lift/): `digest.ts` (the cross-primitive lift-terms/void digest — the byte-parity contract with the schema's `Digest()`, plus the hex key/signature codec), `referee.ts` (the single-referee dual signature: ChipNet record signature + per-edge Taleus signatures), and `commit.ts` (the pledge writer, the `EdgeStrand`/`ConsensusEngine` ports backing `TrxParticipantState`/`TrxParticipantResource`, the idempotent signature-verifying `LiftParticipant`, and the originator `LiftCommit` driver). As with discovery and the transport, ChipNet's consensus and the Quereus strand are **injected ports** — `chipnet` is still unpublished (`blocked/chipnet-npm-publish-needed`) and no Quereus runner is wired yet — so the settlement logic (digest parity, dual-signature, finalize/void exclusion, idempotency, reserved-gate interaction) is bound and tested now against in-memory, schema-emulating doubles; the referee whole-record commit-digest preimage and the live Quereus insert land when those dependencies do.
 
 ### Why reuse, not reboot
 
@@ -332,9 +339,11 @@ Known constraints carried into implementation: ChipNet's **bidirectional search 
 
 ## Client Application
 
-- **TypeScript + Svelte Native** (NativeScript). The app embeds a cadre node directly (`@serfab/cadre-core`), with strand filter `sAppId:taleus` so it only participates in tally strands plus the user's control network.
-- Mobile nodes run the **transaction profile** (no storage rings); users who want durability add a cloud/NAS/home node to their cadre (`cadre-host`, `cadre-cli`, or a provider) — that node replicates every tally strand and serves as the always-on lift agent.
-- Storage on device via Quereus's NativeScript plugin (`quereus-plugin-nativescript-sqlite`); the Taleus library itself is platform-neutral and also runs in Node (headless agent) and the browser.
+The mobile client is the **`taleus-app`** package.
+
+- **TypeScript + Svelte Native** (NativeScript). The app embeds a cadre node directly (`@serfab/cadre-core`), with strand filter `sAppId:taleus` so it only participates in tally strands plus the user's control network. It consumes the platform-neutral **`taleus`** library for tally logic, negotiation, and a best-effort lift agent while the phone is awake.
+- Mobile nodes run the **transaction profile** (no storage rings); users who want durability and reliable lift participation add an always-on node to their cadre — a **`taleus-node`** trading service (the always-on lift agent + `/taleus/chipnet/1.0.0` endpoint) running alongside a durable cadre node (`cadre-host`, `cadre-cli`, or a provider) that replicates every tally strand.
+- Storage on device via Quereus's NativeScript plugin (`quereus-plugin-nativescript-sqlite`); the `taleus` library itself is platform-neutral and also runs in Node (the `taleus-node` headless agent) and the browser.
 - App surfaces: tally list + balances (per denomination), formation (QR invite/scan), negotiation (certificates, contract, terms), payments/invoices, lift activity, and cadre management (delegated to Sereus UX patterns).
 
 ## Tally Lifecycle

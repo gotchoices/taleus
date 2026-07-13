@@ -1,6 +1,6 @@
 description: When the neutral third party overseeing a value-clearing lift goes silent forever, the credit each participant set aside for that lift is frozen with no way to reclaim it — design a safe way to release it.
 prereq: feat-schema-lift-chits
-files: schema/draft1.qsql
+files: packages/taleus/schema/draft1.qsql
 ----
 
 ## The problem

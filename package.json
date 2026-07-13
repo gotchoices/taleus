@@ -1,34 +1,21 @@
 {
-	"name": "taleus",
-	"version": "0.1.0",
-	"description": "Taleus: MyCHIPs reboot on Sereus. Tally logic, negotiation, and the lift agent.",
+	"name": "taleus-monorepo",
+	"version": "0.0.0",
+	"description": "Taleus: MyCHIPs reboot on Sereus. Monorepo root.",
 	"license": "MIT",
 	"private": true,
 	"type": "module",
 	"packageManager": "yarn@4.12.0",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"default": "./dist/index.js"
-		},
-		"./crypto": {
-			"types": "./dist/crypto/index.d.ts",
-			"default": "./dist/crypto/index.js"
-		}
-	},
+	"workspaces": [
+		"packages/*"
+	],
 	"engines": {
 		"node": ">=18"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
-		"lint": "eslint ./src"
-	},
-	"dependencies": {
-		"@noble/curves": "2.2.0",
-		"@noble/hashes": "2.2.0"
+		"build": "yarn workspaces foreach --all --topological run build",
+		"test": "yarn workspaces foreach --all run test",
+		"lint": "yarn workspaces foreach --all run lint"
 	},
 	"devDependencies": {
 		"@eslint/js": "10.0.1",

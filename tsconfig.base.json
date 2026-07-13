@@ -6,8 +6,6 @@
 		"moduleResolution": "NodeNext",
 		"forceConsistentCasingInFileNames": true,
 		"declaration": true,
-		"rootDir": "./src",
-		"outDir": "./dist",
 		"strict": true,
 		"isolatedModules": true,
 		"noImplicitOverride": true,
@@ -15,9 +13,6 @@
 		"noUnusedParameters": true,
 		"esModuleInterop": true,
 		"skipLibCheck": true,
-		"sourceMap": true,
-		"types": ["jest", "node"]
-	},
-	"include": ["src/**/*.ts"],
-	"exclude": ["node_modules", "dist"]
+		"sourceMap": true
+	}
 }

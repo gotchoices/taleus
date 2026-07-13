@@ -1,8 +1,8 @@
 ----
 description: The tally's core identity record — the two parties' IDs and the tally's content hash — is used everywhere in the schema but the table that holds it was never actually written.
-files: schema/draft1.qsql, docs/architecture.md
+files: packages/taleus/schema/draft1.qsql, docs/architecture.md
 ----
-Almost every table in `schema/draft1.qsql` reads `TallyCore` — its `StockSid`, `FoilSid`, and `Cid` columns anchor party identity and every signature digest (e.g. `TradingVariable`, `TallyContract`, `Ledger`, `PartyKey.TwoParties` indirectly, and the new `CreditTerms`). `docs/architecture.md` § *Schema and Integrity Model* describes it: "Tally identity: the founding fields (party `Sid`s, protocol version, creation time) whose hash is the tally CID that all other signatures bind to. Single row."
+Almost every table in `packages/taleus/schema/draft1.qsql` reads `TallyCore` — its `StockSid`, `FoilSid`, and `Cid` columns anchor party identity and every signature digest (e.g. `TradingVariable`, `TallyContract`, `Ledger`, `PartyKey.TwoParties` indirectly, and the new `CreditTerms`). `docs/architecture.md` § *Schema and Integrity Model* describes it: "Tally identity: the founding fields (party `Sid`s, protocol version, creation time) whose hash is the tally CID that all other signatures bind to. Single row."
 
 But there is no `create table TallyCore` anywhere in the schema. Every reference is a forward reference to a table that does not exist, so the schema cannot be created or exercised as-is. This is a pre-existing gap, not introduced by any one feature — it surfaced while planning `feat-schema-credit-terms`.
 
