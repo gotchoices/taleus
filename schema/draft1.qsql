@@ -539,6 +539,38 @@ create table CreditTerms (
     constraint InsertOnly check on delete, update (0)
 );
 
+-- Signed close request (feat-schema-tally-close): either party may sign one row to move the tally to
+-- Closing. Unilateral by design AND safe -- Closing does only two things: it FREEZES balance growth (no
+-- new chit from either side may move the settled balance away from zero -- no new credit either direction,
+-- a right each party already holds by setting CreditTerms.CreditLimit to the current balance) and it always
+-- PERMITS balance-reducing activity (direct chits AND lift pledges), so whoever holds a positive balance can
+-- always be paid down or lift its value out. A close therefore never traps the counterparty: Closed is
+-- reached only when the settled balance is ACTUALLY zero (CloseState). Setting CreditTerms.CreditLimit = 0 is
+-- NOT a close: close is its own separately-signed table, so zero credit leaves the tally Open (CloseState =
+-- 'open', balance still payable, credit restorable by a later CreditTerms revision). Mirrors the Invoice /
+-- InvoiceDecline signer pattern: SignerKey resolves against the requesting side's own AuthorizedKey set, and
+-- the Cid-bound digest stops a close request being replayed into another tally. See docs/architecture.md
+-- "Tally close".
+-- NOTE: no reopen/withdraw path; if wind-down needs to be reversible, add a signed CloseWithdrawal that
+-- supersedes -- see backlog if it comes up.
+create table CloseRequest (
+    Requester text check (Requester in ('S','F')),  -- party requesting closure
+    Date text check (ValidDate(Date)),
+    SignerKey text,        -- authorized PartyKey of the requesting party
+    Signature text,        -- requester signs Digest(Cid, Requester, Date)
+
+    primary key (Requester),   -- at most one close request per party; either or both may file
+    constraint SignerAuthorized check on insert (New.SignerKey in (
+        select PublicKey from AuthorizedKey AK
+        where AK.Sid = (select case when New.Requester = 'S' then StockSid else FoilSid end from TallyCore)
+    )),
+    constraint SignatureValid check on insert (SignatureValid(
+        Digest((select Cid from TallyCore), Requester, Date),
+        Signature, New.SignerKey
+    )),
+    constraint InsertOnly check on delete, update (0)
+);
+
 -- Effective (latest-revision) trading variables per party.
 -- A party that has published none trades at the MyCHIPs defaults (all zero):
 -- lifts may pay its accumulated balance down to zero for free, and accumulate nothing beyond that.
@@ -593,6 +625,23 @@ create view OpenPendingLift as
     from PendingLift PL
     where not exists (select 1 from Ledger L where L.LiftId = PL.LiftId and L.Kind = 'lift')
       and not exists (select 1 from LiftVoid V where V.LiftId = PL.LiftId);
+
+-- Derived close lifecycle (feat-schema-tally-close): open / closing / closed, one row (TallyCore is one row).
+--   'open'    -- no CloseRequest row filed. Does NOT distinguish Forming / Open / Void: those depend on
+--                contract/formation state the schema does not materialize today (out of scope).
+--   'closing' -- a CloseRequest row exists but the tally is not yet a stable zero.
+--   'closed'  -- terminal, stable: the SETTLED balance (raw Ledger.Balance, latest row) is zero AND no
+--                pending lift is still open. The open-pledge test is load-bearing -- without it a still-open
+--                pledge could later finalize and bump a "closed" tally back off zero, so 'closed' would not
+--                be stable. Reads settled Ledger.Balance (not reserved) so a finalize can never unsettle it.
+create view CloseState as
+    select case
+        when not exists (select 1 from CloseRequest) then 'open'
+        when coalesce((select Balance from Ledger order by Number desc limit 1), 0) = 0
+             and not exists (select 1 from OpenPendingLift) then 'closed'
+        else 'closing'
+    end as State
+    from TallyCore;   -- single row
 
 -- Reserved balance = settled signed balance + every OPEN pending-lift delta, stock-perspective (same sign
 -- convention as raw Ledger.Balance: foil-issued +Units, stock-issued -Units, matching BalanceCorrect).
@@ -845,6 +894,29 @@ create table Ledger (
                 order by CT.Revision desc limit 1), 0)
         )
     ),
+    -- Closing gate (feat-schema-tally-close): while any CloseRequest is filed, a new DIRECT chit may only
+    -- move the settled balance TOWARD zero -- no new credit in either direction. Finalized lifts (Kind='lift')
+    -- are EXEMPT, same reasoning as WithinCreditLimits / WithinReservedCredit: a referee-committed finalize
+    -- must always settle or cross-strand atomicity breaks; the pledge was gated when made. P = prior settled
+    -- balance (matching BalanceCorrect's reference form), B = New.Balance. Same-sign / bounded form, no abs()
+    -- (Quereus scalar-abs availability unconfirmed): reduce a positive balance toward 0, or a negative one
+    -- toward 0, and forbid a sign-flip overshoot (a chit flipping +30 -> -5 would mint new opposite-direction
+    -- credit). At P = 0 both arms are false => every insert rejected, which is exactly the Closed "no further
+    -- ledger inserts" rule -- no separate constraint. Inlined per use.
+    -- NOTE: commit-time deferred CHECK reading `exists (select 1 from CloseRequest)` -- a balance-growing chit
+    -- whose transaction read-snapshot predates the close-request commit could slip through under snapshot-only
+    -- validation. SAME open isolation question already flagged for PartyKeyRevocation.NotLastKey
+    -- (schema/draft1.qsql:137-146) and Ledger.InvoiceLink / LiftFinalize; not re-solved here.
+    constraint ClosingReducesBalance check on insert (
+        New.Kind = 'lift'                                                               -- finalize exempt (atomicity)
+        or not exists (select 1 from CloseRequest)                                      -- not Closing -> unrestricted
+        or (Coalesce((select Balance from Ledger where Number = New.Number - 1), 0) > 0 -- reduce positive toward 0
+            and New.Balance >= 0
+            and New.Balance < Coalesce((select Balance from Ledger where Number = New.Number - 1), 0))
+        or (Coalesce((select Balance from Ledger where Number = New.Number - 1), 0) < 0 -- reduce negative toward 0
+            and New.Balance <= 0
+            and New.Balance > Coalesce((select Balance from Ledger where Number = New.Number - 1), 0))
+    ),
     -- Kind='direct' only.
     -- NOTE (pre-existing, unrelated to lifts): this references IssuerSid, but the column is Issuer ('S'/'F')
     -- and there is no IssuerSid column -- looks like a draft placeholder. NOT touched by this ticket (out of
@@ -995,6 +1067,25 @@ create table PendingLift (
             where CT.Sid = (select FoilSid from TallyCore)
               and julianday(CT.EffectiveDate) <= julianday(New.Date)
             order by CT.Revision desc limit 1), 0)
+    ),
+    -- Closing gate (feat-schema-tally-close): while any CloseRequest is filed, a new pledge may only move the
+    -- RESERVED balance TOWARD zero -- mirrors putting the direct-chit gate on settled, the pledge gate on
+    -- reserved (same split as the two credit gates). ReservedBalance read with a plain ref already includes
+    -- this new pledge, so NR = reserved WITH this pledge, D = New.Units * (F:+1, S:-1) = this pledge's delta,
+    -- PR = NR - D = prior reserved. Same-sign / bounded form, no abs(). No finalize exemption applies (a
+    -- PendingLift insert is always a fresh pledge, never a finalize; LiftVoid needs no gate -- a void only
+    -- releases reservation). NR / D / PR inlined per use.
+    -- NOTE: commit-time deferred CHECK reading `exists (select 1 from CloseRequest)` -- SAME open isolation
+    -- question already flagged for PartyKeyRevocation.NotLastKey (schema/draft1.qsql:137-146) and the
+    -- WithinReservedCredit gate above; not re-solved here.
+    constraint ClosingReducesReserved check on insert (
+        not exists (select 1 from CloseRequest)
+        or ((select Balance from ReservedBalance) - (New.Units * case when New.Issuer = 'F' then 1 else -1 end) > 0  -- PR > 0
+            and (select Balance from ReservedBalance) >= 0                                                           -- NR >= 0
+            and (select Balance from ReservedBalance) < (select Balance from ReservedBalance) - (New.Units * case when New.Issuer = 'F' then 1 else -1 end))  -- NR < PR
+        or ((select Balance from ReservedBalance) - (New.Units * case when New.Issuer = 'F' then 1 else -1 end) < 0  -- PR < 0
+            and (select Balance from ReservedBalance) <= 0                                                           -- NR <= 0
+            and (select Balance from ReservedBalance) > (select Balance from ReservedBalance) - (New.Units * case when New.Issuer = 'F' then 1 else -1 end))  -- NR > PR
     ),
     constraint InsertOnly check on delete, update (0)
 );
