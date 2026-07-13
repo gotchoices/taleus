@@ -49,7 +49,7 @@ graph TD
 - **Denomination**: the unit of account a tally is kept in — CHIPs, a national currency, or any unit the parties agree on. Chosen in the contract; fixed for the tally's life.
 - **Chit / Ledger entry**: a signed pledge of value from one party to the other, as an integer count of the denomination's smallest unit. The net sum of chits is the tally balance.
 - **Contract**: the legal agreement governing the tally, referenced by content address (CID) and accepted by both signatures. Its arguments carry the denomination and each party's credit terms.
-- **Credit terms**: limits and call terms each party extends to the other.
+- **Credit terms**: the credit limit and notice (call) period each party extends to the other. **Unilateral** — only the grantor signs — so they live in their own per-party, revisioned `CreditTerms` table, not as contract columns; the bilateral contract covers the terms in force at acceptance by referencing each party's operative revision. This is the split from the **denomination**, a *bilateral* contract argument both parties sign (one unit binds both sides of every chit) that attaches as `TallyContract` columns.
 - **Trading variables**: per-party automation parameters (`target`, `bound`, `reward`, `clutch`) that tell the lift agent what balance changes this party will accept and at what cost.
 - **Exchange rates**: per-party quotes for converting between the denominations of that party's own tallies, letting lifts cross denomination boundaries.
 - **Lift**: an atomic transaction around a cycle (or chain) in the tally graph that shifts balances without changing anyone's net worth — the credit-clearing mechanism.
@@ -75,7 +75,7 @@ Formation reuses Sereus strand formation end-to-end (the pre-Sereus "Method 6" b
    - The initiator inserts its `Stock` row: its `Sid` and the invitation *public* key, signed by its party key.
    - The invitee proves possession of the invitation secret by signing its `Foil` row with it, and registers its `PartyKey` revision 1 — the genesis of its authorized-key set (also validated against the invitation key).
    - Each party publishes a `PartyCertificate` (identity disclosure — progressively enriched by revision).
-4. **Negotiation.** Either party proposes a contract (`TallyContractProposal`) with its arguments — denomination, credit terms; the tally becomes operative when both signatures land on the same contract revision (`TallyContract`).
+4. **Negotiation.** Each party first publishes its own `CreditTerms` (a unilateral, grantor-signed revision stating the credit limit and notice period it extends to the counterparty — at least one per party, even if zero). Either party then proposes a contract (`TallyContractProposal`) whose arguments are the *bilateral* terms — the denomination — plus a reference to each party's operative `CreditTerms` revision; the tally becomes operative when both signatures land on the same contract revision (`TallyContract`), whose digest covers those referenced revisions. Credit terms revise later (with notice-delayed effect) without renegotiating the contract.
 5. **Open.** Ledger entries are now accepted.
 
 Progressive disclosure: certificates are revisioned, so a party can start minimal and disclose more as trust develops; the counterparty simply declines to countersign a contract until satisfied.
@@ -101,8 +101,9 @@ Tables:
 | `PartyKeyRevocation` | Forward-only revocation: names a key to remove from a party's authorized set, signed by an authorized key. Past rows signed by the revoked key stay valid; only future inserts by it are rejected. A guard forbids emptying the set. |
 | `PartyKeyAdoption` | Counterparty re-key ceremony: the one path that adds a key to a party's authorized set *without* an existing key of that party. The recovering party self-signs a fresh key (possession) and the counterparty attests it with an authorized key (human trust). `Sid` is unchanged — re-keys an existing party, never a new identity. Last-resort recovery when every authorized key is lost. |
 | `PartyCertificate` | Revisioned identity disclosure per party, signed with an authorized key of the party. |
-| `TallyContractProposal` | Either party's proposal of a contract CID + arguments (denomination, credit terms) — the negotiation cursor. |
-| `TallyContract` | Bilaterally signed contract acceptances, numbered; the highest fully-signed number governs. |
+| `TallyContractProposal` | Either party's proposal of a contract CID + arguments (denomination; a reference to each party's `CreditTerms` revision) — the negotiation cursor. |
+| `TallyContract` | Bilaterally signed contract acceptances, numbered; the highest fully-signed number governs. Names each party's operative `CreditTerms` revision, folded into both signatures so the bilateral signature covers the credit terms in force at acceptance. |
+| `CreditTerms` | Each grantor's **unilateral** (grantor-signed only), revisioned credit policy: `CreditLimit` (how far the grantor lets the counterparty owe it) and `CallDays` (days of notice owed before a *restrictive* change takes effect, enforced via a signed `EffectiveDate`). Same shape as `TradingVariable`. The ledger gates every chit against the limit effective as of the chit's date. |
 | `TradingVariable` | Each party's published lift policy, revisioned: `Target` (ideal balance to accumulate via lifts), `Bound` (maximum to accrue), `Reward` (fee ratio for accumulation above target), `Clutch` (fee ratio for drops). MyCHIPs semantics, expressed from the issuing party's perspective. |
 | `Invoice` | Signed payment requests; answered by a matching chit from the payer. |
 | `Ledger` | Chits: issuer, units (positive integer, smallest denomination unit), date, reference/memo, issuer signature, chained balance. Distinguishes direct chits from lift chits, including the pending-lift state. |
@@ -208,6 +209,7 @@ A **missing or expired quote** at a boundary means that edge cannot convert, so 
 ## Ledger Operation
 
 - **Direct payment**: issuer inserts a `Ledger` row pledging `Units` to the other party, signed with one of the issuer's authorized `PartyKey`s (named in the row's `SignerKey`). Balance convention: foil-issued chits increment, stock-issued decrement (see `BalanceCorrect`).
+- **Credit gate**: every chit is rejected unless the resulting balance stays within the credit each party has extended — the `WithinCreditLimits` constraint checks the prospective balance against each grantor's limit *effective as of the chit's own signed date* (the highest-revision `CreditTerms` row whose `EffectiveDate` has arrived; no `CreditTerms` row means zero credit, so the first nonzero chit needs a published revision). Because the check is keyed to the chit's date it is deterministic. Pending lift chits fold in by construction: once written as `Ledger` rows they are already in the balance chain, so their reserved capacity counts with no extra machinery.
 - **Invoice**: requester signs an `Invoice` row; the payer answers with a chit referencing it.
 - **Lift chit**: inserted in a pending state during a lift, bound to the lift ID and referee; finalized by the referee's commit signature or voided by its timeout/abort. Pending chits reserve capacity — trading variables and credit checks see them.
 

@@ -275,6 +275,10 @@ create table TallyContractProposal (
     SequenceNumber integer,
     ContractCid text,
     Proposer text check Proposer in ('S', 'F'),
+    -- Terms revisions this proposal expects the accepted contract to lock (folded into Signature).
+    -- Load-bearing coverage is on TallyContract; the proposal carries them for a complete offer.
+    StockCreditTermsRevision integer,
+    FoilCreditTermsRevision integer,
     SignerKey text,        -- authorized PartyKey of the proposing party that signed
     Signature text,
 
@@ -286,7 +290,7 @@ create table TallyContractProposal (
         where AK.Sid = (select case when New.Proposer = 'S' then StockSid else FoilSid end from TallyCore)
     )) on insert, update,
     constraint SignatureValid check (SignatureValid(
-        Digest((select Cid from TallyCore), SequenceNumber, ContractCid, Proposer),
+        Digest((select Cid from TallyCore), SequenceNumber, ContractCid, Proposer, StockCreditTermsRevision, FoilCreditTermsRevision),
         Signature,
         New.SignerKey
     )) on insert, update
@@ -296,23 +300,33 @@ create table TallyContractProposal (
 create table TallyContract (
     Number integer,
     ContractCid text,
-    -- TODO: Credit terms (limit, call) - arguments to contract
+    -- Credit terms (limit, call) are UNILATERAL per-party policy in CreditTerms; the bilaterally
+    -- signed contract covers the terms-in-force at acceptance BY REFERENCE -- each party names its
+    -- operative CreditTerms revision here, folded into both signatures. Because CreditTerms rows are
+    -- insert-only and grantor-signed, referencing (Sid, Revision) transitively covers their content.
+    -- Later unilateral revisions do NOT touch the contract. (The bilateral denomination argument, by
+    -- contrast, will attach as its OWN columns here -- feat-denomination-argument.)
+    StockCreditTermsRevision integer,
+    FoilCreditTermsRevision integer,
     StockSignerKey text,   -- authorized PartyKey of StockSid that signed StockSignature
     StockSignature text,
     FoilSignerKey text,    -- authorized PartyKey of FoilSid that signed FoilSignature
     FoilSignature text,
 
     primary key (Number),
+    -- Each named terms revision must exist for its grantor.
+    constraint StockTermsExist check (New.StockCreditTermsRevision in (select Revision from CreditTerms CT where CT.Sid = StockSid)) on insert, update,
+    constraint FoilTermsExist  check (New.FoilCreditTermsRevision  in (select Revision from CreditTerms CT where CT.Sid = FoilSid))  on insert, update,
     -- Each side's SignerKey resolves against ITS OWN party's authorized set, independently.
     constraint StockSignerAuthorized check (New.StockSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = StockSid)) on insert, update,
     constraint StockSignatureValid check (SignatureValid(
-        Digest((select Cid from TallyCore), Number, ContractCid),
+        Digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision),
         StockSignature,
         New.StockSignerKey
     )) on insert, update,
     constraint FoilSignerAuthorized check (New.FoilSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = FoilSid)) on insert, update,
     constraint FoilSignatureValid check (SignatureValid(
-        Digest((select Cid from TallyCore), Number, ContractCid),
+        Digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision),
         FoilSignature,
         New.FoilSignerKey
     )) on insert, update,
@@ -350,6 +364,70 @@ create table TradingVariable (
     constraint InsertOnly check (0) on delete, update
 );
 
+-- Credit one party (Sid = grantor) extends to the counterparty. UNILATERAL: only the grantor
+-- signs. Same shape as TradingVariable (per-Sid, revisioned, insert-only, grantor-signed) --
+-- it is the same kind of published unilateral policy. Semantics (docs/old/tally.md):
+--   CreditLimit: max the grantor lets the counterparty owe it -> caps how far the grantor's
+--                PERSPECTIVE balance may rise in its favor.
+--   CallDays:    days of notice the grantor must give before a RESTRICTIVE change takes effect.
+--   Args:        optional JSON for contract-specific credit parameters; null = none (generic
+--                extension point for "additional terms").
+--   EffectiveDate: when this revision governs. Revision 1 and permissive changes == Date
+--                (immediate); restrictive changes >= Date + prior revision's CallDays.
+-- NOTE: backdated-Date trust caveat. A grantor could set Date in the past to shorten the
+-- real-world notice it owes before a restrictive change bites. This is inherent to a
+-- unilateral, grantor-signed timestamp -- both parties replicate this strand and observe the
+-- signed Date, so a backdate is disputable, not silently exploitable. Not solved
+-- cryptographically here; if a bound is later wanted, gate Date against date('now') -- but that
+-- makes the insert volatile (non-deterministic), so it is deliberately left off.
+create table CreditTerms (
+    Sid text,               -- grantor (party extending credit)
+    Revision integer,
+    CreditLimit integer default 0 check (CreditLimit >= 0),  -- CreditLimit not Limit (reserved word)
+    CallDays integer default 0 check (CallDays >= 0),
+    Args text,              -- optional JSON, contract-specific params
+    Date text check ValidDate(Date),                    -- grantor-signed issuance timestamp
+    EffectiveDate text check ValidDate(EffectiveDate),
+    SignerKey text,         -- authorized PartyKey of Sid that signed this revision
+    Signature text,
+
+    primary key (Sid, Revision),
+    constraint PartyOfTally check (Sid in (select StockSid from TallyCore union select FoilSid from TallyCore)) on insert,
+    -- NOTE: committed.* vs plain ref. This table reads committed.CreditTerms for the monotonic and
+    -- prior-revision lookups, following PartyKey's carefully-reasoned rule (schema/draft1.qsql:54-59):
+    -- committed.* excludes the row being inserted so `Revision = max + 1` is satisfiable. The sibling
+    -- unilateral-revisioned tables TradingVariable (RevisionMonotonicInt) and PartyCertificate use a
+    -- PLAIN ref for the same monotonic check -- an apparent inconsistency in the existing schema.
+    -- Confirm the correct choice against the Quereus deferral model when a runner exists; do NOT
+    -- "fix" the siblings inside this ticket (tripwire, not a task).
+    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from committed.CreditTerms CT where CT.Sid = New.Sid), 0) + 1) on insert,
+    constraint SignerAuthorized check (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)) on insert,
+    constraint SignatureValid check (SignatureValid(
+        Digest((select Cid from TallyCore), Sid, Revision, CreditLimit, CallDays, Args, Date, EffectiveDate),
+        Signature,
+        New.SignerKey
+    )) on insert,
+    -- Notice rule. Prior = immediately preceding revision for this grantor (committed).
+    --   Revision 1 (no prior): effective immediately.
+    --   Permissive (CreditLimit non-decreasing AND CallDays non-decreasing): immediate.
+    --   Restrictive (CreditLimit decreases OR CallDays decreases): grantor owes the counterparty
+    --   the PRIOR revision's CallDays of notice -> EffectiveDate >= Date + prior.CallDays.
+    -- Shortening CallDays is itself restrictive: otherwise a grantor could instantly shorten notice,
+    -- then yank the limit. A revision that raises CreditLimit but shortens CallDays is restrictive.
+    constraint EffectiveDateValid check (
+        (New.Revision = 1 and julianday(New.EffectiveDate) = julianday(New.Date))
+        or (New.Revision > 1 and
+            case
+                when New.CreditLimit >= (select CreditLimit from committed.CreditTerms CT where CT.Sid = New.Sid and CT.Revision = New.Revision - 1)
+                 and New.CallDays   >= (select CallDays   from committed.CreditTerms CT where CT.Sid = New.Sid and CT.Revision = New.Revision - 1)
+                then julianday(New.EffectiveDate) = julianday(New.Date)
+                else julianday(New.EffectiveDate) >= julianday(New.Date)
+                     + (select CallDays from committed.CreditTerms CT where CT.Sid = New.Sid and CT.Revision = New.Revision - 1)
+            end)
+    ) on insert,
+    constraint InsertOnly check (0) on delete, update
+);
+
 -- Effective (latest-revision) trading variables per party.
 -- A party that has published none trades at the MyCHIPs defaults (all zero):
 -- lifts may pay its accumulated balance down to zero for free, and accumulate nothing beyond that.
@@ -362,6 +440,21 @@ create view CurrentTradingVariable as
     from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P
         left join TradingVariable TV on TV.Sid = P.Sid
             and TV.Revision = (select max(Revision) from TradingVariable T2 where T2.Sid = P.Sid);
+
+-- Effective (latest-effective-revision) credit limit each party grants, as of now.
+-- Advisory only -- fuels LiftLading capacity advertisement; the hard safety gate is the
+-- deterministic, chit-dated Ledger.WithinCreditLimits below. Effective limit = CreditLimit of
+-- the highest-Revision CreditTerms row whose EffectiveDate <= now; absent any row -> 0.
+-- NOTE: julianday('now')/date('now') are VOLATILE -- fine in a plain view; NOT allowed in a
+-- MATERIALIZED view (Quereus hard-rejects volatile there). If a future runner rejects
+-- volatile-in-view, fall back to computing the effective revision in the lift agent
+-- (application) and keep the deterministic chit-dated Ledger gate as the safety boundary.
+create view CurrentCreditLimit as
+    select P.Sid,
+        coalesce((select CT.CreditLimit from CreditTerms CT
+                  where CT.Sid = P.Sid and julianday(CT.EffectiveDate) <= julianday('now')
+                  order by CT.Revision desc limit 1), 0) as CreditLimit
+    from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
 
 -- Tally balance from each party's perspective (positive = value that party has accumulated).
 -- Ledger convention: foil-issued chits increment Balance, so raw Balance is already
@@ -384,16 +477,21 @@ create view PerspectiveBalance as
 --   Reward/Clutch: per-unit fee ratios (ppm); Clutch is the releasing counterparty's
 --                  charge and applies to the whole moved amount
 -- Fee ratios compose along a lift route as NewRate = PriorRate + MyRate * (1 - PriorRate).
--- Note: credit-terms limits (contract arguments) will further cap lading when modeled.
+-- Receiver accumulation is additionally capped by the credit the RECEIVER granted the
+-- counterparty: a lift raises the receiver's perspective balance (the counterparty's debt to
+-- the receiver), bounded by CurrentCreditLimit. Cap = min(Bound, receiver's effective
+-- CreditLimit); Balance + moved <= Cap. Advisory only -- the hard safety gate is the
+-- deterministic, chit-dated Ledger.WithinCreditLimits.
 create view LiftLading as
     select
         RV.Sid as ReceiverSid,
-        max(0, RV.Target - PB.Balance) as FreeUnits,
-        max(0, RV.Bound - max(PB.Balance, RV.Target)) as RewardedUnits,
+        max(0, min(RV.Target, min(RV.Bound, CCL.CreditLimit)) - PB.Balance) as FreeUnits,
+        max(0, min(RV.Bound, CCL.CreditLimit) - max(PB.Balance, RV.Target)) as RewardedUnits,
         RV.Reward,
         CV.Clutch
     from CurrentTradingVariable RV
         join PerspectiveBalance PB on PB.Sid = RV.Sid
+        join CurrentCreditLimit CCL on CCL.Sid = RV.Sid
         join CurrentTradingVariable CV on CV.Sid <> RV.Sid;
 
 -- TODO: payment request (invoices)
@@ -432,8 +530,31 @@ create table Ledger (
         ), Signature, New.SignerKey)
     ) on insert,
     constraint BalanceCorrect check (
-        Coalesce((select Balance from Ledger where Number = Number - 1), 0) 
+        Coalesce((select Balance from Ledger where Number = Number - 1), 0)
             + (Units * case when Issuer = 'F' then 1 else -1 end) = Balance
+    ) on insert,
+    -- Credit gate. The prospective (stock-perspective) Balance must sit within the credit each
+    -- party extended, effective as of THIS chit's own signed Date -- deterministic, no now().
+    -- Stock-granted limit caps how far Balance may RISE (foil's debt to stock); foil-granted limit
+    -- caps how far it may FALL (stock's debt to foil). Effective limit for a grantor = CreditLimit
+    -- of the highest-Revision CreditTerms row whose EffectiveDate <= chit Date; absent any row -> 0
+    -- (MyCHIPs zero-credit default -- a party must publish a CreditTerms revision before the first
+    -- nonzero chit can move against it). Picking max-Revision among effective rows is correct even
+    -- when a future-dated restrictive revision and a later immediate permissive revision coexist:
+    -- the permissive one, once effective, has the higher revision and supersedes. Pending lift chits
+    -- fold in by construction -- once written as Ledger rows they are in Balance, so this counts them
+    -- with no extra machinery.
+    constraint WithinCreditLimits check (
+        Balance <= coalesce((
+            select CT.CreditLimit from CreditTerms CT
+            where CT.Sid = (select StockSid from TallyCore)
+              and julianday(CT.EffectiveDate) <= julianday(New.Date)
+            order by CT.Revision desc limit 1), 0)
+        and Balance >= -coalesce((
+            select CT.CreditLimit from CreditTerms CT
+            where CT.Sid = (select FoilSid from TallyCore)
+              and julianday(CT.EffectiveDate) <= julianday(New.Date)
+            order by CT.Revision desc limit 1), 0)
     ) on insert,
     constraint ValidIssuer check (IssuerSid in (select StockSid from TallyCore)) on insert,
     constraint InsertOnly check (0) on delete, update
