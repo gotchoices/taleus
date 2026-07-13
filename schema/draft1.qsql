@@ -516,8 +516,10 @@ create view CurrentCreditLimit as
 -- Ledger convention: foil-issued chits increment Balance, so raw Balance is already
 -- the stock holder's perspective; the foil holder sees its negation.
 -- TODO: fold in pending (unresolved) lift chits once modeled in Ledger, so concurrent
--- lifts reserve capacity; open invoices (payment requests) should likewise inform the
--- lift agent's discretionary capacity decisions.
+-- lifts reserve capacity. Open invoices (payment requests) are already surfaced to the lift
+-- agent via the OpenInvoice view (below) as an advisory signal of upcoming balance movement;
+-- they are deliberately NOT folded into this Balance, LiftLading capacity math, or the hard
+-- WithinCreditLimits gate -- weighting them is discretionary policy in the application layer.
 create view PerspectiveBalance as
     select P.Sid,
         coalesce((select Balance from Ledger order by Number desc limit 1), 0)
@@ -550,7 +552,91 @@ create view LiftLading as
         join CurrentCreditLimit CCL on CCL.Sid = RV.Sid
         join CurrentTradingVariable CV on CV.Sid <> RV.Sid;
 
--- TODO: payment request (invoices)
+-- Invoice state, derived from the tables (never stored). Precedence paid > declined > expired > open.
+-- 'paid' is checked first, so the derived state stays deterministic even if a decline and a chit both
+-- somehow commit (self-inflicted -- both are the payer's own actions; see InvoiceLink / InvoiceDecline).
+-- 'expired' is time-derived (julianday('now') is VOLATILE -- fine in a plain view, NOT allowed in a
+-- MATERIALIZED view; same caveat as CurrentCreditLimit at schema/draft1.qsql:504). It is deliberately
+-- NOT gated at chit insert -- a late payment still succeeds and 'paid' wins by precedence.
+create view InvoiceState as
+    select I.Id, I.Requester, I.Units, I.Date, I.ExpiryDate,
+        case
+            when exists (select 1 from Ledger L where L.InvoiceId = I.Id) then 'paid'
+            when exists (select 1 from InvoiceDecline D where D.InvoiceId = I.Id) then 'declined'
+            when I.ExpiryDate is not null and julianday(I.ExpiryDate) < julianday('now') then 'expired'
+            else 'open'
+        end as State
+    from Invoice I;
+
+-- Open (unanswered, undeclined, unexpired) invoices -- advisory signal of upcoming balance movement
+-- for the lift agent / credit-check application layer. NOT folded into LiftLading or WithinCreditLimits.
+create view OpenInvoice as
+    select Id, Requester, Units, Date, ExpiryDate from InvoiceState where State = 'open';
+
+-- Payment request. One party formally asks the counterparty to pay it: the Requester is the party that
+-- wants to RECEIVE value (the future chit recipient), so the answering chit's Issuer is always the
+-- OPPOSITE side (see Ledger.InvoiceLink and the BalanceCorrect convention). Signed by the requester;
+-- insert-only, Cid-bound digest, no mutable state. An invoice is a REQUEST, not a commitment: it is
+-- NOT gated against credit limits at insert (requesting more than current capacity is legitimate -- the
+-- payer may raise credit first), and its expiry is time-derived and advisory (see InvoiceState), so the
+-- insert stays deterministic/non-volatile. State (open/declined/expired/paid) is DERIVED, never stored.
+create table Invoice (
+    Id text default RandomUUID(),
+    Requester text check Requester in ('S', 'F'),  -- party requesting payment (future recipient)
+    Units integer check Units > 0,                 -- smallest denomination unit, exact-match by the answering chit
+    Date text check ValidDate(Date),
+    ExpiryDate text null,                           -- null = never expires
+    Reference text,                                 -- machine-readable JSON (stored as text, no parser -- house rule)
+    Memo text,
+    SignerKey text,                                 -- authorized PartyKey of the requesting party
+    Signature text,
+
+    primary key (Id),
+    -- SignerKey resolves against the REQUESTING side's own authorized set.
+    constraint SignerAuthorized check (New.SignerKey in (
+        select PublicKey from AuthorizedKey AK
+        where AK.Sid = (select case when New.Requester = 'S' then StockSid else FoilSid end from TallyCore)
+    )) on insert,
+    constraint SignatureValid check (SignatureValid(
+        Digest((select Cid from TallyCore), Id, Requester, Units, Date, ExpiryDate, Reference, Memo),
+        Signature, New.SignerKey
+    )) on insert,
+    -- ExpiryDate, when present, must be a valid date at or after Date.
+    constraint ExpiryValid check (
+        New.ExpiryDate is null
+        or (ValidDate(New.ExpiryDate) and julianday(New.ExpiryDate) >= julianday(New.Date))
+    ) on insert,
+    constraint InsertOnly check (0) on delete, update
+);
+
+-- A signed decline of an invoice by the PAYER (the counterparty of the requester). Expiry needs no row
+-- (it is time-derived); a decline is an explicit act and so needs a signed record. At most one per
+-- invoice, and only before the invoice is answered by a chit.
+create table InvoiceDecline (
+    InvoiceId text,
+    DeclinedBy text check DeclinedBy in ('S', 'F'),  -- must be the payer (counterparty of requester)
+    SignerKey text,
+    Signature text,
+
+    primary key (InvoiceId),                         -- at most one decline per invoice
+    constraint InvoiceExists check (New.InvoiceId in (select Id from Invoice)) on insert,
+    -- Only the payer may decline: DeclinedBy is the side that is NOT the requester.
+    constraint DeclinerIsPayer check (
+        New.DeclinedBy <> (select Requester from Invoice where Id = New.InvoiceId)
+    ) on insert,
+    constraint SignerAuthorized check (New.SignerKey in (
+        select PublicKey from AuthorizedKey AK
+        where AK.Sid = (select case when New.DeclinedBy = 'S' then StockSid else FoilSid end from TallyCore)
+    )) on insert,
+    constraint SignatureValid check (SignatureValid(
+        Digest((select Cid from TallyCore), InvoiceId, DeclinedBy),
+        Signature, New.SignerKey
+    )) on insert,
+    -- Cannot decline an invoice already answered by a chit. Mirror of Ledger.InvoiceLink's
+    -- not-declined guard; both are commit-time subqueries with the SAME isolation caveat noted there.
+    constraint NotPaid check (not exists (select 1 from Ledger L where L.InvoiceId = New.InvoiceId)) on insert,
+    constraint InsertOnly check (0) on delete, update
+);
 
 create table Ledger (
     Number integer, -- Sequential, monotonically increasing
@@ -561,6 +647,7 @@ create table Ledger (
     Date text check ValidDate(Date),
     Reference text, -- JSON object
     Memo text,
+    InvoiceId text null,   -- set when this chit answers an invoice (see InvoiceLink)
     SignerKey text,        -- authorized PartyKey of the issuing party that signed this chit
     Signature text,
     Balance integer,
@@ -582,7 +669,8 @@ create table Ledger (
             Units,
             Date,
             Reference,
-            Memo
+            Memo,
+            InvoiceId
         ), Signature, New.SignerKey)
     ) on insert,
     constraint BalanceCorrect check (
@@ -619,6 +707,31 @@ create table Ledger (
             order by CT.Revision desc limit 1), 0)
     ) on insert,
     constraint ValidIssuer check (IssuerSid in (select StockSid from TallyCore)) on insert,
+    -- If this chit answers an invoice: the invoice must exist, the chit must be issued by the PAYER
+    -- (opposite side from the requester -- a foil-issued chit raises Balance toward stock, so if Stock
+    -- requested payment Foil must issue), pledge EXACTLY the invoiced Units (partial payment is
+    -- DISALLOWED -- one invoice, one chit, exact amount; see feat-schema-invoices), be the ONLY chit
+    -- answering it, and the invoice must not already be declined. A plain (buffered+committed) ref on
+    -- the count includes this new row -> exactly one match for a valid first payment.
+    -- NOTE: concurrency. Two chits referencing the same invoice get different Ledger.Number, so they do
+    -- NOT collide on the primary key; the `count(*) = 1` guard rejects the second only if this deferred
+    -- CHECK is re-evaluated against the latest committed snapshot at commit. Pay-then-decline vs
+    -- decline-then-pay races (this guard vs InvoiceDecline.NotPaid) have the same shape. This is the SAME
+    -- open isolation question already flagged for PartyKeyRevocation.NotLastKey (schema/draft1.qsql:137-146):
+    -- if Optimystic validates only against each transaction's original read snapshot, both could commit.
+    -- Both racing actions are the payer's own, so it only ever produces self-inflicted ambiguity, and
+    -- InvoiceState resolves it deterministically (paid > declined). Not solved here; confirm the isolation
+    -- model when a runner exists, same as the NotLastKey note.
+    constraint InvoiceLink check (
+        New.InvoiceId is null
+        or (
+            exists (select 1 from Invoice where Id = New.InvoiceId)
+            and New.Issuer <> (select Requester from Invoice where Id = New.InvoiceId)
+            and New.Units = (select Units from Invoice where Id = New.InvoiceId)
+            and (select count(*) from Ledger where InvoiceId = New.InvoiceId) = 1
+            and not exists (select 1 from InvoiceDecline where InvoiceId = New.InvoiceId)
+        )
+    ) on insert,
     constraint InsertOnly check (0) on delete, update
 );
 
