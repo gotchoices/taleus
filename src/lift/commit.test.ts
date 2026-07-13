@@ -276,6 +276,27 @@ describe('safety: verify before acting', () => {
 		expect(logs.some((m) => m.includes('unverifiable'))).toBe(true)
 	})
 
+	it('does NOT blame the referee for a forged contradicting record (verify precedes equivocation check)', async () => {
+		const { ref, key } = referee()
+		const { cids, strands, owned, record, signer } = buildRoute(key, [{ liftId: 'L1', cid: 'cid-1', issuer: 'F', units: 300n }])
+		await pledgeAll(owned, key, signer)
+		const seen = new Map<string, 'commit' | 'void'>()
+		const logs: string[] = []
+		const log = (m: string): number => logs.push(m)
+
+		const commitResolved = await new ScriptedConsensusEngine(ref, cids, 'commit').resolve(record)
+		await applyResolution(commitResolved, owned, seen, log)
+		// A void record with a TAMPERED signature (a forgery / corruption, not the real referee).
+		const voidResolved = await new ScriptedConsensusEngine(ref, cids, 'void').resolve(record)
+		const forged: LiftRecord = { ...voidResolved, edgeSignatures: { L1: tamper(voidResolved.edgeSignatures!.L1) } }
+		const result = await applyResolution(forged, owned, seen, log)
+
+		// It must be rejected as unverifiable — NOT recorded as referee equivocation.
+		expect(result.edges[0].applied).toBe('skipped-unverified')
+		expect(logs.some((m) => m.includes('CONTRADICTION'))).toBe(false)
+		expect(strands.get('L1')!.settledBalance()).toBe(300n) // commit stands, void ignored
+	})
+
 	it('detects and logs a referee that contradicts itself (commit then void for one LiftId)', async () => {
 		const { ref, key } = referee()
 		const { cids, owned, record, signer } = buildRoute(key, [{ liftId: 'L1', cid: 'cid-1', issuer: 'F', units: 300n }])

@@ -51,18 +51,37 @@ export function bytesToHex(bytes: Uint8Array): string {
 	return out
 }
 
-/** Decode lowercase/uppercase hex text back to raw bytes. Rejects malformed input. */
+/** One hex char → its 0-15 nibble, or -1 if not a hex digit. */
+function hexNibble(code: number): number {
+	if (code >= 0x30 && code <= 0x39) { // '0'-'9'
+		return code - 0x30
+	}
+	if (code >= 0x61 && code <= 0x66) { // 'a'-'f'
+		return code - 0x61 + 10
+	}
+	if (code >= 0x41 && code <= 0x46) { // 'A'-'F'
+		return code - 0x41 + 10
+	}
+	return -1
+}
+
+/**
+ * Decode lowercase/uppercase hex text back to raw bytes. Rejects malformed input —
+ * per-nibble validation, so `Number.parseInt`'s prefix-parsing laxness (which silently
+ * accepts `'0g'` as `0` or `' a'` as `10`) can never let a junk character through.
+ */
 export function hexToBytes(hex: string): Uint8Array {
 	if (hex.length % 2 !== 0) {
 		throw new Error(`hexToBytes: odd-length hex string (${hex.length})`)
 	}
 	const out = new Uint8Array(hex.length / 2)
 	for (let i = 0; i < out.length; i++) {
-		const byte = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-		if (Number.isNaN(byte)) {
+		const hi = hexNibble(hex.charCodeAt(i * 2))
+		const lo = hexNibble(hex.charCodeAt(i * 2 + 1))
+		if (hi < 0 || lo < 0) {
 			throw new Error(`hexToBytes: non-hex characters at offset ${i * 2}`)
 		}
-		out[i] = byte
+		out[i] = (hi << 4) | lo
 	}
 	return out
 }

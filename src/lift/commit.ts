@@ -177,7 +177,8 @@ export type EdgeApplied =
 	| 'skipped-idempotent' // already finalized/voided the same way — a re-delivered record no-ops
 	| 'skipped-unverified' // the referee signature did not verify against RefereeKey — never acted on
 	| 'skipped-no-signature' // the record carried no signature for this edge's LiftId
-	| 'skipped-contradiction' // a commit+void contradiction was already seen for this LiftId
+	| 'skipped-contradiction' // a verified commit+void contradiction was already seen for this LiftId
+	| 'skipped-error' // the strand rejected the settle write (e.g. a racing resolution) — see `error`
 
 export interface EdgeOutcome {
 	liftId: string
@@ -236,16 +237,10 @@ async function applyToEdge(
 		return { liftId: edge.liftId, applied: 'skipped-no-signature' }
 	}
 
-	// Referee equivocation guard: a single referee could sign commit for some edges and void
-	// for others (docs § edge cases). Detect + log a contradiction; never act on the second face.
-	const prior = seenDecisions.get(edge.liftId)
-	if (prior !== undefined && prior !== decision) {
-		log('CONTRADICTION: referee signed both %s and %s for LiftId %s (single-referee equivocation; see backlog/feat-multi-referee-consensus)', prior, decision, edge.liftId)
-		return { liftId: edge.liftId, applied: 'skipped-contradiction' }
-	}
-
-	// Verify the referee signature against RefereeKey over THIS edge's reconstructed digest,
-	// using the strand's own cid. A record is never trusted from the transport gate alone.
+	// Verify the referee signature FIRST, against RefereeKey over THIS edge's reconstructed
+	// digest (the strand's own cid). A record is never trusted from the transport gate alone —
+	// and only a VERIFIED decision may become the equivocation baseline below, so a forged or
+	// corrupt opposite record can never be mistaken for the referee contradicting itself.
 	const verified =
 		decision === 'commit'
 			? verifyLiftTerms(record.refereeKey, ownedTerms(edge, record.refereeKey), signature)
@@ -253,6 +248,15 @@ async function applyToEdge(
 	if (!verified) {
 		log('rejected unverifiable referee %s signature for LiftId %s on tally %s', decision, edge.liftId, edge.strand.cid)
 		return { liftId: edge.liftId, applied: 'skipped-unverified' }
+	}
+
+	// Referee equivocation guard: a single referee could sign a verified commit for some edges
+	// and a verified void for others (docs § edge cases). Detect + log a contradiction; never act
+	// on the second face. `seenDecisions` only ever holds already-verified decisions.
+	const prior = seenDecisions.get(edge.liftId)
+	if (prior !== undefined && prior !== decision) {
+		log('CONTRADICTION: referee signed both %s and %s for LiftId %s (single-referee equivocation; see backlog/feat-multi-referee-consensus)', prior, decision, edge.liftId)
+		return { liftId: edge.liftId, applied: 'skipped-contradiction' }
 	}
 	seenDecisions.set(edge.liftId, decision)
 
@@ -273,9 +277,11 @@ async function applyToEdge(
 		return { liftId: edge.liftId, applied: 'voided' }
 	} catch (err) {
 		// The schema rejected the write (e.g. a racing void already committed). Surface, don't eat.
+		// It is neither a signature failure nor an equivocation — its own `skipped-error` outcome,
+		// so observers do not miscount strand races as unverifiable signatures or contradictions.
 		const message = err instanceof Error ? err.message : String(err)
 		log('strand rejected %s for LiftId %s on tally %s: %s', decision, edge.liftId, edge.strand.cid, message)
-		return { liftId: edge.liftId, applied: decision === 'commit' ? 'skipped-unverified' : 'skipped-contradiction', error: message }
+		return { liftId: edge.liftId, applied: 'skipped-error', error: message }
 	}
 }
 

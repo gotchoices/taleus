@@ -60,6 +60,14 @@ describe('hex codec', () => {
 		expect(() => hexToBytes('abc')).toThrow(/odd-length/)
 		expect(() => hexToBytes('zz')).toThrow(/non-hex/)
 	})
+
+	it('rejects a valid leading nibble followed by junk (parseInt prefix-parse laxness)', () => {
+		// Number.parseInt('0g',16) === 0 and parseInt(' a',16) === 10 — a naive decoder would
+		// silently accept these. Per-nibble validation must reject them.
+		expect(() => hexToBytes('0g')).toThrow(/non-hex/)
+		expect(() => hexToBytes('a!')).toThrow(/non-hex/)
+		expect(() => hexToBytes(' a')).toThrow(/non-hex/)
+	})
 })
 
 describe('lift-terms digest byte-parity with the schema constraint form', () => {
