@@ -234,18 +234,83 @@ A **missing or expired quote** at a boundary means that edge cannot convert, so 
 
 ## Lifts and ChipNet
 
-A lift clears credit around a cycle: each participant pays one neighbor and is paid by another, net zero for everyone, but balances move back toward targets. A linear lift (payment) does the same along a chain from payer to payee. Requirements:
+A lift clears credit around a cycle: each participant pays one neighbor and is paid by another, net zero for everyone, but balances move back toward targets. A linear lift (payment) does the same along a chain from payer to payee. Two hard problems:
 
-1. **Route discovery** through a graph nobody sees globally — each party knows only its own tallies — now including denomination and rate at each hop.
+1. **Route discovery** through a graph nobody sees globally — each party knows only its own tallies — carrying denomination and rate at each hop.
 2. **Atomic commit** across many independent tally strands — all lift chits finalize, or none do.
 
-ChipNet provides both. Its transport is callback-based rather than socket-bound: Taleus supplies comms callbacks that carry ChipNet messages to tally partners over a lightweight libp2p protocol between cadres (`/taleus/chipnet/1.0.0`). Each tally is an edge; the **lift agent** in each party's cadre participates in discovery and commit on that party's behalf — the role MyCHIPs site servers played, now played by the party's own always-on node (or phone, best-effort). Parties without an always-on node participate opportunistically while awake; routes preferentially flow through continuously reachable agents.
+[ChipNet](https://github.com/gotchoices/chipnet) (`chipnet` on npm; MIT) solves both, and Taleus **reuses it** rather than rebuilding the lift subsystem on Sereus primitives (see [Why reuse, not reboot](#why-reuse-not-reboot)). ChipNet is a *meta-protocol*: it owns the discovery search and the commit-consensus state machines but delegates communications, state persistence, and the meaning of a link's *terms* to callbacks the host supplies (`QueryPeerFunc`, `TrxParticipant.updatePeer`, `TrxParticipantState`, `NegotiateIntentFunc`, `NegotiatePlanFunc`). Its data model is edges (**links**) between **members**, tagged with **intents** — `C` (communications, on every link) and `L` (lift) — whose **terms** are an opaque `Record<string, unknown>`. Because terms and the transaction `payload` are opaque to ChipNet, denomination, scale, rate, and capacity ride inside them with **no change to ChipNet** — the conversion math lives entirely in Taleus's callbacks. Every impedance point below is therefore an **adapter**, not a fork.
 
-Mapping onto strands:
+The **lift agent** in each party's cadre plays the role MyCHIPs site servers played — now the party's own always-on node (or the phone, best-effort, when there is no always-on node). It drives discovery and commit from the party's private [portfolio](#portfolio) (`LiftJournal`) and reads/writes the shared tally strands (`LiftLading`, `PendingLift`, `Ledger`). Parties without an always-on node participate opportunistically while awake; routes preferentially flow through continuously reachable agents.
 
-- A **pending lift chit** (`PendingLift` row) is written into each participating tally strand, conditioned on the `LiftId` and referee, denominated in that tally's own unit per the committed route's rates. It reserves capacity on that edge while open.
-- The lift **commit record** (referee signature over the lift terms) finalizes the pledge in every strand independently, each as a fresh `Ledger` `Kind = 'lift'` row — each strand's schema verifies the referee signature locally against the pledge, so no cross-strand transaction is needed. The referee may instead sign a **void** (`LiftVoid`) — an explicit abort or a post-timeout release — which resolves every strand the same way, cancelling the reservation. Commit and void are mutually exclusive and use distinct digests.
-- Each tally's `LiftLading` view (from the trading variables both parties publish in the strand) tells the agents how many units may flow on each edge and at what fee; it advertises from the **reserved** balance, so an open pending lift on the edge already shrinks the advertised capacity. The party's portfolio exchange rates add the cross-denomination conversion.
+### Identity and address mapping
+
+ChipNet identifies a member by an `Address` (`{ key, cuid? }`) where `key` is an asymmetric public key used for both encryption and signature verification via its `AsymmetricVault`/`Asymmetric` primitives. Taleus binds these as follows:
+
+| ChipNet concept | Taleus binding |
+|---|---|
+| `Address.key` | the **lift agent's** signing key for the party (an authorized cadre key). *Not* the tally `PartyKey` set directly — the agent signs lift protocol messages; the referee's `Address.key` is what a `PendingLift.RefereeKey` names. |
+| `Address.cuid` | optional extra identity, disclosed only where intended (e.g. a payee target advertising itself). |
+| `linkId` (real edge id the comms callback dials on) | one **tally strand**: the agent dials the counterparty's cadre over `/taleus/chipnet/1.0.0` scoped to that tally. Held only by the agent that owns the edge, via ChipNet's private `nonceToLinkMap`. |
+| `nonce` = `base64(sha256(sessionCode ‖ link))` | the **anonymized tally id** seen by intermediaries. A salted per-session hash: a peer can recognize a tally it already knows but learns nothing about tallies it doesn't. This is the graph-privacy property — intermediaries see hashes, never tally identities — matching MyCHIPs' model, no more leakage. |
+
+An `L`-intent link therefore *is* a tally with lift capacity; a `C`-only link is a pure comms/relay hop. Route queries never carry raw tally ids, so discovery leaks no more graph knowledge than MyCHIPs.
+
+### Transport: `/taleus/chipnet/1.0.0`
+
+A lightweight libp2p protocol between the two cadres of a tally carries ChipNet's messages. It sits alongside the tally's own strand network (it is a direct cadre-to-cadre request/response channel, not a strand write) and maps ChipNet's two comms callbacks onto request/response frames:
+
+- **`QueryPeerFunc(request, linkId) → QueryResponse`** — discovery. The agent resolves `linkId` to the counterparty's cadre address (Sereus `resolvePeerAddrs`), dials `/taleus/chipnet/1.0.0`, and round-trips one `QueryRequest`/`QueryResponse`.
+- **`TrxParticipant.updatePeer(address, record) → void`** — commit/consensus. Push a `TrxRecord` to a reachable member; the transport addresses members by their cadre, using `Address`/`topology.members[].physical`.
+
+Which cadre node speaks for a party: the **always-on lift-agent node** by default (it holds the `LiftJournal`, replicates every tally strand, and is continuously dialable). A phone-only party's phone speaks when awake; see [Mobile and offline participation](#mobile-and-offline-participation).
+
+### Denomination-aware discovery
+
+Discovery walks **backward from the payee** (§ [Cross-denomination conversion](#cross-denomination-conversion)). ChipNet carries the mechanics; Taleus fills the `L`-intent terms and the negotiate callbacks:
+
+- Each hop's `L` terms advertise, for that edge: **denomination + scale** (from the tally's `TallyContract`), **movable capacity and fee** (from the strand's `LiftLading` view, computed off the *reserved* balance so an open pledge already shrinks the advertised room), and the intermediary's **exchange-rate quote** for the conversion boundary it straddles (from its private portfolio `ExchangeRateQuote`; never shared into a strand).
+- `NegotiateIntentFunc`/`NegotiatePlanFunc` (Taleus code) accumulate the **conversion product** end-to-end using the exact integer formula `req_in = ceil( req_out · RateNum · 10^(s_in) / ( RateDen · 10^(s_out) ) )` — one ceiling per boundary, BigInt intermediate (§ [Cross-denomination conversion](#cross-denomination-conversion); the reduce-to-lowest-terms overflow rule is a `NOTE:` in `schema/portfolio.qsql`). Trading-variable fees compose per the existing `LiftLading` rule alongside the conversion. A **missing or expired quote** at a boundary prunes the route — the agent never fabricates a rate.
+- The value at the originator's own edge is the exact source-denomination cost, presented before commit. The **originator absorbs the per-edge rounding dust** (payer for a payment, initiator for a circular clearing lift). A single-denomination circular lift is the degenerate case: all rates 1, exactly MyCHIPs behavior.
+
+### Referee model and the commit seam
+
+ChipNet's commit phase is **referee-voted**: a referee set votes commit/void and a majority (`n ≥ ⌈total/2⌉`) is consensus. Taleus's schema, by contrast, names **one** `RefereeKey` per `PendingLift` and settles each edge on **one** `RefereeSignature`. Reconcile as follows.
+
+**Who referees.** The referee is a cadre node **agreed during discovery** and **named in every edge's `PendingLift.RefereeKey`**, so each strand can verify the commit locally. The originator proposes a referee `Address`; every participant must accept it in ChipNet's promise phase (its record validation already checks "the referee(s) are acceptable"), and a participant may reject and force renegotiation or route abandonment. Reference default: the **originator's own always-on agent** (payer's for a payment, initiator's for a circular lift) — the originator has the incentive to complete and bears the dust. A **dedicated referee node** (a public/subscription always-on referee, per ChipNet's referee-participation model) is an allowed deployment but not required for v1. The referee must be reachable — directly (public cadre address in `topology.members[].physical`) or over a `C`-intent path — which is another reason routes bias toward always-on agents.
+
+**The signature seam (key decision).** ChipNet's `getCommitDigest` signs the *whole record* (transactionCode + sessionCode + payload + topology + promises). Taleus's `Ledger.LiftFinalize` verifies a *per-edge* digest `Digest(Cid, LiftId, RefereeKey, Issuer, Units, Date, Expiry)` — deliberately per-edge so a strand settles from its own `PendingLift` row alone, never needing the whole topology (which would leak the route to every edge). These are two independent checks of the **same referee decision**, and the referee emits **both** at commit:
+
+- the ChipNet whole-record commit signature, which drives ChipNet's **liveness/coordination** (ring/star propagation, void-on-timeout, network-split and re-route handling); and
+- one **per-edge Taleus signature** for each edge it finalizes — the schema's **safety/settlement** proof. These ride in the ChipNet record `payload` (opaque to ChipNet) as a `{ LiftId → refereeEdgeSignature }` map, and the agent copies each edge's signature into that strand's finalize `Ledger` row.
+
+So **ChipNet = when the lift commits and how that fact propagates; the schema = whether a given strand may settle.** Void is symmetric: the referee's `LiftVoid` signature over the distinct void digest `Digest(Cid, LiftId, 'void')` releases every strand's reservation with no settled row; commit and void digests are distinct, so neither signature replays as the other.
+
+**Cross-primitive constraint.** The per-edge digest the referee signs must be byte-identical to what the Quereus schema's `Digest()` recomputes, and signed with the scheme `SignatureValid()` verifies — so ChipNet's `CryptoHash`/`Asymmetric` primitives and the schema's crypto functions must share one hash (sha256) and one signature scheme (ed25519). This is wired once at library setup.
+
+**v1 is single-referee.** Referee set size 1 (a "majority" of one), matching the landed schema. The tradeoff is real: a single referee is a single point of both liveness *and* trust — a malicious referee could sign commit to some edges and void to others, breaking atomicity (ChipNet's "lying referee" case), with no majority to outvote it. Acceptable for v1's common case (originator-as-referee has no incentive to equivocate against its own lift) and softened by compensating-reversal recovery and timeout-void. It is **not** adequate for lifts among mutually-distrusting strangers — that is precisely what multi-referee majority buys, deferred to `backlog/feat-multi-referee-consensus` (which needs a schema change: `RefereeKey` → a referee set + threshold, `RefereeSignature` → a majority bundle). The stuck-reservation liveness case (referee unreachable) is `backlog/feat-lift-timeout-release`.
+
+### Mobile and offline participation
+
+A hibernating party cannot answer discovery: its `QueryPeerFunc` call times out. ChipNet already tolerates this — each node gives peers a finite time budget and folds late responses into the next phase — so a sleeping edge is simply skipped that round. For **commit**, the agent must be awake: Sereus push-wake (`/sereus/strand-wake/1.0.0` + the `DeviceToken` push channel) brings the phone up for the commit window. Bias toward always-on agents falls out naturally: an always-on node advertises capacity continuously and answers at lower query cost (ChipNet's query economics down-rank slow/absent sub-links), so routes prefer it. A phone-only party is reachable-while-awake for discovery and push-woken for commit; a party that wants reliable lift participation adds an always-on node to its cadre.
+
+### State mapping
+
+ChipNet injects all persistence, so Taleus backs its state interfaces with existing tables — no new store:
+
+- **Originator/agent discovery + correlation state** → the portfolio `LiftJournal` (which lift, which edges, what phase). This is the private map the agent drives discovery and commit from; it is reconstructible only as bookkeeping, so it is not authoritative for settlement.
+- **Per-edge participant/commit state** (`TrxParticipantState`) → the tally strand's `PendingLift` (the pledge) and `Ledger` (the finalize), plus `LiftVoid`. The authoritative, consensus-replicated, signature-gated state lives here — the schema, not the agent, is the source of truth for whether an edge settled.
+
+### Why reuse, not reboot
+
+The reboot criterion for this ticket was: if the impedance mismatch (identity model, referee, denomination extension) exceeds the cost of a purpose-built implementation on Sereus primitives, reboot instead. It does not.
+
+- **The mismatches are all adapter-layer.** Comms is a clean callback (`QueryPeerFunc`, `updatePeer`) → a libp2p req/resp protocol. State is injected (`TrxParticipantState`) → `LiftJournal` + `PendingLift`/`Ledger`. Terms and payload are opaque `Record<string, unknown>` → denomination/scale/rate/capacity with **zero** ChipNet change. This is exactly what a meta-protocol is built to accept.
+- **The denomination extension — the ticket's specific worry — costs nothing in ChipNet.** The conversion product accumulates in Taleus's negotiate callbacks; ChipNet never sees a rate.
+- **The referee seam is a localized adapter**, not a redesign: the referee signs one extra per-edge digest, and ChipNet vs. schema become complementary liveness/safety layers.
+- **What a reboot would throw away is the expensive part:** ChipNet's discovery search (uni/bidirectional, time-budgeting, query economics, anti-abuse pathology handling) and its cluster consensus (ring/star voting, void-on-timeout, network-split and lying-referee handling) are substantial and subtle. Reimplementing them would re-litigate solved edge cases to avoid glue that is cheap.
+
+Known constraints carried into implementation: ChipNet's **bidirectional search is not yet implemented** (unidirectional suffices for v1 payments and circular lifts — the originator searches for the payee, or for itself); its **time-sync (THIST)** is partly implemented (timeouts rely on loose sync, acceptable); multi-referee is deferred as above.
 
 ## Client Application
 
