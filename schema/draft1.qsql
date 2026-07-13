@@ -271,6 +271,24 @@ create table PartyCertificate (
     constraint InsertOnly check (0) on delete, update
 );
 
+-- ValidDenomination(id): prefix-dispatch validity check for a tally's denomination identifier
+-- (feat-denomination-argument). A host-registered scalar like ValidDate/SignatureValid/Digest --
+-- referenced here, defined by the runner. NO general parser and NO currency-table lookup: three
+-- namespaces, each dispatched by prefix, and that is the whole contract:
+--   `CHIP`             -- the network reference unit; the reserved bare token, no prefix.
+--   `iso4217:<AAA>`    -- national currency; <AAA> is exactly three UPPERCASE ASCII letters
+--                         (an ISO 4217 code). NOT validated against a currency table -- shape only,
+--                         so a future/private code passes; `iso4217:US`, `iso4217:usd`, `iso4217:USDX`
+--                         all fail on the three-uppercase-letter shape.
+--   `cid:<address>`    -- custom / open-ended unit, identified by the content address (CID) of a
+--                         denomination-descriptor document. The address must be NON-EMPTY (`cid:`
+--                         alone fails). Content-addressing makes the identifier globally unique by
+--                         construction: two parties referencing the same descriptor reference the same
+--                         CID, and two different descriptors cannot collide.
+-- Custom-unit meaning is confirmed at NEGOTIATION time (both parties fetch the descriptor by CID and
+-- agree it names the same unit), NOT here -- do not add a runtime CHECK that fetches a CID. The
+-- descriptor is minimal: { name, symbol, description, canonicalUnit }; its human-readable label is
+-- display-only, so label collisions are harmless. See docs/architecture.md "Denomination registry".
 create table TallyContractProposal (
     SequenceNumber integer,
     ContractCid text,
@@ -279,6 +297,13 @@ create table TallyContractProposal (
     -- Load-bearing coverage is on TallyContract; the proposal carries them for a complete offer.
     StockCreditTermsRevision integer,
     FoilCreditTermsRevision integer,
+    -- Denomination argument. The proposal carries it (validated, folded into Signature) so the offer
+    -- is complete and a malformed identifier is rejected at PROPOSAL time as well as at acceptance.
+    -- The load-bearing bilateral-signature coverage + life-of-tally immutability live on TallyContract.
+    -- Defaults to CHIP at scale 0 -- an offer that omits the argument reproduces today's implicit
+    -- single-denomination behavior with no ceremony.
+    Denomination text default 'CHIP' check ValidDenomination(Denomination),
+    DenominationScale integer default 0 check (DenominationScale >= 0),
     SignerKey text,        -- authorized PartyKey of the proposing party that signed
     Signature text,
 
@@ -290,7 +315,7 @@ create table TallyContractProposal (
         where AK.Sid = (select case when New.Proposer = 'S' then StockSid else FoilSid end from TallyCore)
     )) on insert, update,
     constraint SignatureValid check (SignatureValid(
-        Digest((select Cid from TallyCore), SequenceNumber, ContractCid, Proposer, StockCreditTermsRevision, FoilCreditTermsRevision),
+        Digest((select Cid from TallyCore), SequenceNumber, ContractCid, Proposer, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         Signature,
         New.SignerKey
     )) on insert, update
@@ -305,9 +330,22 @@ create table TallyContract (
     -- operative CreditTerms revision here, folded into both signatures. Because CreditTerms rows are
     -- insert-only and grantor-signed, referencing (Sid, Revision) transitively covers their content.
     -- Later unilateral revisions do NOT touch the contract. (The bilateral denomination argument, by
-    -- contrast, will attach as its OWN columns here -- feat-denomination-argument.)
+    -- contrast, attaches as its OWN columns below -- Denomination/DenominationScale -- because it is a
+    -- single shared value BOTH parties sign, not a per-party reference.)
     StockCreditTermsRevision integer,
     FoilCreditTermsRevision integer,
+    -- Denomination argument (feat-denomination-argument): the tally's unit of account + scale. A
+    -- SINGLE shared value covered by BOTH signatures below -- one denomination binds stock and foil
+    -- alike; it is never a per-party (unilaterally-signed) row, unlike credit terms. Fixed for the
+    -- tally's life -- DenominationImmutable ties every later revision to revision 1; renegotiation may
+    -- change credit terms but never the unit. Scale is a decimal exponent >= 0: one Ledger.Units
+    -- integer = 10^(-DenominationScale) of the denomination's display unit (iso4217:USD scale 2 ->
+    -- Units are cents; CHIP scale 3 -> milliCHIPs). The contract's stated scale is authoritative; for
+    -- iso4217 it is NOT cross-checked against a currency table. Defaults to CHIP at scale 0 -- a tally
+    -- created with no denomination argument behaves exactly as today (Ledger math is scale-independent,
+    -- so the default is a true regression). ValidDenomination rejects malformed identifiers.
+    Denomination text default 'CHIP' check ValidDenomination(Denomination),
+    DenominationScale integer default 0 check (DenominationScale >= 0),
     StockSignerKey text,   -- authorized PartyKey of StockSid that signed StockSignature
     StockSignature text,
     FoilSignerKey text,    -- authorized PartyKey of FoilSid that signed FoilSignature
@@ -320,16 +358,27 @@ create table TallyContract (
     -- Each side's SignerKey resolves against ITS OWN party's authorized set, independently.
     constraint StockSignerAuthorized check (New.StockSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = StockSid)) on insert, update,
     constraint StockSignatureValid check (SignatureValid(
-        Digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision),
+        Digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         StockSignature,
         New.StockSignerKey
     )) on insert, update,
     constraint FoilSignerAuthorized check (New.FoilSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = FoilSid)) on insert, update,
     constraint FoilSignatureValid check (SignatureValid(
-        Digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision),
+        Digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         FoilSignature,
         New.FoilSignerKey
     )) on insert, update,
+    -- Denomination + scale are FIXED for the tally's life: every revision after the first must match
+    -- revision 1's, so a revision-2 contract naming a different denomination or scale is rejected.
+    -- Reads `Number = 1` directly -- the filter excludes the row being inserted (whose Number > 1), so
+    -- the plain and committed.* views coincide here (a later revision is never inserted in the same
+    -- transaction as revision 1). Ties immutability to revision 1 (not the immediately-prior revision)
+    -- so the whole chain is anchored to the first accepted contract, per feat-denomination-argument.
+    constraint DenominationImmutable check (
+        New.Number = 1
+        or (New.Denomination = (select Denomination from TallyContract where Number = 1)
+            and New.DenominationScale = (select DenominationScale from TallyContract where Number = 1))
+    ) on insert,
     constraint InsertOnly check (0) on delete, update
 );
 

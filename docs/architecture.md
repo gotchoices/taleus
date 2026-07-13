@@ -102,7 +102,7 @@ Tables:
 | `PartyKeyAdoption` | Counterparty re-key ceremony: the one path that adds a key to a party's authorized set *without* an existing key of that party. The recovering party self-signs a fresh key (possession) and the counterparty attests it with an authorized key (human trust). `Sid` is unchanged — re-keys an existing party, never a new identity. Last-resort recovery when every authorized key is lost. |
 | `PartyCertificate` | Revisioned identity disclosure per party, signed with an authorized key of the party. |
 | `TallyContractProposal` | Either party's proposal of a contract CID + arguments (denomination; a reference to each party's `CreditTerms` revision) — the negotiation cursor. |
-| `TallyContract` | Bilaterally signed contract acceptances, numbered; the highest fully-signed number governs. Names each party's operative `CreditTerms` revision, folded into both signatures so the bilateral signature covers the credit terms in force at acceptance. |
+| `TallyContract` | Bilaterally signed contract acceptances, numbered; the highest fully-signed number governs. Carries the **denomination argument** (`Denomination` + `DenominationScale`) as a single shared value folded into *both* signatures — fixed for the tally's life (a later revision may not change it). Also names each party's operative `CreditTerms` revision, likewise folded in so the bilateral signature covers the credit terms in force at acceptance. |
 | `CreditTerms` | Each grantor's **unilateral** (grantor-signed only), revisioned credit policy: `CreditLimit` (how far the grantor lets the counterparty owe it) and `CallDays` (days of notice owed before a *restrictive* change takes effect, enforced via a signed `EffectiveDate`). Same shape as `TradingVariable`. The ledger gates every chit against the limit effective as of the chit's date. |
 | `TradingVariable` | Each party's published lift policy, revisioned: `Target` (ideal balance to accumulate via lifts), `Bound` (maximum to accrue), `Reward` (fee ratio for accumulation above target), `Clutch` (fee ratio for drops). MyCHIPs semantics, expressed from the issuing party's perspective. |
 | `Invoice` | Signed payment requests; answered by a matching chit from the payer. |
@@ -179,6 +179,22 @@ Consequences for payments and lifts:
 - **Route discovery** carries denomination along with capacity: each hop advertises what it can pass and at what rate, and the discovered route accumulates the conversion product end-to-end, so the originator sees the exact source-denomination cost of delivering the target amount before committing.
 - **Lift terms are fixed at commit.** The signed lift record binds each edge's units in that edge's own denomination — every tally's ledger stays internally consistent in its own unit, and no participant is exposed to rate movement after signing.
 - A **circular clearing lift** in a single denomination is the degenerate case: all rates 1, exactly the MyCHIPs behavior.
+
+### Denomination registry
+
+A denomination is named by a **namespaced identifier** — a string dispatched by prefix, with no general parser and no currency-table lookup. Three namespaces, and that is the whole scheme:
+
+- **`CHIP`** — the network reference unit. A reserved bare token with no prefix.
+- **`iso4217:<AAA>`** — a national currency, where `<AAA>` is a three-uppercase-letter [ISO 4217](https://en.wikipedia.org/wiki/ISO_4217) code (`iso4217:USD`, `iso4217:EUR`). The code is validated by *shape only* (three uppercase letters), never against a currency table, so a private or future code still passes.
+- **`cid:<contentaddress>`** — a custom or open-ended unit, identified by the content address (CID) of a **denomination descriptor** document. The address must be non-empty.
+
+The `ValidDenomination` check (see [`schema/draft1.qsql`](../schema/draft1.qsql)) enforces exactly these three shapes at proposal and at acceptance; malformed identifiers (`usd`, `iso4217:US`, `iso4217:usd`, an empty `cid:`) are rejected.
+
+**Custom-unit collisions are impossible by construction.** Content-addressing makes a `cid:` identifier globally unique: two parties who reference the same descriptor reference the same CID, and two different descriptors cannot produce the same CID. The descriptor is minimal — `{ name, symbol, description, canonicalUnit }` — stored content-addressed (Optimystic). Both parties fetch it by CID *during negotiation* to confirm they mean the same unit; if either cannot fetch it or disagrees, the tally negotiation fails. This is a negotiation-time concern, not a runtime ledger constraint — the schema never fetches a CID. The descriptor's human-readable label is display-only, so label collisions are harmless.
+
+**Scale** is a decimal exponent: one `Ledger.Units` integer equals `10^(−DenominationScale)` of the denomination's display unit. `iso4217:USD` at scale 2 makes each `Units` a cent; `CHIP` at scale 3 makes it a milliCHIP. The contract states the scale explicitly as an integer ≥ 0, and that stated value is authoritative — for `iso4217:` it *may* mirror the currency's canonical minor-unit exponent, but it is never cross-checked against a currency table (the contract wins on any mismatch).
+
+**Bilateral and fixed for life.** Unlike credit terms — which each party grants unilaterally (only the grantor signs) — the denomination is a *single shared value* both parties sign: one denomination governs both sides of the tally, so it sits on the bilaterally-signed `TallyContract` (folded into both signatures), never on a per-party row. It is set on the tally's first accepted contract and locked: the `DenominationImmutable` constraint ties every later contract revision's denomination and scale to revision 1's, so renegotiation may change credit terms but never the unit. A tally created with **no** denomination argument defaults to `CHIP` at scale 0, reproducing today's implicit single-denomination behavior exactly (all `Ledger` math is scale-independent).
 
 ### Exchange rate quotes
 
