@@ -63,7 +63,7 @@ Each tally maps to exactly one Sereus strand:
 - **Latency hint `interactive`.** A party may hold hundreds of tallies; nearly all hibernate nearly all the time. Sereus's hibernation system (check-in wake, push wake to suspended phones) brings a tally strand online when a chit, negotiation step, or lift touches it.
 - **50/50 governance.** Both parties' cadres participate in the strand's Optimystic cohort. Neither party can unilaterally rewrite history: rows are insert-only and every mutation is signature-gated by the schema, so even a party whose nodes outnumber the other's cannot forge the other's signature.
 
-The party-level *portfolio* (which tallies I hold, my exchange rates, pending lift bookkeeping) is private state in the party's own cadre, outside any shared tally strand. This replaces the MyCHIPs user database.
+The party-level *portfolio* — which tallies I hold, my exchange-rate quotes, in-flight lift bookkeeping, app preferences — is private state: never shared into any tally strand, yet visible to *all* of the party's own devices (phone plus any always-on cloud/NAS node that runs the lift agent). It replaces the MyCHIPs user database and lives in its own **single-party Sereus strand**, described under [Portfolio](#portfolio).
 
 ## Tally Formation
 
@@ -107,7 +107,7 @@ Tables:
 | `Invoice` | Signed payment requests; answered by a matching chit from the payer. |
 | `Ledger` | Chits: issuer, units (positive integer, smallest denomination unit), date, reference/memo, issuer signature, chained balance. Distinguishes direct chits from lift chits, including the pending-lift state. |
 
-Alongside the tables, the schema defines views. `RegisteredKey` is every key ever introduced for a party — normal `PartyKey` adds plus counterparty-attested `PartyKeyAdoption` keys — and `AuthorizedKey` is that set minus every `PartyKeyRevocation`: the authoritative "who may sign for this party right now" set that all signature-gated tables resolve their `SignerKey` against. The rest compute lift capacity in place: `PerspectiveBalance` (the chained balance as each party sees it — positive means accumulated value) and `LiftLading` (per direction: units movable free up to the receiver's target, further units to its bound at the receiver's `Reward`, with the releasing party's `Clutch` applied to the whole amount). Trading variables live in the shared strand deliberately — they are signed, unilateral policy the counterparty's lift agent must read to advertise route capacity. Exchange rates, by contrast, span multiple tallies and stay in the party's private portfolio.
+Alongside the tables, the schema defines views. `RegisteredKey` is every key ever introduced for a party — normal `PartyKey` adds plus counterparty-attested `PartyKeyAdoption` keys — and `AuthorizedKey` is that set minus every `PartyKeyRevocation`: the authoritative "who may sign for this party right now" set that all signature-gated tables resolve their `SignerKey` against. The rest compute lift capacity in place: `PerspectiveBalance` (the chained balance as each party sees it — positive means accumulated value) and `LiftLading` (per direction: units movable free up to the receiver's target, further units to its bound at the receiver's `Reward`, with the releasing party's `Clutch` applied to the whole amount). Trading variables live in the shared strand deliberately — they are signed, unilateral policy the counterparty's lift agent must read to advertise route capacity. Exchange rates, by contrast, span multiple tallies and stay in the party's private **portfolio** — a separate single-party strand ([Portfolio](#portfolio)), never this shared tally strand, so no counterparty ever reads them.
 
 ### Why constraints instead of a consensus protocol
 
@@ -123,6 +123,48 @@ A party signs its tally rows with keys from its `PartyKey` authorized set, not a
 Regaining tally-signing authority this way is the **app layer**, and it presupposes the recovering party can still read and write the closed strand. A party that lost all its cadre nodes also lost its **Sereus strand-membership key** and its **cadre authority keys**, so the counterparty must *first* re-admit the party's fresh cadre into the strand at the Sereus layer (the invite → join handshake, `addMemberByAuthority` — see [`../../sereus/docs/architecture.md`](../../sereus/docs/architecture.md), *Invite → join handshake* and *Reinstall & recovery behavior*). The ordering is therefore two-layer: **Sereus re-invite (regain strand access) → Taleus `PartyKeyAdoption` (regain signing authority).** Taleus does not reinvent strand re-admission — it depends on the Sereus mechanism, the same way cadre-assisted device recovery mirrors Sereus's surviving-node re-enrollment rather than inventing a parallel scheme.
 
 Because a stolen key's *past* signatures were checked once at insert and are never re-validated, revocation is forward-only: it cannot retroactively invalidate history, only stop future signatures. The gap between a key being compromised and its revocation committing is an inherent race in a two-party unilateral-chit ledger — bounded in practice by fast revocation, tally close, and the counterparty ceremony.
+
+## Portfolio
+
+The **portfolio** is a party's private financial state — the list of tallies it holds, its exchange-rate quotes, its in-flight lift bookkeeping, and its app preferences. It replaces the MyCHIPs user database. Two properties define it: it is **private** (never shared into any tally strand, so no counterparty ever reads it) yet must be **visible to all of the party's own devices** — the phone and any always-on cloud/NAS node that runs the lift agent, which reads quotes and lift state at decision time.
+
+### Why a single-party strand
+
+The portfolio lives in its own **single-party Sereus strand** — a closed strand whose only member is this party, carrying the Taleus portfolio schema ([`schema/portfolio.qsql`](../schema/portfolio.qsql)). A single-member closed strand is a supported Sereus configuration (the founder-bootstrap / solo path), and its cohort is just this party's own cadre, so ordinary strand replication carries the portfolio to every one of the party's nodes, including the always-on lift-agent node.
+
+The alternative — stuffing this state into the Sereus **control network** (the private Optimystic network of only the party's own cadre nodes) — was rejected: the control network's schema is platform-owned (`Strand`, `AuthorityKey`, `CadrePeer`, …; see the Sereus docs, *Control Network*), and Sereus's own guidance keeps application data in an sApp strand, not the control schema. A single-party sApp strand cleanly separates app state, reuses strand replication + hibernation, and is naturally caught by the phone's existing `sAppId:taleus` strand filter.
+
+**Same `sAppId`, two schemas.** The phone runs one cadre node with one strand filter (`sAppId:taleus`), so both the portfolio strand and every tally strand share `sAppId = taleus` to be picked up. `sAppId` is a filter tag, not a schema identity — each `Strand` row names its own sApp schema, so one `taleus` sAppId hosts both the two-party tally schema ([`schema/draft1.qsql`](../schema/draft1.qsql)) and the single-party portfolio schema. The app tells a portfolio strand from a tally strand by the `PortfolioCore` marker row (below), not by member count — a tally mid-formation is also briefly one member.
+
+### Tables
+
+The portfolio schema keeps the house style of the tally schema — **insert-only, revisioned, latest-wins views** (it mirrors `TradingVariable`) — but carries **no signatures**. The tally schema is signature-gated because it defends against a counterparty; the portfolio's cohort is a single cadre (the party's own devices), so the Sereus strand-membership layer (only this cadre may write) is the sole write gate and no `verify()`/signature constraint is needed. State advances by appending a revision; a view exposes the current row.
+
+| Table | Purpose |
+|---|---|
+| `PortfolioCore` | Singleton marker + owner identity (`OwnerSid`). Its presence is how the app recognizes a strand as *the* portfolio (a tally strand has `TallyCore` instead). |
+| `TallyRegistry` | One revisioned entry per tally the party holds — role (stock/foil), counterparty, cached denomination/state/certificate/balance. A **display index** over the party's tally strands, not authoritative tally state. |
+| `LiftJournal` | In-flight lift bookkeeping: the agent's cross-tally correlation of a lift in progress (which lift, which edges, what state). The authoritative per-edge state is the pending lift chit in each tally strand's `Ledger`; this is the private map the agent drives discovery/commit from. |
+| `AppPreference` | Revisioned key/value app settings (display currency, notification preferences, …). |
+| `ExchangeRateQuote` | The party's per-denomination exchange-rate quotes (added by `feat-exchange-rate-quotes`); private, revisioned, unsigned. See [Denominations and Exchange](#denominations-and-exchange). |
+
+**Identification.** Among the `sAppId:taleus` strands, *the* portfolio is the one carrying a `PortfolioCore` row whose `OwnerSid` equals this party's own `Sid`. This is self-locating — there is no external pointer to lose, and the marker (not member-count-of-one) is what distinguishes it from a tally strand mid-formation.
+
+### Consistency across devices
+
+Both the phone and the always-on node are members of the same single-party strand cohort, so plain Optimystic replication carries a write from one to the other. There is no cross-party consensus (single party), only intra-cadre replication. No read-your-writes guarantee is asserted *across* devices: if the phone edits a rate quote and the write has not yet replicated when a lift decision fires on the always-on node, the agent reads the prior revision — acceptable, and for rate quotes bounded by the quote's own validity window. Concurrent edits from two devices each append a new revision; the `(Key/StrandId/LiftId, Revision)` primary key plus Optimystic write ordering serialize them (the same mechanism as concurrent `PartyKey` adds), rejecting the loser's duplicate revision — latest committed revision wins, the loser retries against the new max.
+
+### Recovery
+
+The portfolio is the *map* of the party's financial life, so losing it must not lose tallies — and it does not:
+
+- **Tallies recover independently.** Each tally is its own strand whose cohort includes the counterparty; it is recovered via cadre membership + `PartyKeyAdoption` ([Key recovery](#key-recovery)), entirely without the portfolio.
+- **The registry is reconstructible.** `TallyRegistry` is an index over strands the cadre already belongs to. The control network's `Strand` view lists every strand this cadre operates; re-enumerating the `sAppId:taleus` strands and reading each tally's `TallyCore`/`TallyContract` rebuilds the registry from scratch. A lost portfolio strand therefore costs no tally.
+- **Quotes, lift journal, and preferences are NOT reconstructible** — they are private policy/bookkeeping with no external source. Their durability rests on the portfolio strand replicating to a durable node (the always-on cloud/NAS node the party adds for the lift agent) plus optional user export. A phone-only party that loses its phone loses its quotes and preferences (not its tallies) — the same durability tradeoff Sereus states for a single-device cadre. The portfolio is **not** recoverable from counterparties.
+
+### First-launch reconciliation (double-create)
+
+Two of the party's devices can both check "no portfolio exists yet" and both create one at first bring-up (they share the control network's `Strand` view), yielding two portfolio strands. The schema cannot prevent this — they are separate strands. The app-wiring layer ([`backlog/feat-portfolio-app-wiring`](../tickets/backlog/feat-portfolio-app-wiring.md)) resolves it deterministically: on detecting more than one portfolio strand for `OwnerSid`, keep the one with the lexicographically-lowest `StrandId`, migrate the loser's rows into it (a plain revision-append, since every portfolio table is keyed for it), and drop the loser from the cadre. The schema side is built to survive this: `PortfolioCore` is a singleton *per strand*, and all tables are keyed so a merge is a plain revision-append into the survivor.
 
 ## Denominations and Exchange
 

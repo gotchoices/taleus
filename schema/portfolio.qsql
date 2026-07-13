@@ -1,0 +1,96 @@
+-- Single-party portfolio strand. sAppId taleus; cohort = this party's own cadre.
+-- Private (never shared into a tally strand). No signatures: Sereus strand
+-- membership is the only write gate. Insert-only + revisioned + latest-wins views.
+--
+-- Same sAppId, two schemas: the phone's one CadreNode runs a single strand filter
+-- (sAppId:taleus), so both this portfolio strand and every two-party tally strand
+-- (schema/draft1.qsql) share sAppId = taleus to be picked up. sAppId is a filter tag,
+-- not a schema identity -- each Strand row names its own sApp schema. The app tells the
+-- two apart by the PortfolioCore marker row below (a tally strand carries TallyCore
+-- instead), not by member count alone (a tally mid-formation is also briefly one member).
+--
+-- NOTE: this strand carries the `interactive` latency hint (same as tally strands). The
+-- always-on lift agent must read quotes / the lift journal at decision time even while the
+-- strand hibernates; agent reads/writes wake it locally (../sereus/docs/architecture.md
+-- § Strand Hibernation, local wake). The hint is set at strand creation (app-wiring, not
+-- schema); recorded here so a reader knows this strand is expected to be interactive.
+--
+-- NOTE: insert-only + revisioned means TallyRegistry / LiftJournal / AppPreference grow
+-- unboundedly as state churns (a 6-transition lift = 6 LiftJournal rows; a chatty balance
+-- cache = one row per update). Fine now -- a portfolio holds hundreds of tallies, not
+-- millions of rows. If a long-lived portfolio's revision history ever grows costly, add
+-- compaction (drop superseded revisions). Safe precisely because these tables are private
+-- and unsigned -- no audit/consensus reason to retain history (unlike the tally Ledger).
+-- Tripwire only; do not build compaction now.
+
+-- Singleton marker + owner identity. Presence of this row is how the app recognizes
+-- a strand as *the* portfolio (vs a tally strand, which has TallyCore instead).
+create table PortfolioCore (
+    OwnerSid text,        -- this party's Sid; same identity used in its tally strands
+    Version integer,      -- portfolio schema/protocol version
+    Created text,
+    primary key (/* 1 row */),
+    constraint InsertOnly check (0) on delete, update
+);
+
+-- One logical entry per tally the party holds; revisioned. This is a *cache/index*
+-- over the party's tally strands, not the authoritative tally state (that lives in
+-- each tally strand). Reconstructible from CadreControl.Strand + reading each tally.
+create table TallyRegistry (
+    StrandId text,                       -- the tally strand's id
+    Revision integer,
+    Role text check Role in ('S', 'F'),  -- this party's seat: Stock or Foil
+    CounterpartySid text,
+    Denomination text,                   -- cached from the tally's accepted contract
+    DenominationScale integer,
+    State text,                          -- forming|open|closing|closed|void (cached)
+    -- NOTE: display-only cache. Authoritative source is the tally strand, which can advance
+    -- while hibernating (the counterparty writes a chit); refreshed opportunistically when the
+    -- tally wakes. Reads that must be exact (a payment amount) read the tally strand, not this.
+    CounterpartyCertificate text null,   -- cached cert (display w/o waking the tally)
+    BalanceCache integer null,           -- last-known perspective balance (display only)
+    Updated text,
+    primary key (StrandId, Revision),
+    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from committed.TallyRegistry T where T.StrandId = New.StrandId), 0) + 1) on insert,
+    constraint InsertOnly check (0) on delete, update
+);
+create view CurrentTallyRegistry as
+    select R.* from TallyRegistry R
+    where R.Revision = (select max(Revision) from TallyRegistry T2 where T2.StrandId = R.StrandId);
+
+-- In-flight lift bookkeeping: the agent's cross-tally correlation of a lift in progress.
+-- The authoritative per-edge state is the pending lift chit in each tally strand's Ledger;
+-- this journal is the private "which lift, which edges, what state" map the agent needs to
+-- drive discovery/commit across strands. Revisioned; advances by appending a new State.
+create table LiftJournal (
+    LiftId text,
+    Revision integer,
+    Role text check Role in ('O', 'I', 'P'),   -- Originator | Intermediary | Payee
+    State text,                                 -- proposed|discovering|pending|committed|aborted|timedout
+    Edges text,                                 -- JSON: [{ strandId, denom, units, direction }]
+    Referee text null,
+    Updated text,
+    primary key (LiftId, Revision),
+    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from committed.LiftJournal J where J.LiftId = New.LiftId), 0) + 1) on insert,
+    constraint InsertOnly check (0) on delete, update
+);
+create view CurrentLift as
+    select J.* from LiftJournal J
+    where J.Revision = (select max(Revision) from LiftJournal J2 where J2.LiftId = J.LiftId);
+
+-- App preferences: key/value, revisioned (e.g. display currency, notification prefs).
+create table AppPreference (
+    Key text,
+    Revision integer,
+    Value text,
+    Updated text,
+    primary key (Key, Revision),
+    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from committed.AppPreference P where P.Key = New.Key), 0) + 1) on insert,
+    constraint InsertOnly check (0) on delete, update
+);
+create view CurrentPreference as
+    select P.* from AppPreference P
+    where P.Revision = (select max(Revision) from AppPreference P2 where P2.Key = P.Key);
+
+-- ExchangeRateQuote is added into THIS file by feat-exchange-rate-quotes (private,
+-- revisioned, unsigned). Do not define it here; that ticket owns its structure + math.
