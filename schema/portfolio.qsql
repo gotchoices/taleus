@@ -108,8 +108,8 @@ create view CurrentPreference as
 -- (1 USD, 1 CHIP), not at smallest-unit granularity, so a quote is independent of any tally's
 -- per-contract scale. Scales enter only at conversion time, from each edge's contract.
 create table ExchangeRateQuote (
-    FromDenom text,                           -- denomination the quoting party releases (pays out)
-    ToDenom text,                             -- denomination the quoting party accumulates (receives)
+    FromDenom text,                           -- convert-FROM denom = D_in in the conversion NOTE below: the upstream (payer-side) edge; value the quoting party RECEIVES/accumulates
+    ToDenom text,                             -- convert-TO   denom = D_out in the conversion NOTE below: the downstream (payee-side) edge; value the quoting party RELEASES/pays out
     Revision integer,
     RateNum integer check (RateNum > 0),      -- effective rate (spread folded in): FromDisplay units per ToDisplay unit
     RateDen integer check (RateDen > 0),      -- rational RateNum/RateDen, for integer-exact conversion
