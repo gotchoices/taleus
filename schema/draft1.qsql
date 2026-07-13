@@ -576,6 +576,11 @@ create view ReservedPerspectiveBalance as
 -- deterministic, chit-dated Ledger.WithinCreditLimits / WithinReservedCredit.
 -- Balance here is the RESERVED perspective balance (settled + open pending lifts), so an open pledge
 -- already subtracts from advertised free capacity -- concurrent lifts do not double-advertise the same room.
+-- NOTE (pre-existing, unrelated to lift chits): the FreeUnits/RewardedUnits math below uses SCALAR 2-arg
+-- max()/min(), which Quereus does not provide (it has aggregate min/max only, so this view fails to bind:
+-- "Function not found: max/2"). Predates this ticket; tracked in backlog/debt-schema-liftlading-scalar-minmax
+-- (rewrite as CASE expressions, or add scalar min/max upstream). Everything else in the lift-chit machinery
+-- binds cleanly on Quereus -- this is the sole exception.
 create view LiftLading as
     select
         RV.Sid as ReceiverSid,
