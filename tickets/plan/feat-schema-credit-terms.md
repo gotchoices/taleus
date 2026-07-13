@@ -8,7 +8,7 @@ Requirements:
 - Each party extends terms unilaterally (only the grantor signs), per the MyCHIPs model — see `docs/old/tally.md` § Credit Terms Chunk.
 - Terms are revisioned; restrictive changes take effect only after the call term expires, permissive changes immediately.
 - Decide representation: structured columns on the contract proposal/acceptance rows vs. a separate revisioned `CreditTerms` table referenced by the contract. The contract's bilateral signature must cover the terms in force at acceptance.
-- The denomination argument (see `feat-multi-denomination`) travels the same way — design the argument mechanism generically.
+- The denomination argument (see `feat-denomination-argument`, which builds on this ticket's mechanism) travels the same way — design the argument mechanism generically.
 - Ledger/lift validation must be able to check a prospective chit against the current effective limit (including pending lift chits).
 
 Expected outcome: schema tables + constraints for terms; architecture.md contract/negotiation sections stay accurate.
