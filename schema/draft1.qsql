@@ -62,14 +62,23 @@ create table PartyKey (
     -- stays, so a re-add of the same PublicKey makes the count 2 and fails.
     constraint UniqueKey check ((select count(*) from PartyKey PK where PK.Sid = New.Sid and PK.PublicKey = New.PublicKey) = 1) on insert,
     -- The authorizing key must have been in the party's authorized set as of the
-    -- pre-transaction snapshot (registered in committed.PartyKey and not revoked by a
-    -- committed revocation). Using committed.* rather than the live AuthorizedKey view is a
-    -- SECURITY requirement: the live view already contains this new row, so a self-authorizing
-    -- add (AuthKey = New.PublicKey) would validate itself and mint authority from nothing.
+    -- pre-transaction snapshot -- registered either as a normal add (committed.PartyKey) OR as a
+    -- counterparty adoption (committed.PartyKeyAdoption), and not revoked by a committed
+    -- revocation. Including committed.PartyKeyAdoption is REQUIRED for recovery to complete: after
+    -- a total-loss adoption the only surviving key is the adopted one, and the party must be able
+    -- to authorize its fresh device keys with it (see docs "Key recovery"; without this an adopted
+    -- key could sign existing tables but never add further keys). Using committed.* rather than the
+    -- live AuthorizedKey/RegisteredKey view is a SECURITY requirement: the live view already
+    -- contains this new row, so a self-authorizing add (AuthKey = New.PublicKey) would validate
+    -- itself and mint authority from nothing. committed.* also excludes an adoption inserted in the
+    -- SAME transaction, so an add cannot bootstrap off an adoption that has not itself committed.
     constraint AuthKeyAuthorized check (
         New.Revision = 1
-        or (New.AuthKey in (select PK.PublicKey from committed.PartyKey PK where PK.Sid = New.Sid)
-            and not exists (select 1 from committed.PartyKeyRevocation R where R.Sid = New.Sid and R.PublicKey = New.AuthKey))
+        or (
+            (New.AuthKey in (select PK.PublicKey from committed.PartyKey PK where PK.Sid = New.Sid)
+             or New.AuthKey in (select A.PublicKey from committed.PartyKeyAdoption A where A.Sid = New.Sid))
+            and not exists (select 1 from committed.PartyKeyRevocation R where R.Sid = New.Sid and R.PublicKey = New.AuthKey)
+        )
     ) on insert,
     -- Genesis validates against the invitation key (via Stock); every later add against the
     -- key that authorized it. Reuses the single-key SignatureValid primitive -- no new crypto.
@@ -105,9 +114,11 @@ create table PartyKeyRevocation (
     primary key (Sid, PublicKey),   -- also blocks double-revocation of the same key
     -- Target must be a registered key of this party. "Not already revoked" is enforced by the
     -- primary key (a second revocation of the same (Sid, PublicKey) is rejected), so this need
-    -- only confirm registration. It reads PartyKey (not the AuthorizedKey view) because the
-    -- view already excludes the target once this in-flight revocation row is buffered.
-    constraint TargetAuthorized check (New.PublicKey in (select PK.PublicKey from PartyKey PK where PK.Sid = New.Sid)) on insert,
+    -- only confirm registration. It reads RegisteredKey -- normal adds plus counterparty
+    -- adoptions -- not the AuthorizedKey view: the view already excludes the target once this
+    -- in-flight revocation row is buffered, and reading RegisteredKey (rather than PartyKey
+    -- alone) is what makes an ADOPTED key revocable exactly like a normal add.
+    constraint TargetAuthorized check (New.PublicKey in (select RK.PublicKey from RegisteredKey RK where RK.Sid = New.Sid)) on insert,
     -- Revoker must be currently authorized. The live view is correct here: for a normal
     -- revoke (revoker <> target) the view still contains the revoker, and a revoked key can
     -- never itself revoke (the view excludes it). A key naming itself as RevokedBy is excluded
@@ -137,22 +148,99 @@ create table PartyKeyRevocation (
     constraint InsertOnly check (0) on delete, update
 );
 
--- The party's currently-authorized signing keys: every registered key minus revoked ones.
--- Signature-gated tables resolve their SignerKey against this set. Reads current
--- (buffered+committed) state; constraints that must exclude the row being inserted
--- (PartyKey.RevisionMonotonicInt, PartyKey.AuthKeyAuthorized) use committed.* directly
--- instead of this view. The counterparty re-key ceremony (key-counterparty-rekey) unions
--- adopted keys into this same view.
--- NOTE: every SignerAuthorized / RevokerAuthorized / NotLastKey check references THIS view
--- from inside a CHECK sub-query. Confirmed against Quereus source (planner/building/select.ts
--- buildFrom inlines a view wherever a base table is accepted, including constraint sub-queries,
--- with no base-table-only guard) -- but Quereus has NO test exercising a view inside a CHECK.
--- If a future runner rejects a view here, the fallback is to inline this view's body
--- (PartyKey minus PartyKeyRevocation) directly into each referencing constraint.
+-- Counterparty re-key ceremony (ticket key-counterparty-rekey). The ONLY path that introduces a
+-- key into a party's authorized set WITHOUT an existing key of that party -- last-resort recovery
+-- for a party that lost EVERY authorized key (all cadre nodes gone, or every key stolen), where
+-- nothing inside the tally can otherwise sign a new key in. Authority here comes from the human
+-- trust between the two parties: the recovering party self-signs the fresh key (proving it
+-- controls it) and the COUNTERPARTY attests it with one of its own authorized keys ("yes, this
+-- really is you"). Bilateral -- neither side can do it alone.
+--
+-- Sid is UNCHANGED: this re-keys an EXISTING party, it never mints a new identity, so all history
+-- stays valid and the two-party invariant (PartyKey.TwoParties) continues to hold -- SidIsParty
+-- forbids adoption for an unknown Sid, and adoption never inserts a PartyKey row, so it cannot add
+-- a third party. Once an adopted key is authorized, normal add/revoke resumes from it: the party
+-- registers its new devices' keys and revokes the lost/stolen ones (now permitted, because
+-- NotLastKey sees the adopted key). Adoption is allowed even when the set is non-empty (serves the
+-- all-keys-STOLEN case: an honest party gets a counterparty-blessed fresh key BEFORE revoking the
+-- thieves).
+--
+-- Layering: this is the APP layer and presupposes the recovering cadre is already back in the
+-- Sereus strand (it lost strand-membership + cadre-authority keys with its nodes). Ordering is
+-- Sereus re-invite (regain strand access) -> this table (regain signing authority); the strand
+-- re-admission is a sequencing dependency, not a schema constraint, and is NOT modeled here
+-- (see docs/architecture.md "Key recovery").
+--
+-- NOTE: the counterparty IS the recovery trust root. A malicious counterparty colluding to adopt
+-- a key it controls is INHERENT to a two-party human-trust root and is OUT OF SCOPE by design:
+-- SelfSigValid still forces the real party to have generated the key and handed it over out of
+-- band, so the counterparty ALONE cannot forge an adoption, but genuine collusion is not
+-- preventable at this layer.
+-- NOTE: Digest(Sid, PublicKey) is not tally-bound (follows PartyKey precedent, not the chit
+-- tables' Cid-bound digests). A self-signature is valid for this Sid in any tally the party holds,
+-- but confers nothing without THAT tally's counterparty attesting with a locally-authorized key,
+-- so cross-tally replay of the self-signature alone grants no authority. If adoption ever needs to
+-- bind to one specific tally, add (select Cid from TallyCore) to both digests.
+create table PartyKeyAdoption (
+    Sid text,                    -- party regaining authority (unchanged identity)
+    PublicKey text,              -- new key being adopted
+    SelfSignature text,          -- new key signs Digest(Sid, PublicKey): possession proof by the recovering party
+    CounterpartyKey text,        -- counterparty's currently-authorized key that attests
+    CounterpartySignature text,  -- counterparty signs the same digest
+
+    primary key (Sid, PublicKey),   -- also blocks re-adopting the same key for the same party
+    -- No new party: adoption re-keys one of the two existing parties, never bootstraps a Sid.
+    -- (A party only comes into existence via a PartyKey genesis row, so PartyKey is the party set.)
+    constraint SidIsParty check (New.Sid in (select distinct Sid from PartyKey)) on insert,
+    -- The attesting key must belong to the OTHER party and be currently authorized (non-revoked).
+    -- Reads the live AuthorizedKey view: freshness matters (a stale/revoked counterparty key must
+    -- fail), and the `<> New.Sid` filter excludes this very adoption row (whose Sid = New.Sid,
+    -- now unioned into the view) from vouching for itself -- no self-attestation is possible.
+    constraint CounterpartyIsOther check (New.CounterpartyKey in (select PublicKey from AuthorizedKey AK where AK.Sid <> New.Sid)) on insert,
+    -- Possession proof: the adopted key signs its own adoption. This is what stops the counterparty
+    -- from adopting a key it alone controls.
+    constraint SelfSigValid check (SignatureValid(Digest(Sid, PublicKey), SelfSignature, PublicKey)) on insert,
+    -- Attestation: the counterparty's authorized key signs the same digest.
+    constraint CounterpartySigValid check (SignatureValid(Digest(Sid, PublicKey), CounterpartySignature, CounterpartyKey)) on insert,
+    -- Replay/dup guard: the key must not already be a registered add (PartyKey) for this party, and
+    -- this must be the sole adoption row for it (plain ref includes the buffered new row -> 1).
+    constraint UniqueKey check (
+        (select count(*) from PartyKey PK where PK.Sid = New.Sid and PK.PublicKey = New.PublicKey) = 0
+        and (select count(*) from PartyKeyAdoption A where A.Sid = New.Sid and A.PublicKey = New.PublicKey) = 1
+    ) on insert,
+    constraint InsertOnly check (0) on delete, update
+);
+
+-- Every key ever introduced for a party, revocation-agnostic: normal adds (PartyKey) plus
+-- counterparty-attested adoptions (PartyKeyAdoption, the key-counterparty-rekey ceremony).
+-- AuthorizedKey subtracts revocations from this; PartyKeyRevocation.TargetAuthorized reads THIS
+-- view (not the authorized one) so a key stays a recognizable revocation target even after the
+-- in-flight revocation buffers -- and, crucially, so an ADOPTED key is revocable exactly like a
+-- normal add. Factored into its own view so the PartyKey-union-PartyKeyAdoption set is defined
+-- once, not duplicated across every consumer. (union, not union all: the two sources never share a
+-- (Sid, PublicKey) -- PartyKeyAdoption.UniqueKey forbids adopting a key already registered in
+-- PartyKey -- so dedup is a safety net, not load-bearing.)
+create view RegisteredKey as
+    select Sid, PublicKey from PartyKey
+    union
+    select Sid, PublicKey from PartyKeyAdoption;
+
+-- The party's currently-authorized signing keys: every registered key (RegisteredKey = adds plus
+-- adoptions) minus revoked ones. Signature-gated tables resolve their SignerKey against this set.
+-- Reads current (buffered+committed) state; constraints that must exclude the row being inserted
+-- (PartyKey.RevisionMonotonicInt, PartyKey.AuthKeyAuthorized) use committed.* directly instead of
+-- this view.
+-- NOTE: every SignerAuthorized / RevokerAuthorized / NotLastKey / CounterpartyIsOther check
+-- references THIS view (or RegisteredKey) from inside a CHECK sub-query. Confirmed against Quereus
+-- source (planner/building/select.ts buildFrom inlines a view wherever a base table is accepted,
+-- including constraint sub-queries, with no base-table-only guard) -- but Quereus has NO test
+-- exercising a view inside a CHECK. If a future runner rejects a view here, the fallback is to
+-- inline the body -- RegisteredKey (PartyKey union PartyKeyAdoption) minus PartyKeyRevocation --
+-- directly into each referencing constraint.
 create view AuthorizedKey as
-    select PK.Sid, PK.PublicKey
-    from PartyKey PK
-    where not exists (select 1 from PartyKeyRevocation R where R.Sid = PK.Sid and R.PublicKey = PK.PublicKey);
+    select RK.Sid, RK.PublicKey
+    from RegisteredKey RK
+    where not exists (select 1 from PartyKeyRevocation R where R.Sid = RK.Sid and R.PublicKey = RK.PublicKey);
 
 create table PartyCertificate (
     PartySid text,
