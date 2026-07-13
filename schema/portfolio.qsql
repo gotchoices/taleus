@@ -133,10 +133,10 @@ create view CurrentExchangeRateQuote as
     select Q.* from ExchangeRateQuote Q
     where Q.Revision = (select max(Revision) from ExchangeRateQuote Q2 where Q2.FromDenom = Q.FromDenom and Q2.ToDenom = Q.ToDenom);
 
--- NOTE: cross-denomination conversion math. The formula below is the contract the future
--- conversion helper / lift agent (feat-chipnet-integration) must implement; carry these NOTEs
--- to the actual req_in computation site when it is built -- there is no conversion code yet, so
--- this rate definition is its current home. Value flows payer->payee; discovery walks the route
+-- NOTE: cross-denomination conversion math. The formula below is the contract that
+-- src/lift/convert.ts (convertBoundary) implements -- this rate definition is where the
+-- contract is documented; that file mirrors it at the actual req_in computation site.
+-- Value flows payer->payee; discovery walks the route
 -- backward from the payee. At each boundary the downstream tally (nearer payee) is D_out at
 -- scale s_out with required smallest-units req_out; the upstream tally (nearer payer) is D_in at
 -- scale s_in; the intermediary quotes RateNum/RateDen for From=D_in, To=D_out. Required upstream
@@ -150,7 +150,7 @@ create view CurrentExchangeRateQuote as
 -- NOTE: OVERFLOW STRATEGY -- decided; do NOT "optimize" this back to a native 64-bit multiply.
 -- Reduce RateNum/RateDen to lowest terms, then compute req_out*RateNum*10^(s_in) with BigInt
 -- (cross-platform) and take the ceiling via integer division. Large amount x large rate x large
--- scale overflows 64 bits otherwise.
+-- scale overflows 64 bits otherwise. See src/lift/convert.ts for the landed implementation.
 --
 -- NOTE: rounding-dust accumulation (tripwire) -- a route of N conversion boundaries can add up to
 -- N sub-units of extra originator cost. Bounded and acceptable now; only matters if very long
