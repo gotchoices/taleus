@@ -179,6 +179,32 @@ Consequences for payments and lifts:
 - **Lift terms are fixed at commit.** The signed lift record binds each edge's units in that edge's own denomination — every tally's ledger stays internally consistent in its own unit, and no participant is exposed to rate movement after signing.
 - A **circular clearing lift** in a single denomination is the degenerate case: all rates 1, exactly the MyCHIPs behavior.
 
+### Exchange rate quotes
+
+A party that holds tallies in more than one denomination stores its conversion policy as **exchange rate quotes** in its portfolio ([`schema/portfolio.qsql`](../schema/portfolio.qsql), `ExchangeRateQuote`). A quote is *private* — read only by the party's own lift agent at decision time, never shared into a tally strand. This is the key distinction from a **trading variable** (`TradingVariable`), which a party publishes *into the shared tally strand* for the counterparty to read: an exchange rate is the party's own internal cost of crossing between two of its denominations, so no counterparty ever sees it.
+
+Each quote is **directional**: a pair needs two rows (`From→To` and `To→From`) because the spread is asymmetric. `RateNum/RateDen` is the effective rate — a rational for integer-exact math — with the party's conversion cost (spread) already folded in, the multi-denomination generalization of a trading variable's `reward`. Optional `Mid*`/`SpreadPpm` fields record the mid-market rate and applied spread for display and for re-deriving the effective rate; a negative spread (a subsidy) is permitted, mirroring `reward`'s signed semantics.
+
+The rate is defined at each denomination's **display unit** (1 USD, 1 CHIP), *not* at smallest-unit granularity — so a quote is independent of any tally's per-contract scale. Scales enter only at conversion time, from each edge's own contract. Quotes are revisioned and carry a validity window (`ValidFrom`/`ValidUntil`); the lift agent reads the latest revision valid at decision time. Guards: `RateNum > 0`, `RateDen > 0`, `ValidUntil ≥ ValidFrom`.
+
+### Cross-denomination conversion
+
+Value flows from payer toward payee. Discovery walks the route **backward from the payee**, converting the required amount denomination by denomination until it reaches the originator's own edge. At each conversion boundary, let the downstream tally (nearer the payee) be denomination `D_out` at scale `s_out`, with required amount `req_out` (integer smallest-units of `D_out`) already computed; the upstream tally (nearer the payer) is `D_in` at scale `s_in`; the intermediary between them quotes `RateNum/RateDen` from its `ExchangeRateQuote` row for `From = D_in, To = D_out` (in-display per out-display). The required upstream smallest-units are:
+
+```
+req_in = ceil( req_out * RateNum * 10^(s_in)  /  ( RateDen * 10^(s_out) ) )
+```
+
+All whole-number arithmetic, one ceiling. The party paying the upstream edge rounds **up** so the downstream party is never shorted; the sub-unit remainder (< 1 smallest-unit of `D_in` per edge) is borne upstream. The degenerate single-denomination case — same denomination, equal scale, no spread — is `RateNum = RateDen = 1`, `s_in = s_out`, so the ceiling is a no-op and the math reduces exactly to MyCHIPs behavior.
+
+Discovery accumulates `req` across every boundary end-to-end; the value at the originator's own edge is the exact source-denomination cost of delivering the target amount, presented before commit. Trading-variable fees compose per the existing `LiftLading` rule (`NewRate = PriorRate + MyRate × (1 − PriorRate)`) and apply per edge alongside the conversion — the conversion is the multiplicative scale change, the fee ratio the accumulated cost.
+
+**Who absorbs the rounding dust: the originator** — the payer for a linear lift or payment, the initiator for a circular clearing lift. Every intermediary and the payee receive at least their exact integer due; the per-edge ceiling dust accrues upstream to the originator and is disclosed as part of the exact source cost during discovery. A route of N conversion boundaries can therefore add up to N sub-units of extra originator cost — bounded and acceptable. Commit then binds each edge's integer units in that edge's own denomination (the ceiled values), so no participant bears rate movement after signing; a quote that expires between discovery and commit still binds the discovered terms, the quoting party bearing the movement within the window it chose.
+
+**Overflow.** `req_out × RateNum × 10^(s_in)` overflows 64 bits on a large amount × large rate × large scale, so the conversion helper reduces `RateNum/RateDen` to lowest terms and computes the intermediate product with **BigInt** (cross-platform), taking the ceiling via integer division. This is a fixed decision, recorded as a `NOTE:` at the rate definition in [`schema/portfolio.qsql`](../schema/portfolio.qsql) so the helper built under `feat-chipnet-integration` does not regress it to a native 64-bit multiply.
+
+A **missing or expired quote** at a boundary means that edge cannot convert, so discovery prunes the route — the agent never fabricates a rate.
+
 ## Ledger Operation
 
 - **Direct payment**: issuer inserts a `Ledger` row pledging `Units` to the other party, signed with one of the issuer's authorized `PartyKey`s (named in the row's `SignerKey`). Balance convention: foil-issued chits increment, stock-issued decrement (see `BalanceCorrect`).

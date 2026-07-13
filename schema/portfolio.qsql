@@ -92,5 +92,67 @@ create view CurrentPreference as
     select P.* from AppPreference P
     where P.Revision = (select max(Revision) from AppPreference P2 where P2.Key = P.Key);
 
--- ExchangeRateQuote is added into THIS file by feat-exchange-rate-quotes (private,
--- revisioned, unsigned). Do not define it here; that ticket owns its structure + math.
+-- Exchange rate quotes: the party's private trading policy for converting value between
+-- the denominations of its own tallies. Read only by the party's own lift agent at decision
+-- time; NEVER shared into a tally strand -- unlike TradingVariable (schema/draft1.qsql),
+-- which is published per-tally for the counterparty to read. Insert-only, revisioned,
+-- unsigned -- strand membership is the sole write gate, same as the rest of this file.
+--
+-- Directional: a currency pair needs two rows (From->To and To->From) because the spread is
+-- asymmetric. RateNum/RateDen is the *effective* rate with the party's conversion cost (spread)
+-- already folded in -- the multi-denomination generalization of TradingVariable.Reward.
+-- Mid*/SpreadPpm are optional display fields for re-deriving the effective rate; a negative
+-- SpreadPpm (subsidy) is permitted, mirroring Reward's signed semantics.
+--
+-- Display-level, scale-independent: the rate is defined at each denomination's *display* unit
+-- (1 USD, 1 CHIP), not at smallest-unit granularity, so a quote is independent of any tally's
+-- per-contract scale. Scales enter only at conversion time, from each edge's contract.
+create table ExchangeRateQuote (
+    FromDenom text,                           -- denomination the quoting party releases (pays out)
+    ToDenom text,                             -- denomination the quoting party accumulates (receives)
+    Revision integer,
+    RateNum integer check (RateNum > 0),      -- effective rate (spread folded in): FromDisplay units per ToDisplay unit
+    RateDen integer check (RateDen > 0),      -- rational RateNum/RateDen, for integer-exact conversion
+    MidNum integer null,                      -- optional: mid-market rate before spread (display / re-derivation)
+    MidDen integer null,
+    SpreadPpm integer null,                   -- optional: spread applied, parts-per-million (display; negative = subsidy)
+    ValidFrom text,                           -- date; quote usable from (inclusive)
+    ValidUntil text,                          -- date; quote usable until (inclusive)
+    Updated text,
+    primary key (FromDenom, ToDenom, Revision),
+    constraint ValidWindow check (ValidUntil >= ValidFrom) on insert,
+    constraint RevisionMonotonicInt check (Revision = Coalesce((select max(Revision) from committed.ExchangeRateQuote Q where Q.FromDenom = New.FromDenom and Q.ToDenom = New.ToDenom), 0) + 1) on insert,
+    constraint InsertOnly check (0) on delete, update
+);
+-- Latest revision per direction. The lift agent then filters by validity window at decision
+-- time (ValidFrom <= now <= ValidUntil): a pair whose latest revision is out of window has no
+-- usable quote, so that conversion boundary is pruned from the route (the agent must never
+-- fabricate a rate). Committed lift terms bind regardless of later expiry -- the quoting party
+-- bears any rate movement between quote and commit, bounded by the window it chose.
+create view CurrentExchangeRateQuote as
+    select Q.* from ExchangeRateQuote Q
+    where Q.Revision = (select max(Revision) from ExchangeRateQuote Q2 where Q2.FromDenom = Q.FromDenom and Q2.ToDenom = Q.ToDenom);
+
+-- NOTE: cross-denomination conversion math. The formula below is the contract the future
+-- conversion helper / lift agent (feat-chipnet-integration) must implement; carry these NOTEs
+-- to the actual req_in computation site when it is built -- there is no conversion code yet, so
+-- this rate definition is its current home. Value flows payer->payee; discovery walks the route
+-- backward from the payee. At each boundary the downstream tally (nearer payee) is D_out at
+-- scale s_out with required smallest-units req_out; the upstream tally (nearer payer) is D_in at
+-- scale s_in; the intermediary quotes RateNum/RateDen for From=D_in, To=D_out. Required upstream
+-- smallest-units:
+--   req_in = ceil( req_out * RateNum * 10^(s_in) / ( RateDen * 10^(s_out) ) )
+-- Round UP so the downstream party is never shorted; the sub-unit remainder (< 1 smallest-unit
+-- of D_in per edge) is borne upstream, cascading to the originator (the payer for a linear lift /
+-- payment, the initiator for a circular clearing lift). Degenerate single-denomination case
+-- (RateNum=RateDen=1, s_in=s_out) makes the ceiling a no-op -- exactly MyCHIPs behavior.
+--
+-- NOTE: OVERFLOW STRATEGY -- decided; do NOT "optimize" this back to a native 64-bit multiply.
+-- Reduce RateNum/RateDen to lowest terms, then compute req_out*RateNum*10^(s_in) with BigInt
+-- (cross-platform) and take the ceiling via integer division. Large amount x large rate x large
+-- scale overflows 64 bits otherwise.
+--
+-- NOTE: rounding-dust accumulation (tripwire) -- a route of N conversion boundaries can add up to
+-- N sub-units of extra originator cost. Bounded and acceptable now; only matters if very long
+-- routes ever appear. If they do, revisit whether the dust should be redistributed rather than
+-- all borne by the originator.
