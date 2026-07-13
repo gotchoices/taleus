@@ -1,98 +1,43 @@
-<div align="center">
-  <img src="doc/images/logo.svg" alt="Taleus Logo" width="150" align="left">
-  <h1>Taleus</h1>
-  <p>A standardized library for managing private credit tallies using libp2p.</p>
-  <br clear="all">
-</div>
+# Taleus
 
-## Overview
+<p align="center"><img src="docs/images/logo.svg" alt="Taleus" width="180"/></p>
 
-Taleus is a library for negotiating, establishing and maintaining private credit relationships (tallies) between participants in a Private Credit Network (PCN).
+Taleus is a peer-to-peer private credit system — a reboot of [MyCHIPs](https://github.com/gotchoices/mychips) on the [Sereus](https://sereus.org) platform. Two parties who trust each other form a **tally**: a digital credit agreement recorded in a shared database that only they control. Value moves by signed pledges (**chits**), and balances clear across the wider web of tallies through cooperative **lift** transactions — money as pure relationship credit, with no bank, token, or hosted server in the middle.
 
-- A **Private Credit Network (PCN)** is a graph network where:
-  - Nodes represent individuals, organizations, or entities
-  - Edges represent peer-to-peer credit relationships (tallies)
-  
-- A **tally** is a mutually signed contract between two parties that:
-  - Formalizes a trusted relationship
-  - Contains identifying information including cryptographic keys
-  - Tracks transactions (chits) between parties
-  - Enables credit-based exchanges of value
-  - Allows for automated, distributed credit clearing (lifts)
+### Why Taleus
 
-Taleus extends and builds upon concepts developed in the [MyCHIPs](https://github.com/gotchoices/MyCHIPs) project, but focuses on creating a standalone, standard library implementation of the tally, built atop modern peer-to-peer technologies.
+- **No hosts**: MyCHIPs required each user to have an account on a server. In Taleus, your presence is your own devices (a Sereus **cadre**) — phone alone works; add a cloud or home node for durability.
+- **One shared ledger per relationship**: A tally is a private two-party Sereus **strand** — a replicated SQL database spanning both parties' devices. No dual-copy reconciliation protocol; consistency comes from the platform.
+- **Rules enforced by the database itself**: Every tally rule — signatures, key rotation, balance chaining, insert-only history — is a declarative Quereus constraint. An invalid row simply cannot commit on any honest node.
+- **Credit clearing without global visibility**: Lifts discover routes and commit atomically through the tally graph (via [ChipNet](https://github.com/gotchoices/chipnet)) while each party sees only their own relationships.
+- **Any denomination**: Each tally's contract chooses its unit of account — CHIPs, a national currency, hours of labor. Party-posted exchange rates let lifts and payments route across denomination boundaries.
 
-## Features
+### Core Concepts
 
-- **Decentralized Architecture**: Built on [libp2p](https://libp2p.io/), enabling truly peer-to-peer interactions
-- **Standard Library**: Provides a consistent implementation for multiple PCN applications
-- **Secure Identity**: Uses cryptographic identity verification and signatures
-- **Contract Management**: Handles contract references and agreement validation
-- **Transaction Tracking**: Records and validates chits (transactions)
-- **Consensus Mechanisms**: Ensures both parties maintain accurate and consistent records
+- **Tally**: a credit relationship between two parties (**stock** = vendor side, **foil** = client side), embodied as one closed two-party strand.
+- **Chit**: a signed pledge of value; the tally balance is the running sum, in integer units of the tally's denomination.
+- **Contract & terms**: a content-addressed legal agreement both parties sign, carrying the denomination and credit terms; trading variables and exchange rates govern automated lifts.
+- **Lift**: an atomic transaction around a cycle of tallies that moves balances toward targets without changing anyone's net worth.
 
-## Current Status
+### Technology Stack
 
-Taleus is currently in the design and documentation phase. We are:
+- **[Sereus](https://sereus.org)** — cadres, strands, invitation-based formation, hibernation, mobile wake (`../sereus`).
+- **Quereus** — SQL engine with signature-verifying declarative constraints (`../quereus`).
+- **Optimystic** — distributed storage and transactions (`../optimystic`).
+- **ChipNet** — lift route discovery and consensus (callback-based; reuse under evaluation).
+- **Client**: TypeScript + Svelte Native, embedding a cadre node directly.
 
-- Establishing architecture and protocol specifications
-- Researching and comparing database models and identity frameworks
- - Defining chunk structure and SQL operations
- - Designing tally structures and operations
+### Repo Layout
 
-For a detailed roadmap of development, see [Development Roadmap](doc/STATUS.md).
+- `docs/` — design and architecture. **Start with [`docs/architecture.md`](docs/architecture.md).**
+- `docs/old/` — legacy docs from the pre-Sereus prototype (reference only).
+- `schema/` — Quereus sApp schema.
+- `tickets/` and `tess/` — AI-driven ticket workflow (see [`tess/agent-rules/tickets.md`](tess/agent-rules/tickets.md)).
 
-## Architecture
+### Status
 
-Taleus implements a decentralized tally management system using a specific technical stack:
+Design phase. The architecture (tally-as-strand, schema-enforced integrity, Sereus formation) is settled; work is tracked as tickets in [`tickets/`](tickets/).
 
-- **libp2p**: For peer discovery, connection, and communication
-- **Kademlia DHT**: For distributed hash table functionality
-- **Optimystic**: For optimistic database operations atop Kademlia
-- **Quereus**: For SQL query parsing and database operations
-- **Taleus**: The application layer managing tallies and credit relationships
+### Credits
 
-The system uses a shared database model where:
-- Each party nominates trusted nodes to participate in tally management
-- The nominated nodes form a network with equal voting power (50/50 split)
-- Consensus is handled at the database level
-- Cryptographic signatures ensure transaction integrity
-- Parties maintain local copies of critical records for dispute resolution
-
-This represents a significant evolution from the original MyCHIPs message-based approach, where each party maintained their own copy of the tally and used a message protocol for synchronization.
-
-See [Architecture Documentation](doc/architecture.md) for more details.
-
-## Relationship to MyCHIPs
-
-MyCHIPs serves as the prototype implementation for a PCN, demonstrating the viability of private credit as a medium of exchange. Taleus aims to:
-
-1. Extract and standardize the core tally management functionality
-2. Implement this functionality using modern peer-to-peer technologies
-3. Create a reusable library that can be incorporated into various applications
-4. Enable broader adoption of private credit networks
-
-## Documentation
-
-- [Architecture Overview](doc/architecture.md)
-- [Protocol Specification](doc/protocol.md)
-- [Tally Structure](doc/tally.md)
-- [Development Roadmap](doc/STATUS.md)
-
-## Contributing
-
-The Taleus project follows the principles outlined in the [Project Objectives](doc/design/PROJECT.md) file. When contributing:
-
-- Follow normalized coding practices
-- Use TypeScript
-- Solve problems the right way, avoiding kludges
-- Follow conventions found in existing code
-- Use test-driven workflow
-
-## License
-
-[License information will be added]
-
----
-
-*Taleus is currently in active development. Documentation and implementation details are subject to change.*
+Taleus is a project of the GotChoices Foundation, building on the MyCHIPs design by Kyle Bateman.
