@@ -1,0 +1,10 @@
+# Appeus symlinks (recreate with: path/to/appeus/scripts/init-project.sh)
+/appeus
+design/AGENTS.md
+design/**/AGENTS.md
+apps/*/AGENTS.md
+design/stories/README.md
+design/specs/README.md
+design/specs/*/README.md
+/AGENTS.md
+/CLAUDE.md

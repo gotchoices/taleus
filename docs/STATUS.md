@@ -61,12 +61,18 @@ file for now).
 The engine (Nathan's work) is consumed by apps. Kyle authors these using the **appeus** format
 (story-driven app authoring, as in `ser/health`, `ser/chat`).
 
-- [ ] Build an `apps/` folder in the repo to house engine-consuming apps.
-- [ ] Initialize the appeus format there.
-- [ ] Author the initial user stories.
+- [x] House engine-consuming apps in `packages/taleus-app/` (appeus project root; targets land in
+  `packages/taleus-app/apps/<target>/`). Supersedes the earlier "top-level `apps/` folder" plan.
+- [x] Initialize the appeus format there (hosted mode: appeus owns only `design/`, `apps/`, `mock/`,
+  and its rules symlinks; repo root files untouched).
+- [ ] Complete discovery: `packages/taleus-app/design/specs/project.md` (framework choice — React Native
+  vs NativeScript+Svelte — data strategy, quality posture).
+- [ ] Add the first target and author the initial user stories.
+- [ ] Decide whether a generated `apps/<target>/` is enrolled in the root yarn workspaces or keeps its
+  own dependency tree (not covered by the `packages/*` glob today).
 
-(Distinct from the existing `packages/taleus-app` placeholder, which is the Svelte Native mobile client
-scaffold — see `tickets/backlog/feat-taleus-app-shell.md`. Reconcile the two when the apps work starts.)
+(The `feat-taleus-app-shell` ticket's NativeScript assumption is not binding; the toolchain decision now
+belongs to `design/specs/project.md`.)
 
 ## Tickets spawned from the MyCHIPs-comparison analysis
 

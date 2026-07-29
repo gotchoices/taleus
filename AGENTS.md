@@ -4,7 +4,7 @@ Focus: Taleus — MyCHIPs reboot on Sereus. Tallies (private credit relationship
 
 - `docs/` — design docs. [`docs/index.md`](docs/index.md) is the map (front door); [`docs/architecture.md`](docs/architecture.md) is the canonical system overview — read it before any non-trivial work. Topic deep-dives and [`docs/STATUS.md`](docs/STATUS.md) (open items) are linked from the index.
 - `docs/old/` — legacy docs from the pre-Sereus prototype (bespoke bootstrap protocol, chunk negotiation design). Reference only; do **not** treat as current design. The old `src/`/`test/` bootstrap module is retired — Sereus strand formation replaces it.
-- Yarn-workspaces monorepo under `packages/`: `taleus` (core library + Quereus sApp schema in `packages/taleus/schema/`, `draft1.qsql`), `taleus-node` (always-on trading service, a client of the cadre), `taleus-app` (Svelte Native mobile client, placeholder). Root scripts `yarn build` / `yarn test` / `yarn lint` delegate to workspaces.
+- Yarn-workspaces monorepo under `packages/`: `taleus` (core library + Quereus sApp schema in `packages/taleus/schema/`, `draft1.qsql`), `taleus-node` (always-on trading service, a client of the cadre), `taleus-app` (client application(s); an [appeus](packages/taleus-app/appeus/README.md) project — design surface in `packages/taleus-app/design/`, generated targets in `packages/taleus-app/apps/<target>/`, framework TBD). Root scripts `yarn build` / `yarn test` / `yarn lint` delegate to workspaces.
 - Docs are timeless (describe the intended system); outstanding work lives in `tickets/`, not in doc TODO sections.
 
 ## Sibling workspaces (reference/debug)
