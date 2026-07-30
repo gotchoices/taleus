@@ -1,4 +1,4 @@
-package com.mobile
+package org.sereus.taleus
 
 import android.app.Application
 import com.facebook.react.PackageList

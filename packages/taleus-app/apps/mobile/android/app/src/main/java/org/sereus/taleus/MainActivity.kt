@@ -1,4 +1,4 @@
-package com.mobile
+package org.sereus.taleus
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

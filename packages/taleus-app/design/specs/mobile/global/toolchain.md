@@ -5,7 +5,6 @@ runtime: bare
 packageManager: npm
 navigation: react-navigation
 state: zustand
-http: fetch
 
 notes:
-- Adjust as needed; regenerate to apply.
+- No HTTP client: all state comes from the taleus engine (`design/specs/domain/interfaces.md`).

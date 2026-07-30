@@ -1,8 +1,8 @@
 ---
 # Screenshot configuration - edit appId, scheme, and screenshots list
 # This file is per-target under design/generated/<target>/images/
-appId: com.example.myapp
-scheme: myapp
+appId: org.sereus.taleus
+scheme: taleus
 
 screenshots:
   # - route: Home

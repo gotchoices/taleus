@@ -25,6 +25,9 @@ Production / Industrial-strength — optimize for correctness, scalability, acce
 **Are experiences different per platform?**
 Mobile and web are intended to be different experiences and have their own stories.
 
+Every target is multi-language from the first slice; English is the default locale. Per-target
+conventions in `design/specs/<target>/global/i18n.md`.
+
 ## Identity (publisher + app id)
 
 These values are used to form stable application identifiers (especially for mobile).
