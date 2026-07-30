@@ -5,38 +5,37 @@ This document captures key decisions for the project. Complete this during the d
 ## Purpose
 
 **What problem does this project solve?**
-
-<describe the core problem and value proposition>
+Taleus reimplements the MyCHIPs (mychips.org) project using Sereus Fabric (sereus.org) as a framework.  MyCHIPs is a network of private credit relationships over which financial transactions can occur in a highly distributed manner.  Where MyCHIPs was devoted solely to the CHIP as a Unit of Account, Taleus will support multiple UoA's.
 
 **Who are the target users?**
+Any accountable person who has a phone or connected device should be able to establish strands with other trusted users and engage in pledges of credit (chits).
 
-<describe primary user personas>
+**Delivery posture:**
 
-**Delivery posture (pick one):**
-
-- Prototype / Spike — optimize for speed and learning
-- MVP — optimize for speed, avoid obvious dead-ends
-- Production / Industrial-strength — optimize for correctness, scalability, accessibility, maintainability
+Production / Industrial-strength — optimize for correctness, scalability, accessibility, maintainability
 
 ## Platforms
 
 **What platforms will this project target?**
 
-- [ ] Mobile (iOS/Android)
-- [ ] Web (desktop browsers)
-- [ ] Desktop (Electron, Tauri)
+- [x] Mobile (iOS/Android); Immediate
+- [?] Web (desktop browsers); Eventually
+- [?] Desktop; Various libraries may be developed for integration into desktop or other dedicated/server applications (possibly elsewhere).
 
 **Are experiences different per platform?**
-
-<describe if mobile and web have different UX, or if they're responsive versions of the same>
+Mobile and web are intended to be different experiences and have their own stories.
 
 ## Identity (publisher + app id)
 
 These values are used to form stable application identifiers (especially for mobile).
 
-- **Publisher id (reverse-DNS domain)**: `<e.g. org.sereus>`
-- **Preferred app name**: `<e.g. health>`
-- **Default mobile app id (reverse-DNS)**: `<e.g. org.sereus.health>`
+- **Publisher id (reverse-DNS domain)**: `org.sereus`
+- **Preferred app name**: `taleus`
+- **Default mobile app id (reverse-DNS)**: `org.sereus.taleus`
+- **Custom scheme**: `taleus`
+- **Universal link host / claimed path**: `sereus.org`, `/taleus/invite/*` (landing page
+  `sereus.org/taleus` is not claimed). Apex `.well-known` is shared with the other Sereus apps —
+  merge, never overwrite.
 
 ## Apps
 
@@ -45,54 +44,56 @@ List the apps to be built:
 | App Name | Platform | Framework | Status |
 |----------|----------|-----------|--------|
 | mobile | iOS/Android | react-native | planned |
-| web | browser | sveltekit | planned |
+| mobns | iOS/Android | svelt/nativescript | possibly later on |
+| web | browser | sveltekit | eventual |
 
 ## Toolchain
 
 ### Mobile (if applicable)
 
-- Framework: react-native | nativescript-vue | nativescript-svelte
-- Runtime: bare | expo
-- Language: typescript | javascript
-- Package manager: yarn | npm | pnpm
+- Framework: react-native
+- Runtime: bare
+- Language: typescript
+- Package manager: npm
 
-### Web (if applicable)
+### Web (when applicable)
 
-- Framework: sveltekit | nuxt | nextjs
-- Language: typescript | javascript
-- Package manager: npm | yarn | pnpm
+- Framework: sveltekit
+- Language: typescript
+- Package manager: npm
+
+### Both
+
+- Each `apps/<target>/` is a standalone npm project, not a member of the taleus root yarn
+  workspaces. The `taleus` engine is consumed as a package.
 
 ## Data Strategy
 
 **How will data be managed?**
 
-- [ ] Local-first with sync
-- [ ] Cloud-only (backend API)
-- [ ] Offline support required
-- [ ] Real-time updates needed
+- [x] Local-first, distributed (no central server)
+- [x] Offline support required
+- [x] Real-time updates (peers, cadre)
+
+All tally/chit state comes from the `taleus` engine. Three run modes, switchable at one point in the
+data layer: **mock** (fixtures + variants), **engine + local store** (single device), **engine +
+cadre** (real strands, peers, lifts). Screens see only mock-vs-engine; the storage distinction stays
+inside the data layer. See `design/specs/domain/interfaces.md`.
 
 **Backend:**
-
-<describe backend technology if applicable>
+Sereus fabric — sereus (cadre, strands), quereus (schema), optimystic (storage), fret (transport).
 
 ## Shared Resources
 
 **What will be shared across targets?**
 
-- [ ] Domain contract (schema/api/rules/interfaces as needed) — `design/specs/domain/`
-- [ ] TypeScript types — `packages/shared/`
-- [ ] Mock data — `mock/data/`
+- [x] Domain contract — `design/specs/domain/`
+- [x] Engine — the `taleus` package (`packages/taleus/`); behavior that is not app-specific belongs
+      there, not in a target
+- [x] Mock data — `mock/data/`
 
 ## Notes
 
-<additional context, constraints, decisions>
-
 **Quality / performance posture (brief):**
-
-- Expected scale: small | medium | large (relative to your domain)
-- Critical interactions that must stay fast (e.g., search, scrolling, typeahead, import, sync):
-
----
-
-*After completing this document, run `add-app.sh` for each target to scaffold the apps.*
-
+- Expected scale: large
+- Critical interactions that must stay fast: to be identified during story authoring.
