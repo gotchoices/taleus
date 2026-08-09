@@ -10,6 +10,16 @@ Context: <optional additional context, prerequisites, user state, domain knowled
 ## Sequence
 Write numbered steps focusing on **WHAT happens** (user goals + outcomes), not UI HOW.
 
+Story 1:
+- Sue has received a link in a text message from a friend inviting her to "tally"
+- She doesn't know what that means, but she trusts her friend and so clicks the link
+- She finds herself on a page that explains she must install a taleus
+
+
+Story 2:
+- Steve has followed the MyCHIPs project and so is eager to try out the new Taleus app
+- Upon opening the app, he sees that he has no tally partners but he sees an icon that looks like he can use it to 
+
 1. <User accomplishes first goal or takes first action>
 2. <What happens as a result — from user's perspective>
 3. <User's next goal or decision point>
