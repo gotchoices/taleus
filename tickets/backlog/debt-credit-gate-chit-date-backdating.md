@@ -48,3 +48,11 @@ No runner exists yet (design-phase schema, no `package.json`), so this cannot be
 or tested here — capture the decision and the constraint change.
 
 A `NOTE:` marker sits at the `WithinCreditLimits` constraint pointing back to this ticket.
+
+## Note (app design pass)
+
+`feat-manual-chit-credit-gate` proposes dropping the credit-limit gate on **manual** chits entirely,
+warning both parties instead of refusing the entry. If that lands, the backdating attack described
+here has nothing left to attack on the direct path — an issuer gains nothing by selecting an older
+limit when no limit is enforced. Settle that ticket first; this one then shrinks to the lift path, or
+closes.

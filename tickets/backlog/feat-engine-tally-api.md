@@ -51,6 +51,12 @@ Drawn from the drafted stories in `packages/taleus-app/design/stories/mobile/`:
   portfolio strand, while each tally is its own strand. Whether apps see one merged surface or two
   is unresolved.
 - **Errors.** What an app is expected to do when a counterparty's cadre is unreachable mid-negotiation.
+- **Can a party record anything while the counterparty is unreachable?** A tally is one shared
+  record, so whether a write commits with the other side offline is a consensus question, not a
+  presentation choice — and the answer changes what the app must say. A party who records and
+  converges later needs different words from one who cannot record at all. This matters most at a
+  shop counter, where "did that go through" is the only question the user has. See
+  `packages/taleus-app/design/stories/mobile/20-pay-a-partner.md` § Open.
 
 ## Not in scope
 

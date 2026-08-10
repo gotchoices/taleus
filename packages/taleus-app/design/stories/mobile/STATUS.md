@@ -8,17 +8,16 @@ States: **stub** (topic only) → **drafted** (written, not yet human-reviewed) 
 
 ## Ready for review
 
-Group 3b — the rest of identity, completing what 12 referenced. 13 carries two angles: which devices
-can act as me, and whether anything of mine is available for my tallies to keep clearing. 50 keeps
-total-loss recovery entirely outside the app — no in-band request to re-authorize anyone.
+Group 4 — paying and being paid, the first stories where value actually moves. Sam, Jan, and Mara's
+shop. Grounded in how entries work: value is recorded by whoever gives it, requests carry an exact
+amount and an expiry, and a refused request is visible to the requester (unlike a refused tally
+offer).
 
 | # | Story | State |
 |---|-------|-------|
-| 13 | [My devices](13-my-devices.md) | drafted |
-| 50 | [Recover after losing a device](50-recover-after-losing-a-device.md) | revised — recovery moved out of band |
-
-Both defer platform specifics to the `feat-master-key-custody` and `feat-total-loss-recovery`
-tickets rather than assuming them.
+| 20 | [Pay a partner](20-pay-a-partner.md) | drafted |
+| 21 | [Ask to be paid](21-ask-to-be-paid.md) | drafted |
+| 22 | [Respond to a request](22-respond-to-a-request.md) | drafted |
 
 ## Reviewed
 
@@ -36,7 +35,9 @@ Group 1 — tally negotiation, one continuous thread (Jan and Sam, carried over 
 | 07 | [Review the agreement](07-review-the-agreement.md) | reviewed |
 | 10 | [First run](10-first-run.md) | reviewed |
 | 11 | [My profile and what I disclose](11-my-profile-and-disclosure.md) | revised — dropped withdrawal path; corrections now authorized |
-| 12 | [Keys and backup](12-keys-and-backup.md) | revised — off-device spare authority; platform parts flagged |
+| 12 | [Keys and backup](12-keys-and-backup.md) | reviewed |
+| 13 | [My devices](13-my-devices.md) | reviewed |
+| 50 | [Recover after losing a device](50-recover-after-losing-a-device.md) | reviewed |
 
 Groups 1 and 2 (01-07) cover the tally lifecycle end to end. Known open point: whether a declined
 invitation is visible to the inviter (story 02, alternative B) — being settled in the
@@ -46,9 +47,6 @@ invitation is visible to the inviter (story 02, alternative B) — being settled
 
 | # | Story | State |
 |---|-------|-------|
-| 20 | [Pay a partner](20-pay-a-partner.md) | stub |
-| 21 | [Ask to be paid](21-ask-to-be-paid.md) | stub |
-| 22 | [Respond to a request](22-respond-to-a-request.md) | stub |
 | 23 | [What needs my attention](23-what-needs-my-attention.md) | stub |
 | 24 | [Tally history](24-tally-history.md) | stub |
 | 30 | [Pay someone I'm not connected to](30-pay-through-the-network.md) | stub |
@@ -59,8 +57,8 @@ invitation is visible to the inviter (story 02, alternative B) — being settled
 | 43 | [Notifications](43-notifications.md) | stub |
 | 51 | [Change my address](51-change-my-address.md) | stub |
 
-## Suggested order after group 3b
+## Suggested order after group 4
 
-- **Group 4 — trading**: 20, 21, 22, 24, then 23 once there is enough happening to need it.
+- **Group 4b — what happened and what's waiting**: 24, then 23.
 - **Group 5 — the network**: 30, 31. Hardest to explain; worth having the rest settled first.
 - **Group 6 — the rest**: 40, 41, 42, 43, 51.

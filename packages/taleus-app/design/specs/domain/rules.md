@@ -16,6 +16,11 @@ estimates, never replacing the per-unit figures.
 Two limits per tally, one per direction, each set by the party being asked to trust. They need not
 match and either may be zero. Zero credit is not a closed tally.
 
+A limit says what a party agreed to be owed. It does not stop the other party pledging more: a
+pledge is the pledger's own promise, and the party holding it has given up nothing. Both sides are
+warned when a pledge goes beyond the limit — the one making it, and the one deciding whether to
+hand over goods for it. Lifts are a different matter: those stay inside the limits.
+
 ## Signing
 
 Two kinds of act, and the app has to keep them apart:

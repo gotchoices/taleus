@@ -41,6 +41,15 @@ The story reads identically either way, which suggests the choice is genuinely a
 judgment. If the platform route is preferred, this ticket's first output may be a request to the
 Sereus maintainer rather than code here.
 
+## A use case worth designing for
+
+A vendor's standing invitation that extends the newcomer **no credit at all** is still useful, and is
+arguably the easiest on-ramp in the system: the customer opens a tally with the shop, hands over cash,
+and the shop records the value received — the customer then spends that value with the shop. It
+behaves like a prepaid card, needs no trust in the customer's direction, and gives the vendor an
+obvious inducement to offer (a better price for buying that way, since the customer has effectively
+lent them the money). Worth making sure the mechanism chosen here supports it.
+
 ## Open questions
 
 - Whether a vendor's standing terms live in their portfolio as a reusable template, and whether that
