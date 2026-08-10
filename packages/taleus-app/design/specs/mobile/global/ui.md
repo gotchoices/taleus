@@ -42,3 +42,6 @@ Dark:
 
 Every amount appears with its unit of account — a party holds tallies in more than one
 (`design/specs/domain/rules.md`). Amounts use tabular figures so columns align.
+
+Figures converted into the display unit are estimates and are marked as such, distinctly enough
+that an estimate is never mistaken for a signed balance.

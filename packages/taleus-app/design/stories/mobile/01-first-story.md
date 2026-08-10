@@ -20,6 +20,19 @@ Story 2:
 - Steve has followed the MyCHIPs project and so is eager to try out the new Taleus app
 - Upon opening the app, he sees that he has no tally partners but he sees an icon that looks like he can use it to 
 
+
+Seed (carried over from theory.md, where the narrative stops at the QR code):
+- Jan shares an invitation — a QR code on his phone, or a link sent by text, email, or chat
+- Sam scans it and lands on a sereus.org page describing Taleus, with a link to the app store
+- He installs the app; it opens showing that he has been invited to tally with Jan, and offers to
+  proceed or refuse
+- Sam proceeds and is asked for basic identifying information (name, email, phone), with further
+  fields (address, birthday) that appear optional; he supplies only the basics
+- He lands on a home screen showing he has no money yet
+- Jan, meanwhile, gets a notification that Sam has responded to his invitation
+- (Open: neither has yet named a credit limit — that exchange is what turns a connection into a
+  tally.  See `design/specs/domain/rules.md` § Credit.)
+
 1. <User accomplishes first goal or takes first action>
 2. <What happens as a result — from user's perspective>
 3. <User's next goal or decision point>
