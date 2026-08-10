@@ -32,10 +32,11 @@ Roles swap with each counter.
 6. When both have signed the same offer, the tally is open on those terms.
    → [04](04-first-look-at-an-open-tally.md)
 
-### Alternative A: an old offer gets accepted
-3.1. The responder counters while the other party is accepting the previous offer.
-3.2. Both are valid; the accepted offer is the agreement. Both parties are shown the terms that
-     actually took effect, and that the later counter did not.
+### Alternative A: two offers get signed at once
+3.1. The responder counters while the other party is accepting the previous offer, so both offers
+     end up signed by both parties.
+3.2. The later-drafted offer governs. Both parties see the same outcome, and both are shown which
+     offer took effect and which was superseded.
 3.3. Either party may propose again from there, or close the tally if the outcome is unwanted.
 
 ### Alternative B: it goes stale
@@ -62,7 +63,8 @@ Roles swap with each counter.
 - [ ] Countering is presented as replacing agreement, not amending in place
 - [ ] The terms in force are always visible and distinguishable from the terms proposed
 - [ ] When an offer is accepted, both parties see the same terms took effect
-- [ ] If a superseded offer is accepted, both are shown which terms took effect and which did not
+- [ ] If two offers are both fully signed, both parties see the later-drafted one in force, and are
+      shown which offer was superseded
 - [ ] Expired offers stop requesting attention and can be re-proposed
 - [ ] Changing one's own limit alone requires no counter-signature and notifies the other party
 - [ ] A reduction states when it takes effect; an increase applies immediately

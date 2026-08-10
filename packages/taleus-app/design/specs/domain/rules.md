@@ -20,6 +20,7 @@ match and either may be zero. Zero credit is not a closed tally.
 
 - An offer is not an agreement until both parties sign it.
 - More than one offer may be outstanding; any unexpired one may be accepted.
+- If two end up signed by both parties, the later-drafted one governs.
 - Offers expire. Expiry is the only thing that ends one.
 - Declining is private — the other party sees only silence.
 - Exit is by close, not by retraction.

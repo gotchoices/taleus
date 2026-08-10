@@ -27,9 +27,9 @@ Jan has the app and an identity. This story ends when the invitation is out; Sam
 3. **Jan** picks what the tally counts in. It defaults to the unit he uses most; whatever he picks
    here cannot change later.
 4. **Jan** chooses how long the invitation stays good.
-5. **Jan** sends it — as a QR code for someone in the room, or as a link he can text, email, or
-   message.
-6. **Jan** sees the tally in his list as awaiting a response, with the time remaining.
+5. **Jan** shares the invitation — with someone standing in front of him, or by sending it to
+   someone who is not.
+6. **Jan** can tell the invitation is outstanding and when it will expire.
 7. **Jan** is notified when Sam responds. → [02](02-respond-to-an-invitation.md)
 
 ### Alternative A: nobody responds
@@ -53,9 +53,9 @@ Jan has the app and an identity. This story ends when the invitation is out; Sam
 - [ ] Can state his own credit limit and notice period, and is told they are his side only
 - [ ] Can choose the unit of account, and is warned it is permanent
 - [ ] Can set how long the invitation is good for
-- [ ] Can share by QR or by link, from the same tally
-- [ ] Sees pending invitations with time remaining, distinct from open tallies
-- [ ] Sees an expired invitation as expired, not as an open item needing attention
+- [ ] Can share the same invitation either in person or remotely
+- [ ] Can tell an outstanding invitation from an open tally, and when it expires
+- [ ] An expired invitation reads as expired and stops asking for attention
 - [ ] Can re-send an expired invitation without re-entering the terms
 - [ ] A standing invitation yields one separate tally per responder
 

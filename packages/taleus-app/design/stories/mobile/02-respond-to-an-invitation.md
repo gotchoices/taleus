@@ -18,9 +18,9 @@ the app, may not know what a tally is, and has extended nothing yet.
 
 ## Sequence
 
-1. **Sam** opens the invitation — by scanning Jan's code or following his link.
-2. If Sam does not have the app, he lands on a page explaining what Taleus is, with a way to get
-   the app. Installing and returning brings him back to this same invitation.
+1. **Sam** opens the invitation Jan shared with him.
+2. If Sam does not have the app, he is told what Taleus is and how to get it. Installing and
+   returning brings him back to this same invitation, not to a blank start.
 3. **Sam** is shown who is inviting him, what Jan is offering, and — in plain language — what a
    tally is and what accepting would mean.
 4. **Sam** chooses what to tell Jan about himself. Some of it is required to trade; the rest is

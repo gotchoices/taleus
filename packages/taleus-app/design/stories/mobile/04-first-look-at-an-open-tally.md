@@ -16,7 +16,7 @@ Both parties see the same tally, each from their own side. Where they differ is 
 ## Sequence
 
 1. Each party is told the tally is open and with whom.
-2. Each sees the tally listed with a zero balance in the unit they agreed on.
+2. Each sees the tally with a zero balance, in the unit they agreed on.
 3. Each can see the terms in force: what they extended, what the other extended, and the notice
    periods — stated from their own point of view, so "what I allow" and "what they allow" are never
    ambiguous.
@@ -31,7 +31,7 @@ Both parties see the same tally, each from their own side. Where they differ is 
      much, distinct from a balance they hold.
 
 ### Alternative B: more than one tally
-2.1. A party with several tallies sees them together, each with its own unit and balance.
+2.1. A party with several tallies can see all of them, each in its own unit.
 2.2. Where the units differ, an estimated total in their chosen display unit is offered, marked as
      an estimate, alongside the per-unit figures.
 
