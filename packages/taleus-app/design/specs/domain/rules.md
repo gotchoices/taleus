@@ -16,6 +16,21 @@ estimates, never replacing the per-unit figures.
 Two limits per tally, one per direction, each set by the party being asked to trust. They need not
 match and either may be zero. Zero credit is not a closed tally.
 
+## Signing
+
+Two kinds of act, and the app has to keep them apart:
+
+- **The party signs it, then and there.** Terms, offers and acceptances, manual payments,
+  disclosures, close requests, corrections, and changes to the party's own lift settings. Nothing of
+  this kind happens on a party's behalf or as a side effect of something else.
+- **The party authorized it earlier.** Lifts. A party's signed lift settings say how much movement it
+  will accept and at what price; lifts then happen within those settings without prompting, including
+  while the party is asleep.
+
+So the app never asks a party to approve a lift, and never fails to ask before anything else. What a
+party's settings currently permit is something they can see and change; changing them is itself an
+act they sign.
+
 ## Offers
 
 - An offer is not an agreement until both parties sign it.
