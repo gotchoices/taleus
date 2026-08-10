@@ -74,6 +74,20 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
 (The `feat-taleus-app-shell` ticket's NativeScript assumption is not binding; the toolchain decision now
 belongs to `design/specs/project.md`.)
 
+## Negotiation gaps (app design pass, `packages/taleus-app`)
+
+The offer semantics stated in [`architecture.md`](architecture.md#tally-formation) outrun the schema:
+
+- `TallyContractProposal` is a **single mutable row** (`primary key (/* 1 row */)`, no `InsertOnly`),
+  so it cannot hold more than one outstanding offer or any negotiation history.
+- The proposal carries **no expiry column**, so "expiry is the only thing that ends an offer" is not
+  enforceable.
+- **Multi-use invitations** (a vendor's printed QR that many customers scan) have no mechanism:
+  Sereus records exactly one `FormationUsage` per invite on both the bound and unbound paths.
+- **Formation precedes agreement** — the strand exists and seats the invitee before any contract is
+  signed, so an invitation nobody consummates leaves a formed strand behind. Whether formation should
+  instead be deferred to redemption (unbound invites) is open, and interacts with the item above.
+
 ## Tickets spawned from the MyCHIPs-comparison analysis
 
 - `tickets/backlog/feat-schema-rich-credit-terms.md` — **regression fix (committed):** restore interest /
