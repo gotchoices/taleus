@@ -1,12 +1,67 @@
 # User Story: Review the agreement
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+## Story Overview
 
-## Topic
-Reading what was actually agreed — terms in force, the contract behind them, and the counterparty's disclosed identity — for a tally at any stage.
+I agreed to something months ago and I want to check exactly what. What can each of us do, what did
+we sign, when did it change, and who is this person I signed it with?
 
-## Baseline not to regress
-MyCHIPs: TallyContract and TallyCertificate screens; the contract is a referenced document, not free text.
+Context: A tally that has been running a while. Sam wants to check where he stands with Jan before
+committing to a larger purchase. The same need arises when something surprises a party — a limit
+that is lower than remembered, a notice period they meant to change.
 
-## Open
-How much of the contract document to render in-app versus link out to.
+## Roles
+
+Either party, from their own side. What each sees of the other is limited to what that party
+disclosed.
+
+## Sequence
+
+1. Sam looks at what is currently in force on his tally with Jan.
+2. He sees both directions stated from his own point of view: Jan will let him owe up to $500 with
+   three weeks' notice; Sam lets Jan owe him nothing.
+3. He sees when those terms took effect — this is the third set they have agreed, in force since
+   March.
+4. He can look back at what came before: the original terms from lunch, and the change they
+   negotiated in March. Each shows what changed and when it took effect.
+5. He can read the agreement itself — the terms are arguments to a contract both of them signed, and
+   he can see which contract that is and what it says.
+6. He can see what Jan has disclosed about himself, and that it is Jan's own claim rather than
+   anything Taleus vouches for.
+7. Sam is satisfied and goes ahead with the purchase.
+
+### Alternative Path A: something is pending
+1.1. Jan has proposed new terms that Sam has not answered.
+1.2. Sam sees the terms in force and the terms proposed as clearly different things — what binds him
+     today, and what would bind him if he agreed.
+1.3. Nothing about the proposal changes what he can do right now.
+
+### Alternative Path B: a change that has not taken hold yet
+3.1. Jan reduced his limit last week. Because it is restrictive, it does not apply until the notice
+     period runs out.
+3.2. Sam sees the limit that applies today, the one that will apply, and the date it changes.
+
+### Alternative Path C: Jan has disclosed more since
+6.1. Jan added his business address when they started trading in larger amounts.
+6.2. Sam can see what Jan has disclosed now. What Jan chose not to disclose is distinguishable from
+     what Jan does not have.
+
+### Alternative Path D: reviewing a closed tally
+1.1. Sam looks at a tally he closed last year.
+1.2. Everything is still readable — terms, history, who the other party was, and that it is closed.
+
+## Acceptance Criteria
+
+- [ ] Terms in force are readable from the reader's own perspective, in both directions
+- [ ] The date the current terms took effect is visible
+- [ ] Previous terms are available, showing what changed and when it took effect
+- [ ] A pending proposal is clearly distinct from the terms in force
+- [ ] A change that has not yet taken effect shows both the current value and the effective date
+- [ ] The contract behind the terms is identifiable and readable
+- [ ] The counterparty's disclosure is visible, and presented as their claim rather than a verified fact
+- [ ] What a counterparty withheld is distinguishable from what they lack
+- [ ] A closed tally remains fully reviewable
+
+## Variants
+- happy: current terms, history, contract, and counterparty all readable
+- empty: a tally with only its original terms — no amendments to show
+- error: the contract document cannot be retrieved; terms in force still readable

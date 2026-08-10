@@ -2,70 +2,78 @@
 
 ## Story Overview
 
-As someone who has been invited to tally
-I want to understand what I am being offered and decide
-So that I only enter a credit relationship I actually want
+Someone I know has asked me to tally with them. I want to understand what I am agreeing to before I
+agree to it, and to decide for myself how much I am willing to trust them back.
 
-Context: Continues [01](01-invite-a-partner.md). **Sam** receives Jan's invitation. Sam may not have
-the app, may not know what a tally is, and has extended nothing yet.
+Context: Continues [01](01-invite-a-partner.md). Sam has never used Taleus, does not have the app,
+and has extended nothing to anyone. Jan is waiting across the table.
 
 ## Roles
 
 | Role | Who |
 |------|-----|
 | Invitee | Sam |
-| Inviter | Jan (notified of the outcome) |
+| Inviter | Jan — told the outcome |
 
 ## Sequence
 
-1. **Sam** opens the invitation Jan shared with him.
-2. If Sam does not have the app, he is told what Taleus is and how to get it. Installing and
-   returning brings him back to this same invitation, not to a blank start.
-3. **Sam** is shown who is inviting him, what Jan is offering, and — in plain language — what a
-   tally is and what accepting would mean.
-4. **Sam** chooses what to tell Jan about himself. Some of it is required to trade; the rest is
-   clearly optional and can be added later.
-5. **Sam** states his own side: how much he is willing to be owed by Jan, and his notice period. He
-   is told this is separate from what Jan offered him, and that zero is a valid answer.
-6. **Sam** accepts.
-7. **Jan** is notified that Sam responded, and reviews what Sam disclosed and proposed.
-8. **Jan** agrees, and the tally is open for both of them. → [04](04-first-look-at-an-open-tally.md)
-   - If Jan wants different terms, this becomes a negotiation. → [03](03-negotiate-terms.md)
+1. Sam opens the invitation Jan just shared with him.
+2. He does not have the app. He is told what Taleus is, in terms he can follow without Jan
+   explaining it again, and how to get it.
+3. He installs it and comes back. He lands on Jan's invitation, not on a blank start — he does not
+   have to ask Jan to send it again.
+4. Sam sees that Jan is inviting him, that Jan is willing to be owed up to $500, that Jan wants two
+   weeks' notice, and that the tally counts in dollars. He has disclosed nothing so far.
+5. He is asked what to tell Jan about himself. His name is needed. His phone number and address are
+   offered but marked as his choice; he gives his phone number and skips the address.
+6. He is asked what he is willing to be owed by Jan. He has no reason to extend Jan credit yet, so he
+   says zero, and is told that is a normal answer he can change later.
+7. Sam accepts.
+8. Jan is notified that Sam responded, and can see what Sam disclosed and what Sam proposed.
+9. Jan agrees. Both of them now have an open tally.
+   → [04](04-first-look-at-an-open-tally.md)
+   - If Jan wants something different, this becomes a negotiation → [03](03-negotiate-terms.md)
 
-### Alternative A: Sam wants different terms
-5.1. Sam changes what Jan proposed instead of accepting it.
-5.2. This is a counter-offer, and needs Jan's agreement. → [03](03-negotiate-terms.md)
+### Alternative Path A: Sam wants different terms
+6.1. Sam is uneasy about two weeks' notice and wants a month.
+6.2. He changes it, which makes this his offer rather than his acceptance. Jan now has to agree.
+     → [03](03-negotiate-terms.md)
 
-### Alternative B: Sam declines
-6.1. Sam dismisses the invitation and it leaves his view.
-6.2. Jan is told nothing. From Jan's side the invitation simply runs out its clock.
+### Alternative Path B: Sam decides against it
+7.1. Sam thinks about it and decides not to. He dismisses the invitation and it leaves his view.
+7.2. What Jan sees depends on a decision still being made in the engine — either Jan is told, or the
+     invitation simply expires. Sam's side of the story is the same either way.
 
-### Alternative C: too late
-1.1. The invitation has already expired.
-1.2. Sam is told it is no longer good and offered a way to ask Jan for a new one.
+### Alternative Path C: Sam is too late
+1.1. Sam finds the message a week later and opens it. The invitation has expired.
+1.2. He is told it is no longer good, and offered a way to ask Jan for another.
 
-### Alternative D: a standing invitation
-1.1. Sam scans a code posted at a shop.
-1.2. He is shown the terms the shop offers everyone, and the flow continues from step 3.
+### Alternative Path D: Sam at Mara's shop
+1.1. Sam is buying a tube at Mara's shop and uses the invitation posted by the register.
+1.2. He sees the terms Mara offers everyone, and continues from step 4.
+1.3. His tally is with Mara alone. Other customers who used the same posted invitation are not part
+     of it and cannot see it.
 
 ## Acceptance Criteria
 
-**Sam (invitee)**
-- [ ] Can act on the invitation whether or not he already has the app; installing does not lose it
-- [ ] Sees who invited him and what they are offering before disclosing anything
-- [ ] Is told what a tally is, in the app, without needing outside explanation
-- [ ] Can tell required identifying information from optional
-- [ ] Sets his own limit and notice period, separately from Jan's, and may set zero
-- [ ] Can accept, counter, or decline
-- [ ] Declining removes it from his view and tells Jan nothing
+- [ ] An invitation can be acted on with or without the app installed; installing does not lose it
+- [ ] The invitee sees who is inviting them and on what terms before disclosing anything
+- [ ] The app explains what a tally is, without relying on the inviter to have explained it
+- [ ] Required identifying information is distinguishable from optional information
+- [ ] The invitee sets their own limit and notice period, independently of the inviter's, and zero is
+      a valid answer
+- [ ] The invitee can accept, counter, or decline
+- [ ] Declining removes the invitation from the invitee's view
 - [ ] An expired invitation is explained as expired, with a way forward
-
-**Jan (inviter)**
-- [ ] Is notified when Sam responds, and sees what Sam disclosed and what he proposed
-- [ ] Can agree, counter, or leave it
-- [ ] Learns nothing when Sam declines or ignores it
+- [ ] The inviter is told when the invitee responds, and can see what was disclosed and proposed
+- [ ] A tally formed from a standing invitation involves only the two parties to it
 
 ## Variants
 - happy: Sam accepts, Jan agrees, tally opens
-- empty: Sam is a brand-new user with nothing else in the app
-- error: invitation expired; disclosure cannot be sent
+- empty: Sam is brand new, with nothing else in the app
+- error: invitation expired; disclosure cannot be delivered
+
+## Open
+
+Whether the inviter learns of a decline (alternative B) is being settled in the engine — see the
+`feat-offer-lifecycle` ticket. If refusals become visible, this story gains a step where Jan is told.
