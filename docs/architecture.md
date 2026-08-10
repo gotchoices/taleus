@@ -19,7 +19,7 @@ Taleus removes the hosted layer entirely:
 | Tally formation | Ticket/token protocol between servers | Sereus strand formation (`/sereus/formation/1.0.0`) + in-strand party seating |
 | Denomination | All tallies denominated in CHIPs | **Contract chooses the denomination**; exchange rates connect tallies of different units |
 | Lifts | Site servers run ChipNet over the tally graph | Party agents run the lift protocol directly, peer-to-peer, across denominations |
-| Client | Mobile app talking to user's server | Svelte Native app embedding a cadre node — the app *is* a peer |
+| Client | Mobile app talking to user's server | React Native app embedding a cadre node — the app *is* a peer |
 
 What carries over unchanged: the stock/foil tally model, chit semantics (signed pledges of value), credit terms, trading variables (bound/target/margin/clutch), contract references, and the lift concept. Nomenclature stays MyCHIPs-compatible.
 
@@ -27,7 +27,7 @@ What carries over unchanged: the stock/foil tally model, chit semantics (signed 
 
 ```mermaid
 graph TD
-    App["taleus-app (Svelte Native)<br/>mobile client, best-effort agent"] --> Lib["taleus library<br/>tally logic, negotiation, lift agent, schema"]
+    App["taleus-app (React Native)<br/>mobile client, best-effort agent"] --> Lib["taleus library<br/>tally logic, negotiation, lift agent, schema"]
     Node["taleus-node<br/>always-on trading service"] --> Lib
     App --> Sereus
     Node -. client of .-> Sereus
@@ -85,7 +85,7 @@ Formation reuses Sereus strand formation end-to-end (the pre-Sereus "Method 6" b
 4. **Negotiation.** Each party first publishes its own `CreditTerms` (a unilateral, grantor-signed revision stating the credit limit and notice period it extends to the counterparty — at least one per party, even if zero). Either party then proposes a contract (`TallyContractProposal`) whose arguments are the *bilateral* terms — the denomination — plus a reference to each party's operative `CreditTerms` revision; the tally becomes operative when both signatures land on the same contract revision (`TallyContract`), whose digest covers those referenced revisions. Credit terms revise later (with notice-delayed effect) without renegotiating the contract.
 5. **Open.** Ledger entries are now accepted.
 
-**Offer semantics.** A proposal is identified, ordered, and carries an expiry; more than one may be outstanding at once. Either party may countersign **any** unexpired outstanding proposal — including one a later proposal was meant to supersede. This is deliberate: in a distributed system a countersignature can be in flight while a revision is being sent, and arbitrating that race by timing would require a retraction protocol that buys little. A second proposal is a suggestion, not a withdrawal. When two proposals end up fully signed, the **later-drafted one governs** — precedence follows the proposal's own version ordering within the tally, not the order the signatures arrived, so both parties reach the same answer without a clock. Expiry is therefore the only thing that ends a proposal: there is no rejection record, and a party that declines simply drops the proposal from its own view (private to its portfolio — the counterparty observes only silence). The protection against an unwanted agreement is exit, not retraction: either party may file a `CloseRequest` at any time, and close cannot be refused once the balance settles. Terms are renegotiated the same way an offer is made — a later proposal, countersigned, becomes a new `TallyContract` revision; `DenominationImmutable` keeps the unit fixed for the tally's life.
+**Offer semantics.** A proposal is identified, ordered, and carries an expiry; more than one may be outstanding at once. Either party may countersign **any** unexpired outstanding proposal — including one a later proposal was meant to supersede. This is deliberate: in a distributed system a countersignature can be in flight while a revision is being sent, and arbitrating that race by timing would require a retraction protocol that buys little. A second proposal is a suggestion, not a withdrawal. When two proposals end up fully signed, the **later-drafted one governs** — precedence follows the proposal's own version ordering within the tally, not the order the signatures arrived, so both parties reach the same answer without a clock. Expiry is therefore the backstop that ends a proposal's acceptability; whether a refusal is *additionally* recorded, so the offeror learns of it rather than watching a clock run out, is an open design question (`feat-offer-lifecycle`). The protection against an unwanted agreement is exit, not retraction: either party may file a `CloseRequest` at any time, and close cannot be refused once the balance settles. Terms are renegotiated the same way an offer is made — a later proposal, countersigned, becomes a new `TallyContract` revision; `DenominationImmutable` keeps the unit fixed for the tally's life.
 
 Progressive disclosure: certificates are revisioned, so a party can start minimal and disclose more as trust develops; the counterparty simply declines to countersign a contract until satisfied.
 
@@ -343,7 +343,7 @@ Known constraints carried into implementation: ChipNet's **bidirectional search 
 
 The mobile client is the **`taleus-app`** package.
 
-- **TypeScript + Svelte Native** (NativeScript). The app embeds a cadre node directly (`@serfab/cadre-core`), with strand filter `sAppId:taleus` so it only participates in tally strands plus the user's control network. It consumes the platform-neutral **`taleus`** library for tally logic, negotiation, and a best-effort lift agent while the phone is awake.
+- **TypeScript + React Native** (bare). The app embeds a cadre node directly (`@serfab/cadre-core`), with strand filter `sAppId:taleus` so it only participates in tally strands plus the user's control network. It consumes the platform-neutral **`taleus`** library for tally logic, negotiation, and a best-effort lift agent while the phone is awake.
 - Mobile nodes run the **transaction profile** (no storage rings); users who want durability and reliable lift participation add an always-on node to their cadre — a **`taleus-node`** trading service (the always-on lift agent + `/taleus/chipnet/1.0.0` endpoint) running alongside a durable cadre node (`cadre-host`, `cadre-cli`, or a provider) that replicates every tally strand.
 - Storage on device via Quereus's NativeScript plugin (`quereus-plugin-nativescript-sqlite`); the `taleus` library itself is platform-neutral and also runs in Node (the `taleus-node` headless agent) and the browser.
 - App surfaces: tally list + balances (per denomination), formation (QR invite/scan), negotiation (certificates, contract, terms), payments/invoices, lift activity, and cadre management (delegated to Sereus UX patterns).

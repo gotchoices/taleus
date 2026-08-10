@@ -31,3 +31,19 @@ ad hoc by each client.
 
 Design context in [`docs/tally-lifecycle.md`](../docs/tally-lifecycle.md) (§ States, § The negotiation
 dance). No runner exists yet; capture the view + the enforcement decision.
+
+## Inputs from the app design pass
+
+The mobile app design (`packages/taleus-app/design/`) settled some of what this ticket anticipates,
+and reopened one part of it:
+
+- **Void may not be a state at all.** Whether a refused tally is recorded, or an unwanted offer
+  simply lapses, is being decided in `feat-offer-lifecycle`. Take the answer from there rather than
+  assuming MyCHIPs' `void`.
+- **Simultaneous acceptance has a proposed rule**: when two proposals end up fully signed, the
+  later-drafted one governs (see `docs/architecture.md`, *Offer semantics*).
+- **The apps want "whose turn is it".** The derived state is most useful to a client when it also
+  answers who must act next — that is what an attention list is built from
+  (`feat-attention-signals`).
+- The app-facing view of these states is listed in
+  `packages/taleus-app/design/specs/domain/interfaces.md`.

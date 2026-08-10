@@ -65,28 +65,29 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   `packages/taleus-app/apps/<target>/`). Supersedes the earlier "top-level `apps/` folder" plan.
 - [x] Initialize the appeus format there (hosted mode: appeus owns only `design/`, `apps/`, `mock/`,
   and its rules symlinks; repo root files untouched).
-- [ ] Complete discovery: `packages/taleus-app/design/specs/project.md` (framework choice — React Native
-  vs NativeScript+Svelte — data strategy, quality posture).
-- [ ] Add the first target and author the initial user stories.
-- [ ] Decide whether a generated `apps/<target>/` is enrolled in the root yarn workspaces or keeps its
-  own dependency tree (not covered by the `packages/*` glob today).
+- [x] Complete discovery: `packages/taleus-app/design/specs/project.md` — React Native (bare, TypeScript),
+  npm, identity `org.sereus.taleus`, three data run modes, multi-language from the first slice.
+- [x] Scaffold the `mobile` target and draft the tally-negotiation stories (01–04, with a stubbed story
+  map covering the rest of the MyCHIPs baseline).
+- [x] Each `apps/<target>/` is a standalone npm project, outside the root yarn workspaces.
+- [ ] Write the remaining stories (see `packages/taleus-app/design/stories/mobile/00-story-map.md`).
 
-(The `feat-taleus-app-shell` ticket's NativeScript assumption is not binding; the toolchain decision now
-belongs to `design/specs/project.md`.)
+(The `feat-taleus-app-shell` ticket has been retired — the app is scaffolded and now evolves through
+the appeus design/generation cycle. Toolchain decisions live in `design/specs/project.md`.)
 
 ## Negotiation gaps (app design pass, `packages/taleus-app`)
 
-The offer semantics stated in [`architecture.md`](architecture.md#tally-formation) outrun the schema:
+Filed as tickets from the app design pass:
 
-- `TallyContractProposal` is a **single mutable row** (`primary key (/* 1 row */)`, no `InsertOnly`),
-  so it cannot hold more than one outstanding offer or any negotiation history.
-- The proposal carries **no expiry column**, so "expiry is the only thing that ends an offer" is not
-  enforceable.
-- **Multi-use invitations** (a vendor's printed QR that many customers scan) have no mechanism:
-  Sereus records exactly one `FormationUsage` per invite on both the bound and unbound paths.
-- **Formation precedes agreement** — the strand exists and seats the invitee before any contract is
-  signed, so an invitation nobody consummates leaves a formed strand behind. Whether formation should
-  instead be deferred to redemption (unbound invites) is open, and interacts with the item above.
+- `feat-offer-lifecycle` — offer history, expiry, simultaneous acceptance, and whether refusal is
+  recorded at all (`TallyContractProposal` is a single mutable row today, with no expiry).
+- `feat-formation-lifecycle` — what an invitation nobody accepts leaves behind.
+- `feat-standing-invitation` — a vendor's reusable invitation; Sereus records one use per invite today.
+- `feat-engine-tally-api` — the app-facing surface for the whole tally lifecycle (`packages/taleus/src`
+  currently exports crypto, transport, and the lift agent only).
+- `feat-engine-run-modes`, `feat-attention-signals`, `feat-position-and-estimates`,
+  `feat-disclosure-selection`, `feat-device-and-recovery-surface` — the rest of what the drafted
+  stories need.
 
 ## Tickets spawned from the MyCHIPs-comparison analysis
 

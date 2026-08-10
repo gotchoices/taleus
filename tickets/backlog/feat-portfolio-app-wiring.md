@@ -2,7 +2,7 @@
 description: Make the app actually create, find, and keep up to date each user's private portfolio store when the app runs — the runtime plumbing around the portfolio, which can't be built until the app itself exists.
 files: docs/architecture.md, packages/taleus/schema/portfolio.qsql
 ----
-The portfolio schema (the single-party portfolio strand and its tables) is defined by `feat-portfolio-state`. This ticket is the **runtime wiring** the app needs to actually use it. It is parked in backlog because there is no app / build scaffolding yet (design phase — see `AGENTS.md`); promote it once the Svelte Native app embedding a `CadreNode` exists.
+The portfolio schema (the single-party portfolio strand and its tables) is defined by `feat-portfolio-state`. This ticket is the **runtime wiring** the app needs to actually use it. The React Native app now exists (`packages/taleus-app/apps/mobile`, scaffolded via appeus) but does not yet embed a `CadreNode`; promote this once it does.
 
 What the app layer must do (design spec lives in `docs/architecture.md` § Portfolio, written by `feat-portfolio-state`):
 
