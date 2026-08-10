@@ -8,18 +8,17 @@ States: **stub** (topic only) → **drafted** (written, not yet human-reviewed) 
 
 ## Ready for review
 
-Group 3 — everything a person meets before, and alongside, their first tally. Steve arrives cold
-(no invitation waiting); Sam's disclosure choices carry on from group 1.
+Group 3b — the rest of identity, completing what 12 referenced. 13 carries two angles: which devices
+can act as me, and whether anything of mine is available for my tallies to keep clearing. 50 keeps
+total-loss recovery entirely outside the app — no in-band request to re-authorize anyone.
 
 | # | Story | State |
 |---|-------|-------|
-| 10 | [First run](10-first-run.md) | drafted |
-| 11 | [My profile and what I disclose](11-my-profile-and-disclosure.md) | revised — dropped withdrawal path; corrections now authorized |
-| 12 | [Keys and backup](12-keys-and-backup.md) | revised — off-device spare authority; platform-dependent parts flagged |
+| 13 | [My devices](13-my-devices.md) | drafted |
+| 50 | [Recover after losing a device](50-recover-after-losing-a-device.md) | revised — recovery moved out of band |
 
-Notes: 12 leans on [13](13-my-devices.md) and [50](50-recover-after-losing-a-device.md), still stubs
-— write those before considering this group settled. What a party's devices and off-device spare
-authority can actually do is being coordinated with Sereus in the `feat-master-key-custody` ticket.
+Both defer platform specifics to the `feat-master-key-custody` and `feat-total-loss-recovery`
+tickets rather than assuming them.
 
 ## Reviewed
 
@@ -35,6 +34,9 @@ Group 1 — tally negotiation, one continuous thread (Jan and Sam, carried over 
 | 05 | [Close a tally](05-close-a-tally.md) | revised — closing permits entries toward zero |
 | 06 | [Find a tally](06-find-a-tally.md) | reviewed |
 | 07 | [Review the agreement](07-review-the-agreement.md) | reviewed |
+| 10 | [First run](10-first-run.md) | reviewed |
+| 11 | [My profile and what I disclose](11-my-profile-and-disclosure.md) | revised — dropped withdrawal path; corrections now authorized |
+| 12 | [Keys and backup](12-keys-and-backup.md) | revised — off-device spare authority; platform parts flagged |
 
 Groups 1 and 2 (01-07) cover the tally lifecycle end to end. Known open point: whether a declined
 invitation is visible to the inviter (story 02, alternative B) — being settled in the
@@ -44,7 +46,6 @@ invitation is visible to the inviter (story 02, alternative B) — being settled
 
 | # | Story | State |
 |---|-------|-------|
-| 13 | [My devices](13-my-devices.md) | stub |
 | 20 | [Pay a partner](20-pay-a-partner.md) | stub |
 | 21 | [Ask to be paid](21-ask-to-be-paid.md) | stub |
 | 22 | [Respond to a request](22-respond-to-a-request.md) | stub |
@@ -56,12 +57,10 @@ invitation is visible to the inviter (story 02, alternative B) — being settled
 | 41 | [My exchange rates](41-my-exchange-rates.md) | stub |
 | 42 | [Settings](42-settings.md) | stub |
 | 43 | [Notifications](43-notifications.md) | stub |
-| 50 | [Recover after losing a device](50-recover-after-losing-a-device.md) | stub |
 | 51 | [Change my address](51-change-my-address.md) | stub |
 
-## Suggested order after group 3
+## Suggested order after group 3b
 
-- **Group 3b — the rest of identity**: 13, 50. Referenced by 12 and best written next.
 - **Group 4 — trading**: 20, 21, 22, 24, then 23 once there is enough happening to need it.
 - **Group 5 — the network**: 30, 31. Hardest to explain; worth having the rest settled first.
-- **Group 6 — the rest**: 40, 41, 42, 43, 13, 50, 51.
+- **Group 6 — the rest**: 40, 41, 42, 43, 51.

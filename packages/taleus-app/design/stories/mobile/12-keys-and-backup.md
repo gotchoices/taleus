@@ -47,10 +47,11 @@ story overlaps [13](13-my-devices.md) and [50](50-recover-after-losing-a-device.
 
 ### Alternative Path D: Steve loses everything, with nothing put away
 1.1. Every device gone and nothing kept anywhere else.
-1.2. His tallies and their history are not lost — they live with his counterparties too — but he
-     cannot act on them until someone he trades with vouches for him.
-1.3. The app is honest that this route depends on a counterparty's cooperation and their judgment
-     about whether it is really him. → [50](50-recover-after-losing-a-device.md)
+1.2. What his counterparties owe him is not lost, but his ability to act on any of it is — getting
+     back to trading means going to those people directly, outside the app, and starting over with
+     each of them.
+1.3. The app says so plainly rather than implying a button exists for this.
+     → [50](50-recover-after-losing-a-device.md)
 
 ### Alternative Path E: getting a new phone on purpose
 1.1. Steve upgrades and wants his new phone to act as him.
@@ -74,8 +75,9 @@ story overlaps [13](13-my-devices.md) and [50](50-recover-after-losing-a-device.
 - [ ] A party who declines to protect themselves is not blocked, but is reminded as value grows
 - [ ] Reminders reference the party's actual holdings rather than generic warnings
 - [ ] A party who has protected themselves is not repeatedly prompted
-- [ ] Losing every device loses the ability to act, not the tallies or their history
-- [ ] Recovery through a counterparty is presented as depending on that party's cooperation
+- [ ] Losing every device loses the ability to act, not the value counterparties owe
+- [ ] Recovery from total loss is presented as something arranged directly with counterparties,
+      outside the app
 - [ ] A party can keep a spare means of authority away from their devices, and use it alone to bring
       a new device back
 
