@@ -1,6 +1,6 @@
 # User Story: Settings
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Language, display unit, theme, and the other preferences that are mine alone.

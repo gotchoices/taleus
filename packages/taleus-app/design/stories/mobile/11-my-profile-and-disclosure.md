@@ -1,6 +1,6 @@
 # User Story: My profile and what I disclose
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Maintaining name, contact details, address, bio, and avatar — and choosing which of them a given counterparty sees.

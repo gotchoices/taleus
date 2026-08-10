@@ -1,6 +1,6 @@
 # User Story: My exchange rates
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Telling the app how I value one unit against another, for display and for lifts that cross units.

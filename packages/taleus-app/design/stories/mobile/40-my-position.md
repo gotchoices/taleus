@@ -1,6 +1,6 @@
 # User Story: My position
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Understanding what I am worth across all tallies, in a unit I choose, and what that number does and does not mean.

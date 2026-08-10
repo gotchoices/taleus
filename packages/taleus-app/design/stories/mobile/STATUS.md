@@ -1,7 +1,7 @@
 # Stories Status
 
 Tracks how far each story has come. The set itself, its grouping, and where it came from live in
-[00-story-map.md](00-story-map.md).
+[index.md](index.md).
 
 States: **stub** (topic only) → **drafted** (written, not yet human-reviewed) → **reviewed**
 (human has read and accepted it) → **revised** (changed after review).

@@ -1,6 +1,6 @@
 # User Story: Ask to be paid
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Requesting payment from a partner, or producing a request anyone can pay — the invoice side of a chit.

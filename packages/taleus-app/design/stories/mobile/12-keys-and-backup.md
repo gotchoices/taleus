@@ -1,6 +1,6 @@
 # User Story: Keys and backup
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Generating a signing key, backing it up, restoring it, and understanding what is lost without it.

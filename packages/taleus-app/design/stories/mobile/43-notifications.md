@@ -1,6 +1,6 @@
 # User Story: Notifications
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Being told when something needs me — an offer, a request, a lift awaiting commit — including while the app is closed.

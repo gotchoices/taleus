@@ -16,21 +16,24 @@ asking, and nobody being able to settle.
 ## Sequence
 
 1. Sam asks to close the tally.
-2. He is told what that means before it happens: nothing more can be added by either of them, what he
-   owes does not go away, and the tally ends when the balance reaches zero.
+2. He is told what that means before it happens: the balance can no longer grow in either
+   direction, what he owes does not go away, and the tally ends when the balance reaches zero.
+   Settling it is still allowed — that is the point.
 3. Jan is told the tally is closing. He does not get to refuse it — he keeps everything he is owed,
    and closing does not forgive it.
-4. The tally now shows as closing to both of them. Neither can add to it: Sam cannot spend against
-   Jan's credit, and Jan cannot extend more.
-5. Sam settles the $180 — by paying it, or by any other arrangement they reach that moves the balance
-   to zero.
+4. The tally now shows as closing to both of them. What each can still do has narrowed to one
+   direction: anything that moves the balance toward zero goes through, anything that would move it
+   further from zero does not. Sam can pay Jan; Sam cannot spend more against Jan's credit.
+5. Sam settles the $180 — all at once, or in pieces over several weeks. Each payment is allowed
+   because each one moves the balance toward zero.
 6. The balance reaches zero and the tally closes for both of them.
 7. Both keep the record. A closed tally is still readable: what happened, what was agreed, who the
    other party was.
 
 ### Alternative Path A: Jan closes it and writes it off
 1.1. Jan is the one who wants out, and would rather forgive the $180 than chase it.
-1.2. He asks to close and gives Sam the balance back, which moves it to zero.
+1.2. He asks to close and gives Sam the balance back — permitted precisely because it moves the
+     balance to zero.
 1.3. The tally closes immediately. Sam is told, and owes nothing.
 
 ### Alternative Path B: nothing is owed
@@ -58,7 +61,8 @@ asking, and nobody being able to settle.
 
 - [ ] Either party can ask to close, at any time, without the other's agreement
 - [ ] The consequences are stated before closing begins: no further activity, the balance still owed
-- [ ] A closing tally accepts nothing new from either party in either direction
+- [ ] A closing tally accepts entries that move the balance toward zero, from either party
+- [ ] A closing tally refuses anything that would move the balance further from zero
 - [ ] Closing does not forgive, reduce, or endanger what is owed
 - [ ] A tally with a settled balance of zero closes; one with a balance stays closing until settled
 - [ ] A creditor may return the balance to bring it to zero, and the tally then closes

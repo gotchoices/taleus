@@ -1,6 +1,6 @@
 # User Story: What needs my attention
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Everything waiting on me, across every tally — offers to sign, requests to answer, chits to approve — gathered so none is missed.

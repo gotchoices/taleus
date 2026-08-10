@@ -1,6 +1,6 @@
 # User Story: Pay someone I'm not connected to
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Paying a person I hold no tally with, by moving value along a path of tallies — and understanding what it cost.

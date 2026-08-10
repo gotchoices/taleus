@@ -1,6 +1,6 @@
 # User Story: Respond to a request
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Reviewing an incoming payment request and paying, declining, or letting it expire.

@@ -1,6 +1,6 @@
 # User Story: Pay a partner
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Recording value owed directly to someone I hold a tally with, and seeing it reflected on both sides.

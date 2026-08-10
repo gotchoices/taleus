@@ -1,6 +1,6 @@
 # User Story: Change my address
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Changing the address others use to reach me, without breaking existing tallies.

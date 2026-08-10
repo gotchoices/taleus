@@ -1,13 +1,12 @@
-# Story map (mobile)
+# Stories Index (mobile)
 
-The set of stories we intend to write, and where each came from. Not a story itself.
-<!--EC Consider whether this file should be named 'index.md' -->
-Background for all of them: [theory.md](theory.md).
+The set of stories we intend to write, in reading order, and where each came from. Not a story itself.
+
+Background for all of them: [theory.md](theory.md). Progress per story is tracked in
+[STATUS.md](STATUS.md). Files excluded from the index itself: `AGENTS.md`, `STATUS.md`, `theory.md`.
 
 Numbering leaves gaps so stories can be inserted without renumbering. A stub file exists for every
 planned story; it states the topic and what it must not lose from MyCHIPs.
-
-Progress per story is tracked in [STATUS.md](STATUS.md).
 
 ## Grouping
 

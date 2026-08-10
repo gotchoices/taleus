@@ -1,6 +1,6 @@
 # User Story: First run
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 A new user opens the app with nothing: identity is established, keys are created, and the app explains what a tally is before asking for anything.

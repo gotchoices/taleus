@@ -1,6 +1,6 @@
 # User Story: My devices
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Adding a second device, seeing which devices can act for me, and removing one I no longer control.

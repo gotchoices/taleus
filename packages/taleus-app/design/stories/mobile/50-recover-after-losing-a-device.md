@@ -1,6 +1,6 @@
 # User Story: Recover after losing a device
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Getting back to a working identity after losing a phone: from another device, or with a counterparty's help when nothing survives.

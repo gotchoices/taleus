@@ -1,6 +1,6 @@
 # User Story: Trading variables
 
-**Stub — not yet written.** See [00-story-map.md](00-story-map.md).
+**Stub — not yet written.** See [index.md](index.md).
 
 ## Topic
 Setting how much value I want to hold on a tally and what I will pay or accept to move it — the settings that let my tallies participate in lifts.
