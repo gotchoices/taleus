@@ -46,6 +46,7 @@ The roles swap with every counter. In this telling Sam counters first.
 
 ### Alternative Path C: changing the terms of an open tally
 1.1. Months later, Sam asks Jan to raise his limit — the bike turned into a habit.
+<!--EC  NTA: might be good to clarify that "asks" isn't just a verbal interaction.  Sam "proposes" this through the system -->
 1.2. The tally keeps working on the existing terms while Jan considers it. Nothing is in limbo.
 1.3. Jan agrees, and both can see the new terms and when they took effect.
 1.4. The unit is never up for renegotiation; dollars is what this tally counts in for good.
@@ -55,6 +56,8 @@ The roles swap with every counter. In this telling Sam counters first.
      have to agree.
 1.2. Sam is told. Because the change is restrictive, it takes effect only after the notice Jan
      already owes him, and both can see the date it applies from.
+<!--EC  NTA: Should clarify that "notice" = call term -->
+<!--EC  NTA: Should clarify that said call notice should be a formal feature of the system - not out of band -->
 1.3. Had Jan raised the limit instead, it would apply at once — nobody needs protection from being
      trusted more.
 

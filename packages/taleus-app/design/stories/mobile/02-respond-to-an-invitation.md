@@ -43,6 +43,7 @@ and has extended nothing to anyone. Jan is waiting across the table.
 7.1. Sam thinks about it and decides not to. He dismisses the invitation and it leaves his view.
 7.2. What Jan sees depends on a decision still being made in the engine — either Jan is told, or the
      invitation simply expires. Sam's side of the story is the same either way.
+<!--EC  NTA: I lean towards active rejection in addition to expiration -->
 
 ### Alternative Path C: Sam is too late
 1.1. Sam finds the message a week later and opens it. The invitation has expired.
