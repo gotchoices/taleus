@@ -20,7 +20,7 @@ Jan: You, and your partners hold money for each other.
 
 Sam: Like you have to store your friend's cash?  Sounds scary!
 
-Jan: It doesn't work like that.  Most people don't really understand money very well.  Money is just
+Jan: It doesn't work like that.  Think of it this way: Money is just
 a way of storing value in the present so we can use it later in the future.
 
 There are two kinds of money:

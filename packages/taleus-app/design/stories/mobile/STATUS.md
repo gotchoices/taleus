@@ -8,14 +8,15 @@ States: **stub** (topic only) → **drafted** (written, not yet human-reviewed) 
 
 ## Ready for review
 
-Group 5 — the network pair. 30 is the payoff of the whole system: paying someone you have no
-relationship with. 31 is the standing permission that makes it possible without anyone being asked
-each time. Read 31 second — it explains why 30's path F never interrupts anybody.
+Group 6 — how a party sees their own affairs. 40 needs 41 (an overall figure needs rates), and 42 is
+where the display unit is chosen, so the three hang together. Jan is the protagonist: forty tallies,
+three units.
 
 | # | Story | State |
 |---|-------|-------|
-| 30 | [Pay someone I'm not connected to](30-pay-through-the-network.md) | drafted |
-| 31 | [Trading settings](31-trading-variables.md) | drafted |
+| 40 | [My position](40-my-position.md) | drafted |
+| 41 | [My exchange rates](41-my-exchange-rates.md) | drafted |
+| 42 | [Settings](42-settings.md) | drafted |
 
 ## Reviewed
 
@@ -41,6 +42,8 @@ Group 1 — tally negotiation, one continuous thread (Jan and Sam, carried over 
 | 22 | [Respond to a request](22-respond-to-a-request.md) | reviewed |
 | 23 | [What needs my attention](23-what-needs-my-attention.md) | reviewed |
 | 24 | [Tally history](24-tally-history.md) | revised — running balance separated from net worth |
+| 30 | [Pay someone I'm not connected to](30-pay-through-the-network.md) | revised — no directory; payee issues the request |
+| 31 | [Trading settings](31-trading-variables.md) | revised — cross-unit movement needs a rate first |
 
 Groups 1-2 (01-07) cover the tally lifecycle end to end; group 3 (10-13, 50) covers identity;
 group 4 (20-22) covers value moving between two parties.
@@ -56,11 +59,9 @@ Open points carried by reviewed stories, each tracked as a ticket:
 | # | Story | State |
 |---|-------|-------|
 | 25 | [My records in my books](25-my-records-in-my-books.md) | stub |
-| 40 | [My position](40-my-position.md) | stub |
-| 41 | [My exchange rates](41-my-exchange-rates.md) | stub |
-| 42 | [Settings](42-settings.md) | stub |
 | 43 | [Notifications](43-notifications.md) | stub |
 | 51 | [Change my address](51-change-my-address.md) | stub |
 
 ## Suggested order after group 4b
-- **Group 6 — the rest**: 40 and 41 together (position needs rates), then 42, 43, 51, 25.
+- **Group 7 — the tail**: 43 (notifications), 51 (change my address), 25 (books). 51 may not survive
+  contact with Taleus at all — see its stub.
