@@ -11,6 +11,10 @@ and no unit is privileged — there is no single party-level balance.
 A party may pick a display unit. Cross-unit figures are estimates at the party's own rates, shown as
 estimates, never replacing the per-unit figures.
 
+Value does not move between units a party has not priced. Until they say what one unit is worth to
+them, their tallies in different units settle separately — nobody else's valuation is applied to
+their holdings on their behalf.
+
 ## Credit
 
 Two limits per tally, one per direction, each set by the party being asked to trust. They need not

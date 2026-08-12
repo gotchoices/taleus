@@ -8,8 +8,14 @@ States: **stub** (topic only) → **drafted** (written, not yet human-reviewed) 
 
 ## Ready for review
 
-Nothing pending. Next up: **30** and **31** — the network pair (paying someone you are not connected
-to, and the settings that make it possible). Hardest remaining material.
+Group 5 — the network pair. 30 is the payoff of the whole system: paying someone you have no
+relationship with. 31 is the standing permission that makes it possible without anyone being asked
+each time. Read 31 second — it explains why 30's path F never interrupts anybody.
+
+| # | Story | State |
+|---|-------|-------|
+| 30 | [Pay someone I'm not connected to](30-pay-through-the-network.md) | drafted |
+| 31 | [Trading settings](31-trading-variables.md) | drafted |
 
 ## Reviewed
 
@@ -50,8 +56,6 @@ Open points carried by reviewed stories, each tracked as a ticket:
 | # | Story | State |
 |---|-------|-------|
 | 25 | [My records in my books](25-my-records-in-my-books.md) | stub |
-| 30 | [Pay someone I'm not connected to](30-pay-through-the-network.md) | stub |
-| 31 | [Trading variables](31-trading-variables.md) | stub |
 | 40 | [My position](40-my-position.md) | stub |
 | 41 | [My exchange rates](41-my-exchange-rates.md) | stub |
 | 42 | [Settings](42-settings.md) | stub |
@@ -59,5 +63,4 @@ Open points carried by reviewed stories, each tracked as a ticket:
 | 51 | [Change my address](51-change-my-address.md) | stub |
 
 ## Suggested order after group 4b
-- **Group 5 — the network**: 30, 31. Hardest to explain; worth having the rest settled first.
-- **Group 6 — the rest**: 40, 41, 42, 43, 51.
+- **Group 6 — the rest**: 40 and 41 together (position needs rates), then 42, 43, 51, 25.

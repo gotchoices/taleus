@@ -1,22 +1,103 @@
 # User Story: Pay someone I'm not connected to
 
-**Stub — not yet written.** See [index.md](index.md).
+## Story Overview
 
-## Topic
-Paying a person I hold no tally with, by moving value along a path of tallies — and understanding what it cost.
+I want to pay someone I have no tally with. I want to know whether that is possible before I promise
+anything, what it will cost me, and — when it is done — that it is actually done.
 
-## Baseline not to regress
-MyCHIPs: lifts, surfaced in chit history rather than as their own flow.
+Context: Sam owes a supplier $300 for parts. He has no tally with them. He does hold credit with
+Mara, who deals with people the supplier deals with. None of that is Sam's problem to work out.
+
+## Roles
+
+| Role | Who |
+|------|-----|
+| Payer | Sam |
+| Payee | the supplier — no tally with Sam |
+| Everyone between | people whose tallies the value moves along, who are not consulted |
+
+## Sequence
+
+1. Sam cannot look the supplier up — there is no directory to look anybody up in, and nobody is
+   findable unless they choose to be. What he has is what the supplier gave him: a payment request
+   the supplier produced and sent, which carries everything needed to try to reach them.
+2. Before he commits to anything, he is told whether it can be done — whether value can reach the
+   supplier at all, and whether enough of it can.
+3. It can, and it costs him the $300. Moving value this way is usually free — it settles balances
+   people wanted settled anyway. Where it is not free, Sam sees one number for what he gives up, not
+   a breakdown of who charged what.
+4. He agrees to it. This is his payment and his promise, so he authorizes it in the moment, the same
+   as any value he gives ([20](20-pay-a-partner.md)).
+5. It either happens completely or not at all. There is no state where Sam has paid part of it, or
+   where value has left him but not reached the supplier.
+6. Sam sees what changed on his side: he owes Mara more, or holds less of what she owed him.
+7. The supplier sees value arrive from the person they are connected to, not from Sam — and Sam is
+   told that is how it works, so he is not surprised to be invisible at the far end.
+
+### Alternative Path A: there is no way through
+2.1. Nobody Sam is connected to leads to the supplier — an ordinary outcome in a young network, not
+     a fault.
+     <!--EC I am hopeful that tallynet may, at some point, also be able to reveal to Sam (in some cases) a handful of well known potential trading partners that would facilitate such a transfer.  For example: the payment you are considering would be much more likely if you shared a tally with one or more of the following: ... -->
+2.2. He is told so plainly, and told what would change it: a tally with the supplier
+     ([01](01-invite-a-partner.md)), or with someone who deals with them.
+2.3. He can still settle outside the app and record it ([20](20-pay-a-partner.md)).
+
+### Alternative Path B: a way through, but not enough of it
+2.1. Value can reach the supplier, but only $180 of it.
+2.2. Sam is told the amount that is possible rather than a bare refusal, and can decide what to do
+     with that.
+
+### Alternative Path C: it costs more than Sam will pay
+3.1. This payment pushes value in a direction people along the way would rather it did not go, so
+     someone is charging to allow it: $300 reaching the supplier costs Sam $327.
+3.2. He sees that before agreeing and can decline. Nothing has moved and nothing is owed.
+3.3. This is the exception rather than the rule — a payment running with the grain costs nothing.
+
+### Alternative Path D: it does not complete
+5.1. Something goes wrong partway — somebody is unreachable, or too slow.
+5.2. Nothing moved. Sam is told it did not happen, not that it might have.
+5.3. He can try again, and is told if the reason is likely to persist.
+
+### Alternative Path E: crossing units
+1.1. Sam's tallies are in dollars; the supplier deals in CHIPs.
+1.2. He is told what the supplier will receive and what it costs him, in his own unit.
+1.3. The rate used is visible, and is his own valuation rather than a market price
+     ([41](41-my-exchange-rates.md)).
+
+### Alternative Path F: value passing through Sam
+1.1. Overnight, value moves along one of Sam's tallies because someone else was paying someone else.
+1.2. Sam is not asked and is not interrupted. His settings already allowed it
+     ([31](31-trading-variables.md)).
+1.3. He sees it afterward in his history, marked as something that passed through rather than
+     something he did. → [24](24-tally-history.md)
+1.4. His net worth is unchanged by it. He holds the same total as before; it now sits on different
+     tallies than it did.
+
+## Acceptance Criteria
+
+- [ ] A party can pay someone they hold no tally with, starting from something that party issued —
+      there is no directory and nobody is findable without choosing to be
+- [ ] Feasibility is established before the party commits to anything
+- [ ] The total cost to the payer is shown before agreeing, in the payer's own unit
+- [ ] The payer authorizes the payment explicitly, as with any value they give
+- [ ] A payment either completes in full or does not happen; no partial outcome exists
+- [ ] When no route exists, the party is told plainly and offered what would change it, including
+      who they might tally with to make it possible
+- [ ] When only part of the amount is possible, the possible amount is stated
+- [ ] A payment that fails leaves nothing moved and says so unambiguously
+- [ ] Cross-unit payments show what the payee receives and the rate used
+- [ ] The payer is told the payee sees the value arriving from their own counterparty
+- [ ] Value passing through a party never asks that party for anything, and is visible afterward as
+      having passed through
+- [ ] Value passing through leaves the party's net worth unchanged
+
+## Variants
+- happy: route found, cost accepted, payment completes
+- empty: a party with no tallies, or a network with no route — nothing is possible yet
+- error: insufficient capacity; cost declined; payment fails partway
 
 ## Open
-How much of the path to reveal, what the user sees while a lift is in flight, and what happens when
-it fails.
 
-Unlike a direct request ([21](21-ask-to-be-paid.md)), a request to someone with no tally between you
-cannot travel in-band — it has to be something the payer can pick up, scan, or follow. On receiving
-it the payer's side has to answer a question that has no analogue in direct payment: is there a route
-to the payee at all, and does it have the capacity for this amount? In a mature network the answer is
-usually yes; in a young one it is often no, and the story has to make that a comprehensible outcome
-rather than a failure. Note that lifts a party *relays* need no approval from them — their signed settings already
-authorized it ([31](31-trading-variables.md)) — so the story must distinguish a lift the party
-initiated from one that passed through them while they slept.
+How much of the path to reveal is unsettled. Showing it exposes who a party trades with to people who
+have no business knowing; hiding it entirely leaves the payer trusting a number they cannot check.
+Worth deciding deliberately rather than by default.

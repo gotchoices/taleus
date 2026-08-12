@@ -26,6 +26,14 @@ their own spread folded in — plus a `CurrentExchangeRateQuote` view.
   value identical holdings differently and both be right.
 - A party with no quotes for some unit gets something honest rather than a wrong number or a crash.
 
+## Related decision (app design pass)
+
+A party's quotes gate more than display: **value should not move between units the party has not
+priced**. Until a rate exists, that party's tallies in different units settle separately, because any
+conversion would apply someone else's valuation to their holdings. Whether that gate lives in the
+lift path, in the quote lookup, or both is an engine call — but the default must be "no rate, no
+crossing".
+
 ## Open questions
 
 - What happens when a quote is missing or stale: omit that tally from the estimate, show it
