@@ -8,15 +8,14 @@ States: **stub** (topic only) → **drafted** (written, not yet human-reviewed) 
 
 ## Ready for review
 
-Group 6 — how a party sees their own affairs. 40 needs 41 (an overall figure needs rates), and 42 is
-where the display unit is chosen, so the three hang together. Jan is the protagonist: forty tallies,
-three units.
+Group 7 — the tail. 14 is new: cadre management, which 13 alluded to but did not cover. 51 is
+renamed "Staying reachable" and may not survive as its own story — see its Open note.
 
 | # | Story | State |
 |---|-------|-------|
-| 40 | [My position](40-my-position.md) | drafted |
-| 41 | [My exchange rates](41-my-exchange-rates.md) | drafted |
-| 42 | [Settings](42-settings.md) | drafted |
+| 14 | [My cadre](14-my-cadre.md) | drafted |
+| 43 | [Notifications](43-notifications.md) | drafted |
+| 51 | [Staying reachable](51-change-my-address.md) | drafted |
 
 ## Reviewed
 
@@ -44,6 +43,9 @@ Group 1 — tally negotiation, one continuous thread (Jan and Sam, carried over 
 | 24 | [Tally history](24-tally-history.md) | revised — running balance separated from net worth |
 | 30 | [Pay someone I'm not connected to](30-pay-through-the-network.md) | revised — no directory; payee issues the request |
 | 31 | [Trading settings](31-trading-variables.md) | revised — cross-unit movement needs a rate first |
+| 40 | [My position](40-my-position.md) | reviewed |
+| 41 | [My exchange rates](41-my-exchange-rates.md) | revised — Goldback example, indexed rates, arbitrage risk |
+| 42 | [Settings](42-settings.md) | reviewed |
 
 Groups 1-2 (01-07) cover the tally lifecycle end to end; group 3 (10-13, 50) covers identity;
 group 4 (20-22) covers value moving between two parties.
@@ -59,8 +61,6 @@ Open points carried by reviewed stories, each tracked as a ticket:
 | # | Story | State |
 |---|-------|-------|
 | 25 | [My records in my books](25-my-records-in-my-books.md) | stub |
-| 43 | [Notifications](43-notifications.md) | stub |
-| 51 | [Change my address](51-change-my-address.md) | stub |
 
 ## Suggested order after group 4b
 - **Group 7 — the tail**: 43 (notifications), 51 (change my address), 25 (books). 51 may not survive

@@ -15,6 +15,10 @@ Value does not move between units a party has not priced. Until they say what on
 them, their tallies in different units settle separately — nobody else's valuation is applied to
 their holdings on their behalf.
 
+Pricing a unit others trade widely is a market position, not a display choice: the party's rate is
+what value converts at until they change it, against counterparties who may follow that market far
+more closely. Treat it as a decision with exposure, and say so.
+
 ## Credit
 
 Two limits per tally, one per direction, each set by the party being asked to trust. They need not

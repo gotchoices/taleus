@@ -5,7 +5,7 @@
 I want to know how I am doing overall — what I am owed, what I owe, and what that leaves me worth —
 in a unit I actually think in, without being misled about how precise that is.
 
-Context: Jan holds forty tallies. Most are in dollars, two are in hours of work, one is in CHIPs.
+Context: Jan holds forty tallies. Most are in dollars, three are in Goldbacks, one is in CHIPs.
 Some hold value for him; on others he is the one who owes. He has never had a single figure for any
 of it.
 
@@ -20,9 +20,9 @@ anyone else.
 2. He sees what he is owed and what he owes as two separate quantities, not merely the difference —
    being owed $9,000 and owing $8,000 is a different life from being owed $1,000 and owing nothing.
 3. Both are broken out by unit, because that is where the figures are real: dollars with dollars,
-   hours with hours.
+   Goldbacks with Goldbacks.
 4. He also sees one overall figure in dollars, the unit he thinks in. It is marked as an estimate,
-   because getting there meant valuing hours and CHIPs at rates he chose himself.
+   because getting there meant valuing Goldbacks and CHIPs at rates he chose himself.
    → [41](41-my-exchange-rates.md)
 5. He can see how that estimate was arrived at — which holdings were converted and at what rate — so
    it is not a number he has to take on faith.
