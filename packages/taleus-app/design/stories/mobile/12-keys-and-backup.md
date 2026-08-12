@@ -64,6 +64,9 @@ story overlaps [13](13-my-devices.md) and [50](50-recover-after-losing-a-device.
 1.2. He cannot — he is prevented, and told why: doing so would leave him unable to act as himself at
      all, recoverable only through a counterparty.
 
+<!--EC  NTA: In all of these scenarios, it should be made clear that the device itself can't be used as him, but rather the combindation of he and his biometrics -->
+<!--EC  NTA: If a printer is used to retain a private key, users must be warned that the logs from printers can sometimes be used to recover content -->
+
 ## Acceptance Criteria
 
 - [ ] A party can find out what can currently act as them

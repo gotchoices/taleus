@@ -55,6 +55,8 @@ A person with no identity, no tallies, and no counterparty.
 2.2. He can see what the app is for without having created anything. Whether an identity exists yet
      is not something he has to care about.
 
+<!--EC  NTA: Alternative: Steve wants to print a QR code that makes it easy for others to tally with him... -->
+
 ## Acceptance Criteria
 
 - [ ] A new user is told what Taleus is before being asked for anything

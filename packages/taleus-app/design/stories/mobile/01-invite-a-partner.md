@@ -60,6 +60,8 @@ across the table and does not have the app. Jan does. Two-party story — Sam's 
 7.1. Sam is not in the room, so Jan sends the invitation to him instead.
 7.2. Jan gives it a week rather than a day, since Sam may not look right away.
 
+<!--EC  NTA: Probably need to incorporate details about contracts here -->
+
 ## Acceptance Criteria
 
 - [ ] The inviter sets terms without naming the other party; whoever accepts becomes that party

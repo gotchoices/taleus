@@ -49,6 +49,10 @@ disclosed.
 1.1. Sam looks at a tally he closed last year.
 1.2. Everything is still readable — terms, history, who the other party was, and that it is closed.
 
+<!--EC  NTA: Alternative path: Jan sees that Sam reduced his limit to $300, and decides he should correspondingly reduce his.  Nothing special, but shows that each takes place at end of call term from initiation. -->
+<!--EC  NTA: What happens if a party further reduces terms, before the call term? -->
+
+
 ## Acceptance Criteria
 
 - [ ] Terms in force are readable from the reader's own perspective, in both directions

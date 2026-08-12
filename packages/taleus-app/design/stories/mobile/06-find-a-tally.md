@@ -20,6 +20,7 @@ Any party with more than a handful of tallies. What a party can find is limited 
    dollars. He finds it by the unit it counts in.
 4. Later still he wants the one he was arguing about last week. He finds it among those that have
    changed recently.
+<!--EC  NTA: "arguing about" -> "negotiating terms on" -->
 5. Whatever he was looking for, he ends up at the tally itself and can act on it.
 
 ### Alternative Path A: what needs Jan
@@ -47,6 +48,8 @@ Any party with more than a handful of tallies. What a party can find is limited 
 ### Alternative Path E: closed ones
 3.1. Jan wants a tally he closed last spring, to check what it was.
 3.2. Closed tallies are findable, and are not mixed in with the ones he is still trading on.
+
+<!--EC  NTA: Additional alternative: searching by any of the personal information shared by any of the peers (e.g. phone number or address) -->
 
 ## Acceptance Criteria
 
