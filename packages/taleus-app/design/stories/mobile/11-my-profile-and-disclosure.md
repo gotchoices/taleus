@@ -27,12 +27,14 @@ Any party. What another party learns about them is only ever what they chose to 
    and business name, Mara has a name.
 7. Jan's business grows and he asks Sam for an address. Sam adds it to their existing tally — no new
    tally, no renegotiated terms, just more disclosed than before.
+   <!--EC  NTA: Is Sam notified? -->
 
 ### Alternative Path A: someone wants more than Sam will give
 4.1. The supplier expects a tax identifier. Sam is not willing.
 4.2. He can proceed without it. The supplier is free to decline to countersign — that is their
      answer, and Sam is not forced either way.
 4.3. Sam is not told his information was "rejected"; he is told the tally is not agreed.
+<!--EC  NTA: Can a party "counter" with an information request? -->
 
 ### Alternative Path B: Mara's shop discloses to everyone
 3.1. Mara publishes a standing invitation ([01](01-invite-a-partner.md), path C).
@@ -52,6 +54,7 @@ Any party. What another party learns about them is only ever what they chose to 
 1.1. Sam looks at what Jan has disclosed to him.
 1.2. He can see it is what Jan says about himself, not something Taleus has verified.
 1.3. He can tell what Jan chose not to send from what Jan does not have.
+<!--EC  NTA: Clarify that he cannot "tell" what information Jan has in his system that he has withheld, only that he doesn't have that information. -->
 
 ## Acceptance Criteria
 
