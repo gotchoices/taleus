@@ -16,8 +16,8 @@ depends on at least one of them being available.
 
 ## Sequence
 
-1. Steve can see what acts as him: his phone and his tablet, each recognisable as the thing he owns
-   rather than as an identifier he has to decode.
+1. Steve can see what can act as him — his phone and his tablet, each in his own hands and unlocked
+   by him — recognisable as the things he owns rather than as identifiers he has to decode.
 2. For each one he can tell when it was last active, so a device he has not carried in months is
    obvious.
 3. He learns something he had not realised: settling value with people he is not directly connected

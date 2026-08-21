@@ -23,7 +23,8 @@ and has extended nothing to anyone. Jan is waiting across the table.
 3. He installs it and comes back. He lands on Jan's invitation, not on a blank start — he does not
    have to ask Jan to send it again.
 4. Sam sees that Jan is inviting him, that Jan is willing to be owed up to $500, that Jan wants two
-   weeks' notice, and that the tally counts in dollars. He has disclosed nothing so far.
+   weeks' notice, that the tally counts in dollars, and which agreement governs it. He can read that
+   agreement before agreeing to anything, and he has disclosed nothing so far.
 5. He is asked what to tell Jan about himself. His name is needed. His phone number and address are
    offered but marked as his choice; he gives his phone number and skips the address.
 6. He is asked what he is willing to be owed by Jan. He has no reason to extend Jan credit yet, so he
@@ -40,13 +41,12 @@ and has extended nothing to anyone. Jan is waiting across the table.
      → [03](03-negotiate-terms.md)
 
 ### Alternative Path B: Sam decides against it
-7.1. Sam thinks about it and decides not to. He dismisses the invitation and it leaves his view.
-7.2. What Jan sees depends on a decision still being made in the engine — either Jan is told, or the
-     invitation simply expires. Sam's side of the story is the same either way.
-<!--EC  NTA: I lean towards active rejection in addition to expiration 
-
-KB: I'm OK with incorporating active rejection.  I do wonder if a rejected tally can ever be revived or if it is dead forever.  Use case: my partner rejected the terms.  I now re-edit the tally with better terms and try again.  Thoughts?
--->
+7.1. Sam thinks about it and decides not to. He refuses it, and can say why if he wants to.
+7.2. Jan is told. He is not left watching a clock, wondering whether Sam ever looked.
+7.3. That offer is finished — refusing it is not a pause, and it cannot be revived by either of them.
+7.4. The relationship is not finished. Jan can come back with better terms, and Sam can consider
+     those on their own merits. → [03](03-negotiate-terms.md)
+7.5. Sam can also simply ignore it, in which case it expires and Jan learns only that.
 
 ### Alternative Path C: Sam is too late
 1.1. Sam finds the message a week later and opens it. The invitation has expired.
@@ -61,13 +61,16 @@ KB: I'm OK with incorporating active rejection.  I do wonder if a rejected tally
 ## Acceptance Criteria
 
 - [ ] An invitation can be acted on with or without the app installed; installing does not lose it
-- [ ] The invitee sees who is inviting them and on what terms before disclosing anything
+- [ ] The invitee sees who is inviting them, on what terms, and under which agreement, before
+      disclosing anything
+- [ ] The governing agreement is readable before the invitee commits
 - [ ] The app explains what a tally is, without relying on the inviter to have explained it
 - [ ] Required identifying information is distinguishable from optional information
 - [ ] The invitee sets their own limit and notice period, independently of the inviter's, and zero is
       a valid answer
-- [ ] The invitee can accept, counter, or decline
-- [ ] Declining removes the invitation from the invitee's view
+- [ ] The invitee can accept, counter, refuse, or ignore
+- [ ] A refusal reaches the inviter; an ignored invitation simply expires
+- [ ] A refused offer cannot be revived; a fresh offer on new terms can always be made
 - [ ] An expired invitation is explained as expired, with a way forward
 - [ ] The inviter is told when the invitee responds, and can see what was disclosed and proposed
 - [ ] A tally formed from a standing invitation involves only the two parties to it
@@ -77,7 +80,3 @@ KB: I'm OK with incorporating active rejection.  I do wonder if a rejected tally
 - empty: Sam is brand new, with nothing else in the app
 - error: invitation expired; disclosure cannot be delivered
 
-## Open
-
-Whether the inviter learns of a decline (alternative B) is being settled in the engine — see the
-`feat-offer-lifecycle` ticket. If refusals become visible, this story gains a step where Jan is told.

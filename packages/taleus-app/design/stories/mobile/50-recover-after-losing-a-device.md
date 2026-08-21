@@ -21,7 +21,8 @@ because it happens outside the app entirely.
 
 1. Sam realises the phone is gone. The first thing he wants is for it to stop being able to act as
    him.
-2. From his tablet, he retires the lost phone. Anything the thief tries afterward is refused.
+2. From his tablet, he retires the lost phone. A thief could not have acted as Sam anyway without
+   being able to unlock it; retiring it closes the question rather than leaving him to hope.
 3. He is told what that did and did not do: nothing further can be done as him from that phone;
    anything already done stands.
 4. Sam checks what he still has. His tallies, balances, history, and terms are all intact — they were

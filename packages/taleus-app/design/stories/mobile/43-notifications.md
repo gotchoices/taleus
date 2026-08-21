@@ -35,8 +35,7 @@ Any party. What reaches them here is only ever things that need *them*
 1.1. Sam has no always-on machine, so his phone is the only thing that can take part in settling.
 1.2. It is roused when it is needed, briefly, without showing him anything — that is participation,
      not a message, and there is nothing for him to read or dismiss.
-     <!--EC I imagine this is _possible_ only if the app has been launched recently and is still running.  I'm not sure how much control we will have in a phone OS to make sure that a phone is _always_ available to do lifts autonomously.  Thoughts? -->
-1.3. If he never wants that, the honest answer is that his tallies will settle less often, and he is
+     1.3. If he never wants that, the honest answer is that his tallies will settle less often, and he is
      told so plainly rather than being quietly cut out. → [13](13-my-devices.md)
 
 ### Alternative Path C: on a lock screen, in company
@@ -48,7 +47,8 @@ Any party. What reaches them here is only ever things that need *them*
 ### Alternative Path D: the app is not allowed to notify
 1.1. Sam declines notification permission, or turns them off later.
 1.2. Nothing breaks, and he is not badgered. He is told once what it costs: things will wait for him
-     to look, including requests with deadlines.
+     to look, including requests with deadlines, and his phone may take part in settling less often
+     than it otherwise would.
 1.3. Anything that was waiting is still waiting when he opens the app.
 
 ### Alternative Path E: too many at once
@@ -71,6 +71,8 @@ Any party. What reaches them here is only ever things that need *them*
 - [ ] The party can set quiet periods, and what may override them
 - [ ] Automated settling never produces a notification — it needs nothing from the party
 - [ ] Background participation is distinguishable from a message, and shows the party nothing
+- [ ] Participation by phone alone is presented as best effort, never as a guarantee
+- [ ] A party wanting dependable participation is pointed at an always-on machine, not at a setting
 - [ ] A party who declines background participation is told the cost, not silently excluded
 - [ ] Notices reveal nothing financial to onlookers by default, and the party chooses otherwise
       knowingly

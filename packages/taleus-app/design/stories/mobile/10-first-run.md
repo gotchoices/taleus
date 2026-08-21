@@ -55,7 +55,16 @@ A person with no identity, no tallies, and no counterparty.
 2.2. He can see what the app is for without having created anything. Whether an identity exists yet
      is not something he has to care about.
 
-<!--EC  NTA: Alternative: Steve wants to print a QR code that makes it easy for others to tally with him... -->
+
+### Alternative Path E: Steve wants to be tallyable
+6.1. Steve would rather people came to him than chase them one at a time — he has a workshop and
+     customers who might.
+6.2. There is nobody to look him up: no directory exists, and he is findable only if he hands
+     something out. What he can do is publish an invitation on his own terms and put it where people
+     will see it — printed by the till, on a card, in a message.
+6.3. He offers strangers no credit; whoever takes it up gets a tally with him and funds it
+     themselves. → [01](01-invite-a-partner.md) path C, [21](21-ask-to-be-paid.md) path A
+6.4. He can do this before he has ever tallied with anyone.
 
 ## Acceptance Criteria
 
@@ -64,6 +73,7 @@ A person with no identity, no tallies, and no counterparty.
 - [ ] The user is told their identity lives on this device, and what that means for them
 - [ ] Only a display name is required up front; everything else is deferred until something needs it
 - [ ] A user with no tallies is told what they need and offered both ways to get one
+- [ ] A user can publish an invitation others can take up, before having any tallies
 - [ ] Nothing in first run obliges the user to another party
 - [ ] A user arriving via an invitation completes setup on the way to answering it, and returns to it
 - [ ] A user with an existing identity can continue as themselves rather than start over

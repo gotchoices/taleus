@@ -15,7 +15,8 @@ story overlaps [13](13-my-devices.md) and [50](50-recover-after-losing-a-device.
 
 ## Sequence
 
-1. Steve can find out what protects him today: this phone can act as him, and nothing else can.
+1. Steve can find out what protects him today: this phone, unlocked by him, can act as him. Nothing
+   else can, and the phone alone cannot — someone holding it still has to be him to use it.
 2. He is told what that means in his terms — if this phone is lost, he keeps his tallies and his
    history, but he loses the ability to agree to anything new on them until he does something about
    it.
@@ -23,11 +24,14 @@ story overlaps [13](13-my-devices.md) and [50](50-recover-after-losing-a-device.
    another device that can also act as him, or a spare means of authority he keeps somewhere off his
    devices entirely — a safe, a deposit box — that could bring a new device back if every device he
    owns is gone.
-4. Steve adds his tablet. Now two devices can act as him, and losing either one is an inconvenience
+4. Whatever he puts away is useless to whoever finds it: it takes something only he knows to make it
+   work. He is told that plainly, because a thing kept in a drawer, photographed, or run through an
+   office printer does not stay as private as people assume.
+5. Steve adds his tablet. Now two devices can act as him, and losing either one is an inconvenience
    rather than a crisis. → [13](13-my-devices.md)
-5. He can see, at any point, what he is relying on: which devices can act as him, and whether he has
+6. He can see, at any point, what he is relying on: which devices can act as him, and whether he has
    anything else to fall back on.
-6. The app stops asking. Having been told once and acted on it, Steve is not nagged again.
+7. The app stops asking. Having been told once and acted on it, Steve is not nagged again.
 
 ### Alternative Path A: Steve does nothing
 3.1. Steve declines to set anything up.
@@ -64,15 +68,13 @@ story overlaps [13](13-my-devices.md) and [50](50-recover-after-losing-a-device.
 1.2. He cannot — he is prevented, and told why: doing so would leave him unable to act as himself at
      all, recoverable only through a counterparty.
 
-<!--EC  NTA: In all of these scenarios, it should be made clear that the device itself can't be used as him, but rather the combindation of he and his biometrics -->
-<!--EC  NTA: If a printer is used to retain a private key, users must be warned that the logs from printers can sometimes be used to recover content 
-
-KB: Ideally, a printed QR code would store an encrypted key.  The user would need the QR as well as the password he used to encode the file.
--->
 
 ## Acceptance Criteria
 
 - [ ] A party can find out what can currently act as them
+- [ ] Acting as the party requires both their device and them — a device alone is not enough
+- [ ] Anything a party puts away for recovery is useless without something only they know, and they
+      are told so
 - [ ] The consequence of losing a device is stated in terms of what the party can and cannot do
 - [ ] Protection options are described by what they protect against, not by mechanism
 - [ ] A party can add another device that can act as them

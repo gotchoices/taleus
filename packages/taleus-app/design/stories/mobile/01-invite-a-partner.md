@@ -29,21 +29,24 @@ across the table and does not have the app. Jan does. Two-party story — Sam's 
    back is their decision, and they may extend nothing.
 5. He is asked what the tally counts in. Dollars is offered because that is what his other tallies
    use.  CHIPs is also offered.  He is told this one cannot be changed later, so he thinks for a second before confirming.
-6. He is asked how long the invitation should stay good. Sam is right there, so a day is plenty.
-7. Jan shares the invitation with Sam directly, since they are together.
-8. Jan can see the invitation is outstanding and when it runs out. Nothing is owed yet; there is no
+6. He is asked which agreement governs the tally — what the two of them are actually agreeing to
+   when they lend and settle. A published standard one is offered and he takes it. He is told he can
+   read it, and that whoever accepts has to accept the same one.
+7. He is asked how long the invitation should stay good. Sam is right there, so a day is plenty.
+8. Jan shares the invitation with Sam directly, since they are together.
+9. Jan can see the invitation is outstanding and when it runs out. Nothing is owed yet; there is no
    tally until Sam responds.
-9. Sam responds. Jan is told, and only now learns who accepted — Sam's identity comes from what Sam
-   discloses, not from anything Jan entered. → [02](02-respond-to-an-invitation.md)
+10. Sam responds. Jan is told, and only now learns who accepted — Sam's identity comes from what Sam
+    discloses, not from anything Jan entered. → [02](02-respond-to-an-invitation.md)
 
 ### Alternative Path A: Sam never responds
-8.1. Sam gets distracted and never opens it. The next day the invitation runs out.
-8.2. Jan sees it as expired. It stops asking him for anything.
-8.3. Jan can invite Sam again from the same setup, without re-entering the terms he already chose.
+9.1. Sam gets distracted and never opens it. The next day the invitation runs out.
+9.2. Jan sees it as expired. It stops asking him for anything.
+9.3. Jan can invite Sam again from the same setup, without re-entering the terms he already chose.
 
 ### Alternative Path B: Jan changes his mind
-8.1. Before Sam responds, Jan decides against it and abandons the invitation.
-8.2. If Sam responds anyway, Jan is told, and can simply leave it alone. An invitation Jan never
+9.1. Before Sam responds, Jan decides against it and abandons the invitation.
+9.2. If Sam responds anyway, Jan is told, and can simply leave it alone. An invitation Jan never
      agrees to does not become a tally on its own.
 
 ### Alternative Path C: Mara's bike shop
@@ -56,14 +59,18 @@ across the table and does not have the app. Jan does. Two-party story — Sam's 
 1.4. Mara sees each new tally arrive as its own relationship, and can negotiate any of them
      individually afterward.
 
+### Alternative Path E: an agreement Jan did not write
+6.1. Jan wonders what he is signing up to and reads the standard agreement.
+6.2. He can choose a different published one if he prefers it. He does not write his own — he would
+     not know where to start, and even if he did, nobody sensible signs a stranger's custom
+     agreement without having a lawyer read it first. Published agreements are what make this
+     practical, the way people pick a software licence rather than drafting one.
+6.3. Whoever accepts sees the same agreement and is free to refuse it.
+
 ### Alternative Path D: Jan is not with Sam
-7.1. Sam is not in the room, so Jan sends the invitation to him instead.
-7.2. Jan gives it a week rather than a day, since Sam may not look right away.
+8.1. Sam is not in the room, so Jan sends the invitation to him instead.
+8.2. Jan gives it a week rather than a day, since Sam may not look right away.
 
-<!--EC  NTA: Probably need to incorporate details about contracts here 
-
-KB: It is intended that sereus strands will be enhanced to include the concept of a strand contract.  In MyCHIPs, the tally contract was part of the tally record.  In Taleus, we _could_ deal with this separately, but since sereus strands are intended to include a governing contract, I think we should make the assumption in taleus that it will be incorporate at the sereus level (and we can insist that sereus enhance it's notion of contracts until it is fully capable of servicing taleus' needs).  For the purpose of our stories, we should probably note that the tally participants adopt (and must agree on) a governing contract.  We could allude to a sanctioned (GotChoices, MyCHIPs.org, or Taleus.org) standard contract for now.  Or, if we want to get fancy, we could have a path that includes a custom contract.  Not a lot of details exist yet about how custom contracts will be authored.  In the end, people will probably have to trust publishers of standard contracts in much the same way that open-source software authors trust publishers of various licenses.
--->
 
 ## Acceptance Criteria
 
@@ -72,6 +79,8 @@ KB: It is intended that sereus strands will be enhanced to include the concept o
 - [ ] The counterparty's identity comes only from what that party discloses when responding
 - [ ] The inviter sets their own credit limit and notice period, and is told these bind only them
 - [ ] The unit of account is chosen at invitation time, with the user warned it is permanent
+- [ ] A governing agreement is chosen at invitation time, from published agreements, and is readable
+- [ ] The invitee must accept the same agreement for the tally to open
 - [ ] The inviter chooses how long the invitation stays good
 - [ ] The same invitation can be shared with someone present or sent to someone absent
 - [ ] An outstanding invitation is distinguishable from an open tally, and shows when it expires

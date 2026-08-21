@@ -42,21 +42,30 @@ disclosed.
 
 ### Alternative Path C: Jan has disclosed more since
 6.1. Jan added his business address when they started trading in larger amounts.
-6.2. Sam can see what Jan has disclosed now. What Jan chose not to disclose is distinguishable from
-     what Jan does not have.
+6.2. Sam can see what Jan has disclosed now. What is absent stays ambiguous — withheld and never-held
+     look the same from here — and if it matters, Sam can ask.
+     → [11](11-my-profile-and-disclosure.md)
 
-### Alternative Path D: reviewing a closed tally
+### Alternative Path D: matching a reduction
+1.1. Sam has cut what he will let Jan owe him from $500 to $300. Jan sees it, and decides to cut his
+     side to match.
+1.2. Neither reduction reaches back. What Sam already owes stays under the terms it was borrowed
+     under; the new figure governs what happens from here.
+1.3. Each of them can see which terms apply to what: the balance already outstanding, and anything
+     from now on.
+1.4. With nothing outstanding, a reduction simply applies — there is no debt whose runway it could
+     shorten, so there is nothing to wait for.
+
+### Alternative Path E: a second reduction, before the first has taken hold
+1.1. Jan cuts his limit again a week later, before the earlier cut has taken effect.
+1.2. It changes nothing about the money already advanced, which keeps the terms in force when it was
+     advanced. Reductions stack on the future, not on the past.
+1.3. Both of them can see each change, when it was made, and what it governs.
+
+### Alternative Path F: reviewing a closed tally
 1.1. Sam looks at a tally he closed last year.
 1.2. Everything is still readable — terms, history, who the other party was, and that it is closed.
 
-<!--EC  NTA: Alternative path: Jan sees that Sam reduced his limit to $300, and decides he should correspondingly reduce his.  Nothing special, but shows that each takes place at end of call term from initiation. 
-
-KB: Yes, but: I think a call term amendment _could_ kick in immediately on a tally with no outstanding balance.  I think an existing call term is allowed to run its course if a debt was incurred when the old policy was in play.  So call terms run on actual debts, not necessarily from the date of inception of the tally.
--->
-<!--EC  NTA: What happens if a party further reduces terms, before the call term? 
-
-KB: Again, I think a debt incurred is resolved according to the terms in play at the time of accrual.  Not sure if this policy will get too messy, but it seems like the right thing to do (to me).
--->
 
 
 ## Acceptance Criteria
@@ -66,9 +75,12 @@ KB: Again, I think a debt incurred is resolved according to the terms in play at
 - [ ] Previous terms are available, showing what changed and when it took effect
 - [ ] A pending proposal is clearly distinct from the terms in force
 - [ ] A change that has not yet taken effect shows both the current value and the effective date
+- [ ] It is visible which terms govern value already outstanding and which govern new activity
+- [ ] Successive changes are individually visible, each with what it governs
+- [ ] A restrictive change on a tally with nothing outstanding is shown as applying immediately
 - [ ] The contract behind the terms is identifiable and readable
 - [ ] The counterparty's disclosure is visible, and presented as their claim rather than a verified fact
-- [ ] What a counterparty withheld is distinguishable from what they lack
+- [ ] Absent information is not presented as evidence of anything about the counterparty
 - [ ] A closed tally remains fully reviewable
 
 ## Variants

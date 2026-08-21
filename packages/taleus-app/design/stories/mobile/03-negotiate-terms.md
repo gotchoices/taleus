@@ -20,7 +20,8 @@ The roles swap with every counter. In this telling Sam counters first.
 
 ## Sequence
 
-1. Sam wants a month's notice instead of two weeks. He says so, and sends it back to Jan.
+1. Sam wants a month's notice instead of two weeks — the time he would get to settle up if Jan ever
+   called the balance in. He says so, and sends it back to Jan.
 2. He is told this is now his offer — Jan's earlier agreement no longer stands on its own, and Jan
    has to agree to this before anything is settled.
 3. Jan is notified that an answer came back, and can see exactly what Sam changed: the notice period, nothing
@@ -45,23 +46,29 @@ The roles swap with every counter. In this telling Sam counters first.
 3.2. Neither is left with something waiting on them. Either may offer again.
 
 ### Alternative Path C: changing the terms of an open tally
-1.1. Months later, Sam asks Jan to raise his limit — the bike turned into a habit.
-<!--EC  NTA: might be good to clarify that "asks" isn't just a verbal interaction.  Sam "proposes" this through the system.
+1.1. Months later, Sam wants Jan to raise his limit — the bike turned into a habit. He asks through
+     the app rather than by text message, so the request reaches Jan where his other business is
+     waiting and neither of them has to remember it.
+1.2. What Sam sends is a request, not a proposal: only Jan can decide what Jan is willing to be
+     owed. Jan sees what is being asked for and acts, or does not.
+1.3. The tally keeps working on the existing terms while Jan considers it. Nothing is in limbo.
+1.4. Jan agrees, and both can see the new terms and when they took effect.
+1.5. The unit is never up for renegotiation; dollars is what this tally counts in for good.
 
-KB: This is not the way I had envisioned it.  I had imagined an out-of-band request, followed by a human action by the partner to get in and manually amend the tally.  However, I _am_ open to an in-band command to request a particular credit limit.  Perhaps this is generalized to be _any_ renegotiation request.  We can cover this very lightly in the stories, but the engine may need some fodder to chew on regarding this if we are to extend the protocol to renegotiate an open tally. -->
-1.2. The tally keeps working on the existing terms while Jan considers it. Nothing is in limbo.
-1.3. Jan agrees, and both can see the new terms and when they took effect.
-1.4. The unit is never up for renegotiation; dollars is what this tally counts in for good.
+### Alternative Path E: Jan calls the balance in
+1.1. Jan needs settling up. He calls the balance in through the app, not by ringing Sam.
+1.2. Sam is told what is being asked and by when — the notice period they agreed is what sets the
+     date, and both of them see the same one.
+1.3. The tally keeps working meanwhile. Calling for settlement is not closing
+     ([05](05-close-a-tally.md)), and it does not freeze anything by itself.
+1.4. If the date passes unsettled, the app says so plainly to both of them. What follows is between
+     them and whatever they agreed to — the app reports, it does not enforce.
 
 ### Alternative Path D: Jan tightens up on his own
 1.1. Jan decides $500 was generous and drops his limit to $200. This is his call alone — Sam does not
      have to agree.
 1.2. Sam is told. Because the change is restrictive, it takes effect only after the notice Jan
      already owes him, and both can see the date it applies from.
-<!--EC  NTA: Should clarify that "notice" = call term -->
-<!--EC  NTA: Should clarify that said call notice should be a formal feature of the system - not out of band 
-
-KB: I concur.  -->
 1.3. Had Jan raised the limit instead, it would apply at once — nobody needs protection from being
      trusted more.
 
@@ -76,7 +83,14 @@ KB: I concur.  -->
       shown which was superseded
 - [ ] An expired offer stops requesting attention and can be re-proposed
 - [ ] A tally that is already open keeps working on its existing terms while a new offer is pending
+- [ ] A party can ask for terms only the other party can grant, in the app, as a request rather than
+      a proposal
 - [ ] A party can change their own limit without the other party's agreement
+- [ ] A party can call a balance in, in the app, with the deadline derived from the agreed notice
+      period and visible to both
+- [ ] Calling for settlement is distinguishable from closing, and does not freeze the tally
+- [ ] A deadline that passes unsettled is reported to both parties, without the app enforcing
+      anything
 - [ ] A restrictive change states the date it takes effect; a permissive one applies immediately
 - [ ] The unit of account is never offered as negotiable after the first agreement
 

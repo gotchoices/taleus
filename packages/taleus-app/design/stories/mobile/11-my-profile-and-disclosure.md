@@ -26,25 +26,28 @@ Any party. What another party learns about them is only ever what they chose to 
 6. Later, Sam can see what he sent to whom: Jan has his name and phone, the supplier has his address
    and business name, Mara has a name.
 7. Jan's business grows and he asks Sam for an address. Sam adds it to their existing tally — no new
-   tally, no renegotiated terms, just more disclosed than before.
-   <!--EC  NTA: Is Sam notified? -->
-
+   tally, no renegotiated terms, just more disclosed than before. Jan is notified that something
+   arrived; disclosure is not something Sam does silently into a record Jan may never reread.
+   
 ### Alternative Path A: someone wants more than Sam will give
 4.1. The supplier expects a tax identifier. Sam is not willing.
 4.2. He can proceed without it. The supplier is free to decline to countersign — that is their
      answer, and Sam is not forced either way.
 4.3. Sam is not told his information was "rejected"; he is told the tally is not agreed.
-<!--EC  NTA: Can a party "counter" with an information request? 
 
-KB: Great idea.
--->
+### Alternative Path B: asking rather than refusing
+4.1. Rather than turn Sam down flat, the supplier asks him for the tax identifier — a request
+     alongside their offer, saying what would satisfy them.
+4.2. Sam sees what is wanted and why it matters to them. He can supply it, or say he will not.
+4.3. Either answer is visible to the supplier. Asking turns an ambiguous silence into a plain yes or
+     no, which is the point of asking.
 
-### Alternative Path B: Mara's shop discloses to everyone
+### Alternative Path C: Mara's shop discloses to everyone
 3.1. Mara publishes a standing invitation ([01](01-invite-a-partner.md), path C).
 3.2. Whatever she includes goes to every customer who takes it up. She is told this before she
      publishes: this disclosure is effectively public.
 
-### Alternative Path C: correcting something
+### Alternative Path D: correcting something
 1.1. Sam changes his phone number, and wants the people who have the old one to have the new one.
 1.2. He is shown which of his tallies carry the old number, and asked to authorize the correction —
      each one is a statement he signs, so the app does not send any of them on his behalf. He
@@ -53,11 +56,14 @@ KB: Great idea.
 1.4. What he corrected and when remains visible to both sides; a correction is a new statement, not
      an erasure of the old one.
 
-### Alternative Path D: what Sam sees of others
+### Alternative Path E: what Sam sees of others
 1.1. Sam looks at what Jan has disclosed to him.
 1.2. He can see it is what Jan says about himself, not something Taleus has verified.
-1.3. He can tell what Jan chose not to send from what Jan does not have.
-<!--EC  NTA: Clarify that he cannot "tell" what information Jan has in his system that he has withheld, only that he doesn't have that information. -->
+1.3. What he cannot tell is why something is missing. An address he was never given might be one Jan
+     withheld or one Jan never recorded — from Sam's side those look identical, and the app does not
+     pretend otherwise.
+1.4. If it matters, he can ask ([path B](#alternative-path-b-asking-rather-than-refusing)). A request
+     turns absence into an answer.
 
 ## Acceptance Criteria
 
@@ -66,11 +72,15 @@ KB: Great idea.
 - [ ] A party can see what they have disclosed to each counterparty, after the fact
 - [ ] A party can disclose more on an existing tally without renegotiating terms
 - [ ] An inviter can state what they expect to be disclosed; the invitee may decline and proceed
+- [ ] A party can request specific information from a counterparty rather than only refusing them
+- [ ] A request for information gets a visible answer, whether it is supplied or refused
+- [ ] The counterparty is notified when a party discloses something new on an existing tally
 - [ ] Withholding is not framed as failure — the counterparty simply need not agree
 - [ ] A correction is sent only to the counterparties the party authorizes, never automatically
 - [ ] A standing invitation's disclosure is presented as public before it is published
 - [ ] What a counterparty discloses is presented as their claim, not as verified fact
-- [ ] What a counterparty withheld is distinguishable from what they do not have
+- [ ] Missing information is presented as missing, without implying whether it was withheld or never
+      held
 
 ## Variants
 - happy: different disclosure for three different counterparties

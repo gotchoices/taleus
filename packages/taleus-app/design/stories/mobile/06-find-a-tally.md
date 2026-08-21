@@ -18,9 +18,8 @@ Any party with more than a handful of tallies. What a party can find is limited 
 2. He finds it by who it is with.
 3. Later he wants "the one in hours" — he cannot remember whose it is, only that it is not in
    dollars. He finds it by the unit it counts in.
-4. Later still he wants the one he was arguing about last week. He finds it among those that have
-   changed recently.
-<!--EC  NTA: "arguing about" -> "negotiating terms on" -->
+4. Later still he wants the one whose terms he was negotiating last week. He finds it among those
+   that have changed recently.
 5. Whatever he was looking for, he ends up at the tally itself and can act on it.
 
 ### Alternative Path A: what needs Jan
@@ -45,15 +44,21 @@ Any party with more than a handful of tallies. What a party can find is limited 
 1.2. Nothing about finding gets in his way — the effort of locating a tally scales with how many a
      party has.
 
-### Alternative Path E: closed ones
+### Alternative Path E: all he remembers is a phone number
+2.1. Jan has a number in his call log and no idea which tally it belongs to.
+2.2. He can find it by what that party disclosed to him — a number, an address, a business name.
+2.3. He is searching what he was given, not a directory: a party who disclosed nothing but a name is
+     findable only by that name. → [11](11-my-profile-and-disclosure.md)
+
+### Alternative Path F: closed ones
 3.1. Jan wants a tally he closed last spring, to check what it was.
 3.2. Closed tallies are findable, and are not mixed in with the ones he is still trading on.
 
-<!--EC  NTA: Additional alternative: searching by any of the personal information shared by any of the peers (e.g. phone number or address) -->
 
 ## Acceptance Criteria
 
 - [ ] A party can reach a tally by who it is with
+- [ ] A party can reach a tally by anything the counterparty disclosed to them, not only by name
 - [ ] A party can reach a tally by the unit it counts in
 - [ ] A party can reach a tally by how recently something happened on it
 - [ ] Tallies waiting on the party are reachable without searching for them individually

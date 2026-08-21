@@ -47,7 +47,8 @@ Groups 1-2 (01-07) cover the tally lifecycle end to end; group 3 (10-13, 50) cov
 group 4 (20-22) covers value moving between two parties.
 
 Open points carried by reviewed stories, each tracked as a ticket:
-- Whether a declined invitation is visible to the inviter — `feat-offer-lifecycle` (story 02).
+- ~~Whether a declined invitation is visible to the inviter~~ — **resolved**: offers can be refused
+  outright and the refusal reaches the offerer (story 02). See `tmp/nate-feedback.md`.
 - Whether over-limit pledges warn rather than block — `feat-manual-chit-credit-gate` (story 20).
 - Whether a party can record while the counterparty is unreachable — `feat-engine-tally-api`
   (story 20).

@@ -29,6 +29,12 @@ pledge is the pledger's own promise, and the party holding it has given up nothi
 warned when a pledge goes beyond the limit — the one making it, and the one deciding whether to
 hand over goods for it. Lifts are a different matter: those stay inside the limits.
 
+## Agreements
+
+Every tally is governed by an agreement both parties accept — chosen when the tally is offered, from
+agreements someone has published and stands behind. Terms (limits, notice) are arguments to it. A
+party can read it before accepting and can refuse it.
+
 ## Signing
 
 Two kinds of act, and the app has to keep them apart:
@@ -49,6 +55,7 @@ act they sign.
 - An offer is not an agreement until both parties sign it.
 - More than one offer may be outstanding; any unexpired one may be accepted.
 - If two end up signed by both parties, the later-drafted one governs.
-- Offers expire. Expiry is the only thing that ends one.
-- Declining is private — the other party sees only silence.
+- Offers expire, and can also be refused outright. A refusal reaches the offerer; being ignored
+  only tells them time ran out.
+- A refused offer is finished and cannot be revived. A fresh offer can always be made.
 - Exit is by close, not by retraction.
