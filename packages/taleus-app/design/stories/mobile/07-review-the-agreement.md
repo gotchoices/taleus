@@ -49,8 +49,14 @@ disclosed.
 1.1. Sam looks at a tally he closed last year.
 1.2. Everything is still readable — terms, history, who the other party was, and that it is closed.
 
-<!--EC  NTA: Alternative path: Jan sees that Sam reduced his limit to $300, and decides he should correspondingly reduce his.  Nothing special, but shows that each takes place at end of call term from initiation. -->
-<!--EC  NTA: What happens if a party further reduces terms, before the call term? -->
+<!--EC  NTA: Alternative path: Jan sees that Sam reduced his limit to $300, and decides he should correspondingly reduce his.  Nothing special, but shows that each takes place at end of call term from initiation. 
+
+KB: Yes, but: I think a call term amendment _could_ kick in immediately on a tally with no outstanding balance.  I think an existing call term is allowed to run its course if a debt was incurred when the old policy was in play.  So call terms run on actual debts, not necessarily from the date of inception of the tally.
+-->
+<!--EC  NTA: What happens if a party further reduces terms, before the call term? 
+
+KB: Again, I think a debt incurred is resolved according to the terms in play at the time of accrual.  Not sure if this policy will get too messy, but it seems like the right thing to do (to me).
+-->
 
 
 ## Acceptance Criteria

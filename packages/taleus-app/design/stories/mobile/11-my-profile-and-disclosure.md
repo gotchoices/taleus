@@ -34,7 +34,10 @@ Any party. What another party learns about them is only ever what they chose to 
 4.2. He can proceed without it. The supplier is free to decline to countersign — that is their
      answer, and Sam is not forced either way.
 4.3. Sam is not told his information was "rejected"; he is told the tally is not agreed.
-<!--EC  NTA: Can a party "counter" with an information request? -->
+<!--EC  NTA: Can a party "counter" with an information request? 
+
+KB: Great idea.
+-->
 
 ### Alternative Path B: Mara's shop discloses to everyone
 3.1. Mara publishes a standing invitation ([01](01-invite-a-partner.md), path C).

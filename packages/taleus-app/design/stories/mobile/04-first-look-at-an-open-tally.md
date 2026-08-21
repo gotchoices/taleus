@@ -35,21 +35,31 @@ Both parties see the same tally, each from their own side. Where their views dif
 2.2. Two of his tallies are in hours, not dollars. He can still ask what he is worth overall, in
      dollars, and gets an estimate — marked as an estimate, at his own rates, never replacing the
      real per-unit figures.
-<!--EC  NTA: "can still ask" seems like suggesting a specific action.  Maybe we shouldn't assume whether this takes an extra action, or is always there? -->
+<!--EC  NTA: "can still ask" seems like suggesting a specific action.  Maybe we shouldn't assume whether this takes an extra action, or is always there? 
+
+KB: Maybe "He can still" observe, see, tell.  Something like that? -->
 
 ### Alternative Path B: Sam wants out
 7.1. Sam decides this was a mistake before anything happens on the tally.
 7.2. He asks to close it. The balance is zero, so it closes. Jan does not have to agree.
 7.3. Had something been owed, the tally would stay visible as closing until it settled, and neither
      of them could add to it in the meantime.
-<!--EC  NTA: Request reopen?  ...before or after the end of term. -->
+<!--EC  NTA: Request reopen?  ...before or after the end of term. 
+
+KB: I think a party can unilaterally close a zero tally at any time.  A "term" applies only to credit repayment (how long you are allowed to carry a balance).  Thoughts?
+-->
 
 ### Alternative Path C: the counterparty is unreachable
 2.1. Jan's phone is off. Sam can still see the tally and its terms — this is his record too, not a
      view of Jan's.
-<!--EC  NTA: This oversimplifies cadres -->
+<!--EC  NTA: This oversimplifies cadres 
+
+KB: This may be true, but I'm not sure what we can do any better in stories for now (we're working on UI, not the engine here). -->
 2.2. Anything Sam does that needs Jan is described as pending rather than failed.
-<!--EC  NTA: We may want a local queueing mechanism beyond cadres. -->
+<!--EC  NTA: We may want a local queueing mechanism beyond cadres. 
+
+KB: Again, probably not the business of hte UI design, rather engine.
+-->
 
 ## Acceptance Criteria
 

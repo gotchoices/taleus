@@ -46,7 +46,9 @@ The roles swap with every counter. In this telling Sam counters first.
 
 ### Alternative Path C: changing the terms of an open tally
 1.1. Months later, Sam asks Jan to raise his limit — the bike turned into a habit.
-<!--EC  NTA: might be good to clarify that "asks" isn't just a verbal interaction.  Sam "proposes" this through the system -->
+<!--EC  NTA: might be good to clarify that "asks" isn't just a verbal interaction.  Sam "proposes" this through the system.
+
+KB: This is not the way I had envisioned it.  I had imagined an out-of-band request, followed by a human action by the partner to get in and manually amend the tally.  However, I _am_ open to an in-band command to request a particular credit limit.  Perhaps this is generalized to be _any_ renegotiation request.  We can cover this very lightly in the stories, but the engine may need some fodder to chew on regarding this if we are to extend the protocol to renegotiate an open tally. -->
 1.2. The tally keeps working on the existing terms while Jan considers it. Nothing is in limbo.
 1.3. Jan agrees, and both can see the new terms and when they took effect.
 1.4. The unit is never up for renegotiation; dollars is what this tally counts in for good.
@@ -57,7 +59,9 @@ The roles swap with every counter. In this telling Sam counters first.
 1.2. Sam is told. Because the change is restrictive, it takes effect only after the notice Jan
      already owes him, and both can see the date it applies from.
 <!--EC  NTA: Should clarify that "notice" = call term -->
-<!--EC  NTA: Should clarify that said call notice should be a formal feature of the system - not out of band -->
+<!--EC  NTA: Should clarify that said call notice should be a formal feature of the system - not out of band 
+
+KB: I concur.  -->
 1.3. Had Jan raised the limit instead, it would apply at once — nobody needs protection from being
      trusted more.
 

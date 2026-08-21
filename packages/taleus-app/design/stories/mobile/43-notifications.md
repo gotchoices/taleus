@@ -35,6 +35,7 @@ Any party. What reaches them here is only ever things that need *them*
 1.1. Sam has no always-on machine, so his phone is the only thing that can take part in settling.
 1.2. It is roused when it is needed, briefly, without showing him anything — that is participation,
      not a message, and there is nothing for him to read or dismiss.
+     <!--EC I imagine this is _possible_ only if the app has been launched recently and is still running.  I'm not sure how much control we will have in a phone OS to make sure that a phone is _always_ available to do lifts autonomously.  Thoughts? -->
 1.3. If he never wants that, the honest answer is that his tallies will settle less often, and he is
      told so plainly rather than being quietly cut out. → [13](13-my-devices.md)
 

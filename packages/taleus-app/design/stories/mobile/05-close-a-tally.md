@@ -30,7 +30,10 @@ asking, and nobody being able to settle.
 5. Sam settles the $180 — all at once, or in pieces over several weeks. Each payment is allowed
    because each one moves the balance toward zero.
 6. The balance reaches zero and the tally closes for both of them.
-<!--EC  NTA: We may consider a "margin" so that tallies aren't hung up on fractions of a cent or even fractions of a dollar -->
+<!--EC  NTA: We may consider a "margin" so that tallies aren't hung up on fractions of a cent or even fractions of a dollar 
+
+I think I'm fine requiring a tally to be exactly zero to close.  My argument: If we agree in advance to a closing margin, we are simply agreeing that one party or another will "write off" a small balance at the end.  Without a pre-determined margin, either party who is still owed some small balance could decide at any time to write off the balance by entering a closing chit on the tally (i.e. sending the value to the other partner.). This makes the act of writing off a closing balance more deliberate, which I think it should be in the case of a write off.  Such a trasaction would need to be entered somewhere to make one's books balance.  It shouldn't just be automatic and invisible.
+-->
 7. Both keep the record. A closed tally is still readable: what happened, what was agreed, who the
    other party was.
 
@@ -52,7 +55,10 @@ asking, and nobody being able to settle.
      recorded and collectible.
 5.3. Both of them can see it is waiting on settlement rather than finished.
 5.4. If Sam settles a year later, it closes then.
-<!--EC  NTA: No mention of being "late".  Potential late and/or collection fees in the contract? -->
+<!--EC  NTA: No mention of being "late".  Potential late and/or collection fees in the contract? 
+
+KB: In a standard, short-term trading contract (for tallies intended to act like money), I don't envision any kind of automatic charges being entered on the tally.  However, the tally contract could/should certainly include penalties/interest for being late.  But adjudication of a default tally is not intended to be automatic (i.e. like a self-executing blockchain contract).  Rather, it is an agreement meant to be resolved between humans.  Hopefully, the relationship is trusted and valued enough that the parties voluntarily abide by its terms.  In extreme cases, a tally might be enforced in court (as it will be a legally binding contract, assuming the jurisdiction supports it).
+-->
 
 ### Alternative Path D: closing while something is in flight
 5.1. A payment routed through this tally is still in progress when the balance would otherwise hit

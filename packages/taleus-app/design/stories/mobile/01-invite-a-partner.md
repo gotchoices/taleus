@@ -60,7 +60,10 @@ across the table and does not have the app. Jan does. Two-party story — Sam's 
 7.1. Sam is not in the room, so Jan sends the invitation to him instead.
 7.2. Jan gives it a week rather than a day, since Sam may not look right away.
 
-<!--EC  NTA: Probably need to incorporate details about contracts here -->
+<!--EC  NTA: Probably need to incorporate details about contracts here 
+
+KB: It is intended that sereus strands will be enhanced to include the concept of a strand contract.  In MyCHIPs, the tally contract was part of the tally record.  In Taleus, we _could_ deal with this separately, but since sereus strands are intended to include a governing contract, I think we should make the assumption in taleus that it will be incorporate at the sereus level (and we can insist that sereus enhance it's notion of contracts until it is fully capable of servicing taleus' needs).  For the purpose of our stories, we should probably note that the tally participants adopt (and must agree on) a governing contract.  We could allude to a sanctioned (GotChoices, MyCHIPs.org, or Taleus.org) standard contract for now.  Or, if we want to get fancy, we could have a path that includes a custom contract.  Not a lot of details exist yet about how custom contracts will be authored.  In the end, people will probably have to trust publishers of standard contracts in much the same way that open-source software authors trust publishers of various licenses.
+-->
 
 ## Acceptance Criteria
 

@@ -65,7 +65,10 @@ story overlaps [13](13-my-devices.md) and [50](50-recover-after-losing-a-device.
      all, recoverable only through a counterparty.
 
 <!--EC  NTA: In all of these scenarios, it should be made clear that the device itself can't be used as him, but rather the combindation of he and his biometrics -->
-<!--EC  NTA: If a printer is used to retain a private key, users must be warned that the logs from printers can sometimes be used to recover content -->
+<!--EC  NTA: If a printer is used to retain a private key, users must be warned that the logs from printers can sometimes be used to recover content 
+
+KB: Ideally, a printed QR code would store an encrypted key.  The user would need the QR as well as the password he used to encode the file.
+-->
 
 ## Acceptance Criteria
 
