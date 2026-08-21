@@ -16,8 +16,12 @@ Any party. A cadre is the set of machines acting for one person — nobody else'
 
 1. Jan can see what his cadre consists of today: one phone.
 2. He is told what that means, split honestly in two.
-3. **His tallies are not the fragile part.** Every tally is held by his counterparty's machines as
+3. **His tallies are the less fragile part.** Every tally is held by his counterparty's machines as
    well as his own, so the record of what he owes and is owed survives his phone going under a bus.
+   That safety is borrowed, though: it rests on the other party keeping their copy and being willing
+   to produce it. Nobody can quietly alter it — every entry carries the signature of whoever made it
+   — but a partner who vanishes, or who keeps careless records, leaves Jan with nothing of his own to
+   point at. His own copy is what makes the record his evidence rather than their favor.
 4. **His own private records are the fragile part.** What he has valued things at, what he prefers,
    his own view of everything he holds — nobody else has a copy of that, because none of it is any
    counterparty's business. It lives only on his machines.
@@ -30,8 +34,9 @@ Any party. A cadre is the set of machines acting for one person — nobody else'
 
 ### Alternative Path A: only ever a phone
 1.1. Jan never adds anything.
-1.2. This is not blocked and not nagged at. It is stated once, accurately: his tallies are safe with
-     his counterparties; his own private records are not safe anywhere else.
+1.2. This is not blocked and not nagged at. It is stated once, accurately: his tallies survive with
+     his counterparties — as far as those counterparties are diligent and honest — while his own
+     private records survive nowhere but here.
 1.3. He is told what he could lose in his own terms — his rates, his preferences, his own view of his
      affairs — rather than in the language of nodes and replication.
 
@@ -63,6 +68,8 @@ Any party. A cadre is the set of machines acting for one person — nobody else'
 - [ ] A party can see what machines make up their cadre
 - [ ] The party is told which of their records survive elsewhere and which exist only on their own
       machines
+- [ ] Survival elsewhere is described as depending on the counterparty keeping and producing their
+      copy — not as a guarantee the system makes
 - [ ] A party can add a machine of their own, whether hosted by a provider or self-run
 - [ ] The contribution of each machine is stated: durability, availability, or both
 - [ ] A party can remove a machine, and is told the consequence when it leaves them with one

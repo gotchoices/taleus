@@ -37,10 +37,15 @@ Mara, who deals with people the supplier deals with. None of that is Sam's probl
 ### Alternative Path A: there is no way through
 2.1. Nobody Sam is connected to leads to the supplier — an ordinary outcome in a young network, not
      a fault.
-     <!--EC I am hopeful that tallynet may, at some point, also be able to reveal to Sam (in some cases) a handful of well known potential trading partners that would facilitate such a transfer.  For example: the payment you are considering would be much more likely if you shared a tally with one or more of the following: ... -->
-2.2. He is told so plainly, and told what would change it: a tally with the supplier
-     ([01](01-invite-a-partner.md)), or with someone who deals with them.
-2.3. He can still settle outside the app and record it ([20](20-pay-a-partner.md)).
+2.2. He is told so plainly, and told what would change it.
+2.3. Where it can be worked out, he is shown *who* would change it: "this would be possible if you
+     had a tally with any of these" — a handful of well-connected parties, rather than leaving him to
+     guess who to go and meet.
+2.4. Tallying with the supplier directly is often the answer, and it is not shaped like his tally
+     with Jan: a supplier extends a newcomer nothing. Trust runs the other way, so Sam funds the
+     tally — with outside money, or by directing value into it over time
+     ([31](31-trading-variables.md)) — and pays from there. → [21](21-ask-to-be-paid.md) path A
+2.5. He can also settle outside the app entirely and record it ([20](20-pay-a-partner.md)).
 
 ### Alternative Path B: a way through, but not enough of it
 2.1. Value can reach the supplier, but only $180 of it.

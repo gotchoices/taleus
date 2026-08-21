@@ -8,14 +8,7 @@ States: **stub** (topic only) → **drafted** (written, not yet human-reviewed) 
 
 ## Ready for review
 
-Group 7 — the tail. 14 is new: cadre management, which 13 alluded to but did not cover. 51 is
-renamed "Staying reachable" and may not survive as its own story — see its Open note.
-
-| # | Story | State |
-|---|-------|-------|
-| 14 | [My cadre](14-my-cadre.md) | drafted |
-| 43 | [Notifications](43-notifications.md) | drafted |
-| 51 | [Staying reachable](51-change-my-address.md) | drafted |
+Nothing pending — every story except 25 is written and reviewed.
 
 ## Reviewed
 
@@ -41,11 +34,14 @@ Group 1 — tally negotiation, one continuous thread (Jan and Sam, carried over 
 | 22 | [Respond to a request](22-respond-to-a-request.md) | reviewed |
 | 23 | [What needs my attention](23-what-needs-my-attention.md) | reviewed |
 | 24 | [Tally history](24-tally-history.md) | revised — running balance separated from net worth |
-| 30 | [Pay someone I'm not connected to](30-pay-through-the-network.md) | revised — no directory; payee issues the request |
+| 30 | [Pay someone I'm not connected to](30-pay-through-the-network.md) | revised — no directory; suggested partners; vendor-funded route |
 | 31 | [Trading settings](31-trading-variables.md) | revised — cross-unit movement needs a rate first |
 | 40 | [My position](40-my-position.md) | reviewed |
 | 41 | [My exchange rates](41-my-exchange-rates.md) | revised — Goldback example, indexed rates, arbitrage risk |
 | 42 | [Settings](42-settings.md) | reviewed |
+| 14 | [My cadre](14-my-cadre.md) | revised — counterparty durability is borrowed, not guaranteed |
+| 43 | [Notifications](43-notifications.md) | reviewed |
+| 51 | [Staying reachable](51-change-my-address.md) | reviewed |
 
 Groups 1-2 (01-07) cover the tally lifecycle end to end; group 3 (10-13, 50) covers identity;
 group 4 (20-22) covers value moving between two parties.
