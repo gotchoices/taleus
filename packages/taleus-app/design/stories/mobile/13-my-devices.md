@@ -35,10 +35,11 @@ depends on at least one of them being available.
 3.2. It is honest about the consequence: things that need him will wait until he opens the app, and
      he may miss chances to settle that were only available while he was asleep.
 
-### Alternative Path B: something is off, not gone
+### Alternative Path B: something is quiet
 2.1. Steve's always-on device loses power for a day.
-2.2. He can tell the difference between a device that is temporarily unreachable and one that is
-     gone for good — the first needs no action from him.
+2.2. What he can see is when it was last heard from. Whether it is unplugged, out of signal, or gone
+     for good is not something the app can know, and it does not guess on his behalf.
+2.3. Knowing how long it has been quiet is enough for him to decide whether to go and look at it.
 
 ### Alternative Path C: a device he no longer controls
 1.1. Steve's phone is stolen.
@@ -64,7 +65,7 @@ depends on at least one of them being available.
 - [ ] The consequence of having only a phone is stated in terms of what the party misses, not as an
       error or a defect
 - [ ] A party can add a device that stays available, and can see it participating
-- [ ] A temporarily unreachable device is distinguishable from one that is gone
+- [ ] Each device shows how long it has been quiet, without the app claiming to know why
 - [ ] A party can retire a device from any other device they control
 - [ ] Retiring is described accurately: it stops future acts, it undoes nothing already done
 - [ ] A party cannot retire their last remaining device

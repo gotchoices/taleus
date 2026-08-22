@@ -17,7 +17,8 @@ customers at the counter without knowing in advance who they will be.
 
 ## Sequence
 
-1. Mara asks Sam for $95 on their tally.
+1. Mara requests $95 from Sam on their tally — through the app, not by mentioning it next time
+   he is in.
 2. She says what it is for, in terms Sam will recognise when he sees it.
 3. She sets how long the request is good for. A repair invoice can stand for a month; a request at the
    counter should not outlive the customer's visit.
@@ -44,19 +45,20 @@ customers at the counter without knowing in advance who they will be.
 6.1. The month passes and Sam has not answered.
 6.2. The request runs out. It stops waiting on Sam, and Mara can see it went unanswered rather than
      refused.
-6.3. She can ask again — a fresh request, not a revival of the old one.
+6.3. She can request it again — a fresh request, not a revival of the old one.
 
 ### Alternative Path C: Mara changes her mind
 4.1. Mara realises she overcharged and wants to take the request back.
-4.2. She cannot un-ask it. What she can do is tell Sam not to pay it and let it run out, or ask again
-     for the right amount, and the app is honest about which of those it is doing.
+4.2. She cannot un-ask it. What she can do is tell Sam not to pay it and let it run out, or request
+     the right amount instead, and the app is honest about which of those it is doing.
 4.3. This is why the expiry she set in step 3 matters, and why the app helps her choose one.
 
 ### Alternative Path D: Sam refuses
 6.1. Sam declines the request.
-6.2. Mara is told. Unlike an unanswered tally offer, a refused request is something she knows about,
-     because she is waiting on an answer and deserves one.
-6.3. Nothing about the balance changes. She can talk to Sam and ask again if it was a misunderstanding.
+6.2. Mara is notified. She is waiting on an answer and a refusal is one, so she is not left watching
+     a clock to find out.
+6.3. Nothing about the balance changes. She can talk to Sam and request again if it was a
+     misunderstanding.
 
 ### Alternative Path E: paid without being asked
 1.1. Sam pays Mara for the repair before she gets round to asking.

@@ -61,7 +61,9 @@ Mara, who deals with people the supplier deals with. None of that is Sam's probl
 ### Alternative Path D: it does not complete
 5.1. Something goes wrong partway — somebody is unreachable, or too slow.
 5.2. Nothing moved. Sam is told it did not happen, not that it might have.
-5.3. He can try again, and is told if the reason is likely to persist.
+5.3. He can try again. What he is given is what is known — that no route was found at all, or that
+     it was found and somebody along it did not follow through — rather than a prediction about
+     whether trying again will work.
 
 ### Alternative Path E: crossing units
 1.1. Sam's tallies are in dollars; the supplier deals in CHIPs.
@@ -90,6 +92,7 @@ Mara, who deals with people the supplier deals with. None of that is Sam's probl
       who they might tally with to make it possible
 - [ ] When only part of the amount is possible, the possible amount is stated
 - [ ] A payment that fails leaves nothing moved and says so unambiguously
+- [ ] A failure reports what is known about it, without predicting whether a retry will succeed
 - [ ] Cross-unit payments show what the payee receives and the rate used
 - [ ] The payer is told the payee sees the value arriving from their own counterparty
 - [ ] Value passing through a party never asks that party for anything, and is visible afterward as

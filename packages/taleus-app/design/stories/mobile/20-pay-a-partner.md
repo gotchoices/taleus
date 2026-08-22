@@ -58,7 +58,7 @@ Either party can be either role at any time. Recording value is always the giver
      is proud of.
 
 ### Alternative Path D: the counterparty is unreachable
-4.1. Mara's phone is off when Sam signs.
+4.1. Nothing of Mara's is reachable when Sam signs.
 4.2. Sam is told plainly whether his entry is recorded. Standing at a counter, "did that go through"
      is the only question he has, and he gets a straight answer to it.
 4.3. He is never asked to sign the same thing twice, and never left unsure whether he just paid once

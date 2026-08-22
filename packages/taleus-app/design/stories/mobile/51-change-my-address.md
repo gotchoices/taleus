@@ -34,8 +34,9 @@ Any party whose machines change. Counterparties are affected only when something
 
 ### Alternative Path B: Jan cannot reach a counterparty
 1.1. Jan sees a tally that has not been reachable for weeks.
-1.2. He can tell the difference between silence and a problem of his own making, and he can see when
-     that tally was last reached.
+1.2. He can see when that tally was last reached, and whether anything of his own is having trouble.
+     Why the other side is quiet is not something he can know from here — it may be their machines,
+     the network between them, or simply nobody home.
 1.3. The remedy is human — call them — rather than anything the app can fix.
 
 ### Alternative Path C: what people actually see of him
@@ -52,7 +53,8 @@ Any party whose machines change. Counterparties are affected only when something
 - [ ] A party's identity and history are unchanged by any machine change
 - [ ] A counterparty who cannot be reached is described as unreachable, not as missing or broken
 - [ ] Work blocked by unreachability waits and completes rather than failing
-- [ ] A party can see when each tally was last reached
+- [ ] A party can see when each tally was last reached, and whether their own side is at fault
+- [ ] The app does not speculate about why a counterparty is unreachable
 - [ ] Disclosed contact information is presented as separate from how machines find each other
 
 ## Variants

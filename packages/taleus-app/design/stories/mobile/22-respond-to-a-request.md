@@ -27,8 +27,8 @@ an older request from a supplier he does not recognise.
 ### Alternative Path A: Sam does not accept the charge
 3.1. Sam thinks the repair was quoted at $70, not $95.
 3.2. He declines the request, and can say why.
-3.3. Mara is told it was refused. Nothing has moved, and the two of them can sort it out between
-     themselves.
+3.3. Mara is notified that it was refused. Nothing has moved, and the two of them can sort it out
+     between themselves.
 3.4. Sam is not left with a refused request nagging him, and Mara is not left waiting on an answer
      that will never come.
 
@@ -42,8 +42,8 @@ an older request from a supplier he does not recognise.
 2.1. Paying $95 would put Sam beyond what Mara agreed to be owed.
 2.2. He is told before deciding, and so is Mara when the payment lands — but he is not stopped.
      Mara asked for it; whether she treats it as settling the repair is her call.
-2.3. He can also settle up first or ask Mara for more room ([03](03-negotiate-terms.md)) if he would
-     rather stay inside it.
+2.3. He can also settle up first, or request more room from Mara through the app
+     ([03](03-negotiate-terms.md) path C), if he would rather stay inside it.
 
 ### Alternative Path D: Sam ignores it
 3.1. Sam does nothing. The request runs out on its own.
@@ -51,7 +51,7 @@ an older request from a supplier he does not recognise.
      thing, and she may read it either way.
 
 ### Alternative Path E: a request Sam does not recognise
-1.1. A supplier Sam barely remembers asks him for $2,400.
+1.1. A supplier Sam barely remembers requests $2,400 from him.
 1.2. Sam can see who is asking, what tally it is on, what they said it was for, and what he has
      traded with them before — enough to tell a forgotten obligation from a mistake or an attempt.
 1.3. Declining costs him nothing and moves nothing.
