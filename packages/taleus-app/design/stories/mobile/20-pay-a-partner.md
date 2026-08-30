@@ -63,10 +63,14 @@ Either party can be either role at any time. Recording value is always the giver
      is the only question he has, and he gets a straight answer to it.
 4.3. He is never asked to sign the same thing twice, and never left unsure whether he just paid once
      or twice.
+<!--EC NTA: This presents a bit of a technical challenge, but may be possible. -->
+
 
 ### Alternative Path E: giving without being owed anything
 1.1. Sam simply wants to give Jan $50 for a birthday.
 1.2. He can. Recording value he is giving needs no invoice, no request, and no reason.
+
+<!--EC NTA: Another alternative: Mara already owes Sam, so the $40 doesn't become a debt from Sam, but rather reduces the debt Mara owes Sam -->
 
 ## Acceptance Criteria
 

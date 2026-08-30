@@ -16,15 +16,19 @@ Any party. What reaches them here is only ever things that need *them*
 ## Sequence
 
 1. Sam is away from the app when Mara asks him for $95. He is told.
+<!--EC NTA: I know we want to avoid over-specifying mechanisms, but I at least think we need to be clear what are behaviors of the system, versus outside events.  "He is told" could be a human wispering to him, which is clearly not what we intend.  I would minimally say something like, "his phone notifies him".
+ -->
 2. What he is told is enough to decide whether to deal with it now: who, what, how much, how long he
    has.
 3. He opens it and lands on the request itself, not on a general starting point that makes him find
    it again.
 4. Jan answers an offer on his tablet; the notice about it stops mattering on his phone too. He is
    told once, as a person, not once per device.
+<!--EC NTA: I assume what this means is that for a notification sent across his devices, the notice will stop showing as pending once he has acknowledged the message on any device.  This may not be possible for the OS-level notification, but is good for the in-app notice list. -->
 5. Sam chooses what is worth interrupting him. Something needing a signature is not the same as
    something merely finishing, and he can treat them differently.
 6. He can also say when he is not to be disturbed, and what is important enough to override that.
+<!--EC NTA: The OSs already have facilities for DnD which we probably shouldn't duplicate, but an message importance filter would be good. -->
 
 ### Alternative Path A: what is happening on its own
 1.1. Value moves through Sam's tallies overnight ([31](31-trading-variables.md)).
