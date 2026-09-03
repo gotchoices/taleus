@@ -42,6 +42,7 @@ Group 1 — tally negotiation, one continuous thread (Jan and Sam, carried over 
 | 14 | [My cadre](14-my-cadre.md) | revised — counterparty durability is borrowed, not guaranteed |
 | 43 | [Notifications](43-notifications.md) | reviewed |
 | 51 | [Staying reachable](51-change-my-address.md) | reviewed |
+<!--EC NTA: TODO: Partner goes offline for long time or indefinitely -->
 
 Groups 1-2 (01-07) cover the tally lifecycle end to end; group 3 (10-13, 50) covers identity;
 group 4 (20-22) covers value moving between two parties.

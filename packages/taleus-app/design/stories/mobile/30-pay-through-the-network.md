@@ -26,6 +26,7 @@ Mara, who deals with people the supplier deals with. None of that is Sam's probl
 3. It can, and it costs him the $300. Moving value this way is usually free — it settles balances
    people wanted settled anyway. Where it is not free, Sam sees one number for what he gives up, not
    a breakdown of who charged what.
+<!--EC NTA: Note that the indication that "it can" is only true at the moment of the query, and may not be true when and if Sam decides to proceed. -->
 4. He agrees to it. This is his payment and his promise, so he authorizes it in the moment, the same
    as any value he gives ([20](20-pay-a-partner.md)).
 5. It either happens completely or not at all. There is no state where Sam has paid part of it, or
@@ -33,6 +34,7 @@ Mara, who deals with people the supplier deals with. None of that is Sam's probl
 6. Sam sees what changed on his side: he owes Mara more, or holds less of what she owed him.
 7. The supplier sees value arrive from the person they are connected to, not from Sam — and Sam is
    told that is how it works, so he is not surprised to be invisible at the far end.
+<!--EC NTA: This should also be tracked against an instrument for the supplier, no? -->
 
 ### Alternative Path A: there is no way through
 2.1. Nobody Sam is connected to leads to the supplier — an ordinary outcome in a young network, not
@@ -41,6 +43,7 @@ Mara, who deals with people the supplier deals with. None of that is Sam's probl
 2.3. Where it can be worked out, he is shown *who* would change it: "this would be possible if you
      had a tally with any of these" — a handful of well-connected parties, rather than leaving him to
      guess who to go and meet.
+<!--EC NTA: I don't think this is viable as it would require disclosure of parties.  At most it could only be done for the supplier's direct connections.  This seems like something the supplier will want to divulge, in general, however.  The obvious "connect-alls" would be financial institutions, and people are likely to already know that.  In practice, probably any financial institution will lead to all financial institutions.  -->
 2.4. Tallying with the supplier directly is often the answer, and it is not shaped like his tally
      with Jan: a supplier extends a newcomer nothing. Trust runs the other way, so Sam funds the
      tally — with outside money, or by directing value into it over time
@@ -79,6 +82,7 @@ Mara, who deals with people the supplier deals with. None of that is Sam's probl
      something he did. → [24](24-tally-history.md)
 1.4. His net worth is unchanged by it. He holds the same total as before; it now sits on different
      tallies than it did.
+<!--EC NTA: Not necessarily.  His net worth might be shifted... Sally dollars might be worth more than Jim dollars, or CHIPs might be discounted relative to dollars as he's trying to convert -->
 
 ## Acceptance Criteria
 
