@@ -28,8 +28,10 @@ them, but does read them.
    who is paying.
 6. Between $500 and $800 he can ask for something in return for taking on more, since it is past what
    he wanted. He can also leave that at nothing.
+<!--EC NTA: What does "ask" mean, concretely.  Setting a percent?  Should either have this example set it or not; can use alt to discuss the variant.  -->
 7. He can also say what it takes to draw value *back out* of this tally once he has accumulated it —
    free, at a price, or not at all.
+<!--EC NTA: Again, should either set it or not as the base case. -->
 8. He signs the settings. From that point they are standing permission: value moves within them
    without anyone asking Sam again, including while he sleeps.
 9. He can come back at any time and see what his settings currently permit, in the same plain terms.
@@ -45,27 +47,32 @@ them, but does read them.
 7.2. He cannot. A debt he owes can always be paid down, freely, without his charging for it — an IOU
      is honored without conditions.
 7.3. What he controls is what he *accumulates*, not whether he can be released from what he owes.
+<!--EC NTA: Clarify?: Without this, value can only move from what he is owed, to what he owes.  This allows him to increase what he owes (up to the limit imposed by the applicable party) -->
 
 ### Alternative Path C: Mara wants the opposite
 1.1. Mara does not want to hold customer credit; she wants it moving.
 1.2. She sets things so value passes through her readily, and can pay to make that more attractive to
      others rather than charging for it.
+<!--EC NTA: Should spell out how she does this. -->
 
 ### Alternative Path D: shutting a tally out
 1.1. Sam has a tally he wants left entirely alone — no automated movement at all.
 1.2. He can say so, and is shown the cost of that: this tally will not help him pay anyone, and
      others will not route through it.
 1.3. What he owes on it can still be paid down. That is not something he can switch off.
+<!--EC NTA: Does this preclude the other party from allowing value the other direction, or only when increasing what he owes?  Should say. -->
 
 ### Alternative Path E: the same intent across many tallies
 1.1. Sam has forty tallies and does not want to set each one.
 1.2. He can express what he wants generally and adjust individual tallies where they differ.
+<!--EC NTA: Can he set all that aren't explicitly set, or does he have to override them all, then set the ones he previously set back?  -->
 
 ### Alternative Path F: changing his mind
 8.1. Months later Sam lowers his limit from $800 to $200.
 8.2. It is a signed change, like the first one.
 8.3. Movement already agreed under the old settings is not undone by the new ones; what changes is
      what happens from here.
+<!--EC NTA: Need to spell out the affect on changing the limit relative to trading -->
 
 ### Alternative Path G: value that would cross units
 1.1. A payment could settle through Sam only by turning dollars into hours — two of his tallies are
@@ -74,6 +81,7 @@ them, but does read them.
      of it will be used on his behalf.
 1.3. If he wants his tallies to work together across units, he says what they are worth to him first.
      → [41](41-my-exchange-rates.md)
+<!--EC NTA: Another case, written as a hypothetical; should actually happen and discuss the result. -->
 
 ## Acceptance Criteria
 

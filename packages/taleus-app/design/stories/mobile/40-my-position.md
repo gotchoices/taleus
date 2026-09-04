@@ -24,12 +24,14 @@ anyone else.
 4. He also sees one overall figure in dollars, the unit he thinks in. It is marked as an estimate,
    because getting there meant valuing Goldbacks and CHIPs at rates he chose himself.
    → [41](41-my-exchange-rates.md)
+<!--EC NTA: The overall figure may have to exclude certain currencies if an exchange rate isn't set; this should be clearly indicated. -->
 5. He can see how that estimate was arrived at — which holdings were converted and at what rate — so
    it is not a number he has to take on faith.
 6. He can see how it got there over time: whether he has been building up or drawing down, over
    months rather than in one instant.
 7. What he does *not* see mixed into any of this is credit available to him. Room to spend is not
    value he holds; treating it as such is the mistake the whole system exists to avoid.
+<!--EC NTA: What if he's considering buying something expensive and he wants to know if he can? -->
 
 ### Alternative Path A: everything in one unit
 1.1. Sam holds three tallies, all in dollars.

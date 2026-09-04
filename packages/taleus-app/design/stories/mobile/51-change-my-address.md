@@ -23,6 +23,7 @@ Any party whose machines change. Counterparties are affected only when something
    people's inboxes were made when his old machines answered.
 5. He is told which of those are affected and offered the obvious remedy: issue fresh ones
    ([01](01-invite-a-partner.md)).
+<!--EC NTA: Nothing about the invites should be tied to his old phone; they're reservations on the shared network, so nothing to do.  -->
 6. Nothing about his identity changed through any of this. He is the same party to everyone he trades
    with, with the same history.
 
@@ -31,6 +32,7 @@ Any party whose machines change. Counterparties are affected only when something
 1.2. Sam is told it cannot be reached right now, not that Jan is gone or that something is wrong with
      the tally.
 1.3. Whatever Sam wanted to do waits, and completes when Jan is reachable again.
+<!--EC NTA: This will take some extra doing relative to current Sereus/Optimystic -->
 
 ### Alternative Path B: Jan cannot reach a counterparty
 1.1. Jan sees a tally that has not been reachable for weeks.
@@ -38,6 +40,7 @@ Any party whose machines change. Counterparties are affected only when something
      Why the other side is quiet is not something he can know from here — it may be their machines,
      the network between them, or simply nobody home.
 1.3. The remedy is human — call them — rather than anything the app can fix.
+<!--EC NTA: This is where a pseudo-public registry would be nice - anonymous, but in a registry.  Also, could potentially be used to avoid the "many small tallies" fraud case. -->
 
 ### Alternative Path C: what people actually see of him
 1.1. Jan wonders what his counterparties know about where he is.
