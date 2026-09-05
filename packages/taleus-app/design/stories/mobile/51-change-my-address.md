@@ -32,7 +32,10 @@ Any party whose machines change. Counterparties are affected only when something
 1.2. Sam is told it cannot be reached right now, not that Jan is gone or that something is wrong with
      the tally.
 1.3. Whatever Sam wanted to do waits, and completes when Jan is reachable again.
-<!--EC NTA: This will take some extra doing relative to current Sereus/Optimystic -->
+<!--EC NTA: This will take some extra doing relative to current Sereus/Optimystic 
+
+KB: OK to omit if it is more than sereus can handle.
+-->
 
 ### Alternative Path B: Jan cannot reach a counterparty
 1.1. Jan sees a tally that has not been reachable for weeks.
@@ -40,7 +43,10 @@ Any party whose machines change. Counterparties are affected only when something
      Why the other side is quiet is not something he can know from here — it may be their machines,
      the network between them, or simply nobody home.
 1.3. The remedy is human — call them — rather than anything the app can fix.
-<!--EC NTA: This is where a pseudo-public registry would be nice - anonymous, but in a registry.  Also, could potentially be used to avoid the "many small tallies" fraud case. -->
+<!--EC NTA: This is where a pseudo-public registry would be nice - anonymous, but in a registry.  Also, could potentially be used to avoid the "many small tallies" fraud case. 
+
+KB: User registry must _not_ be part of the talleus protocol.  However, I'm open to third-party services evolving to help people discover deadbeats.  The MyCHIPs tally contract currently says that upon breach, the damaged party _can_ disclose details about the trading partner publicly (like putting him on a deadbeat list somewhere).  That is out-of-band for Taleus/MyCHIPs but it can certainly become a thing.  Might be worth you reading the current mychips/contract/*.yaml files for context.
+-->
 
 ### Alternative Path C: what people actually see of him
 1.1. Jan wonders what his counterparties know about where he is.

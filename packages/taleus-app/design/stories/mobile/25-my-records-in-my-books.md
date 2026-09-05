@@ -16,7 +16,10 @@ How applications on this platform share data with each other is still being work
 should stay vague about mechanism and specific about outcome. Something better than a file is
 plausible; nothing is promised.
 
-<!--EC NTA: Requests as invoices?  Cash basis vs accrual reporting and views? -->
+<!--EC NTA: Requests as invoices?  Cash basis vs accrual reporting and views? 
+
+KB: not sure we need to act on this input, other than possibly inserting placeholders in Open section to address the questions.
+-->
 
 ## Baseline not to regress
 MyCHIPs had no accounting integration. Health's `06-imp-exp` story is the nearest sibling precedent

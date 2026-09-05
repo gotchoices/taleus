@@ -38,13 +38,25 @@ an older request from a supplier he does not recognise.
 3.2. He cannot answer the request with a different amount — a request is for what was asked.
 3.3. What he can do is give Mara $70 directly ([20](20-pay-a-partner.md)) and decline the request, so
      the record says what actually happened rather than dressing $70 up as an answer to $95.
-<!--EC NTA: Why not allow for partial-pay?  Seems like a mismatch relative to reality... "this was $70 against the repair; I'll pay the rest soon."  If invoices had to be PIF always, this would create all sorts of accounting problems. -->
+<!--EC NTA: Why not allow for partial-pay?  Seems like a mismatch relative to reality... "this was $70 against the repair; I'll pay the rest soon."  If invoices had to be PIF always, this would create all sorts of accounting problems. 
+
+KB: I would agree, but from this (possibly different) standpoint:
+- An invoice is a request, not a pledge
+- Having received the invoice, I can do anything I want
+- If I can pay you without an invoice, I can pay you _differently_ than what the invoice asks for
+- The schema/rules probably need to be loose enough to treat the invoice as what it is: a stand-alone request that can be responded to in a number of ways (including returning the product and asking for a refund/cancelation).
+-->
 
 ### Alternative Path C: paying would take Sam past his limit
 2.1. Paying $95 would put Sam beyond what Mara agreed to be owed.
 2.2. He is told before deciding, and so is Mara when the payment lands — but he is not stopped.
      Mara asked for it; whether she treats it as settling the repair is her call.
-<!--EC NTA: What should this do to the receivable instrument?  You could argue that it's cleaner to close it out and regard the debt as a simple figure, or you could argue that leaving the invoice pending makes it clear that the product/service has not truly been settled (potentially avoiding giving something that isn't paid for, for e.g.) -->
+<!--EC NTA: What should this do to the receivable instrument?  You could argue that it's cleaner to close it out and regard the debt as a simple figure, or you could argue that leaving the invoice pending makes it clear that the product/service has not truly been settled (potentially avoiding giving something that isn't paid for, for e.g.) 
+
+KB: I real life, an invoice is sent to the customer and the customer decides how to act on it.  When the customer thinks the invoice is settled, he "puts it away" himself.  The vendor may think the invoice is not fully resolved but if so, he would typically record the payment against the invoice or the order and then decide whether to generate another invoice for the shortfall.
+
+I view the credit limit as a pledge by the grantor to the grantee that services/products _will_ be rendered in exchange for credit up to that amount.  I do _not_ view the credit limit as a line that the software cannot cross.  And if an invoice _has_ been issued that would run past the limit, it is evident that the consideration has already been given (the one choice-point the vendor has).  So at the point, there is nothing to be done other than advise the parties.  Advising the creditor is probably more important than advising the debtor, but produent to advise both.
+-->
 2.3. He can also settle up first, or request more room from Mara through the app
      ([03](03-negotiate-terms.md) path C), if he would rather stay inside it.
 
@@ -52,7 +64,10 @@ an older request from a supplier he does not recognise.
 3.1. Sam does nothing. The request runs out on its own.
 3.2. It stops waiting on him, and Mara sees it went unanswered rather than refused — a different
      thing, and she may read it either way.
-<!--EC NTA: Might invoice terms be part of up-front tally terms?  But either way, shouldn't the receivable age, not expire? -->
+<!--EC NTA: Might invoice terms be part of up-front tally terms?  But either way, shouldn't the receivable age, not expire? 
+
+KB: Agreed.  I'm not sure an invoice should ever expire.  Typically (in paper-world), an invoice might be voided and a statement issued showing the new balance.  I think we allow an invoice to be withdrawn (voided) and we allow a payment to reference one or more invoices.  I think that's probably enough (at least for now).
+-->
 
 ### Alternative Path E: a request Sam does not recognise
 1.1. A supplier Sam barely remembers requests $2,400 from him.

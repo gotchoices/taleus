@@ -23,7 +23,10 @@ because it happens outside the app entirely.
    him.
 2. From his tablet, he retires the lost phone. A thief could not have acted as Sam anyway without
    being able to unlock it; retiring it closes the question rather than leaving him to hope.
-<!--EC NTA: I assume this means remove him from the cadre?  Still a risk that if his key on that device wasn't secure, someone could sign for him and bring as evidence, even though the attacker can't sync with the rest of the network? -->
+<!--EC NTA: I assume this means remove him from the cadre?  Still a risk that if his key on that device wasn't secure, someone could sign for him and bring as evidence, even though the attacker can't sync with the rest of the network? 
+
+KB: Not sure how to address this comment.  I'm inclined to leave the functionality in the stories until we find out it can't be done.  We _do_ need a way to remove a compromised device.  We are designing UX for the app, not the engine.  Some debates will need to occur at the engine level.
+-->
 3. He is told what that did and did not do: nothing further can be done as him from that phone;
    anything already done stands.
 4. Sam checks what he still has. His tallies, balances, history, and terms are all intact — they were
@@ -54,7 +57,10 @@ because it happens outside the app entirely.
      value survives even though the old tally does not.
 1.6. Steve is back in business with Jan, on a new footing, and repeats this with anyone else he
      traded with.
-<!--EC NTA: Addendum in new contract that says that it is for the purpose of restoring prior tally?  (not just replacing, as parties haven't signed their chits yet).  Null and void if fraudulent -->
+<!--EC NTA: Addendum in new contract that says that it is for the purpose of restoring prior tally?  (not just replacing, as parties haven't signed their chits yet).  Null and void if fraudulent 
+
+KB: I would agree that a replacement tally should ideally reference the old one.  Probably a comment rather than a contract addendum.  This creates a paper trail should enforcement become necessary.  Not sure how much of this needs to be in the stories.  Maybe just an allusion.
+-->
 
 ### Alternative Path C: Jan cannot satisfy himself
 1.1. Jan is not sure, or does not want the responsibility.

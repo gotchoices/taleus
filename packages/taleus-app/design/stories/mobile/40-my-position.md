@@ -31,7 +31,10 @@ anyone else.
    months rather than in one instant.
 7. What he does *not* see mixed into any of this is credit available to him. Room to spend is not
    value he holds; treating it as such is the mistake the whole system exists to avoid.
-<!--EC NTA: What if he's considering buying something expensive and he wants to know if he can? -->
+<!--EC NTA: What if he's considering buying something expensive and he wants to know if he can? 
+
+KB: I see no downside to also showing a summary (or detail) of how much spending power he has either from accumulated credits, or available credit, or both.  The first is like a debit card limit, the second is like a credit card limit.  Both good information.  Not sure where it should be displayed.
+-->
 
 ### Alternative Path A: everything in one unit
 1.1. Sam holds three tallies, all in dollars.

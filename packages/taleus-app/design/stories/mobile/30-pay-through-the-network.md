@@ -34,7 +34,10 @@ Mara, who deals with people the supplier deals with. None of that is Sam's probl
 6. Sam sees what changed on his side: he owes Mara more, or holds less of what she owed him.
 7. The supplier sees value arrive from the person they are connected to, not from Sam — and Sam is
    told that is how it works, so he is not surprised to be invisible at the far end.
-<!--EC NTA: This should also be tracked against an instrument for the supplier, no? -->
+<!--EC NTA: This should also be tracked against an instrument for the supplier, no? 
+
+KB: I'm not sure what NTA's point is here.  Do you understand?  I think the point is, the supplier gets a pledge/chit from his partner.  That way, he can buy more stuf from that partner on the resulting credit.
+-->
 
 ### Alternative Path A: there is no way through
 2.1. Nobody Sam is connected to leads to the supplier — an ordinary outcome in a young network, not
@@ -43,7 +46,10 @@ Mara, who deals with people the supplier deals with. None of that is Sam's probl
 2.3. Where it can be worked out, he is shown *who* would change it: "this would be possible if you
      had a tally with any of these" — a handful of well-connected parties, rather than leaving him to
      guess who to go and meet.
-<!--EC NTA: I don't think this is viable as it would require disclosure of parties.  At most it could only be done for the supplier's direct connections.  This seems like something the supplier will want to divulge, in general, however.  The obvious "connect-alls" would be financial institutions, and people are likely to already know that.  In practice, probably any financial institution will lead to all financial institutions.  -->
+<!--EC NTA: I don't think this is viable as it would require disclosure of parties.  At most it could only be done for the supplier's direct connections.  This seems like something the supplier will want to divulge, in general, however.  The obvious "connect-alls" would be financial institutions, and people are likely to already know that.  In practice, probably any financial institution will lead to all financial institutions.  
+
+KB: Here is a wording I think NTA will agree to:  Either he is told that the deal just can't be done or, if enough information was given by the supplier in the payment request, he _might_ be able to see some possible, publicly known, partners that, if Sam were connected to, he would be more likely to be able to complete the transaction.  This is a contemplated feature of tally-net (I think) but, of course, not much of anything is currently implemented.
+-->
 2.4. Tallying with the supplier directly is often the answer, and it is not shaped like his tally
      with Jan: a supplier extends a newcomer nothing. Trust runs the other way, so Sam funds the
      tally — with outside money, or by directing value into it over time
@@ -82,7 +88,10 @@ Mara, who deals with people the supplier deals with. None of that is Sam's probl
      something he did. → [24](24-tally-history.md)
 1.4. His net worth is unchanged by it. He holds the same total as before; it now sits on different
      tallies than it did.
-<!--EC NTA: Not necessarily.  His net worth might be shifted... Sally dollars might be worth more than Jim dollars, or CHIPs might be discounted relative to dollars as he's trying to convert -->
+<!--EC NTA: Not necessarily.  His net worth might be shifted... Sally dollars might be worth more than Jim dollars, or CHIPs might be discounted relative to dollars as he's trying to convert.
+
+KB: I understand NTA's point here, but disagree with it. "net worth" in this context _nominal_ value--the only thing we can measure.  If the tallies use the same UoA, they _are_ the same nominal value.  The "collectability" of that debt from Sally vs Jim is a orthoginal issue.  I would probably strike his EC or, if anything, note that Sam might "prefer" one tally or another but he determines that by how he sets his trading variables.  If value disappeared from one tally and reappeared on another, due to a lift, we should presume that his position improved.  He moved a less desirable credit to a more desirable debtor.  That's why he had the trading variables set the way he did.
+-->
 
 ## Acceptance Criteria
 

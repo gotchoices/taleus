@@ -26,7 +26,10 @@ Either party, from their own side. Both see the same entries; each sees them in 
    their tally. Sam can tell those apart from the ones he and Mara made deliberately.
 6. He finds the $95 repair from March and can see it answered Mara's request, not just that money
    moved that day.
-<!--EC NTA: If you agree that partial payment is a thing, should see any remaining request/invoice balances -->
+<!--EC NTA: If you agree that partial payment is a thing, should see any remaining request/invoice balances 
+
+KB: I'm not sure this is right.  I think it is the job of the creditor to invoice (ask for payment).  It is the job of the debtor to respond by paying what he thinks is right.  I'm _not_ sure that an invoice should be treated somehow as a ledger item that is netted with payments.  My reasoning: The alleged debtor has not signed anything agreeing to pay yet.  The invoice is a unilaterally asserted request/demand.  It can't have teeth in the ledger.  I think, if the debtor pays short (or long), the creditor needs to decide whether to write off (or on) the difference and the take action to either re-invoice or refund, as the case may be.  Thoughts?
+-->
 7. Satisfied he knows where they stand, he goes ahead. → [20](20-pay-a-partner.md)
 
 ### Alternative Path A: something still in progress

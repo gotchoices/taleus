@@ -63,7 +63,10 @@ Either party can be either role at any time. Recording value is always the giver
      is the only question he has, and he gets a straight answer to it.
 4.3. He is never asked to sign the same thing twice, and never left unsure whether he just paid once
      or twice.
-<!--EC NTA: This presents a bit of a technical challenge, but may be possible. -->
+<!--EC NTA: This presents a bit of a technical challenge, but may be possible. 
+
+KB: Let's try to keep the stories within capabilities we think sereus can handle for now.  If unsure, consult sereus documentation.  There is a current clone in ser/sereus.
+-->
 
 
 ### Alternative Path E: giving without being owed anything

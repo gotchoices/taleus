@@ -17,6 +17,8 @@ Any party. What reaches them here is only ever things that need *them*
 
 1. Sam is away from the app when Mara asks him for $95. He is told.
 <!--EC NTA: I know we want to avoid over-specifying mechanisms, but I at least think we need to be clear what are behaviors of the system, versus outside events.  "He is told" could be a human wispering to him, which is clearly not what we intend.  I would minimally say something like, "his phone notifies him".
+
+KB: Agreed.  This is in the spirit of NTA's first round of comments, I think.
  -->
 2. What he is told is enough to decide whether to deal with it now: who, what, how much, how long he
    has.
@@ -24,11 +26,17 @@ Any party. What reaches them here is only ever things that need *them*
    it again.
 4. Jan answers an offer on his tablet; the notice about it stops mattering on his phone too. He is
    told once, as a person, not once per device.
-<!--EC NTA: I assume what this means is that for a notification sent across his devices, the notice will stop showing as pending once he has acknowledged the message on any device.  This may not be possible for the OS-level notification, but is good for the in-app notice list. -->
+<!--EC NTA: I assume what this means is that for a notification sent across his devices, the notice will stop showing as pending once he has acknowledged the message on any device.  This may not be possible for the OS-level notification, but is good for the in-app notice list. 
+
+Agreed.  It may imply coordination between devices such that we are keeping notifications in the DB rather than on the device.  I'm OK keeping the behavior for now but also willing to relax it if we find ourselves up against insurmountable technical issues.
+-->
 5. Sam chooses what is worth interrupting him. Something needing a signature is not the same as
    something merely finishing, and he can treat them differently.
 6. He can also say when he is not to be disturbed, and what is important enough to override that.
-<!--EC NTA: The OSs already have facilities for DnD which we probably shouldn't duplicate, but an message importance filter would be good. -->
+<!--EC NTA: The OSs already have facilities for DnD which we probably shouldn't duplicate, but a message importance filter would be good.
+
+KB: I'm open-minded on this topic.
+-->
 
 ### Alternative Path A: what is happening on its own
 1.1. Value moves through Sam's tallies overnight ([31](31-trading-variables.md)).

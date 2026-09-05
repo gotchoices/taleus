@@ -28,7 +28,10 @@ them, but does read them.
    who is paying.
 6. Between $500 and $800 he can ask for something in return for taking on more, since it is past what
    he wanted. He can also leave that at nothing.
-<!--EC NTA: What does "ask" mean, concretely.  Setting a percent?  Should either have this example set it or not; can use alt to discuss the variant.  -->
+<!--EC NTA: What does "ask" mean, concretely.  Setting a percent?  Should either have this example set it or not; can use alt to discuss the variant.  
+
+KB: I'm OK using more precise language.  "Ask" means programming a cost into the trading variables so that the lift only happens if the cost is paid.  I've programmed this (cost) into trading variables but I'm still a little unsure of if/how it will ultimate work.  For now, we keep the UX functionality until we prove that the backend (or accounting) can't support it.
+-->
 7. He can also say what it takes to draw value *back out* of this tally once he has accumulated it —
    free, at a price, or not at all.
 <!--EC NTA: Again, should either set it or not as the base case. -->
@@ -47,32 +50,51 @@ them, but does read them.
 7.2. He cannot. A debt he owes can always be paid down, freely, without his charging for it — an IOU
      is honored without conditions.
 7.3. What he controls is what he *accumulates*, not whether he can be released from what he owes.
-<!--EC NTA: Clarify?: Without this, value can only move from what he is owed, to what he owes.  This allows him to increase what he owes (up to the limit imposed by the applicable party) -->
+<!--EC NTA: Clarify?: Without this, value can only move from what he is owed, to what he owes.  This allows him to increase what he owes (up to the limit imposed by the applicable party)
+
+KB: I don't fully understand NTA's commment here.  What I _can_ say is that I'm quite confident in the way trading variables were designed under MyCHIPs (at least for now).  I agree that the debt can _always_ be paid down with a lift, but moving the opposite direction is under his control.
+-->
 
 ### Alternative Path C: Mara wants the opposite
 1.1. Mara does not want to hold customer credit; she wants it moving.
 1.2. She sets things so value passes through her readily, and can pay to make that more attractive to
      others rather than charging for it.
-<!--EC NTA: Should spell out how she does this. -->
+<!--EC NTA: Should spell out how she does this.
+
+KB: I'm OK giving further detail as long as we don't start designing the UX here (appeus principles).  If you're unsure how to do so, let's discuss.
+-->
 
 ### Alternative Path D: shutting a tally out
 1.1. Sam has a tally he wants left entirely alone — no automated movement at all.
 1.2. He can say so, and is shown the cost of that: this tally will not help him pay anyone, and
      others will not route through it.
 1.3. What he owes on it can still be paid down. That is not something he can switch off.
-<!--EC NTA: Does this preclude the other party from allowing value the other direction, or only when increasing what he owes?  Should say. -->
+<!--EC NTA: Does this preclude the other party from allowing value the other direction, or only when increasing what he owes?  Should say. 
+
+KB: If I understand the question: A lift has to be allowable from the perspective of _both_ parties to an edge/tally.  Either side can provide a rule that will preclude its execution.
+-->
 
 ### Alternative Path E: the same intent across many tallies
 1.1. Sam has forty tallies and does not want to set each one.
 1.2. He can express what he wants generally and adjust individual tallies where they differ.
-<!--EC NTA: Can he set all that aren't explicitly set, or does he have to override them all, then set the ones he previously set back?  -->
+<!--EC NTA: Can he set all that aren't explicitly set, or does he have to override them all, then set the ones he previously set back?
+
+KB: Good question and I'd go further.  It could be difficult or even dangerous to set _all_ trading variables the same on a group of tallies.  Might be more realistic to apply a single setting to a group or range of tallies.
+
+To try to answer NTA's question, I'm not sure there is such a thing as "not explicitly set".  I guess it depends on how we design the schema.  But I imagine there are default settings (zero, for example).  Having set a variable, the user could be presented with a choice of other tallies to apply it to and, optionally, to filter that to tallies that still have defaults applied.
+
+Again, we don't want to design the UI in full here in the stories.
+-->
 
 ### Alternative Path F: changing his mind
 8.1. Months later Sam lowers his limit from $800 to $200.
 8.2. It is a signed change, like the first one.
 8.3. Movement already agreed under the old settings is not undone by the new ones; what changes is
      what happens from here.
-<!--EC NTA: Need to spell out the affect on changing the limit relative to trading -->
+<!--EC NTA: Need to spell out the affect on changing the limit relative to trading 
+
+KB: I think future (not yet executed) lifts are affected immediately.  Not sure what else NTA is looking for here.
+-->
 
 ### Alternative Path G: value that would cross units
 1.1. A payment could settle through Sam only by turning dollars into hours — two of his tallies are
@@ -81,7 +103,10 @@ them, but does read them.
      of it will be used on his behalf.
 1.3. If he wants his tallies to work together across units, he says what they are worth to him first.
      → [41](41-my-exchange-rates.md)
-<!--EC NTA: Another case, written as a hypothetical; should actually happen and discuss the result. -->
+<!--EC NTA: Another case, written as a hypothetical; should actually happen and discuss the result.
+
+KB: I don't understand NTA's comment.
+-->
 
 ## Acceptance Criteria
 

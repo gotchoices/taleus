@@ -48,7 +48,18 @@ customers at the counter without knowing in advance who they will be.
 6.2. The request runs out. It stops waiting on Sam, and Mara can see it went unanswered rather than
      refused.
 6.3. She can request it again — a fresh request, not a revival of the old one.
-<!--EC NTA: I think I don't like this arrangement.  Mara should own her invoice; have ageing, etc. -->
+<!--EC NTA: I think I don't like this arrangement.  Mara should own her invoice; have ageing, etc. 
+
+KB: NTA hasn't given much justification here.  However, my thoughts:
+- An offer should have expiration and not be revokab.  It is a half a contract and so once signed, should stand by its own terms.
+- But a request is different.  I don't think it needs to be signed (other than cryptographic proof that it really came from the partner) because it is not a commitment.
+- By the same logic, I'm not sure it should be uncumbered with an expiration.
+- Presumably, it can be refused by the partner being petitioned.
+- I have no problem with it being retractable by the petitioner.
+- The main problem that comes into play is when the revocation and the payment cross mid-flight.
+- We probably just need a CRDT-type rule to determine who wins.
+- In a trust-based tally arrangement, over-payment is not a catestrophic error.  The partners are seeking equity in good faith and are expected to refund overpayments in exactly the same way as they are expected to honor pledges.
+-->
 
 ### Alternative Path C: Mara changes her mind
 4.1. Mara realises she overcharged and wants to take the request back.

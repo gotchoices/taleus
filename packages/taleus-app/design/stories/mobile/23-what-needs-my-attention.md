@@ -28,7 +28,7 @@ Any party with more tallies than they can hold in their head.
    settings, not each time it happened. → [31](31-trading-variables.md)
 7. Two of his tallies are waiting on the other party. They are visible if he goes looking, but they
    are not asking anything of him.
-<!--EC NTA: Should be able to see all prior (no longer active) pending items. -->
+<!--EC NTA: Should be able, somehow, to see all prior (no longer active) pending items. -->
 
 ### Alternative Path A: nothing is waiting
 1.1. Most days, nothing needs Jan.
