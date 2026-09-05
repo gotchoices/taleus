@@ -17,8 +17,10 @@ Any party. Nothing here affects any counterparty or any tally.
 1. Sam changes the app to Spanish. Everything he reads changes with it.
 2. What does not change is anything a counterparty wrote: notes on entries, names, what people said
    things were for. Those stay as written, and it is clear they are quoted rather than untranslated.
+<!--EC NTA: also contracts -->
 3. He sets dollars as the unit he wants overall figures in. Individual tallies keep counting in what
    they were agreed in — that is not his to change ([03](03-negotiate-terms.md)).
+<!--EC NTA: ...but he can see the dollar equivalent if he has set an exchange rate -->
 4. He picks how the app looks: following his device, or always light, or always dark.
 5. He can see which of these choices are his and follow him everywhere, and which belong to the
    device in his hand.

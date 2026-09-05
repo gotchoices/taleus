@@ -22,6 +22,7 @@ counterparty sees them, and nobody else's rates are ever applied to this party's
 3. He is told what that now permits: those holdings count toward his overall estimate
    ([40](40-my-position.md)), and value can move between his dollar tallies and his Goldback tallies
    when a payment needs it to ([30](30-pay-through-the-network.md)).
+<!--EC NTA: Hmm, there probably shouldn't be a single "overall estimate" if there is an isolated currency?  Should show the overall plus a separate breakdown of each isolated maybe? -->
 4. He is also told the scope of what he just did: this is what a Goldback is worth **to him**, on
    every tally he holds in Goldbacks. It is not a per-partner judgment. If he needs to value
    something differently depending on who he is dealing with, that is a different unit, not a

@@ -26,6 +26,7 @@ Either party, from their own side. Both see the same entries; each sees them in 
    their tally. Sam can tell those apart from the ones he and Mara made deliberately.
 6. He finds the $95 repair from March and can see it answered Mara's request, not just that money
    moved that day.
+<!--EC NTA: If you agree that partial payment is a thing, should see any remaining request/invoice balances -->
 7. Satisfied he knows where they stand, he goes ahead. → [20](20-pay-a-partner.md)
 
 ### Alternative Path A: something still in progress
@@ -42,6 +43,7 @@ Either party, from their own side. Both see the same entries; each sees them in 
      through the year, which side of zero it sat on, and whether it trends toward him or away. This
      is movement through the tally over a period, not a statement of what he is worth; that is a
      single moment across all his tallies. → [40](40-my-position.md)
+<!--EC NTA: Can search by exact amount -->
 
 ### Alternative Path C: an entry Sam does not recognise
 2.1. Sam finds an entry from November he has no memory of.

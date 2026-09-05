@@ -22,6 +22,7 @@ customers at the counter without knowing in advance who they will be.
 2. She says what it is for, in terms Sam will recognise when he sees it.
 3. She sets how long the request is good for. A repair invoice can stand for a month; a request at the
    counter should not outlive the customer's visit.
+<!--EC NTA: Should receivables really expire?  I could see them being canceled, but expired? -->
 4. She signs the request. It is her own statement, and it obliges Sam to nothing by itself.
 5. Sam is asked to answer it. → [22](22-respond-to-a-request.md)
 6. Mara can see where it stands: waiting, answered, refused, or run out.
@@ -31,6 +32,7 @@ customers at the counter without knowing in advance who they will be.
 ### Alternative Path A: a customer Mara has no tally with
 1.1. A request is made to someone Mara already holds a tally with — she picks the party, states the
      amount, and it reaches them. There is nothing to scan and nothing to guess.
+<!--EC NTA: This seems like an unnecessary restatement of the base sequence -->
 1.2. A newcomer at the counter has no tally with her, so there is nothing to record a request
      against. What Mara offers them is a tally, not a request. → [01](01-invite-a-partner.md)
 1.3. She can offer that tally extending them nothing at all — no trust in their direction. It is
@@ -46,11 +48,13 @@ customers at the counter without knowing in advance who they will be.
 6.2. The request runs out. It stops waiting on Sam, and Mara can see it went unanswered rather than
      refused.
 6.3. She can request it again — a fresh request, not a revival of the old one.
+<!--EC NTA: I think I don't like this arrangement.  Mara should own her invoice; have ageing, etc. -->
 
 ### Alternative Path C: Mara changes her mind
 4.1. Mara realises she overcharged and wants to take the request back.
 4.2. She cannot un-ask it. What she can do is tell Sam not to pay it and let it run out, or request
      the right amount instead, and the app is honest about which of those it is doing.
+<!--EC NTA: Again, this is her receivable instrument, why can't she cancel it? -->
 4.3. This is why the expiry she set in step 3 matters, and why the app helps her choose one.
 
 ### Alternative Path D: Sam refuses
@@ -63,6 +67,9 @@ customers at the counter without knowing in advance who they will be.
 ### Alternative Path E: paid without being asked
 1.1. Sam pays Mara for the repair before she gets round to asking.
 1.2. Mara does not need to ask at all — the value is already recorded. → [20](20-pay-a-partner.md)
+
+<!--EC NTA: Alternative: payment splits over n invoices -->
+
 
 ## Acceptance Criteria
 

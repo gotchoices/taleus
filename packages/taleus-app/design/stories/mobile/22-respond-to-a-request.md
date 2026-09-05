@@ -20,6 +20,7 @@ an older request from a supplier he does not recognise.
 1. Sam sees that Mara is asking him for $95, what it is for, and when the request runs out.
 2. He sees what paying it would do: what he would owe afterward, and how much room that leaves him.
 3. He pays it. The amount is Mara's — he is answering her request, not deciding an amount himself.
+<!--EC NTA: This is confusing, because the amount isn't Mara's until Sam signs it (next step).  Also, see my below comment on partial pay.--> 
 4. He signs it, in the moment, as with any value he gives ([20](20-pay-a-partner.md)).
 5. Mara sees the request settled and the balance moved.
 6. The request stops waiting on Sam and does not ask him again.
@@ -37,11 +38,13 @@ an older request from a supplier he does not recognise.
 3.2. He cannot answer the request with a different amount — a request is for what was asked.
 3.3. What he can do is give Mara $70 directly ([20](20-pay-a-partner.md)) and decline the request, so
      the record says what actually happened rather than dressing $70 up as an answer to $95.
+<!--EC NTA: Why not allow for partial-pay?  Seems like a mismatch relative to reality... "this was $70 against the repair; I'll pay the rest soon."  If invoices had to be PIF always, this would create all sorts of accounting problems. -->
 
 ### Alternative Path C: paying would take Sam past his limit
 2.1. Paying $95 would put Sam beyond what Mara agreed to be owed.
 2.2. He is told before deciding, and so is Mara when the payment lands — but he is not stopped.
      Mara asked for it; whether she treats it as settling the repair is her call.
+<!--EC NTA: What should this do to the receivable instrument?  You could argue that it's cleaner to close it out and regard the debt as a simple figure, or you could argue that leaving the invoice pending makes it clear that the product/service has not truly been settled (potentially avoiding giving something that isn't paid for, for e.g.) -->
 2.3. He can also settle up first, or request more room from Mara through the app
      ([03](03-negotiate-terms.md) path C), if he would rather stay inside it.
 
@@ -49,6 +52,7 @@ an older request from a supplier he does not recognise.
 3.1. Sam does nothing. The request runs out on its own.
 3.2. It stops waiting on him, and Mara sees it went unanswered rather than refused — a different
      thing, and she may read it either way.
+<!--EC NTA: Might invoice terms be part of up-front tally terms?  But either way, shouldn't the receivable age, not expire? -->
 
 ### Alternative Path E: a request Sam does not recognise
 1.1. A supplier Sam barely remembers requests $2,400 from him.
