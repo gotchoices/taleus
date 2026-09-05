@@ -1,0 +1,65 @@
+/**
+ * Shapes the app asks for, mirroring `design/specs/domain/interfaces.md`.
+ *
+ * These are the app's reading of what the engine will one day answer. The
+ * engine does not exist yet, so mock mode is where the surface is being
+ * defined — see `mock/data/README.md`. When the engine's real surface differs,
+ * these types and the fixtures move together.
+ */
+
+/**
+ * A whole number of a unit's smallest part. `{ units: 18000 }` on a scale-2
+ * dollar tally is $180.00. Never a decimal, never combined across units except
+ * through an explicit estimate.
+ */
+export interface Amount {
+	units: number
+	denom?: string
+	scale?: number
+}
+
+/** A balance always states whose side it is read from. */
+export type Perspective = 'owed-to-me' | 'owed-by-me' | 'level'
+
+export interface Balance extends Amount {
+	perspective: Perspective
+}
+
+export interface Unit {
+	denom: string
+	scale: number
+	/** Human label for a unit whose identifier is not self-explanatory. */
+	label?: string
+}
+
+export interface Counterparty {
+	sid: string
+	name: string
+	disclosed?: Record<string, string>
+}
+
+/** Derived by the engine, never stored — `interfaces.md` § Tally states. */
+export type TallyState = 'Forming' | 'Offered' | 'Expired' | 'Open' | 'Amending' | 'Closing' | 'Closed'
+
+/** Whose move it is. Drives the attention list; never a demand on the waiter. */
+export type WaitingOn = 'me' | 'them' | 'nobody'
+
+export interface TallySummary {
+	id: string
+	counterparty: Counterparty
+	unit: Unit
+	balance: Balance
+	state: TallyState
+	waitingOn: WaitingOn
+	waitingReason?: 'offer' | 'request' | 'closing'
+	lastActivity: string
+}
+
+/** Anything an adapter could not answer, said plainly rather than thrown away. */
+export interface DataError {
+	kind: string
+	message: string
+	retryable: boolean
+}
+
+export type Result<T> = { ok: true; value: T } | { ok: false; error: DataError }

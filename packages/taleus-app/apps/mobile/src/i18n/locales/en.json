@@ -1,0 +1,18 @@
+{
+  "tally-list.title": "Tallies",
+  "tally-list.empty-title": "No tallies yet",
+  "tally-list.empty-body": "A tally is a running account between you and one other person. You need someone to keep one with.",
+  "tally-list.empty-invite": "Invite someone",
+  "tally-list.empty-accept": "I have an invitation",
+  "tally-list.error-title": "Your tallies could not be read",
+  "tally-list.error-retry": "Try again",
+  "tally-list.owed-to-me": "owed to you",
+  "tally-list.owed-by-me": "you owe",
+  "tally-list.level": "settled",
+  "tally-list.waiting-on-me": "Needs you",
+  "tally-list.waiting-on-them": "Waiting on them",
+  "tally-list.state-offered": "Offered",
+  "tally-list.state-closing": "Closing",
+  "tally-list.state-expired": "Expired",
+  "tally-list.last-activity": "Last activity {date}"
+}
