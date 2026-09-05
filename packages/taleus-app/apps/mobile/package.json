@@ -3,10 +3,12 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "android": "react-native run-android",
+    "android": "sh -c '. ./env-defaults.sh && react-native run-android --port \"$METRO_PORT\" --deviceId \"$DEVICE_SERIAL\"'",
+    "android:emu": "sh -c '. ./env-defaults.sh && react-native run-android --active-arch-only --port \"$METRO_PORT\" --deviceId \"$DEVICE_SERIAL\"'",
+    "emulator": "sh -c '. ./env-defaults.sh && \"${ANDROID_HOME:-$HOME/Library/Android/sdk}/emulator/emulator\" -avd \"$AVD_NAME\" -port \"$EMULATOR_PORT\"'",
     "ios": "react-native run-ios",
     "lint": "eslint .",
-    "start": "react-native start",
+    "start": "sh -c '. ./env-defaults.sh && react-native start --port \"$METRO_PORT\"'",
     "test": "jest"
   },
   "dependencies": {

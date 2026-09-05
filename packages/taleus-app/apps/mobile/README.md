@@ -1,5 +1,36 @@
 This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
 
+## Emulator and Metro ports
+
+[`env-defaults.sh`](env-defaults.sh) — sourced by every `yarn` script — carries the
+stock React Native ports, so a fresh clone just works. Running Taleus alongside its
+siblings needs a dedicated slot, which goes in a git-ignored `.env.ports.local`
+beside it:
+
+```sh
+METRO_PORT=8083
+EMULATOR_PORT=5560
+DEVICE_SERIAL="emulator-5560"
+AVD_NAME="B_Phone_API_34"
+```
+
+That keeps clear of the slots the siblings use:
+
+| project      | Metro | emulator console | AVD              |
+| ------------ | ----- | ---------------- | ---------------- |
+| `ser/chat`   | 8086  | 5556             | `Phone_API_37.1` |
+| `ser/health` | 8082  | 5558             | `A_Phone_API_36` |
+| `ser/taleus` | 8083  | 5560             | `B_Phone_API_34` |
+
+Console ports must be even and in 5554..5682 — the odd port above is the paired
+adb port. Boot the emulator on its assigned port first, then Metro, then the app:
+
+```sh
+yarn emulator          # AVD_NAME on EMULATOR_PORT
+yarn start             # Metro on METRO_PORT
+yarn android           # installs to DEVICE_SERIAL
+```
+
 # Getting Started
 
 > **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
