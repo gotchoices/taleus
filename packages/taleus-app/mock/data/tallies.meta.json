@@ -1,0 +1,10 @@
+{
+  "namespace": "tallies",
+  "variants": ["happy", "empty", "error"],
+  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "notes": [
+    "balance.perspective is stated from the reading party's side: owed-to-me, owed-by-me, level",
+    "waitingOn is me | them | nobody — story 23 builds the attention list from it",
+    "units are whole numbers of the unit's smallest part; scale gives the decimal exponent"
+  ]
+}

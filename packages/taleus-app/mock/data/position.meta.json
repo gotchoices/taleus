@@ -1,0 +1,10 @@
+{
+  "namespace": "position",
+  "variants": ["happy", "empty"],
+  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "notes": [
+    "estimate.covers and estimate.excluded are load-bearing: story 40 requires the figure to name what it leaves out",
+    "estimate.direction is always conservative — the less favourable side of a two-way rate (rules.md § Amounts)",
+    "spendingPower is never folded into net; heldByOthers is the party's, creditExtendedToMe is somebody's willingness"
+  ]
+}

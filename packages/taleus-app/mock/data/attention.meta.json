@@ -1,0 +1,10 @@
+{
+  "namespace": "attention",
+  "variants": ["happy", "empty"],
+  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "notes": [
+    "items with waitingOn: them appear but never as a demand on this party (story 23 path D)",
+    "automated settling never appears here — it was authorized in advance (story 23 step 6)",
+    "route names match design/specs/mobile/navigation.md"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "displayUnit": "iso4217:USD",
+  "perUnit": [
+    { "denom": "iso4217:USD", "scale": 2, "owedToMe": { "units": 18000 }, "owedByMe": { "units": 4250 } },
+    { "denom": "cid:bafy-dave-hours", "scale": 0, "label": "Dave-hours", "owedToMe": { "units": 6 }, "owedByMe": { "units": 0 } },
+    { "denom": "CHIP", "scale": 3, "owedToMe": { "units": 0 }, "owedByMe": { "units": 0 } }
+  ],
+  "estimate": {
+    "unit": "iso4217:USD",
+    "scale": 2,
+    "owedToMe": { "units": 18000 },
+    "owedByMe": { "units": 4250 },
+    "net": { "units": 13750 },
+    "covers": ["iso4217:USD"],
+    "excluded": [
+      { "denom": "cid:bafy-dave-hours", "label": "Dave-hours", "reason": "no rate set" },
+      { "denom": "CHIP", "reason": "no rate set" }
+    ],
+    "direction": "conservative"
+  },
+  "spendingPower": {
+    "heldByOthers": { "units": 18000, "denom": "iso4217:USD", "scale": 2 },
+    "creditExtendedToMe": { "units": 15750, "denom": "iso4217:USD", "scale": 2 }
+  }
+}

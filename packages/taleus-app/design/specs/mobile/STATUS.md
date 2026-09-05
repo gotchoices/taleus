@@ -5,22 +5,30 @@ This file tracks progress for a single app target (`<target>`). It is meant to b
 Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
 
 ## Bootstrap / Discovery (shared)
-- [ ] `design/specs/project.md` is complete enough to proceed
-- [ ] (Mobile targets) Apply the app id (Android `applicationId`, iOS bundle id) in the native build trees (from `design/specs/project.md`, e.g. `org.sereus.health`)
+- [x] `design/specs/project.md` is complete enough to proceed
+- [x] (Mobile targets) App id applied in the native build trees — `org.sereus.taleus`
 
 ## Story Generation (this target)
-- [ ] Stories exist under `design/stories/<target>/` and describe the intended experience
+- [x] Stories exist under `design/stories/mobile/` — 29 written and human-reviewed, three rounds of
+  feedback processed; only `25-my-records-in-my-books` remains a stub, deferred until cross-app
+  sharing on the platform is understood
 
 ## Navigation Planning (this target)
-- [ ] `design/specs/<target>/navigation.md` exists and is reviewed
-- [ ] `design/specs/<target>/screens/index.md` lists the intended screens/routes
+- [x] `design/specs/mobile/navigation.md` exists — derived from the stories, awaiting human review
+- [x] `design/specs/mobile/screens/index.md` lists 30 screens/routes, with a suggested slice order
 
 ## Domain Contract (shared)
-- [ ] `design/specs/domain/` is sufficient to support this target’s slices
+- [x] `design/specs/domain/` is sufficient for this target's early slices — `rules.md` and
+  `interfaces.md`, the latter now carrying what the apps ask of the engine
 
 ## Screen/Component Slicing (this target)
-- [ ] Key screens/components have specs under `design/specs/<target>/screens/` and `design/specs/<target>/components/`
+- [ ] Key screens/components have specs under `design/specs/mobile/screens/` and `.../components/`
 - [ ] Slices are being generated one at a time with test/commit pauses
+
+## Mock mode (this target)
+- [x] `mock/data/` carries the first fixtures — party, tallies, tally, entries, requests, attention,
+  position — shaped to the domain contract, standing in for an engine that does not exist yet
+- [ ] The data layer's single switch point exists in `apps/mobile/src/data/` (lands with the first slice)
 
 ## Scenario / Peer Review (optional)
 - [ ] Scenario docs/images exist under `design/generated/<target>/scenarios/` and `design/generated/<target>/images/`

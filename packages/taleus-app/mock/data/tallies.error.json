@@ -1,0 +1,7 @@
+{
+  "error": {
+    "kind": "unavailable",
+    "message": "Your tallies could not be read just now.",
+    "retryable": true
+  }
+}

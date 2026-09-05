@@ -1,0 +1,29 @@
+{
+  "requests": [
+    {
+      "id": "request:mara-95",
+      "tallyId": "tally:mara-shop",
+      "direction": "asked-of-me",
+      "requester": { "sid": "sid:mara-4d10", "name": "Mara's Bike Shop" },
+      "amount": { "units": 9500 },
+      "memo": "Repair — brake service",
+      "asked": "2026-09-04T11:05:00Z",
+      "outstandingDays": 1,
+      "applied": { "units": 7000 },
+      "stillAsked": { "units": 2500 },
+      "state": "part-answered"
+    },
+    {
+      "id": "request:jan-240",
+      "tallyId": "tally:rae-offer",
+      "direction": "asked-by-me",
+      "amount": { "units": 24000 },
+      "memo": "Consulting, August",
+      "asked": "2026-06-02T09:00:00Z",
+      "outstandingDays": 95,
+      "applied": { "units": 0 },
+      "stillAsked": { "units": 24000 },
+      "state": "waiting"
+    }
+  ]
+}

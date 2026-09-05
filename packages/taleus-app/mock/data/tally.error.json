@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "counterparty-unreachable",
+    "message": "Nothing of Sam's is reachable just now.",
+    "readable": true,
+    "retryable": true
+  }
+}
