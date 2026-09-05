@@ -29,6 +29,8 @@ system) and flags its own open questions.
 
 Design intentions still under analysis; not yet timeless. See [`drafts/`](drafts/).
 
+- **[drafts/engine-api.md](drafts/engine-api.md)** — the app-facing library surface, drafted from the
+  mobile app's side while mock mode stands in for the engine. For reaction; nothing settled.
 - **[drafts/credit-terms.md](drafts/credit-terms.md)** — roadmap from demand credit to rich instruments
   (interest, amortization, vesting). A gap carried over from MyCHIPs, not yet designed.
 

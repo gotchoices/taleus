@@ -39,6 +39,13 @@ Drawn from the drafted stories in `packages/taleus-app/design/stories/mobile/`:
   rule already delays restrictive changes by the prior notice period).
 - Reading is cheap and repeatable; the app is expected to ask often.
 
+## A draft to react to
+
+`docs/drafts/engine-api.md` states this surface from the app's side — the asks, the shapes the stories
+depend on, and five questions for whoever builds it. `packages/taleus-app/mock/data/` is the
+executable form of the same thing. Both are the app's guess, offered as a starting point rather than a
+specification.
+
 ## Open questions for the implementer
 
 - **Shape.** Callable operations, reactive/subscribable queries over tally state, or both? The apps
