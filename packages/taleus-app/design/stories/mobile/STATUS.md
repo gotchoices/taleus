@@ -42,12 +42,13 @@ Group 1 — tally negotiation, one continuous thread (Jan and Sam, carried over 
 | 14 | [My cadre](14-my-cadre.md) | revised — counterparty durability is borrowed, not guaranteed |
 | 43 | [Notifications](43-notifications.md) | reviewed |
 | 51 | [Staying reachable](51-change-my-address.md) | reviewed |
-<!--EC NTA: TODO: Partner goes offline for long time or indefinitely -->
 
 Groups 1-2 (01-07) cover the tally lifecycle end to end; group 3 (10-13, 50) covers identity;
 group 4 (20-22) covers value moving between two parties.
 
 Open points carried by reviewed stories, each tracked as a ticket:
+- A counterparty who is permanently gone — covered in story 05 path F; whether the platform lets a
+  party write to such a tally at all is open (`feat-engine-tally-api`).
 - ~~Whether a declined invitation is visible to the inviter~~ — **resolved**: offers can be refused
   outright and the refusal reaches the offerer (story 02). See `tmp/nate-feedback.md`.
 - Whether over-limit pledges warn rather than block — `feat-manual-chit-credit-gate` (story 20).

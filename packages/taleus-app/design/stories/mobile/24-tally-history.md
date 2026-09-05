@@ -26,11 +26,11 @@ Either party, from their own side. Both see the same entries; each sees them in 
    their tally. Sam can tell those apart from the ones he and Mara made deliberately.
 6. He finds the $95 repair from March and can see it answered Mara's request, not just that money
    moved that day.
-<!--EC NTA: If you agree that partial payment is a thing, should see any remaining request/invoice balances 
-
-KB: I'm not sure this is right.  I think it is the job of the creditor to invoice (ask for payment).  It is the job of the debtor to respond by paying what he thinks is right.  I'm _not_ sure that an invoice should be treated somehow as a ledger item that is netted with payments.  My reasoning: The alleged debtor has not signed anything agreeing to pay yet.  The invoice is a unilaterally asserted request/demand.  It can't have teeth in the ledger.  I think, if the debtor pays short (or long), the creditor needs to decide whether to write off (or on) the difference and the take action to either re-invoice or refund, as the case may be.  Thoughts?
--->
-7. Satisfied he knows where they stand, he goes ahead. → [20](20-pay-a-partner.md)
+7. Alongside the entries, he can see what is still being asked of him — a bill of Mara's he paid $70
+   against, with $25 outstanding. It sits beside the ledger rather than in it: what he *owes* is what
+   he has signed, and what she is *asking* is her statement of what she thinks he owes. Both are
+   worth seeing; only one of them moves the balance.
+8. Satisfied he knows where they stand, he goes ahead. → [20](20-pay-a-partner.md)
 
 ### Alternative Path A: something still in progress
 1.1. A payment routing through this tally has not finished.
@@ -40,13 +40,12 @@ KB: I'm not sure this is right.  I think it is the job of the creditor to invoic
 
 ### Alternative Path B: a long history
 1.1. Sam and Mara have hundreds of entries.
-1.2. Sam can narrow to a period, or to entries above a size, or find the one he half-remembers by
-     what it was for.
+1.2. Sam can narrow to a period, or to entries above a size, or find one by its exact amount, or find
+     the one he half-remembers by what it was for.
 1.3. He can also follow the running balance over time rather than entry by entry — where it stood
      through the year, which side of zero it sat on, and whether it trends toward him or away. This
      is movement through the tally over a period, not a statement of what he is worth; that is a
      single moment across all his tallies. → [40](40-my-position.md)
-<!--EC NTA: Can search by exact amount -->
 
 ### Alternative Path C: an entry Sam does not recognise
 2.1. Sam finds an entry from November he has no memory of.
@@ -72,8 +71,11 @@ KB: I'm not sure this is right.  I think it is the job of the creditor to invoic
 - [ ] Each entry shows the balance that resulted, so the current figure can be followed back
 - [ ] Entries that arose from routed payments are distinguishable from ones the parties made
 - [ ] An entry that answered a request is recognisably tied to that request
+- [ ] Outstanding requests are visible alongside the history, showing what has been applied and what
+      is still asked
+- [ ] A request never affects the balance; only signed entries do, and the difference is evident
 - [ ] Unfinished movement is visibly unfinished, with its prospective effect shown
-- [ ] Long histories can be narrowed by period, size, or purpose
+- [ ] Long histories can be narrowed by period, size, exact amount, or purpose
 - [ ] The running balance over a period is available, not only individual entries
 - [ ] Movement over a period is presented as distinct from what the party is worth at a moment
 - [ ] History remains complete and readable after a tally closes

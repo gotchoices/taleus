@@ -59,12 +59,29 @@ able to settle.
      balance for lateness — no charge appears that neither of them entered.
 5.6. Whatever their agreement says about being late is between them and that agreement, to be
      resolved as people resolve things. The app records; it does not adjudicate.
+5.7. If it hardens into a real default, the agreement is where Jan finds what he may do about it —
+     including, after the cure period it specifies, telling others honestly what happened, and
+     saying so again if Sam later makes it good. That is Jan acting under the agreement, out in the
+     world. Taleus keeps no register of anybody's conduct and publishes nothing on his behalf.
+     → [07](07-review-the-agreement.md)
 
 ### Alternative Path D: closing while something is in flight
 5.1. A payment routed through this tally is still in progress when the balance would otherwise hit
      zero.
 5.2. The tally does not close yet — closing waits until nothing is outstanding, so a payment landing
      later cannot reopen something already called finished.
+
+### Alternative Path F: Sam is gone for good
+5.1. Sam stops answering. Not for a week — he has moved on, and nothing of his ever comes back.
+5.2. Jan can still read everything: the balance, the history, the terms, and what Sam disclosed. It is
+     his record too, and it does not decay.
+5.3. What he cannot do is finish anything. A tally is a record the two of them keep together, so with
+     Sam permanently absent there may be nothing Jan can add to it — including the settling that
+     would let it close.
+5.4. The app says that plainly rather than leaving a tally that looks live and quietly refuses
+     everything. A tally nobody can act on is shown for what it is.
+5.5. What Jan does about the money is outside the app: it is his to pursue under the agreement, with
+     the evidence he already holds. → [07](07-review-the-agreement.md)
 
 ### Alternative Path E: Sam changes his mind
 4.1. Partway through settling, Sam and Jan patch things up and want to carry on.
@@ -97,9 +114,21 @@ able to settle.
       the amount, and accepts a refusal without repeating itself
 - [ ] A missed settlement date is shown to both parties, with nothing added to the balance for it
 - [ ] The app never adjudicates lateness or applies penalties on its own
+- [ ] Remedies for a genuine default are found in the agreement, and are the party's to exercise
+- [ ] Taleus keeps no record of anyone's conduct beyond the tallies themselves, and publishes nothing
 - [ ] A closed tally remains readable — history, terms, and counterparty
+- [ ] A tally whose counterparty has permanently gone is shown as unworkable rather than live, and
+      remains fully readable
+
+## Open
+
+Whether a party can record anything at all on a tally whose counterparty is permanently absent
+depends on the platform: a shared record needs enough of both sides present to accept a write, and
+how much is enough depends on how many machines each party runs. The story states the requirement
+either way — the app must say which of these is true rather than letting someone sign into a void.
 
 ## Variants
 - happy: close requested, balance settled, tally closes
 - empty: nothing owed, closes immediately
-- error: cannot settle; closing persists indefinitely; an agreed date passes unsettled
+- error: cannot settle; closing persists indefinitely; an agreed date passes unsettled; a
+  counterparty who never returns

@@ -19,34 +19,28 @@ Any party whose machines change. Counterparties are affected only when something
    anyone his new details — how his machines are found is the platform's business, not a thing he
    maintains.
 3. Later he moves his node to a different provider. Same result: his counterparties notice nothing.
-4. What does not carry over is anything he handed out earlier. The two invitations still sitting in
-   people's inboxes were made when his old machines answered.
-5. He is told which of those are affected and offered the obvious remedy: issue fresh ones
-   ([01](01-invite-a-partner.md)).
-<!--EC NTA: Nothing about the invites should be tied to his old phone; they're reservations on the shared network, so nothing to do.  -->
-6. Nothing about his identity changed through any of this. He is the same party to everyone he trades
+4. The invitations he handed out last month still work. They name him, not the machine he happened to
+   be carrying when he made them, so there is nothing to reissue and nobody to warn.
+5. Nothing about his identity changed through any of this. He is the same party to everyone he trades
    with, with the same history.
 
 ### Alternative Path A: a counterparty cannot reach him
 1.1. Sam tries to act on their tally while Jan is between machines.
 1.2. Sam is told it cannot be reached right now, not that Jan is gone or that something is wrong with
      the tally.
-1.3. Whatever Sam wanted to do waits, and completes when Jan is reachable again.
-<!--EC NTA: This will take some extra doing relative to current Sereus/Optimystic 
-
-KB: OK to omit if it is more than sereus can handle.
--->
+1.3. Nothing is half-done and nothing is lost. Sam knows exactly where he stands and can do it again
+     when Jan is back.
 
 ### Alternative Path B: Jan cannot reach a counterparty
 1.1. Jan sees a tally that has not been reachable for weeks.
 1.2. He can see when that tally was last reached, and whether anything of his own is having trouble.
      Why the other side is quiet is not something he can know from here — it may be their machines,
      the network between them, or simply nobody home.
-1.3. The remedy is human — call them — rather than anything the app can fix.
-<!--EC NTA: This is where a pseudo-public registry would be nice - anonymous, but in a registry.  Also, could potentially be used to avoid the "many small tallies" fraud case. 
-
-KB: User registry must _not_ be part of the talleus protocol.  However, I'm open to third-party services evolving to help people discover deadbeats.  The MyCHIPs tally contract currently says that upon breach, the damaged party _can_ disclose details about the trading partner publicly (like putting him on a deadbeat list somewhere).  That is out-of-band for Taleus/MyCHIPs but it can certainly become a thing.  Might be worth you reading the current mychips/contract/*.yaml files for context.
--->
+1.3. The remedy is human — call them — rather than anything the app can fix. There is no directory to
+     consult and no register of bad behaviour to check: nobody is findable here who has not chosen to
+     be.
+1.4. If it turns into a genuine default rather than a quiet week, what he can do about it comes from
+     the agreement they signed, not from the app. → [07](07-review-the-agreement.md)
 
 ### Alternative Path C: what people actually see of him
 1.1. Jan wonders what his counterparties know about where he is.
@@ -58,10 +52,11 @@ KB: User registry must _not_ be part of the talleus protocol.  However, I'm open
 
 - [ ] Replacing or moving machines requires no action toward counterparties
 - [ ] A party is never asked to maintain their own reachability details by hand
-- [ ] Outstanding invitations affected by a change are identified, with re-issuing offered
+- [ ] Invitations already issued keep working when the party's machines change
 - [ ] A party's identity and history are unchanged by any machine change
 - [ ] A counterparty who cannot be reached is described as unreachable, not as missing or broken
-- [ ] Work blocked by unreachability waits and completes rather than failing
+- [ ] Work blocked by unreachability is reported honestly, leaves nothing half-done, and can be
+      retried
 - [ ] A party can see when each tally was last reached, and whether their own side is at fault
 - [ ] The app does not speculate about why a counterparty is unreachable
 - [ ] Disclosed contact information is presented as separate from how machines find each other

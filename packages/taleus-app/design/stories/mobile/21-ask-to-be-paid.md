@@ -20,20 +20,18 @@ customers at the counter without knowing in advance who they will be.
 1. Mara requests $95 from Sam on their tally — through the app, not by mentioning it next time
    he is in.
 2. She says what it is for, in terms Sam will recognise when he sees it.
-3. She sets how long the request is good for. A repair invoice can stand for a month; a request at the
-   counter should not outlive the customer's visit.
-<!--EC NTA: Should receivables really expire?  I could see them being canceled, but expired? -->
-4. She signs the request. It is her own statement, and it obliges Sam to nothing by itself.
+3. She does not set it ticking. A request is hers, and it stands until Sam answers it or she takes it
+   back — an unpaid bill does not stop existing because a month went by.
+4. It is her own statement, and it obliges Sam to nothing by itself.
 5. Sam is asked to answer it. → [22](22-respond-to-a-request.md)
-6. Mara can see where it stands: waiting, answered, refused, or run out.
+6. Mara can see where it stands — waiting, answered in part, answered in full, refused, or withdrawn
+   — and how long it has been waiting, because a bill unpaid for ninety days is a different matter
+   from one sent this morning.
 7. Sam pays it, and Mara sees the balance move and the request settled — she does not have to work
    out whether the payment she received was for this request.
 
 ### Alternative Path A: a customer Mara has no tally with
-1.1. A request is made to someone Mara already holds a tally with — she picks the party, states the
-     amount, and it reaches them. There is nothing to scan and nothing to guess.
-<!--EC NTA: This seems like an unnecessary restatement of the base sequence -->
-1.2. A newcomer at the counter has no tally with her, so there is nothing to record a request
+1.1. A newcomer at the counter has no tally with her, so there is nothing to record a request
      against. What Mara offers them is a tally, not a request. → [01](01-invite-a-partner.md)
 1.3. She can offer that tally extending them nothing at all — no trust in their direction. It is
      still useful: the customer hands her cash, she records the value they have given her, and they
@@ -44,29 +42,22 @@ customers at the counter without knowing in advance who they will be.
      altogether. → [30](30-pay-through-the-network.md)
 
 ### Alternative Path B: nobody answers
-6.1. The month passes and Sam has not answered.
-6.2. The request runs out. It stops waiting on Sam, and Mara can see it went unanswered rather than
-     refused.
-6.3. She can request it again — a fresh request, not a revival of the old one.
-<!--EC NTA: I think I don't like this arrangement.  Mara should own her invoice; have ageing, etc. 
+6.1. Months pass and Sam has not answered.
+6.2. The request does not evaporate. It ages, visibly, and Mara can see how long it has been
+     outstanding — which is what she needs to decide whether to chase him, write it off, or stop
+     serving him.
+6.3. It keeps waiting on Sam too. Nothing about the passage of time excuses it.
 
-KB: NTA hasn't given much justification here.  However, my thoughts:
-- An offer should have expiration and not be revokab.  It is a half a contract and so once signed, should stand by its own terms.
-- But a request is different.  I don't think it needs to be signed (other than cryptographic proof that it really came from the partner) because it is not a commitment.
-- By the same logic, I'm not sure it should be uncumbered with an expiration.
-- Presumably, it can be refused by the partner being petitioned.
-- I have no problem with it being retractable by the petitioner.
-- The main problem that comes into play is when the revocation and the payment cross mid-flight.
-- We probably just need a CRDT-type rule to determine who wins.
-- In a trust-based tally arrangement, over-payment is not a catestrophic error.  The partners are seeking equity in good faith and are expected to refund overpayments in exactly the same way as they are expected to honor pledges.
--->
-
-### Alternative Path C: Mara changes her mind
-4.1. Mara realises she overcharged and wants to take the request back.
-4.2. She cannot un-ask it. What she can do is tell Sam not to pay it and let it run out, or request
-     the right amount instead, and the app is honest about which of those it is doing.
-<!--EC NTA: Again, this is her receivable instrument, why can't she cancel it? -->
-4.3. This is why the expiry she set in step 3 matters, and why the app helps her choose one.
+### Alternative Path C: Mara takes it back
+4.1. Mara realises she overcharged and withdraws the request. It is hers; asking was her act and so
+     is unasking.
+4.2. Sam sees it withdrawn rather than merely vanishing, so he is not left wondering whether he still
+     owes it.
+4.3. If Sam paid it in the same moment she withdrew it, one of those happened first on their shared
+     record and both of them see the same answer. Should it land as an overpayment, it is returned
+     the same way any other value is — people who trade on credit are already trusting each other for
+     more than this.
+4.4. She can then request the right amount instead.
 
 ### Alternative Path D: Sam refuses
 6.1. Sam declines the request.
@@ -79,18 +70,26 @@ KB: NTA hasn't given much justification here.  However, my thoughts:
 1.1. Sam pays Mara for the repair before she gets round to asking.
 1.2. Mara does not need to ask at all — the value is already recorded. → [20](20-pay-a-partner.md)
 
-<!--EC NTA: Alternative: payment splits over n invoices -->
+### Alternative Path F: one payment, several bills
+1.1. Sam owes Mara for a repair, a tube, and a service, each asked for separately.
+1.2. He settles the lot in one payment, and says which bills it answers.
+1.3. Mara sees each of them settled by it, rather than a lump sum she has to allocate herself.
+
 
 
 ## Acceptance Criteria
 
 - [ ] A party can ask a counterparty for a specific amount, with a reason attached
-- [ ] The requester sets how long the request stands, and is helped to choose sensibly
+- [ ] A request stands until answered or withdrawn; it does not expire on its own
+- [ ] Both parties can see how long a request has been outstanding
 - [ ] A request is signed by the requester and obliges the payer to nothing by itself
-- [ ] The requester can see whether a request is waiting, paid, refused, or expired
+- [ ] The requester can see whether a request is waiting, part-answered, answered, refused, or
+      withdrawn
 - [ ] A payment answering a request is recognisably tied to it, not merely coincident with it
-- [ ] A request cannot be withdrawn once made; the requester is told plainly and given real options
-- [ ] An expired request is distinguishable from a refused one
+- [ ] One payment can answer several requests, with the payer saying which
+- [ ] The requester can withdraw a request at any time, and the payer sees it withdrawn
+- [ ] A withdrawal and a payment that cross are resolved the same way for both parties, with any
+      overpayment returnable
 - [ ] A refused request is visible to the requester
 - [ ] A request is made to a counterparty the requester already holds a tally with
 - [ ] A newcomer with no tally is offered a tally rather than a request
@@ -99,4 +98,4 @@ KB: NTA hasn't given much justification here.  However, my thoughts:
 ## Variants
 - happy: request made, answered, settled
 - empty: no outstanding requests
-- error: request expires unanswered; request refused; requester wants to withdraw and cannot
+- error: a request left unanswered for months; a request refused; a withdrawal and a payment crossing

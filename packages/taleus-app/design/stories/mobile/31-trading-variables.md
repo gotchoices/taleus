@@ -18,23 +18,20 @@ them, but does read them.
 1. Sam looks at what his tally with Mara is currently set to do. He has never touched it, so it is at
    the ordinary default: balances can settle toward zero freely, and nothing accumulates beyond that.
 2. He is told what that means in plain terms before he changes anything: value may move through this
-   tally to settle what people owe each other, it can only ever reduce what he holds or what he
-   owes, and it never changes what he is worth. Nothing can pile up here that he did not ask for.
+   tally to settle what people owe each other, but only ever *downward* — shrinking what he holds or
+   what he owes toward zero. Nothing accumulates here that he did not ask for, and nothing he owes
+   grows without his say-so.
 3. Sam decides he would like to hold about $500 of Mara's credit, because he buys from her often and
    would rather have value parked there than elsewhere. He says so.
 4. He is shown the consequence: value will now accumulate here, up to $500, at no charge to anyone
    sending it his way.
 5. He sets the most he will ever let build up — $800 — beyond which he wants nothing more, no matter
    who is paying.
-6. Between $500 and $800 he can ask for something in return for taking on more, since it is past what
-   he wanted. He can also leave that at nothing.
-<!--EC NTA: What does "ask" mean, concretely.  Setting a percent?  Should either have this example set it or not; can use alt to discuss the variant.  
-
-KB: I'm OK using more precise language.  "Ask" means programming a cost into the trading variables so that the lift only happens if the cost is paid.  I've programmed this (cost) into trading variables but I'm still a little unsure of if/how it will ultimate work.  For now, we keep the UX functionality until we prove that the backend (or accounting) can't support it.
--->
-7. He can also say what it takes to draw value *back out* of this tally once he has accumulated it —
-   free, at a price, or not at all.
-<!--EC NTA: Again, should either set it or not as the base case. -->
+6. Between $500 and $800 he is being asked to hold more than he wanted, so he attaches a price to it:
+   one percent. Value above his target moves onto this tally only if that cost is covered by whoever
+   is sending it, and below $500 it moves for nothing.
+7. Drawing value back out he leaves free. Parking value with Mara is only useful if he can spend it
+   with her, and charging himself for that would defeat the point.
 8. He signs the settings. From that point they are standing permission: value moves within them
    without anyone asking Sam again, including while he sleeps.
 9. He can come back at any time and see what his settings currently permit, in the same plain terms.
@@ -49,64 +46,50 @@ KB: I'm OK using more precise language.  "Ask" means programming a cost into the
 7.1. Sam tries to set things so that nobody can ever reduce what he owes Mara.
 7.2. He cannot. A debt he owes can always be paid down, freely, without his charging for it — an IOU
      is honored without conditions.
-7.3. What he controls is what he *accumulates*, not whether he can be released from what he owes.
-<!--EC NTA: Clarify?: Without this, value can only move from what he is owed, to what he owes.  This allows him to increase what he owes (up to the limit imposed by the applicable party)
-
-KB: I don't fully understand NTA's commment here.  What I _can_ say is that I'm quite confident in the way trading variables were designed under MyCHIPs (at least for now).  I agree that the debt can _always_ be paid down with a lift, but moving the opposite direction is under his control.
--->
+7.3. What he controls is growth, not repayment. Left alone, this tally only ever settles downward;
+     what his settings buy him is permission for the balance to grow in a direction he chose — and
+     even then only as far as both his own ceiling and the limit the other party extended him allow.
 
 ### Alternative Path C: Mara wants the opposite
 1.1. Mara does not want to hold customer credit; she wants it moving.
-1.2. She sets things so value passes through her readily, and can pay to make that more attractive to
-     others rather than charging for it.
-<!--EC NTA: Should spell out how she does this.
-
-KB: I'm OK giving further detail as long as we don't start designing the UX here (appeus principles).  If you're unsure how to do so, let's discuss.
--->
+1.2. She sets what she would like to hold to nothing, so no lift ever leaves value parked with her.
+1.3. And rather than charging to let value move out through her, she gives up a little — half a
+     percent — to make her tallies the attractive route. She is paying to keep her books clear, which
+     for a shop is worth more than the half percent.
 
 ### Alternative Path D: shutting a tally out
 1.1. Sam has a tally he wants left entirely alone — no automated movement at all.
 1.2. He can say so, and is shown the cost of that: this tally will not help him pay anyone, and
      others will not route through it.
-1.3. What he owes on it can still be paid down. That is not something he can switch off.
-<!--EC NTA: Does this preclude the other party from allowing value the other direction, or only when increasing what he owes?  Should say. 
-
-KB: If I understand the question: A lift has to be allowable from the perspective of _both_ parties to an edge/tally.  Either side can provide a rule that will preclude its execution.
--->
+1.3. His refusal is enough on its own. A lift needs both parties to permit it, so it does not matter
+     how willing the other side is — either of them can stop it.
+1.4. The exception is what he owes. That can always be paid down, and it is not something he can
+     switch off.
 
 ### Alternative Path E: the same intent across many tallies
 1.1. Sam has forty tallies and does not want to set each one.
-1.2. He can express what he wants generally and adjust individual tallies where they differ.
-<!--EC NTA: Can he set all that aren't explicitly set, or does he have to override them all, then set the ones he previously set back?
-
-KB: Good question and I'd go further.  It could be difficult or even dangerous to set _all_ trading variables the same on a group of tallies.  Might be more realistic to apply a single setting to a group or range of tallies.
-
-To try to answer NTA's question, I'm not sure there is such a thing as "not explicitly set".  I guess it depends on how we design the schema.  But I imagine there are default settings (zero, for example).  Having set a variable, the user could be presented with a choice of other tallies to apply it to and, optionally, to filter that to tallies that still have defaults applied.
-
-Again, we don't want to design the UI in full here in the stories.
--->
+1.2. Having decided what he wants on one, he can apply it to others he chooses — a group he picks,
+     not everything he holds. Applying one number to forty different relationships without looking is
+     exactly the mistake worth making him take a beat over.
+1.3. He can see which tallies are still sitting at their defaults, since those are usually the ones he
+     meant to get to.
+1.4. Anything he did not include is left exactly as it was.
 
 ### Alternative Path F: changing his mind
 8.1. Months later Sam lowers his limit from $800 to $200.
-8.2. It is a signed change, like the first one.
-8.3. Movement already agreed under the old settings is not undone by the new ones; what changes is
-     what happens from here.
-<!--EC NTA: Need to spell out the affect on changing the limit relative to trading 
+8.2. It is a signed change, like the first one, and it binds from the moment he makes it. Unlike the
+     credit he extends to Mara — where tightening owes her notice ([03](03-negotiate-terms.md)) —
+     this is his own participation, not a promise to her, so nobody is owed warning of it.
+8.3. Anything already agreed completes on the old terms; everything from here uses the new ones.
 
-KB: I think future (not yet executed) lifts are affected immediately.  Not sure what else NTA is looking for here.
--->
-
-### Alternative Path G: value that would cross units
-1.1. A payment could settle through Sam only by turning dollars into hours — two of his tallies are
-     in different units.
-1.2. That does not happen. Sam has never said what an hour is worth to him, and nobody else's opinion
-     of it will be used on his behalf.
-1.3. If he wants his tallies to work together across units, he says what they are worth to him first.
-     → [41](41-my-exchange-rates.md)
-<!--EC NTA: Another case, written as a hypothetical; should actually happen and discuss the result.
-
-KB: I don't understand NTA's comment.
--->
+### Alternative Path G: a payment that would have to cross units
+1.1. Sam tries to pay a supplier $200. The only way value reaches them runs out through his hours
+     tally with Dave, which means turning dollars into hours.
+1.2. It does not go through, and he is told why: he has never said what an hour is worth to him, and
+     nobody else's opinion of it will be used on his behalf.
+1.3. He is offered the thing that would change it — saying what an hour is worth
+     ([41](41-my-exchange-rates.md)) — and told what saying it would permit.
+1.4. Lifts running entirely in dollars were never affected and carried on throughout.
 
 ## Acceptance Criteria
 
@@ -114,14 +97,20 @@ KB: I don't understand NTA's comment.
 - [ ] Defaults are sensible and usable by someone who never opens these settings
 - [ ] A party can state how much value they would like to accumulate on a tally
 - [ ] A party can state the most they will ever accumulate on it
-- [ ] A party can ask something in return for accumulating beyond what they wanted
+- [ ] A party can attach a price to accumulating beyond what they wanted, and value moves past that
+      point only if the price is covered
 - [ ] A party can state what it takes to draw accumulated value back out
 - [ ] A party cannot prevent a debt they owe from being paid down, and is told why
 - [ ] Settings are signed, and are presented as standing permission rather than a preference
 - [ ] Once signed, movement within them happens without further prompting
-- [ ] A party can express intent across many tallies without configuring each one
-- [ ] Changing settings is itself signed, and does not retroactively affect movement already agreed
+- [ ] A party can apply a setting to a group of tallies they choose, leaving the rest untouched
+- [ ] A party can see which tallies still sit at their defaults
+- [ ] Changing settings is itself signed, binds immediately, and does not disturb movement already
+      agreed
+- [ ] Changing these settings owes the counterparty no notice, unlike tightening the credit extended
+      to them
 - [ ] A party can shut a tally out of automated movement entirely, and is shown what that costs them
+- [ ] Either party's refusal is sufficient to keep a lift off a tally
 - [ ] Default settings permit only movement that reduces what the party holds or owes, and never
       change what they are worth
 - [ ] Value never crosses between units a party has not priced; until they do, each unit settles

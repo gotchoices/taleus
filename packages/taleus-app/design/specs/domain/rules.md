@@ -9,7 +9,9 @@ Each tally is denominated in one unit, fixed for its life. A party holds tallies
 and no unit is privileged — there is no single party-level balance.
 
 A party may pick a display unit. Cross-unit figures are estimates at the party's own rates, shown as
-estimates, never replacing the per-unit figures.
+estimates, never replacing the per-unit figures. One set of rates serves both trading and display;
+where a rate runs both ways, an estimate takes the less favourable direction. An estimate states what
+it covers and names any holding it left out for want of a rate.
 
 Value does not move between units a party has not priced. Until they say what one unit is worth to
 them, their tallies in different units settle separately — nobody else's valuation is applied to
@@ -34,6 +36,19 @@ hand over goods for it. Lifts are a different matter: those stay inside the limi
 Every tally is governed by an agreement both parties accept — chosen when the tally is offered, from
 agreements someone has published and stands behind. Terms (limits, notice) are arguments to it. A
 party can read it before accepting and can refuse it.
+
+## Requests
+
+A request for payment is not an offer and does not behave like one.
+
+- It commits nobody. Until the payer gives value, the amount asked is a statement of what the
+  requester wants.
+- It does not expire. It stands until answered or withdrawn, and both parties can see how long it has
+  been outstanding.
+- The requester may withdraw it at any time; the payer sees it withdrawn.
+- The payer may answer in full, in part, or not at all, and may answer several requests with one
+  payment.
+- A part-answered request shows what was applied and what is still asked for.
 
 ## Signing
 

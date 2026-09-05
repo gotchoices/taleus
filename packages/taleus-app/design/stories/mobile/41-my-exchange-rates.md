@@ -22,10 +22,6 @@ counterparty sees them, and nobody else's rates are ever applied to this party's
 3. He is told what that now permits: those holdings count toward his overall estimate
    ([40](40-my-position.md)), and value can move between his dollar tallies and his Goldback tallies
    when a payment needs it to ([30](30-pay-through-the-network.md)).
-<!--EC NTA: Hmm, there probably shouldn't be a single "overall estimate" if there is an isolated currency?  Should show the overall plus a separate breakdown of each isolated maybe? 
-
-KB: Dealing in multiple UoA's without complete exchange information is virgin territory, something Taleus will be first at.  I'm OK still showing an "overall estimate" and I'm OK that Jan is "told" somehow that it may not include everything.  I'm not as concerned as NTA.
--->
 4. He is also told the scope of what he just did: this is what a Goldback is worth **to him**, on
    every tally he holds in Goldbacks. It is not a per-partner judgment. If he needs to value
    something differently depending on who he is dealing with, that is a different unit, not a
@@ -33,13 +29,16 @@ KB: Dealing in multiple UoA's without complete exchange information is virgin te
 5. He is asked whether it works the same in both directions. It does not: he will take Goldbacks at
    his stated rate, but parting with them costs him a little more, because he would rather keep them.
    That difference is his own reluctance, not a fee anyone charges him.
-6. He is warned about the thing that will actually hurt him: a fixed number goes stale. Gold moves,
+6. He is told which of the two his own figures will use: the less flattering one. There is no second
+   set of numbers for looking at his position — the same rates price his trades and his estimate, and
+   the estimate takes the conservative side of them.
+7. He is warned about the thing that will actually hurt him: a fixed number goes stale. Gold moves,
    his rate does not, and anyone paying attention can take the difference off him.
-7. So he is offered the alternative — follow a published source, plus or minus his own margin —
+8. So he is offered the alternative — follow a published source, plus or minus his own margin —
    rather than a number he must remember to maintain. He chooses that for Goldbacks.
-8. He signs it, as with anything governing movement that happens without him being asked
+9. He signs it, as with anything governing movement that happens without him being asked
    ([31](31-trading-variables.md)). What he signed is the instruction, not each day's number.
-9. Later he can see what his rates are doing: what has been converted, in which direction, at what
+10. Later he can see what his rates are doing: what has been converted, in which direction, at what
    rate, and where that rate came from.
 
 ### Alternative Path A: Jan sets nothing
@@ -93,6 +92,8 @@ KB: Dealing in multiple UoA's without complete exchange information is virgin te
 1.1. Someone offers Jan a tally denominated in something he cannot price at all.
 1.2. He can hold it. It stays in its own unit, outside his estimate, and outside any automated
      movement — which is a coherent state, not a broken one.
+1.3. His overall figure does not pretend otherwise: it names what it left out, so a smaller number
+     is never mistaken for a poorer party. → [40](40-my-position.md)
 
 ## Acceptance Criteria
 
@@ -101,6 +102,9 @@ KB: Dealing in multiple UoA's without complete exchange information is virgin te
       not a rate but a different unit
 - [ ] Rates are private to the party and never disclosed to a counterparty
 - [ ] Rates may differ by direction, and the party is asked about both
+- [ ] One set of rates serves both trading and the party's own figures; there is no separate display
+      rate to maintain
+- [ ] Estimates take the less favourable direction of a two-way rate
 - [ ] The party is told what setting a rate enables: inclusion in their position, and movement
       between units
 - [ ] Rates are signed, like anything else governing movement that happens without asking

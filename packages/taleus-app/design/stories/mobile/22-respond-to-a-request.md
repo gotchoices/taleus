@@ -20,7 +20,7 @@ an older request from a supplier he does not recognise.
 1. Sam sees that Mara is asking him for $95, what it is for, and when the request runs out.
 2. He sees what paying it would do: what he would owe afterward, and how much room that leaves him.
 3. He pays it. The amount is Mara's — he is answering her request, not deciding an amount himself.
-<!--EC NTA: This is confusing, because the amount isn't Mara's until Sam signs it (next step).  Also, see my below comment on partial pay.--> 
+ 
 4. He signs it, in the moment, as with any value he gives ([20](20-pay-a-partner.md)).
 5. Mara sees the request settled and the balance moved.
 6. The request stops waiting on Sam and does not ask him again.
@@ -33,41 +33,28 @@ an older request from a supplier he does not recognise.
 3.4. Sam is not left with a refused request nagging him, and Mara is not left waiting on an answer
      that will never come.
 
-### Alternative Path B: Sam wants to pay part of it
-3.1. Sam accepts $70 of it but not the rest.
-3.2. He cannot answer the request with a different amount — a request is for what was asked.
-3.3. What he can do is give Mara $70 directly ([20](20-pay-a-partner.md)) and decline the request, so
-     the record says what actually happened rather than dressing $70 up as an answer to $95.
-<!--EC NTA: Why not allow for partial-pay?  Seems like a mismatch relative to reality... "this was $70 against the repair; I'll pay the rest soon."  If invoices had to be PIF always, this would create all sorts of accounting problems. 
-
-KB: I would agree, but from this (possibly different) standpoint:
-- An invoice is a request, not a pledge
-- Having received the invoice, I can do anything I want
-- If I can pay you without an invoice, I can pay you _differently_ than what the invoice asks for
-- The schema/rules probably need to be loose enough to treat the invoice as what it is: a stand-alone request that can be responded to in a number of ways (including returning the product and asking for a refund/cancelation).
--->
+### Alternative Path B: Sam pays part of it
+3.1. Sam accepts $70 of the repair and wants to argue about the rest next week.
+3.2. He pays $70 against it, and says that is what he is doing. A request is a request: he may answer
+     it in full, in part, or not at all, exactly as he could hand Mara $70 across the counter without
+     any bill existing.
+3.3. Both of them see the bill part-answered, with $25 still asked for. Nothing pretends $70 settled
+     $95, and nothing forces Mara to treat the matter as closed.
+3.4. Mara decides what to do with the remainder — leave it standing, withdraw it and bill the agreed
+     figure, or let it age while they sort it out. → [21](21-ask-to-be-paid.md)
 
 ### Alternative Path C: paying would take Sam past his limit
 2.1. Paying $95 would put Sam beyond what Mara agreed to be owed.
 2.2. He is told before deciding, and so is Mara when the payment lands — but he is not stopped.
      Mara asked for it; whether she treats it as settling the repair is her call.
-<!--EC NTA: What should this do to the receivable instrument?  You could argue that it's cleaner to close it out and regard the debt as a simple figure, or you could argue that leaving the invoice pending makes it clear that the product/service has not truly been settled (potentially avoiding giving something that isn't paid for, for e.g.) 
-
-KB: I real life, an invoice is sent to the customer and the customer decides how to act on it.  When the customer thinks the invoice is settled, he "puts it away" himself.  The vendor may think the invoice is not fully resolved but if so, he would typically record the payment against the invoice or the order and then decide whether to generate another invoice for the shortfall.
-
-I view the credit limit as a pledge by the grantor to the grantee that services/products _will_ be rendered in exchange for credit up to that amount.  I do _not_ view the credit limit as a line that the software cannot cross.  And if an invoice _has_ been issued that would run past the limit, it is evident that the consideration has already been given (the one choice-point the vendor has).  So at the point, there is nothing to be done other than advise the parties.  Advising the creditor is probably more important than advising the debtor, but produent to advise both.
--->
 2.3. He can also settle up first, or request more room from Mara through the app
      ([03](03-negotiate-terms.md) path C), if he would rather stay inside it.
 
 ### Alternative Path D: Sam ignores it
-3.1. Sam does nothing. The request runs out on its own.
-3.2. It stops waiting on him, and Mara sees it went unanswered rather than refused — a different
-     thing, and she may read it either way.
-<!--EC NTA: Might invoice terms be part of up-front tally terms?  But either way, shouldn't the receivable age, not expire? 
-
-KB: Agreed.  I'm not sure an invoice should ever expire.  Typically (in paper-world), an invoice might be voided and a statement issued showing the new balance.  I think we allow an invoice to be withdrawn (voided) and we allow a payment to reference one or more invoices.  I think that's probably enough (at least for now).
--->
+3.1. Sam does nothing.
+3.2. The request does not go away. It keeps waiting on him and visibly ages, so neither of them can
+     mistake an unpaid bill for a settled one.
+3.3. Mara can leave it, chase it, or withdraw it. Time alone decides nothing.
 
 ### Alternative Path E: a request Sam does not recognise
 1.1. A supplier Sam barely remembers requests $2,400 from him.
@@ -84,16 +71,19 @@ KB: Agreed.  I'm not sure an invoice should ever expire.  Typically (in paper-wo
 
 - [ ] The payer sees the amount, the reason, who is asking, and when the request expires
 - [ ] The effect of paying — resulting balance and remaining room — is shown before deciding
-- [ ] Paying answers the request for exactly the amount asked, and is signed in the moment
+- [ ] The amount asked is a request, not a commitment, until the payer gives it
+- [ ] A payer may answer in full, in part, or not at all, and says which they are doing
 - [ ] The requester can tell a payment that answers their request from an unrelated one
 - [ ] A payer can decline, and may say why
 - [ ] A declined request is visible to the requester, and stops waiting on the payer
-- [ ] An ignored request expires, and is distinguishable from a declined one by both parties
-- [ ] A payer going beyond the agreed limit is warned, not blocked, and so is the requester
-- [ ] A request cannot be answered with a different amount; paying something else is a separate act
+- [ ] A part-answered request shows what was applied and what is still asked for
+- [ ] An ignored request keeps waiting and visibly ages; it does not lapse on its own
+- [ ] A payer going beyond the agreed limit is warned, not blocked, and the requester is warned too
+      — they are the party whose decision it actually affects
+
 - [ ] Requests across all tallies can be seen together
 
 ## Variants
 - happy: request reviewed and paid
 - empty: no requests waiting
-- error: insufficient room; unrecognised requester; request expires unanswered
+- error: payment beyond the agreed limit; unrecognised requester; a bill left ageing

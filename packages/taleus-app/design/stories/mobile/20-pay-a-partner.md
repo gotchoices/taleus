@@ -58,22 +58,26 @@ Either party can be either role at any time. Recording value is always the giver
      is proud of.
 
 ### Alternative Path D: the counterparty is unreachable
-4.1. Nothing of Mara's is reachable when Sam signs.
-4.2. Sam is told plainly whether his entry is recorded. Standing at a counter, "did that go through"
-     is the only question he has, and he gets a straight answer to it.
-4.3. He is never asked to sign the same thing twice, and never left unsure whether he just paid once
-     or twice.
-<!--EC NTA: This presents a bit of a technical challenge, but may be possible. 
+4.1. Nothing of Mara's is reachable when Sam signs. Their tally is one shared record kept by both of
+     them, so with her side wholly absent there is nowhere for the entry to land.
+4.2. It does not go through, and Sam is told so. Standing at a counter, "did that go through" is the
+     only question he has, and he gets a straight answer: no, not yet, nothing is owed differently
+     than a moment ago.
+4.3. Nothing is left half-done, and trying again later cannot end up recording it twice.
+4.4. A shop that cannot afford this answer keeps something of its own always on, which is what makes
+     it reachable when a customer is standing there. → [14](14-my-cadre.md)
 
-KB: Let's try to keep the stories within capabilities we think sereus can handle for now.  If unsure, consult sereus documentation.  There is a current clone in ser/sereus.
--->
 
+### Alternative Path F: paying down what she owes him
+1.1. Mara already owes Sam $200 from a job he did for her.
+1.2. His $40 tube does not put him in debt to her — it comes off what she owes, leaving $160.
+1.3. Nothing about the act differs: he records value he is giving, and the balance moves. Which side
+     of zero it lands on is arithmetic, not a different kind of transaction.
 
 ### Alternative Path E: giving without being owed anything
 1.1. Sam simply wants to give Jan $50 for a birthday.
 1.2. He can. Recording value he is giving needs no invoice, no request, and no reason.
 
-<!--EC NTA: Another alternative: Mara already owes Sam, so the $40 doesn't become a debt from Sam, but rather reduces the debt Mara owes Sam -->
 
 ## Acceptance Criteria
 
@@ -86,7 +90,9 @@ KB: Let's try to keep the stories within capabilities we think sereus can handle
       party may proceed
 - [ ] The receiving party is warned when a pledge exceeds what they extended, before they act on it
 - [ ] Entries cannot be edited or removed; a correction is a further entry, and both remain visible
-- [ ] Whether an entry is recorded is stated plainly, never ambiguously, and never requires re-signing
+- [ ] Whether an entry is recorded is stated plainly, never ambiguously
+- [ ] An entry that cannot be recorded says so, leaves nothing half-done, and can be retried without
+      risk of recording twice
 - [ ] Both parties end up seeing the same entry, amount, and reason
 
 ## Variants
@@ -96,7 +102,8 @@ KB: Let's try to keep the stories within capabilities we think sereus can handle
 
 ## Open
 
-Whether an entry can be recorded at all while the counterparty is unreachable is an engine question,
-not a presentation choice — the tally is one shared record. The answer changes path D materially: a
-party who can record and converge later needs different words than one who cannot record at all.
-Raised on the `feat-engine-tally-api` ticket.
+Path D reflects what the platform actually does: a write to a shared record commits only with enough
+of both parties' machines present, and a write that cannot reach that bar fails cleanly rather than
+queueing. What remains open is the boundary — how much of the other side must be reachable — which
+depends on how many machines each party runs. The user-visible rule holds either way: it either went
+through or it did not, and the app says which.

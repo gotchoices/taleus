@@ -17,24 +17,18 @@ Any party. Nothing here affects any counterparty or any tally.
 1. Sam changes the app to Spanish. Everything he reads changes with it.
 2. What does not change is anything a counterparty wrote: notes on entries, names, what people said
    things were for. Those stay as written, and it is clear they are quoted rather than untranslated.
-<!--EC NTA: also contracts 
-
-KB: I don't agree with this.  I don't think the app can be in the business of translating contracts on the fly.  I _would_ like to support executing tally contracts in varying languages.  But I think the contract stands on its own in whatever language the parties executed it in.
--->
-3. He sets dollars as the unit he wants overall figures in. Individual tallies keep counting in what
-   they were agreed in — that is not his to change ([03](03-negotiate-terms.md)).
-<!--EC NTA: ...but he can see the dollar equivalent if he has set an exchange rate 
-
-KB: Am I correct that we have two notions of exchange rate in the app:
-- What I'd like to see when generating a "overall estimate" (or balance sheet); and
-- What I'm willing to accept on a cross UoA lift, which may have multiple values, depending on the direction of the trade.
-
-We may need to discuss this.
--->
-4. He picks how the app looks: following his device, or always light, or always dark.
-5. He can see which of these choices are his and follow him everywhere, and which belong to the
+3. Nor does the agreement governing a tally. It is a legal document in the language it was executed
+   in, and that text is the agreement. Where a publisher offers the same agreement in Spanish, Sam
+   can choose that version when a tally is formed ([01](01-invite-a-partner.md)); what he cannot get
+   is an English agreement rendered into Spanish and presented as though it were the one he signed.
+4. He sets dollars as the unit he wants overall figures in. Individual tallies keep counting in what
+   they were agreed in — that is not his to change ([03](03-negotiate-terms.md)) — but where he has
+   said what a unit is worth to him, he can see the dollar equivalent alongside the real figure
+   ([41](41-my-exchange-rates.md)).
+5. He picks how the app looks: following his device, or always light, or always dark.
+6. He can see which of these choices are his and follow him everywhere, and which belong to the
    device in his hand.
-6. He picks up his tablet. It is in Spanish, showing dollars, without being told again.
+7. He picks up his tablet. It is in Spanish, showing dollars, without being told again.
 
 ### Alternative Path A: a language the app does not have
 1.1. Sam's language is not among those available.
@@ -62,7 +56,11 @@ We may need to discuss this.
 
 - [ ] The party can choose the app's language from those available
 - [ ] Counterparty-authored text is presented as quoted, never machine-altered
+- [ ] A tally's agreement is presented in the language it was executed in, never machine-translated
+- [ ] Where a publisher offers an agreement in more than one language, the version is chosen at
+      formation, not in settings
 - [ ] The party can choose the unit their overall figures are expressed in
+- [ ] Where a rate exists, an equivalent is shown alongside the tally's own figure, never instead
 - [ ] Per-tally units are not presented as changeable here
 - [ ] Choosing a display unit the party has no rates for is explained, with the way forward offered
 - [ ] The party can choose the app's appearance, including following the device

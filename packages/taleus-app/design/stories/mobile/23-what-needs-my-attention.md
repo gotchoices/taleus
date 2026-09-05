@@ -28,7 +28,6 @@ Any party with more tallies than they can hold in their head.
    settings, not each time it happened. → [31](31-trading-variables.md)
 7. Two of his tallies are waiting on the other party. They are visible if he goes looking, but they
    are not asking anything of him.
-<!--EC NTA: Should be able, somehow, to see all prior (no longer active) pending items. -->
 
 ### Alternative Path A: nothing is waiting
 1.1. Most days, nothing needs Jan.
@@ -52,11 +51,25 @@ Any party with more tallies than they can hold in their head.
 2.2. It appears, because Jan should know about it, but it is honest that the next move is not his —
      it is waiting on someone else, not on him.
 
-### Alternative Path E: on another device
+### Alternative Path E: what happened to the last lot
+1.1. Jan half-remembers an offer from a fortnight ago and cannot tell whether he answered it.
+1.2. He can look back at what has already been through here and what became of each one — answered,
+     refused, withdrawn by the other party, or left until it no longer mattered.
+1.3. Nothing quietly disappears. An item leaving his list is an event with an outcome, not an
+     absence.
+
+### Alternative Path F: not now
+1.1. One of the four is a request Jan intends to answer, but not today.
+1.2. He can set it aside. It stops asking, and his list is about what he means to deal with rather
+     than everything outstanding.
+1.3. Setting aside is not refusing, and he is not allowed to confuse the two: nothing about it
+     reaches the other party, nothing is answered, and what he owes or agreed is untouched.
+1.4. It comes back if the thing itself changes, and he can bring it back whenever he likes.
+
+### Alternative Path G: on another device
 1.1. Jan answers the offer on his tablet.
 1.2. It stops asking on his phone too. Attention is his, not his device's.
 
-<!--EC NTA: Ability to dismiss something?  Ability to re-awaken something? -->
 
 ## Acceptance Criteria
 
@@ -65,6 +78,10 @@ Any party with more tallies than they can hold in their head.
       waited
 - [ ] Items waiting on the party are distinguishable from items waiting on the counterparty
 - [ ] Dealing with an item stops it asking, on every device the party uses
+- [ ] Items already dealt with remain reviewable, each showing what became of it
+- [ ] A party can set an item aside without answering it, and bring it back
+- [ ] Setting aside is distinguishable from refusing, changes nothing for the other party, and is
+      never mistaken for an answer
 - [ ] Items with a deadline are distinguishable from open-ended ones without the user doing date
       arithmetic
 - [ ] An item that lapses unanswered is distinguishable from one that was dealt with

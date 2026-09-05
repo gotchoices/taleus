@@ -15,28 +15,20 @@ Any party. What reaches them here is only ever things that need *them*
 
 ## Sequence
 
-1. Sam is away from the app when Mara asks him for $95. He is told.
-<!--EC NTA: I know we want to avoid over-specifying mechanisms, but I at least think we need to be clear what are behaviors of the system, versus outside events.  "He is told" could be a human wispering to him, which is clearly not what we intend.  I would minimally say something like, "his phone notifies him".
-
-KB: Agreed.  This is in the spirit of NTA's first round of comments, I think.
- -->
+1. Sam is away from the app when Mara requests $95 from him. His phone notifies him.
 2. What he is told is enough to decide whether to deal with it now: who, what, how much, how long he
    has.
 3. He opens it and lands on the request itself, not on a general starting point that makes him find
    it again.
-4. Jan answers an offer on his tablet; the notice about it stops mattering on his phone too. He is
-   told once, as a person, not once per device.
-<!--EC NTA: I assume what this means is that for a notification sent across his devices, the notice will stop showing as pending once he has acknowledged the message on any device.  This may not be possible for the OS-level notification, but is good for the in-app notice list. 
-
-Agreed.  It may imply coordination between devices such that we are keeping notifications in the DB rather than on the device.  I'm OK keeping the behavior for now but also willing to relax it if we find ourselves up against insurmountable technical issues.
--->
+4. Jan answers an offer on his tablet. In the app, on any device of his, that item stops asking — the
+   list of what wants him belongs to him, not to a handset. A notice his phone has already put on its
+   own lock screen may linger there, as any phone's notices do, and opening it says the matter is
+   settled.
 5. Sam chooses what is worth interrupting him. Something needing a signature is not the same as
    something merely finishing, and he can treat them differently.
-6. He can also say when he is not to be disturbed, and what is important enough to override that.
-<!--EC NTA: The OSs already have facilities for DnD which we probably shouldn't duplicate, but a message importance filter would be good.
-
-KB: I'm open-minded on this topic.
--->
+6. Quiet hours are his phone's business, not this app's — he already has that where he expects it.
+   What the app does is classify honestly, so what he has told his phone about interruptions can act
+   on something real: this one needs a signature, that one is a courtesy.
 
 ### Alternative Path A: what is happening on its own
 1.1. Value moves through Sam's tallies overnight ([31](31-trading-variables.md)).
@@ -45,10 +37,12 @@ KB: I'm open-minded on this topic.
 
 ### Alternative Path B: the phone has to be woken anyway
 1.1. Sam has no always-on machine, so his phone is the only thing that can take part in settling.
-1.2. It is roused when it is needed, briefly, without showing him anything — that is participation,
-     not a message, and there is nothing for him to read or dismiss.
-     1.3. If he never wants that, the honest answer is that his tallies will settle less often, and he is
-     told so plainly rather than being quietly cut out. → [13](13-my-devices.md)
+1.2. When it can be, it is roused briefly without showing him anything — that is participation, not a
+     message, and there is nothing for him to read or dismiss.
+1.3. This is best effort and the app says so. A phone decides for itself how much it will do while
+     nobody is holding it, so some settling will pass him by.
+1.4. If he wants his tallies to keep working regardless, the answer is something of his that stays on
+     — not a setting in this app. → [13](13-my-devices.md), [14](14-my-cadre.md)
 
 ### Alternative Path C: on a lock screen, in company
 1.1. Sam's phone lights up on a table between other people.
@@ -78,9 +72,10 @@ KB: I'm open-minded on this topic.
 - [ ] The party is told about things that need them, while the app is closed
 - [ ] A notice carries enough to decide whether to act now: who, what, how much, what deadline
 - [ ] Acting on a notice lands on the thing itself
-- [ ] Dealing with something on one device settles it on the party's other devices
+- [ ] Dealing with something on one device settles it in the app on every device of theirs
+- [ ] A stale notice already delivered by a phone explains itself when opened
 - [ ] The party can distinguish what interrupts them from what merely informs them
-- [ ] The party can set quiet periods, and what may override them
+- [ ] Interruption policy is left to the phone; the app classifies items so that policy can work
 - [ ] Automated settling never produces a notification — it needs nothing from the party
 - [ ] Background participation is distinguishable from a message, and shows the party nothing
 - [ ] Participation by phone alone is presented as best effort, never as a guarantee

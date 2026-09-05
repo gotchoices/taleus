@@ -23,18 +23,16 @@ because it happens outside the app entirely.
    him.
 2. From his tablet, he retires the lost phone. A thief could not have acted as Sam anyway without
    being able to unlock it; retiring it closes the question rather than leaving him to hope.
-<!--EC NTA: I assume this means remove him from the cadre?  Still a risk that if his key on that device wasn't secure, someone could sign for him and bring as evidence, even though the attacker can't sync with the rest of the network? 
-
-KB: Not sure how to address this comment.  I'm inclined to leave the functionality in the stories until we find out it can't be done.  We _do_ need a way to remove a compromised device.  We are designing UX for the app, not the engine.  Some debates will need to occur at the engine level.
--->
-3. He is told what that did and did not do: nothing further can be done as him from that phone;
-   anything already done stands.
-4. Sam checks what he still has. His tallies, balances, history, and terms are all intact — they were
-   never only on that phone.
-<!--EC NTA: I wouldn't say "never", since they were only there prior to syncing with the rest -->
+3. He is told what that did and did not do: nothing signed on that phone from now on will be
+   accepted as his; anything it already committed stands. Something it signed but never got onto the
+   record cannot be slipped in afterwards.
+4. Sam checks what he still has. His tallies, balances, history, and terms are all intact — his
+   tablet and his counterparties hold them too, so losing the phone loses none of it. Anything the
+   phone had taken in but not yet passed on is the exception, and he can see where that leaves him.
 5. He sets up a replacement phone from his tablet, without involving anyone he trades with.
-6. He is back to normal, and can see that two devices act as him again. → [13](13-my-devices.md)
-<!--EC NTA: Not very clear to say "act as him".  He must still sign for all activity besides trading, so better to spell that out? -->
+6. He is back to normal, and can see that two devices can sign as him again — which is what he
+   needs for everything except the settling that runs on its own under the settings he already
+   signed. → [13](13-my-devices.md), [31](31-trading-variables.md)
 
 ### Alternative Path A: Steve has nothing left, but planned ahead
 1.1. Steve lost every device and has no second one to work from.
@@ -55,12 +53,11 @@ KB: Not sure how to address this comment.  I'm inclined to leave the functionali
 1.5. Once satisfied, Jan can act. What he owes Steve does not evaporate because Steve lost a phone:
      he can settle what is between them and open a fresh tally with Steve's new identity, so the
      value survives even though the old tally does not.
+1.6. When he does, he notes on the new tally that it stands in place of the old one, and what was
+     carried across. Neither of them expects to need that later; both would want it if this ever has
+     to be explained to somebody else.
 1.6. Steve is back in business with Jan, on a new footing, and repeats this with anyone else he
      traded with.
-<!--EC NTA: Addendum in new contract that says that it is for the purpose of restoring prior tally?  (not just replacing, as parties haven't signed their chits yet).  Null and void if fraudulent 
-
-KB: I would agree that a replacement tally should ideally reference the old one.  Probably a comment rather than a contract addendum.  This creates a paper trail should enforcement become necessary.  Not sure how much of this needs to be in the stories.  Maybe just an allusion.
--->
 
 ### Alternative Path C: Jan cannot satisfy himself
 1.1. Jan is not sure, or does not want the responsibility.
@@ -83,15 +80,18 @@ KB: I would agree that a replacement tally should ideally reference the old one.
 
 ### Alternative Path F: getting the old phone back
 2.1. The phone turns up a week later, after Sam retired it.
-2.2. It no longer acts as him. He can put it back into service deliberately if he wants, as a new
-     device rather than by undoing the retirement.
-<!--EC NTA: As a new key/peer would be more precise -->
+2.2. It cannot sign as him any more, and retiring is not undone. If he wants the phone back in
+     service he enrols it afresh — a new key on a device he still owns, not a resurrection of the
+     old one.
 
 ## Acceptance Criteria
 
 **Recovering party**
 - [ ] Retiring a lost device is reachable from any other device the party controls
-- [ ] The party is told what retiring does and does not undo
+- [ ] The party is told what retiring does and does not undo, including that work already committed
+      stands and work signed but never recorded cannot be added later
+- [ ] A retired device can only return by being enrolled afresh, never by reversing the retirement
+- [ ] A tally opened to replace a lost one records what it replaces and what was carried across
 - [ ] Tallies, balances, history, and terms survive the loss of any or all devices
 - [ ] A party with another device can restore themselves without involving a counterparty
 - [ ] A party with something put away can restore themselves without involving a counterparty

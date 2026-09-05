@@ -26,35 +26,35 @@ Mara, who deals with people the supplier deals with. None of that is Sam's probl
 3. It can, and it costs him the $300. Moving value this way is usually free — it settles balances
    people wanted settled anyway. Where it is not free, Sam sees one number for what he gives up, not
    a breakdown of who charged what.
-<!--EC NTA: Note that the indication that "it can" is only true at the moment of the query, and may not be true when and if Sam decides to proceed. -->
-4. He agrees to it. This is his payment and his promise, so he authorizes it in the moment, the same
+4. What he is being told is how things stand right now. Other people are trading while he decides, so
+   an answer that was yes a minute ago can be no by the time he commits — in which case nothing
+   happens and he is told that, rather than the payment going through on worse terms than he agreed
+   to.
+5. He agrees to it. This is his payment and his promise, so he authorizes it in the moment, the same
    as any value he gives ([20](20-pay-a-partner.md)).
-5. It either happens completely or not at all. There is no state where Sam has paid part of it, or
+6. It either happens completely or not at all. There is no state where Sam has paid part of it, or
    where value has left him but not reached the supplier.
-6. Sam sees what changed on his side: he owes Mara more, or holds less of what she owed him.
-7. The supplier sees value arrive from the person they are connected to, not from Sam — and Sam is
+7. Sam sees what changed on his side: he owes Mara more, or holds less of what she owed him.
+8. The supplier sees value arrive from the person they are connected to, not from Sam — and Sam is
    told that is how it works, so he is not surprised to be invisible at the far end.
-<!--EC NTA: This should also be tracked against an instrument for the supplier, no? 
-
-KB: I'm not sure what NTA's point is here.  Do you understand?  I think the point is, the supplier gets a pledge/chit from his partner.  That way, he can buy more stuf from that partner on the resulting credit.
--->
+9. If Sam was paying a bill the supplier had sent him, that bill is settled by this, not left
+   standing while an unexplained credit appears elsewhere. → [21](21-ask-to-be-paid.md)
 
 ### Alternative Path A: there is no way through
 2.1. Nobody Sam is connected to leads to the supplier — an ordinary outcome in a young network, not
      a fault.
 2.2. He is told so plainly, and told what would change it.
-2.3. Where it can be worked out, he is shown *who* would change it: "this would be possible if you
-     had a tally with any of these" — a handful of well-connected parties, rather than leaving him to
-     guess who to go and meet.
-<!--EC NTA: I don't think this is viable as it would require disclosure of parties.  At most it could only be done for the supplier's direct connections.  This seems like something the supplier will want to divulge, in general, however.  The obvious "connect-alls" would be financial institutions, and people are likely to already know that.  In practice, probably any financial institution will lead to all financial institutions.  
-
-KB: Here is a wording I think NTA will agree to:  Either he is told that the deal just can't be done or, if enough information was given by the supplier in the payment request, he _might_ be able to see some possible, publicly known, partners that, if Sam were connected to, he would be more likely to be able to complete the transaction.  This is a contemplated feature of tally-net (I think) but, of course, not much of anything is currently implemented.
--->
-2.4. Tallying with the supplier directly is often the answer, and it is not shaped like his tally
+2.3. Sometimes there is more to say than "no". If the supplier put enough in the payment request to
+     make it possible, Sam may be shown a few widely-known parties — the sort everyone already knows
+     are connected to everyone — that he would be more likely to reach the supplier through.
+2.4. Nothing about anybody's private connections is revealed to get there. What can be suggested is
+     what the payee chose to make public about itself, and parties whose connectedness is public
+     knowledge anyway.
+2.5. Tallying with the supplier directly is often the answer, and it is not shaped like his tally
      with Jan: a supplier extends a newcomer nothing. Trust runs the other way, so Sam funds the
      tally — with outside money, or by directing value into it over time
      ([31](31-trading-variables.md)) — and pays from there. → [21](21-ask-to-be-paid.md) path A
-2.5. He can also settle outside the app entirely and record it ([20](20-pay-a-partner.md)).
+2.6. He can also settle outside the app entirely and record it ([20](20-pay-a-partner.md)).
 
 ### Alternative Path B: a way through, but not enough of it
 2.1. Value can reach the supplier, but only $180 of it.
@@ -86,23 +86,24 @@ KB: Here is a wording I think NTA will agree to:  Either he is told that the dea
      ([31](31-trading-variables.md)).
 1.3. He sees it afterward in his history, marked as something that passed through rather than
      something he did. → [24](24-tally-history.md)
-1.4. His net worth is unchanged by it. He holds the same total as before; it now sits on different
-     tallies than it did.
-<!--EC NTA: Not necessarily.  His net worth might be shifted... Sally dollars might be worth more than Jim dollars, or CHIPs might be discounted relative to dollars as he's trying to convert.
-
-KB: I understand NTA's point here, but disagree with it. "net worth" in this context _nominal_ value--the only thing we can measure.  If the tallies use the same UoA, they _are_ the same nominal value.  The "collectability" of that debt from Sally vs Jim is a orthoginal issue.  I would probably strike his EC or, if anything, note that Sam might "prefer" one tally or another but he determines that by how he sets his trading variables.  If value disappeared from one tally and reappeared on another, due to a lift, we should presume that his position improved.  He moved a less desirable credit to a more desirable debtor.  That's why he had the trading variables set the way he did.
--->
+1.4. The total he holds is unchanged — same unit, same number, now owed by somebody else. What did
+     change is who owes it, and that swap happened only because his own settings said it was worth
+     making ([31](31-trading-variables.md)). Whether one debtor is better than another is his
+     judgment, expressed in those settings, not a figure the app computes for him.
 
 ## Acceptance Criteria
 
 - [ ] A party can pay someone they hold no tally with, starting from something that party issued —
       there is no directory and nobody is findable without choosing to be
-- [ ] Feasibility is established before the party commits to anything
+- [ ] Feasibility is established before the party commits to anything, and presented as true of this
+      moment rather than guaranteed
+- [ ] A payment that is no longer possible when committed does not happen, and says so
 - [ ] The total cost to the payer is shown before agreeing, in the payer's own unit
 - [ ] The payer authorizes the payment explicitly, as with any value they give
 - [ ] A payment either completes in full or does not happen; no partial outcome exists
-- [ ] When no route exists, the party is told plainly and offered what would change it, including
-      who they might tally with to make it possible
+- [ ] When no route exists, the party is told plainly and offered what would change it
+- [ ] Any suggestion of who to tally with uses only what the payee made public and parties already
+      publicly known as widely connected; no private connections are disclosed
 - [ ] When only part of the amount is possible, the possible amount is stated
 - [ ] A payment that fails leaves nothing moved and says so unambiguously
 - [ ] A failure reports what is known about it, without predicting whether a retry will succeed
@@ -110,7 +111,8 @@ KB: I understand NTA's point here, but disagree with it. "net worth" in this con
 - [ ] The payer is told the payee sees the value arriving from their own counterparty
 - [ ] Value passing through a party never asks that party for anything, and is visible afterward as
       having passed through
-- [ ] Value passing through leaves the party's net worth unchanged
+- [ ] Value passing through leaves the total held unchanged, and shows what changed hands instead
+- [ ] A payment that answers a bill settles that bill, wherever the value travelled from
 
 ## Variants
 - happy: route found, cost accepted, payment completes
