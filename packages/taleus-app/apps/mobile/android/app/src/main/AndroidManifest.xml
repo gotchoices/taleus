@@ -22,6 +22,29 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+
+        <!-- Custom scheme: app-to-app links, notification taps, QR, and the
+             variant/locale parameters scenario capture uses.
+             See design/specs/mobile/navigation.md § Deep Links. -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="taleus" />
+        </intent-filter>
+
+        <!-- Universal links: https://sereus.org/taleus/invite/<token>. Inert
+             until the apex .well-known/assetlinks.json carries this app, which
+             is safe to ship — it falls back to the web page. -->
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data
+                android:scheme="https"
+                android:host="sereus.org"
+                android:pathPrefix="/taleus/invite" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>

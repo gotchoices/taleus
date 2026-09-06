@@ -22,16 +22,22 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
   `interfaces.md`, the latter now carrying what the apps ask of the engine
 
 ## Screen/Component Slicing (this target)
-- [ ] Key screens/components have specs under `design/specs/mobile/screens/` and `.../components/`
-- [ ] Slices are being generated one at a time with test/commit pauses
+- [x] Five screens sliced end to end — `TallyList`, `TallyView`, `TallyHistory`, `Attention`,
+  `Position` — each with a spec, a consolidation, generated code, a registry entry, and hashed
+  dependencies. All five read `false | hash` from `check-stale.sh`.
+- [ ] The remaining 25 screens in `screens/index.md`; next by the suggested order are `Welcome` and
+  `ChooseName`, then the invitation arc
 
 ## Mock mode (this target)
 - [x] `mock/data/` carries the first fixtures — party, tallies, tally, entries, requests, attention,
   position — shaped to the domain contract, standing in for an engine that does not exist yet
-- [ ] The data layer's single switch point exists in `apps/mobile/src/data/` (lands with the first slice)
+- [x] The data layer's single switch point exists — `apps/mobile/src/data/config.ts`
+- [x] Mock fixtures are registered as slice dependencies, so editing one marks its screen stale
 
 ## Scenario / Peer Review (optional)
-- [ ] Scenario docs/images exist under `design/generated/<target>/scenarios/` and `design/generated/<target>/images/`
+- [x] Screenshots for six screen/variant pairs under `design/generated/mobile/images/`, captured from
+  a release build by deep link
+- [ ] Scenario docs under `design/generated/mobile/scenarios/`
 
 ## Final wiring
 - [ ] Production data wiring is implemented and tested

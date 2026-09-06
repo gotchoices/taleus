@@ -1,28 +1,61 @@
 {
   "requests": [
     {
+      "id": "request:jan-sam-60",
+      "tallyId": "tally:sam-bike",
+      "direction": "asked-by-me",
+      "amount": {
+        "units": 6000
+      },
+      "memo": "Wheel truing",
+      "asked": "2026-08-30T10:00:00Z",
+      "outstandingDays": 6,
+      "applied": {
+        "units": 0
+      },
+      "stillAsked": {
+        "units": 6000
+      },
+      "state": "waiting"
+    },
+    {
       "id": "request:mara-95",
       "tallyId": "tally:mara-shop",
       "direction": "asked-of-me",
-      "requester": { "sid": "sid:mara-4d10", "name": "Mara's Bike Shop" },
-      "amount": { "units": 9500 },
-      "memo": "Repair — brake service",
+      "requester": {
+        "sid": "sid:mara-4d10",
+        "name": "Mara's Bike Shop"
+      },
+      "amount": {
+        "units": 9500
+      },
+      "memo": "Repair \u2014 brake service",
       "asked": "2026-09-04T11:05:00Z",
       "outstandingDays": 1,
-      "applied": { "units": 7000 },
-      "stillAsked": { "units": 2500 },
+      "applied": {
+        "units": 7000
+      },
+      "stillAsked": {
+        "units": 2500
+      },
       "state": "part-answered"
     },
     {
       "id": "request:jan-240",
       "tallyId": "tally:rae-offer",
       "direction": "asked-by-me",
-      "amount": { "units": 24000 },
+      "amount": {
+        "units": 24000
+      },
       "memo": "Consulting, August",
       "asked": "2026-06-02T09:00:00Z",
       "outstandingDays": 95,
-      "applied": { "units": 0 },
-      "stillAsked": { "units": 24000 },
+      "applied": {
+        "units": 0
+      },
+      "stillAsked": {
+        "units": 24000
+      },
       "state": "waiting"
     }
   ]

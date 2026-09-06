@@ -53,6 +53,13 @@ depHashes: {}
 Sorting, filtering, and search (story 06); opening a tally (`TallyView`); the cross-unit estimate,
 which belongs to `Position` and is deliberately absent from a list where units differ.
 
+## Defensive loading
+
+Each screen's load is wrapped so an unexpected throw becomes the failed state with its message,
+rather than a spinner that never resolves. This came out of watching a screen hang on a device with
+nothing in the log: in a release build an unhandled rejection is silent, and a permanent spinner is
+the worst of both worlds — no information for the user and none for us.
+
 ## Validation
 
 - `npx tsc --noEmit` clean.

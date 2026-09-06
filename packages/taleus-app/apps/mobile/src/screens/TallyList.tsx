@@ -12,8 +12,11 @@ import {
 import { listTallies } from '../data/tallies'
 import type { DataError, TallySummary } from '../data/types'
 import { t } from '../i18n'
+import type { ScreenProps } from '../navigation/routes'
 import { dark, light, spacing, type as typography, type Tokens } from '../theme/tokens'
 import { formatAmount } from '../util/amount'
+
+type Props = ScreenProps<'TallyList'>
 
 /**
  * TallyList (stories 06, 04) — the launch route once a party exists.
@@ -22,7 +25,7 @@ import { formatAmount } from '../util/amount'
  * with, what it counts in, where the balance stands from this party's side,
  * and whether it is waiting on them.
  */
-export function TallyList(): React.JSX.Element {
+export function TallyList({ navigation }: Props): React.JSX.Element {
 	const tokens = useColorScheme() === 'dark' ? dark : light
 	const styles = makeStyles(tokens)
 	const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading')
@@ -31,14 +34,23 @@ export function TallyList(): React.JSX.Element {
 
 	const load = useCallback(async () => {
 		setState('loading')
-		const result = await listTallies()
-		if (result.ok) {
-			setTallies(result.value)
-			setState('ready')
-			return
+		try {
+			const result = await listTallies()
+			if (result.ok) {
+				setTallies(result.value)
+				setState('ready')
+				return
+			}
+			setError(result.error)
+			setState('failed')
+		} catch (thrown) {
+			setError({
+				kind: 'unexpected',
+				message: thrown instanceof Error ? thrown.message : String(thrown),
+				retryable: true,
+			})
+			setState('failed')
 		}
-		setError(result.error)
-		setState('failed')
 	}, [])
 
 	useEffect(() => {
@@ -86,17 +98,35 @@ export function TallyList(): React.JSX.Element {
 
 	return (
 		<View style={styles.screen}>
-			<Text style={styles.heading}>{t('tally-list.title')}</Text>
 			<FlatList
 				data={tallies}
 				keyExtractor={item => item.id}
-				renderItem={({ item }) => <TallyRow tally={item} tokens={tokens} />}
+				renderItem={({ item }) => (
+					<TallyRow
+						tally={item}
+						tokens={tokens}
+						onOpen={() =>
+							navigation.navigate('TallyView', {
+								tallyId: item.id,
+								counterpartyName: item.counterparty.name,
+							})
+						}
+					/>
+				)}
 			/>
 		</View>
 	)
 }
 
-function TallyRow({ tally, tokens }: { tally: TallySummary; tokens: Tokens }): React.JSX.Element {
+function TallyRow({
+	tally,
+	tokens,
+	onOpen,
+}: {
+	tally: TallySummary
+	tokens: Tokens
+	onOpen: () => void
+}): React.JSX.Element {
 	const styles = makeStyles(tokens)
 	const amount = formatAmount(tally.balance, tally.unit)
 	const direction = t(`tally-list.${tally.balance.perspective}`)
@@ -108,7 +138,7 @@ function TallyRow({ tally, tokens }: { tally: TallySummary; tokens: Tokens }): R
 				: tokens.textSecondary
 
 	return (
-		<Pressable style={styles.row}>
+		<Pressable style={styles.row} onPress={onOpen}>
 			<View style={styles.rowMain}>
 				<Text style={styles.rowName}>{tally.counterparty.name}</Text>
 				<Text style={[styles.rowAmount, { color: balanceColour }]}>{amount}</Text>

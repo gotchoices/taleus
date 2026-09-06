@@ -27,3 +27,25 @@ export function formatAmount(amount: Amount, unit: Unit, locale = 'en'): string 
 	}).format(value)
 	return `${number} ${label}`
 }
+
+/**
+ * A unit as a person would say it. `iso4217:USD` is a machine's name for a
+ * thing everyone else calls dollars.
+ */
+export function unitLabel(denom: string, label?: string, locale = 'en'): string {
+	if (label) {
+		return label
+	}
+	if (denom.startsWith('iso4217:')) {
+		const code = denom.slice('iso4217:'.length)
+		try {
+			return new Intl.DisplayNames([locale], { type: 'currency' }).of(code) ?? code
+		} catch {
+			return code
+		}
+	}
+	if (denom.startsWith('cid:')) {
+		return denom.slice('cid:'.length)
+	}
+	return denom
+}

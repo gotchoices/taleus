@@ -9,9 +9,9 @@ screen is sliced, not up front.
 |-------------|-------|-----------|---------|----------|--------|
 | Welcome | Welcome | welcome.md | 10 | happy | draft |
 | Choose name | ChooseName | choose-name.md | 10, 11 | happy, error | draft |
-| Tally list | TallyList | tally-list.md | 06, 04 | happy, empty, error | draft |
-| Tally view | TallyView | tally-view.md | 04, 07 | happy, empty, error | draft |
-| Tally history | TallyHistory | tally-history.md | 24 | happy, empty, error | draft |
+| Tally list | TallyList | tally-list.md | 06, 04 | happy, empty, error | generated |
+| Tally view | TallyView | tally-view.md | 04, 07 | happy, empty, error | generated |
+| Tally history | TallyHistory | tally-history.md | 24 | happy, empty, error | generated |
 | Entry detail | EntryDetail | entry-detail.md | 24 | happy | draft |
 | Tally terms | TallyTerms | tally-terms.md | 07, 03 | happy, error | draft |
 | Trading settings | TradingSettings | trading-settings.md | 31 | happy, empty | draft |
@@ -20,7 +20,7 @@ screen is sliced, not up front.
 | Review invitation | ReviewInvitation | review-invitation.md | 02 | happy, error | draft |
 | Review offer | ReviewOffer | review-offer.md | 03, 02 | happy, error | draft |
 | Standing invitation | StandingInvitation | standing-invitation.md | 01, 10, 21 | happy, empty | draft |
-| Attention | Attention | attention.md | 23 | happy, empty, error | draft |
+| Attention | Attention | attention.md | 23 | happy, empty, error | generated |
 | Attention history | AttentionHistory | attention-history.md | 23 | happy, empty | draft |
 | Pay chooser | PayChooser | pay-chooser.md | 20, 21, 30 | happy | draft |
 | Pay a partner | PayPartner | pay-partner.md | 20 | happy, error | draft |
@@ -28,7 +28,7 @@ screen is sliced, not up front.
 | Create request | CreateRequest | create-request.md | 21 | happy, error | draft |
 | Request view | RequestView | request-view.md | 21, 22 | happy, empty, error | draft |
 | Scan | Scan | scan.md | 02, 21, 30 | happy, error | draft |
-| Position | Position | position.md | 40 | happy, empty, error | draft |
+| Position | Position | position.md | 40 | happy, empty, error | generated |
 | Exchange rates | ExchangeRates | exchange-rates.md | 41 | happy, empty | draft |
 | Settings | Settings | settings.md | 42 | happy | draft |
 | Profile | Profile | profile.md | 11 | happy, empty | draft |
