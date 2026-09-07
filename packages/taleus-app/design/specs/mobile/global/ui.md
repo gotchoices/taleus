@@ -7,6 +7,10 @@ Shared visual foundations. Screens reference tokens by name, never raw hex.
 - **Theme**: user-selectable — system | light | dark
 - **Icon set**: Ionicons (as in the sibling Sereus apps); feature specs name the icons they use
 - **UI kit**: none — plain React Native components
+- **Brand mark**: the logo (`docs/images/logo4.svg`, indigo diamond + tally-stick handover) appears
+  once — as the header-left mark on the `TallyList` root, ~26pt, `accessibilityLabel` "Taleus",
+  decorative. The in-app PNG and the launcher icons are generated from it by
+  `apps/mobile/scripts/logo-gen-*.sh`
 
 ## Colors (semantic tokens)
 

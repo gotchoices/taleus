@@ -1,6 +1,6 @@
 # Taleus
 
-<p align="center"><img src="docs/images/logo.svg" alt="Taleus" width="180"/></p>
+<p align="center"><img src="docs/images/logo4.svg" alt="Taleus" width="180"/></p>
 
 Taleus is a peer-to-peer private credit system — a reboot of [MyCHIPs](https://github.com/gotchoices/mychips) on the [Sereus](https://sereus.org) platform. Two parties who trust each other form a **tally**: a digital credit agreement recorded in a shared database that only they control. Value moves by signed pledges (**chits**), and balances clear across the wider web of tallies through cooperative **lift** transactions — money as pure relationship credit, with no bank, token, or hosted server in the middle.
 

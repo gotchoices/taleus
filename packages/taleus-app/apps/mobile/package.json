@@ -6,6 +6,8 @@
     "android": "sh -c '. ./env-defaults.sh && react-native run-android --port \"$METRO_PORT\" --deviceId \"$DEVICE_SERIAL\"'",
     "android:emu": "sh -c '. ./env-defaults.sh && react-native run-android --active-arch-only --port \"$METRO_PORT\" --deviceId \"$DEVICE_SERIAL\"'",
     "emulator": "sh -c '. ./env-defaults.sh && \"${ANDROID_HOME:-$HOME/Library/Android/sdk}/emulator/emulator\" -avd \"$AVD_NAME\" -port \"$EMULATOR_PORT\"'",
+    "icons:android": "sh ./scripts/logo-gen-android.sh",
+    "icons:ios": "sh ./scripts/logo-gen-ios.sh",
     "ios": "react-native run-ios",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint .",
     "start": "sh -c '. ./env-defaults.sh && react-native start --port \"$METRO_PORT\"'",

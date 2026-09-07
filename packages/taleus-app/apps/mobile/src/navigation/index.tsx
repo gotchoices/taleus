@@ -2,6 +2,7 @@ import Ionicons from '@react-native-vector-icons/ionicons'
 import { NavigationContainer, type Theme } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
+import { Image, StyleSheet } from 'react-native'
 
 import { Attention } from '../screens/Attention'
 import { Position } from '../screens/Position'
@@ -27,13 +28,32 @@ const AttentionStack = createNativeStackNavigator<AttentionParams>()
 const PositionStack = createNativeStackNavigator<PositionParams>()
 const Tabs = createBottomTabNavigator<TabParams>()
 
+/**
+ * The one branded corner in the app — the mark on the home header, the way the
+ * sibling Sereus apps carry theirs (`global/ui.md` § Brand mark). Decorative only.
+ */
+function HeaderLogo(): React.JSX.Element {
+	return (
+		<Image
+			source={require('../assets/logo.png')}
+			style={styles.headerLogo}
+			accessibilityRole="image"
+			accessibilityLabel="Taleus"
+		/>
+	)
+}
+
+const styles = StyleSheet.create({
+	headerLogo: { width: 26, height: 26, marginRight: 8, resizeMode: 'contain' },
+})
+
 function TalliesStack(): React.JSX.Element {
 	return (
 		<Tallies.Navigator screenOptions={useStackOptions()}>
 			<Tallies.Screen
 				name="TallyList"
 				component={TallyList}
-				options={{ title: t('screens.tally-list.title') }}
+				options={{ title: t('screens.tally-list.title'), headerLeft: HeaderLogo }}
 			/>
 			<Tallies.Screen
 				name="TallyView"
