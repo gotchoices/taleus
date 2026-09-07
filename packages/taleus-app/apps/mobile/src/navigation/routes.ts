@@ -4,7 +4,7 @@
  */
 export type RouteParams = {
 	TallyList: undefined
-	TallyView: { tallyId: string; counterpartyName?: string }
+	TallyView: { tallyId: string }
 	TallyHistory: { tallyId: string }
 	Attention: undefined
 	Position: undefined
@@ -28,6 +28,15 @@ export const tabs: { name: TabName; root: RouteName; labelKey: string }[] = [
 	{ name: 'Attention', root: 'Attention', labelKey: 'tab.attention' },
 	{ name: 'Position', root: 'Position', labelKey: 'tab.position' },
 ]
+
+/**
+ * Is this a route the app actually has? Attention items name routes from
+ * `navigation.md` that later slices will add; until then a caller can fall back
+ * rather than navigate into nothing.
+ */
+export function isRoute(name: string): name is RouteName {
+	return name in tabForRoute
+}
 
 /** What a screen receives. Mirrors the shape a real navigator would pass. */
 export interface ScreenProps<R extends RouteName> {

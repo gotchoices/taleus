@@ -114,3 +114,10 @@ most missed later. See `feat-engine-run-modes`.
    client-supplied id that the engine treats as idempotent would settle it.
 5. **How much of a counterparty must be present** for a write to commit, and can the app know that
    before asking a party to sign?
+6. **Days or moments.** Some values are calendar days — when credit terms take effect, when a notice
+   period runs out — and read the same to both parties wherever they are. Others are moments: when an
+   entry was signed, when a request was made. If everything arrives as a timestamp the app cannot
+   tell them apart, and rendering a day through the reader's zone shows the wrong date roughly half
+   the time. Either the engine distinguishes them in its types, or it tells the app which fields are
+   which. (This is not hypothetical — the mobile app shipped "Mar 1" for a `2026-03-02` effective
+   date until the fixtures were changed to carry dates as days.)

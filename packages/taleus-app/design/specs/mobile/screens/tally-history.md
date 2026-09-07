@@ -13,13 +13,13 @@ What has actually happened on a tally, and what is still being asked (story 24).
 ## Behavior (user-observable)
 
 - Entries are listed most recent first: amount, direction, date, and what it was for.
-- Each entry shows the balance that resulted, so the current figure can be followed back rather than
-  trusted.
+- Each entry shows the balance that resulted, **stated from the reader's side** like every other
+  balance, so the current figure can be followed back rather than trusted.
 - Each entry says who made it. Nothing in the history is anonymous.
 - Entries that arrived because a payment routed through the tally are distinguishable from ones the
   two parties made deliberately.
-- Outstanding requests appear **alongside** the entries, never among them, showing what has been
-  applied and how long they have been outstanding — with a plain statement that only signed entries
+- Outstanding requests appear **alongside** the entries, never among them, each saying which way it
+  runs, showing what has been applied and how long it has been outstanding — with a plain statement that only signed entries
   move the balance.
 - Empty: a tally with no entries and nothing asked reads as normal, not as an error.
 

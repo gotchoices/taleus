@@ -71,4 +71,4 @@ Both parties see the same tally, each from their own side. Where their views dif
 ## Variants
 - happy: open tally, zero balance, next actions available
 - empty: this is the party's only tally
-- error: counterparty unreachable; terms cannot be read
+- error: counterparty unreachable; the tally and its terms still read, pending work marked pending

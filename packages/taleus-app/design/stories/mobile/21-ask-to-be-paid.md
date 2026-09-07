@@ -81,6 +81,8 @@ customers at the counter without knowing in advance who they will be.
 
 - [ ] A party can ask a counterparty for a specific amount, with a reason attached
 - [ ] A request stands until answered or withdrawn; it does not expire on its own
+- [ ] Every request says which way it runs — asked of this party, or asked by them — wherever
+      requests are listed, since both kinds sit on the same tally
 - [ ] Both parties can see how long a request has been outstanding
 - [ ] A request is signed by the requester and obliges the payer to nothing by itself
 - [ ] The requester can see whether a request is waiting, part-answered, answered, refused, or

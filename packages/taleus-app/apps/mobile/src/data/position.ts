@@ -1,6 +1,6 @@
 import { mockMode } from './config'
 import { getVariant } from '../mock/variant'
-import type { Amount, Result } from './types'
+import { engineAbsent, type Amount, type Result, type UnitAmount } from './types'
 
 export interface PerUnitPosition {
 	denom: string
@@ -24,9 +24,10 @@ export interface Estimate {
 	direction: 'conservative'
 }
 
+/** Both figures carry their own unit; the screen must never guess one. */
 export interface SpendingPower {
-	heldByOthers: Amount
-	creditExtendedToMe: Amount
+	heldByOthers: UnitAmount
+	creditExtendedToMe: UnitAmount
 }
 
 export interface PositionSummary {
@@ -39,10 +40,7 @@ export interface PositionSummary {
 /** The party's position: per unit, an estimate, and spending power (story 40). */
 export async function readPosition(): Promise<Result<PositionSummary>> {
 	if (!mockMode) {
-		return {
-			ok: false,
-			error: { kind: 'engine-absent', message: 'The taleus engine is not wired up yet.', retryable: false },
-		}
+		return { ok: false, error: engineAbsent }
 	}
 	return { ok: true, value: fixtureFor(getVariant()) }
 }

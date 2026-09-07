@@ -34,12 +34,27 @@ depHashes: {}
 
 Setting items aside, deadline urgency, cross-device dismissal, and the history of past items (story 23 paths B, C, E, F, G).
 
-## Defensive loading
+## Revised after review
 
-Each screen's load is wrapped so an unexpected throw becomes the failed state with its message,
-rather than a spinner that never resolves. This came out of watching a screen hang on a device with
-nothing in the log: in a release build an unhandled rejection is silent, and a permanent spinner is
-the worst of both worlds — no information for the user and none for us.
+- **Items are reachable.** Every item was a `Pressable` with no `onPress`, while `route` sat unused
+  in the fixture — story 23 step 4 is *getting to the thing*. Routes the app does not have yet fall
+  back to the tally the item belongs to rather than navigating into nothing.
+- **Ageing is shown.** `waitingSince` was in the fixture and unused; story 23 step 3 asks how long it
+  has been waiting. Days are derived in the adapter, not stored, so the same derivation runs when the
+  engine hands over a timestamp.
+- **No English in the data.** `attention.happy.json` carried sentences (`"Closing — waiting on them
+  to settle"`) that the screen printed verbatim, which `global/i18n.md` forbids and an engine will
+  never do. The summary is now written from `kind` through `t()`, and the fixture carries data only.
+- **No dollar fallback.** `denom ?? 'iso4217:USD'` privileged a unit that `rules.md` does not. The
+  amount type now requires its unit, so the case is a compile error rather than a silent dollar.
+
+## Loading
+
+`src/hooks/useLoad.ts`. Five screens had five copies of the same state machine, and three of them
+dropped `result.error` — losing both the message and the adapter's word on whether retrying could
+help. One hook now owns it, so the next twenty-five screens inherit the fix rather than the bug. It
+still wraps the load defensively: in a release build an unhandled rejection is silent, and a
+permanent spinner is the worst of both worlds.
 
 ## Validation
 

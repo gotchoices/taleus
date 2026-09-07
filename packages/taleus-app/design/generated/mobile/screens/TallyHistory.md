@@ -36,12 +36,26 @@ depHashes: {}
 
 Narrowing by period, size, exact amount, or purpose; entry detail; export (story 24 paths B, C, E).
 
-## Defensive loading
+## Revised after review
 
-Each screen's load is wrapped so an unexpected throw becomes the failed state with its message,
-rather than a spinner that never resolves. This came out of watching a screen hang on a device with
-nothing in the log: in a release build an unhandled rejection is silent, and a permanent spinner is
-the worst of both worlds — no information for the user and none for us.
+- **Balance-after states its side.** "Balance $180.00" put the sign back on the reader, which is the
+  one thing this app does not do — and `balanceAfter.perspective` was in the fixture all along.
+  Story 24 step 4 now says so explicitly.
+- **Entry direction is not colour.** "Which way it went" (story 24 step 2) was green or red on the
+  amount and nothing else — unreadable for the ~8% of men with red-green deficiency, and an
+  inference even for everyone else, since the sign convention on `Entry.amount` was undocumented.
+  It is now documented on the type, and `Amount` renders word, sign, and colour together.
+- **`answers` is rendered**, and the fixture that had an entry answering a request on a *different
+  tally* was corrected. Entries are now keyed by tally, so that class of mistake does not recur.
+- **Requests are labelled by direction**, as on `TallyView`.
+
+## Loading
+
+`src/hooks/useLoad.ts`. Five screens had five copies of the same state machine, and three of them
+dropped `result.error` — losing both the message and the adapter's word on whether retrying could
+help. One hook now owns it, so the next twenty-five screens inherit the fix rather than the bug. It
+still wraps the load defensively: in a release build an unhandled rejection is silent, and a
+permanent spinner is the worst of both worlds.
 
 ## Validation
 

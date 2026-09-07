@@ -61,6 +61,13 @@ stories in `design/stories/mobile/`; each area below names the stories it serves
 - A party arriving via a link with no identity yet completes onboarding and returns to the link's
   destination, not to the tab root (02 path A, 10 path A)
 
+## Behavior
+
+- The platform's back gesture and Android's hardware back go back within the app, and only leave
+  Taleus from a tab root.
+- Following a link to a screen the party is already on replaces it rather than stacking a second
+  copy — opening the same notification twice must not build a pile.
+
 ## Route options
 
 - `TallyList` is the launch route once a party exists; `Welcome` before that

@@ -1,8 +1,58 @@
 {
-  "error": {
-    "kind": "counterparty-unreachable",
-    "message": "Nothing of Sam's is reachable just now.",
-    "readable": true,
-    "retryable": true
+  "tallies": {
+    "tally:sam-bike": {
+      "id": "tally:sam-bike",
+      "counterparty": {
+        "sid": "sid:sam-91c2",
+        "name": "Sam Ortiz",
+        "disclosed": {
+          "name": "Sam Ortiz",
+          "phone": "+1-555-0188"
+        }
+      },
+      "unit": {
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "balance": {
+        "units": 18000,
+        "perspective": "owed-to-me"
+      },
+      "state": "Open",
+      "waitingOn": "nobody",
+      "counterpartyReachable": false,
+      "opened": "2025-11-14T18:02:00Z",
+      "agreement": {
+        "id": "cid:bafy-standard-tally-v1",
+        "title": "Standard Tally Agreement",
+        "publisher": "taleus.org",
+        "language": "en"
+      },
+      "terms": {
+        "mine": {
+          "creditLimit": {
+            "units": 50000
+          },
+          "noticeDays": 21,
+          "effective": "2026-03-02"
+        },
+        "theirs": {
+          "creditLimit": {
+            "units": 0
+          },
+          "noticeDays": 21,
+          "effective": "2025-11-14"
+        }
+      },
+      "roomToSpend": {
+        "units": 0
+      },
+      "pending": [
+        {
+          "kind": "terms",
+          "since": "2026-09-05T14:20:00Z"
+        }
+      ]
+    }
   }
 }

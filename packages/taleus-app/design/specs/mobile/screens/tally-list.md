@@ -19,7 +19,9 @@ answer "where do I stand, and does anything want me?" without opening anything (
   Neither party has to work out a sign.
 - A tally waiting on this party is distinguishable from one waiting on the counterparty, and from one
   waiting on nobody. Only the first is a demand.
-- A tally that is not simply open — offered, closing, expired — says so.
+- A tally that is not simply open — offered, closing, expired — says so, and one that has not begun
+  trading is not given a balance to misread. An offer is not "settled".
+- Each tally says when it last moved, so several tallies with the same partner are told apart.
 - Tallies in different units sit together without their figures being combined. No total appears here.
 - Empty: a party with no tallies is told what a tally is and offered both ways to get one — invite
   someone, or accept an invitation. It is not an error and does not read like one.

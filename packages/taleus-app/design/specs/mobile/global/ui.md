@@ -36,7 +36,10 @@ Dark:
 
 - Title: 20 / 600
 - Body: 16 / 400
-- Small: 12 / 400
+- Caption: 14 / 400 — the explanatory lines that teach; read on every visit
+- Small: 12 / 400 — metadata only (dates, who signed, ageing)
+
+The captions are the product's voice, not chrome. They do not get the metadata size.
 
 ## Amounts
 
@@ -44,4 +47,24 @@ Every amount appears with its unit of account — a party holds tallies in more 
 (`design/specs/domain/rules.md`). Amounts use tabular figures so columns align.
 
 Figures converted into the display unit are estimates and are marked as such, distinctly enough
-that an estimate is never mistaken for a signed balance.
+that an estimate is never mistaken for a signed balance: a leading `≈` and the secondary text
+color, so the difference survives a glance and a greyscale screen.
+
+**Direction is never carried by color alone.** Wherever an amount has a side, it appears in words
+and as a sign or arrow, with color as the third cue. A reader who cannot distinguish the colors
+loses nothing.
+
+## Interaction
+
+Cross-screen conventions, so thirty screens do not each invent one.
+
+- **Anything tappable looks tappable**: a pressed state always; a trailing chevron on a row that
+  opens something. Nothing that is not tappable wears either.
+- **Touch targets**: 44pt minimum (48dp on Android), whatever the text size.
+- **Tally states and waiting-on** appear as filled chips, not inline gray text — the *waiting on me*
+  case is what a party opened the app to find.
+- **Icons** appear in four places and nowhere else: the tab bar (always with its label), the row
+  chevron, the direction of an amount, and state chips. An icon without a label must be one every
+  user already knows.
+- **Accessibility** is not deferred: roles on anything actionable, selected state on the active tab,
+  and an amount's direction in its label, not only in its color.

@@ -16,7 +16,8 @@ How the party is doing overall: what they are owed, what they owe, and what that
 - Owed and owing are shown as **two quantities**, not only their difference.
 - Figures are broken out per unit, because that is where they are exact.
 - A single estimate in the party's chosen unit is available, marked as an estimate, and it **names
-  what it leaves out** for want of a rate.
+  what it leaves out** for want of a rate. The estimate shows owed and owing separately too — the
+  rule above is not suspended because the figures are approximate.
 - The estimate uses the less favourable direction of a two-way rate.
 - Credit available is never mixed into what the party holds. Spending power appears separately, in
   two parts: value others hold for them, and credit others extended them.

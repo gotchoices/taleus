@@ -64,6 +64,13 @@ rewired when it differs.
 Two properties every ask carries, because the stories depend on them: an act either happened or did
 not (never partially), and the app is told which — see story 20 path D.
 
+## Dates and instants
+
+Two different things, and the apps must not confuse them. A **date** is a day in the calendar — when
+terms take effect, when notice runs out — and reads the same to both parties wherever they are. An
+**instant** is a moment — when an entry was signed, when a request was made — and reads in each
+party's own zone. The engine says which it is handing over; the apps never format one as the other.
+
 ## Amounts, as the apps handle them
 
 An amount is a whole number of a unit's smallest part, plus the unit and its scale — `18000` of

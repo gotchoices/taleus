@@ -1,33 +1,103 @@
 {
-  "tallyId": "tally:sam-bike",
-  "entries": [
-    {
-      "id": "entry:0006",
-      "kind": "direct",
-      "issuer": "them",
-      "amount": { "units": 4000 },
-      "date": "2026-09-02T16:40:00Z",
-      "memo": "Tube and fitting",
-      "balanceAfter": { "units": 18000, "perspective": "owed-to-me" },
-      "answers": ["request:mara-95"]
-    },
-    {
-      "id": "entry:0005",
-      "kind": "routed",
-      "issuer": "network",
-      "amount": { "units": -9500 },
-      "date": "2026-08-21T03:11:00Z",
-      "memo": "Settled through Mara",
-      "balanceAfter": { "units": 14000, "perspective": "owed-to-me" }
-    },
-    {
-      "id": "entry:0004",
-      "kind": "direct",
-      "issuer": "me",
-      "amount": { "units": 12000 },
-      "date": "2026-06-30T12:00:00Z",
-      "memo": "Bike",
-      "balanceAfter": { "units": 23500, "perspective": "owed-to-me" }
-    }
-  ]
+  "entries": {
+    "tally:sam-bike": [
+      {
+        "id": "entry:0006",
+        "kind": "direct",
+        "issuer": "them",
+        "amount": {
+          "units": 4000
+        },
+        "date": "2026-09-02T16:40:00Z",
+        "memo": "Tube and fitting",
+        "balanceAfter": {
+          "units": 18000,
+          "perspective": "owed-to-me"
+        },
+        "answers": [
+          "request:jan-sam-40"
+        ]
+      },
+      {
+        "id": "entry:0005",
+        "kind": "routed",
+        "issuer": "network",
+        "amount": {
+          "units": -9500
+        },
+        "date": "2026-08-21T03:11:00Z",
+        "memo": "Settled through Mara",
+        "balanceAfter": {
+          "units": 14000,
+          "perspective": "owed-to-me"
+        }
+      },
+      {
+        "id": "entry:0004",
+        "kind": "direct",
+        "issuer": "me",
+        "amount": {
+          "units": 12000
+        },
+        "date": "2026-06-30T12:00:00Z",
+        "memo": "Bike",
+        "balanceAfter": {
+          "units": 23500,
+          "perspective": "owed-to-me"
+        }
+      }
+    ],
+    "tally:mara-shop": [
+      {
+        "id": "entry:0101",
+        "kind": "direct",
+        "issuer": "me",
+        "amount": {
+          "units": -7000
+        },
+        "date": "2026-09-05T09:30:00Z",
+        "memo": "Toward the brake service",
+        "balanceAfter": {
+          "units": 4250,
+          "perspective": "owed-by-me"
+        },
+        "answers": [
+          "request:mara-95"
+        ]
+      },
+      {
+        "id": "entry:0100",
+        "kind": "direct",
+        "issuer": "them",
+        "amount": {
+          "units": -11250
+        },
+        "date": "2026-08-14T15:00:00Z",
+        "memo": "Brake service",
+        "balanceAfter": {
+          "units": 11250,
+          "perspective": "owed-by-me"
+        }
+      }
+    ],
+    "tally:dave-hours": [
+      {
+        "id": "entry:0200",
+        "kind": "direct",
+        "issuer": "them",
+        "amount": {
+          "units": 6
+        },
+        "date": "2026-07-19T14:22:00Z",
+        "memo": "Deck framing",
+        "balanceAfter": {
+          "units": 6,
+          "perspective": "owed-to-me"
+        }
+      }
+    ],
+    "tally:supplier-parts": [],
+    "tally:rae-offer": [],
+    "tally:priya-new": []
+  }
 }

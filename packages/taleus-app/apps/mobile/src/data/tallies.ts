@@ -1,6 +1,6 @@
 import { mockMode } from './config'
 import { getVariant } from '../mock/variant'
-import type { DataError, Result, TallySummary } from './types'
+import { engineAbsent, type DataError, type Result, type TallySummary } from './types'
 
 interface TalliesFixture {
 	tallies?: TallySummary[]
@@ -15,14 +15,7 @@ interface TalliesFixture {
  */
 export async function listTallies(): Promise<Result<TallySummary[]>> {
 	if (!mockMode) {
-		return {
-			ok: false,
-			error: {
-				kind: 'engine-absent',
-				message: 'The taleus engine is not wired up yet.',
-				retryable: false,
-			},
-		}
+		return { ok: false, error: engineAbsent }
 	}
 
 	const data = fixtureFor(getVariant())

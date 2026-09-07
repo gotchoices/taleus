@@ -25,6 +25,9 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
 - [x] Five screens sliced end to end — `TallyList`, `TallyView`, `TallyHistory`, `Attention`,
   `Position` — each with a spec, a consolidation, generated code, a registry entry, and hashed
   dependencies. All five read `false | hash` from `check-stale.sh`.
+- [x] All five re-generated against `design/ui-review.md` — correctness fixes, the shared UI
+  foundation (`useLoad`, `useTokens`, `Amount`, `Card`/`Row`, `Chip`), hardware back, touch targets,
+  and accessibility roles. Responses and deferrals: `design/ui-review-response.md`.
 - [ ] The remaining 25 screens in `screens/index.md`; next by the suggested order are `Welcome` and
   `ChooseName`, then the invitation arc
 
@@ -35,11 +38,19 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
 - [x] Mock fixtures are registered as slice dependencies, so editing one marks its screen stale
 
 ## Scenario / Peer Review (optional)
-- [x] Screenshots for six screen/variant pairs under `design/generated/mobile/images/`, captured from
-  a release build by deep link
+- [x] Screenshots for eight screen/variant pairs under `design/generated/mobile/images/`, captured
+  from a release build by deep link — including story 04's own two scenes, a new tally and an
+  unreachable counterparty
 - [ ] Scenario docs under `design/generated/mobile/scenarios/`
 
 ## Final wiring
 - [ ] Production data wiring is implemented and tested
+
+## Known gaps carried forward
+- Icons: `ui.md` names four places for them and the app has none — `debt-mobile-icon-set`
+- i18next and device-locale detection — `debt-mobile-i18n-library`
+- React Navigation — `debt-mobile-navigation-library`
+- No iOS build has been attempted
+- Sort, filter, and search on the tally list (story 06) are unsliced
 
 

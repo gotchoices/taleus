@@ -1,25 +1,154 @@
 {
-  "id": "tally:sam-bike",
-  "counterparty": {
-    "sid": "sid:sam-91c2",
-    "name": "Sam Ortiz",
-    "disclosed": { "name": "Sam Ortiz", "phone": "+1-555-0188" }
-  },
-  "unit": { "denom": "iso4217:USD", "scale": 2 },
-  "balance": { "units": 18000, "perspective": "owed-to-me" },
-  "state": "Open",
-  "waitingOn": "nobody",
-  "opened": "2025-11-14T18:02:00Z",
-  "agreement": {
-    "id": "cid:bafy-standard-tally-v1",
-    "title": "Standard Tally Agreement",
-    "publisher": "taleus.org",
-    "language": "en"
-  },
-  "terms": {
-    "mine": { "creditLimit": { "units": 50000 }, "noticeDays": 21, "effective": "2026-03-02T00:00:00Z" },
-    "theirs": { "creditLimit": { "units": 0 }, "noticeDays": 21, "effective": "2025-11-14T18:02:00Z" }
-  },
-  "roomToSpend": { "units": 0 },
-  "requestsOutstanding": 0
+  "tallies": {
+    "tally:sam-bike": {
+      "id": "tally:sam-bike",
+      "counterparty": {
+        "sid": "sid:sam-91c2",
+        "name": "Sam Ortiz",
+        "disclosed": { "name": "Sam Ortiz", "phone": "+1-555-0188" }
+      },
+      "unit": { "denom": "iso4217:USD", "scale": 2 },
+      "balance": { "units": 18000, "perspective": "owed-to-me" },
+      "state": "Open",
+      "waitingOn": "nobody",
+      "counterpartyReachable": true,
+      "opened": "2025-11-14T18:02:00Z",
+      "agreement": {
+        "id": "cid:bafy-standard-tally-v1",
+        "title": "Standard Tally Agreement",
+        "publisher": "taleus.org",
+        "language": "en"
+      },
+      "terms": {
+        "mine": { "creditLimit": { "units": 50000 }, "noticeDays": 21, "effective": "2026-03-02" },
+        "theirs": { "creditLimit": { "units": 0 }, "noticeDays": 21, "effective": "2025-11-14" }
+      },
+      "roomToSpend": { "units": 0 }
+    },
+    "tally:mara-shop": {
+      "id": "tally:mara-shop",
+      "counterparty": {
+        "sid": "sid:mara-4d10",
+        "name": "Mara's Bike Shop",
+        "disclosed": { "name": "Mara's Bike Shop", "address": "14 Ferrier Row" }
+      },
+      "unit": { "denom": "iso4217:USD", "scale": 2 },
+      "balance": { "units": 4250, "perspective": "owed-by-me" },
+      "state": "Open",
+      "waitingOn": "me",
+      "counterpartyReachable": true,
+      "opened": "2025-08-03T10:15:00Z",
+      "agreement": {
+        "id": "cid:bafy-standard-tally-v1",
+        "title": "Standard Tally Agreement",
+        "publisher": "taleus.org",
+        "language": "en"
+      },
+      "terms": {
+        "mine": { "creditLimit": { "units": 0 }, "noticeDays": 30, "effective": "2025-08-03" },
+        "theirs": { "creditLimit": { "units": 20000 }, "noticeDays": 30, "effective": "2026-01-19" }
+      },
+      "roomToSpend": { "units": 15750 }
+    },
+    "tally:dave-hours": {
+      "id": "tally:dave-hours",
+      "counterparty": {
+        "sid": "sid:dave-2b77",
+        "name": "Dave Lin",
+        "disclosed": { "name": "Dave Lin" }
+      },
+      "unit": { "denom": "cid:bafy-dave-hours", "scale": 0, "label": "Dave-hours" },
+      "balance": { "units": 6, "perspective": "owed-to-me" },
+      "state": "Open",
+      "waitingOn": "nobody",
+      "counterpartyReachable": true,
+      "opened": "2026-02-11T09:00:00Z",
+      "agreement": {
+        "id": "cid:bafy-standard-tally-v1",
+        "title": "Standard Tally Agreement",
+        "publisher": "taleus.org",
+        "language": "en"
+      },
+      "terms": {
+        "mine": { "creditLimit": { "units": 20 }, "noticeDays": 14, "effective": "2026-02-11" },
+        "theirs": { "creditLimit": { "units": 0 }, "noticeDays": 14, "effective": "2026-02-11" }
+      },
+      "roomToSpend": { "units": 0 }
+    },
+    "tally:supplier-parts": {
+      "id": "tally:supplier-parts",
+      "counterparty": {
+        "sid": "sid:parts-8ee1",
+        "name": "Northwind Parts",
+        "disclosed": { "name": "Northwind Parts Ltd" }
+      },
+      "unit": { "denom": "iso4217:USD", "scale": 2 },
+      "balance": { "units": 0, "perspective": "level" },
+      "state": "Closing",
+      "waitingOn": "nobody",
+      "counterpartyReachable": true,
+      "opened": "2024-05-20T08:00:00Z",
+      "agreement": {
+        "id": "cid:bafy-standard-tally-v1",
+        "title": "Standard Tally Agreement",
+        "publisher": "taleus.org",
+        "language": "en"
+      },
+      "terms": {
+        "mine": { "creditLimit": { "units": 0 }, "noticeDays": 30, "effective": "2024-05-20" },
+        "theirs": { "creditLimit": { "units": 0 }, "noticeDays": 30, "effective": "2024-05-20" }
+      },
+      "roomToSpend": { "units": 0 }
+    },
+    "tally:rae-offer": {
+      "id": "tally:rae-offer",
+      "counterparty": {
+        "sid": "sid:rae-55f0",
+        "name": "Rae Whitfield",
+        "disclosed": { "name": "Rae Whitfield" }
+      },
+      "unit": { "denom": "CHIP", "scale": 3 },
+      "balance": { "units": 0, "perspective": "level" },
+      "state": "Offered",
+      "waitingOn": "me",
+      "counterpartyReachable": true,
+      "opened": "2026-09-05T07:30:00Z",
+      "agreement": {
+        "id": "cid:bafy-standard-tally-v1",
+        "title": "Standard Tally Agreement",
+        "publisher": "taleus.org",
+        "language": "en"
+      },
+      "terms": {
+        "mine": { "creditLimit": { "units": 0 }, "noticeDays": 21, "effective": "2026-09-05" },
+        "theirs": { "creditLimit": { "units": 100000 }, "noticeDays": 21, "effective": "2026-09-05" }
+      },
+      "roomToSpend": { "units": 100000 }
+    },
+    "tally:priya-new": {
+      "id": "tally:priya-new",
+      "counterparty": {
+        "sid": "sid:priya-7a03",
+        "name": "Priya Raman",
+        "disclosed": { "name": "Priya Raman", "phone": "+1-555-0142" }
+      },
+      "unit": { "denom": "iso4217:USD", "scale": 2 },
+      "balance": { "units": 0, "perspective": "level" },
+      "state": "Open",
+      "waitingOn": "nobody",
+      "counterpartyReachable": true,
+      "opened": "2026-09-06T16:45:00Z",
+      "agreement": {
+        "id": "cid:bafy-standard-tally-v1",
+        "title": "Standard Tally Agreement",
+        "publisher": "taleus.org",
+        "language": "en"
+      },
+      "terms": {
+        "mine": { "creditLimit": { "units": 50000 }, "noticeDays": 21, "effective": "2026-09-06" },
+        "theirs": { "creditLimit": { "units": 0 }, "noticeDays": 21, "effective": "2026-09-06" }
+      },
+      "roomToSpend": { "units": 0 }
+    }
+  }
 }

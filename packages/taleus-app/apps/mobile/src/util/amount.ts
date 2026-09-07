@@ -1,3 +1,4 @@
+import { getLocale } from '../i18n'
 import type { Amount, Unit } from '../data/types'
 
 /**
@@ -5,7 +6,7 @@ import type { Amount, Unit } from '../data/types'
  * Formatting is the only place a decimal appears, and it always carries the
  * unit — a bare number means nothing on a party's mixed-unit list.
  */
-export function formatAmount(amount: Amount, unit: Unit, locale = 'en'): string {
+export function formatAmount(amount: Amount, unit: Unit, locale = getLocale()): string {
 	const scale = amount.scale ?? unit.scale
 	const denom = amount.denom ?? unit.denom
 	const value = Math.abs(amount.units) / 10 ** scale
@@ -32,7 +33,7 @@ export function formatAmount(amount: Amount, unit: Unit, locale = 'en'): string 
  * A unit as a person would say it. `iso4217:USD` is a machine's name for a
  * thing everyone else calls dollars.
  */
-export function unitLabel(denom: string, label?: string, locale = 'en'): string {
+export function unitLabel(denom: string, label?: string, locale = getLocale()): string {
 	if (label) {
 		return label
 	}

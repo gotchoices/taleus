@@ -20,8 +20,8 @@ Either party, from their own side. Both see the same entries; each sees them in 
    was for.
 3. He can see who put each entry there — the one who gave the value signed it, so there is never a
    question of who said what.
-4. Each entry shows where the balance stood afterward, so he can follow how they arrived at today's
-   figure rather than having to trust it.
+4. Each entry shows where the balance stood afterward — stated from his own side, like every other
+   balance in the app — so he can follow how they arrived at today's figure rather than trust it.
 5. Some entries are ones neither of them typed: value moved because a payment found its way through
    their tally. Sam can tell those apart from the ones he and Mara made deliberately.
 6. He finds the $95 repair from March and can see it answered Mara's request, not just that money
@@ -68,7 +68,8 @@ Either party, from their own side. Both see the same entries; each sees them in 
 
 - [ ] Entries are listed most recent first, each with amount, direction, date, and stated purpose
 - [ ] Each entry identifies the party who made it
-- [ ] Each entry shows the balance that resulted, so the current figure can be followed back
+- [ ] Each entry shows the balance that resulted, stated from the reader's side, so the current
+      figure can be followed back
 - [ ] Entries that arose from routed payments are distinguishable from ones the parties made
 - [ ] An entry that answered a request is recognisably tied to that request
 - [ ] Outstanding requests are visible alongside the history, showing what has been applied and what

@@ -36,29 +36,40 @@ depHashes: {}
 
 ## Decisions this slice had to make
 
-- **No navigator yet.** `App.tsx` renders `TallyList` directly. React Navigation earns its place with
-  the second screen; installing it now would add native dependencies for one route.
 - **Results, not exceptions.** `listTallies()` returns `{ ok }` so an unreadable list is a state the
   screen renders rather than a crash. The error variant's fixture carries `retryable`, and the retry
   affordance appears only when it is true.
 - **i18n without a library.** `global/i18n.md` requires that no user-visible string sit in a screen,
   from the first slice. A minimal `t()` satisfies that today; moving to i18next is mechanical because
   screens only ever call `t()`.
-- **Perspective drives colour, not sign.** `balance.perspective` decides both the wording and whether
-  the figure reads as positive or negative to this party — no screen does sign arithmetic.
+- **Perspective drives the direction, not sign arithmetic.** `balance.perspective` decides the
+  wording, the sign glyph, and the colour; no screen infers a direction from a number.
 - **Tabular figures** on balances, per `global/ui.md` § Amounts.
+- **A row that opens something looks like one.** `OpenableRow` — pressed state, chevron, 48dp — so a
+  reader can tell a list of things to open from a document.
+
+## Revised after review
+
+- **An offer is no longer shown with a balance.** `Rae Whitfield — settled — 0.000 CHIP` was wrong
+  twice: an offer has no balance and is not settled. States before `Open` now lead with the state
+  chip and suppress the figure (story 06 path C).
+- **`lastActivity` is rendered.** It was in the fixture and the string table and nowhere on screen —
+  story 06 path B is three Chens told apart by recency.
+- **States and *needs you* are chips, not grey text.** Invisible on a list of forty, which is exactly
+  the case story 06 path A is about.
 
 ## Not built here
 
-Sorting, filtering, and search (story 06); opening a tally (`TallyView`); the cross-unit estimate,
-which belongs to `Position` and is deliberately absent from a list where units differ.
+Sorting, filtering, and search (story 06); the cross-unit estimate, which belongs to `Position` and is
+deliberately absent from a list where units differ.
 
-## Defensive loading
+## Loading
 
-Each screen's load is wrapped so an unexpected throw becomes the failed state with its message,
-rather than a spinner that never resolves. This came out of watching a screen hang on a device with
-nothing in the log: in a release build an unhandled rejection is silent, and a permanent spinner is
-the worst of both worlds — no information for the user and none for us.
+`src/hooks/useLoad.ts`. Five screens had five copies of the same state machine, and three of them
+dropped `result.error` — losing both the message and the adapter's word on whether retrying could
+help. One hook now owns it, so the next twenty-five screens inherit the fix rather than the bug. It
+still wraps the load defensively: in a release build an unhandled rejection is silent, and a
+permanent spinner is the worst of both worlds.
 
 ## Validation
 

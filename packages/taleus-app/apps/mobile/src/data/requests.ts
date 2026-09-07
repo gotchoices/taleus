@@ -1,16 +1,23 @@
 import { mockMode } from './config'
 import { getVariant } from '../mock/variant'
-import type { Amount, Result } from './types'
+import { daysSince, engineAbsent, type Amount, type Instant, type Result } from './types'
+
+/** Which way a request runs, from the reading party's side (story 21). */
+export type RequestDirection = 'asked-of-me' | 'asked-by-me'
 
 export interface PaymentRequest {
 	id: string
 	tallyId: string
-	direction: 'asked-of-me' | 'asked-by-me'
+	direction: RequestDirection
 	requester?: { sid: string; name: string }
 	amount: Amount
 	memo?: string
-	asked: string
-	/** How long it has been outstanding. Requests age; they do not expire. */
+	asked: Instant
+	/**
+	 * How long it has been outstanding. Derived here rather than stored: the
+	 * engine hands over `asked`, and the same derivation runs in engine mode.
+	 * Requests age; they do not expire.
+	 */
 	outstandingDays: number
 	applied: Amount
 	stillAsked: Amount
@@ -20,13 +27,15 @@ export interface PaymentRequest {
 /** Requests on a tally, or across all tallies when no tally is named (21, 22, 24). */
 export async function listRequests(tallyId?: string): Promise<Result<PaymentRequest[]>> {
 	if (!mockMode) {
-		return {
-			ok: false,
-			error: { kind: 'engine-absent', message: 'The taleus engine is not wired up yet.', retryable: false },
-		}
+		return { ok: false, error: engineAbsent }
 	}
 	const all = fixtureFor(getVariant()).requests ?? []
-	return { ok: true, value: tallyId ? all.filter(r => r.tallyId === tallyId) : all }
+	const mine = tallyId ? all.filter(r => r.tallyId === tallyId) : all
+	return { ok: true, value: mine.map(age) }
+}
+
+function age(request: Omit<PaymentRequest, 'outstandingDays'>): PaymentRequest {
+	return { ...request, outstandingDays: daysSince(request.asked) }
 }
 
 function fixtureFor(variant: string): { requests?: PaymentRequest[] } {

@@ -1,70 +1,52 @@
-import { useCallback, useEffect, useState } from 'react'
-import { FlatList, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native'
+import { useCallback } from 'react'
+import { FlatList, Text, View } from 'react-native'
 
-import { Empty, Failed, Loading } from '../components/Screen'
+import { Amount, Chip, Empty, Failed, Loading, OpenableRow } from '../components'
 import { listAttention, type AttentionItem } from '../data/attention'
-import type { DataError } from '../data/types'
+import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
-import { dark, light, spacing, type as typography, type Tokens } from '../theme/tokens'
-import { formatAmount } from '../util/amount'
+import type { RouteName, ScreenProps } from '../navigation/routes'
+import { isRoute } from '../navigation/routes'
+import { useStyles, spacing, type as typography, type Tokens } from '../theme'
+
+type Props = ScreenProps<'Attention'>
 
 /**
  * Attention (story 23) — everything waiting on this party, across every tally.
  *
+ * Nothing here is prose carried in the data: an engine will never hand the app
+ * English, so what an item *says* is written from its `kind` through `t()`.
  * Two absences are deliberate. Automated settling never appears: it was
  * authorized in advance and needs nothing. And items waiting on the *other*
  * party appear plainly marked, so a party knows about them without being asked
  * for anything.
  */
-export function Attention(): React.JSX.Element {
-	const tokens = useColorScheme() === 'dark' ? dark : light
-	const styles = makeStyles(tokens)
-	const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading')
-	const [items, setItems] = useState<AttentionItem[]>([])
-	const [error, setError] = useState<DataError | undefined>()
-
-	const load = useCallback(async () => {
-		setState('loading')
-		try {
-		const result = await listAttention()
-		if (!result.ok) {
-			setState('failed')
-			return
-		}
-		setItems(result.value)
-		setState('ready')
-		} catch (thrown) {
-			setError({
-				kind: 'unexpected',
-				message: thrown instanceof Error ? thrown.message : String(thrown),
-				retryable: true,
-			})
-			setState('failed')
-		}
-	}, [])
-
-	useEffect(() => {
-		void load()
-	}, [load])
+export function Attention({ navigation }: Props): React.JSX.Element {
+	const styles = useStyles(make)
+	const { state, value, error, reload } = useLoad(useCallback(() => listAttention(), []))
 
 	if (state === 'loading') {
-		return <Loading tokens={tokens} />
+		return <Loading />
 	}
 	if (state === 'failed') {
-		return <Failed
-				tokens={tokens}
-				title={t('attention.unreadable-title')}
-				message={error?.message}
-				retryable={error?.retryable ?? true}
-				onRetry={() => void load()}
-			/>
+		return <Failed title={t('screens.attention.unreadable-title')} error={error} onRetry={reload} />
 	}
 
+	const items = value ?? []
 	const mine = items.filter(item => item.waitingOn !== 'them')
 	const theirs = items.filter(item => item.waitingOn === 'them')
 
-	if (mine.length === 0 && theirs.length === 0) {
-		return <Empty tokens={tokens} title={t('attention.empty-title')} body={t('attention.empty-body')} />
+	if (items.length === 0) {
+		return (
+			<Empty title={t('screens.attention.empty-title')} body={t('screens.attention.empty-body')} />
+		)
+	}
+
+	const open = (item: AttentionItem) => {
+		// Story 23 step 4: the point of the list is getting to the thing. Routes
+		// that are not sliced yet fall back to the tally they belong to.
+		const target: RouteName = isRoute(item.route) ? (item.route as RouteName) : 'TallyView'
+		navigation.navigate(target, { tallyId: item.tallyId } as never)
 	}
 
 	return (
@@ -73,15 +55,17 @@ export function Attention(): React.JSX.Element {
 			data={mine}
 			keyExtractor={item => item.id}
 			ListHeaderComponent={
-				mine.length === 0 ? <Text style={styles.sectionNote}>{t('attention.none-for-you')}</Text> : null
+				mine.length === 0 ? (
+					<Text style={styles.sectionNote}>{t('screens.attention.none-for-you')}</Text>
+				) : null
 			}
-			renderItem={({ item }) => <Item item={item} tokens={tokens} needsYou />}
+			renderItem={({ item }) => <Item item={item} needsYou onOpen={() => open(item)} />}
 			ListFooterComponent={
 				theirs.length > 0 ? (
 					<View style={styles.footer}>
-						<Text style={styles.sectionNote}>{t('attention.waiting-on-others')}</Text>
+						<Text style={styles.sectionNote}>{t('screens.attention.waiting-on-others')}</Text>
 						{theirs.map(item => (
-							<Item key={item.id} item={item} tokens={tokens} />
+							<Item key={item.id} item={item} onOpen={() => open(item)} />
 						))}
 					</View>
 				) : null
@@ -92,50 +76,60 @@ export function Attention(): React.JSX.Element {
 
 function Item({
 	item,
-	tokens,
 	needsYou,
+	onOpen,
 }: {
 	item: AttentionItem
-	tokens: Tokens
 	needsYou?: boolean
+	onOpen: () => void
 }): React.JSX.Element {
-	const styles = makeStyles(tokens)
+	const styles = useStyles(make)
+	const summary = t(`screens.attention.summary-${item.kind}`, { name: item.counterparty.name })
+
 	return (
-		<Pressable style={styles.item}>
+		<OpenableRow onPress={onOpen} accessibilityLabel={summary}>
 			<View style={styles.itemTop}>
-				<Text style={styles.body}>{item.counterparty.name}</Text>
+				<Text style={styles.body}>{summary}</Text>
 				{item.amount ? (
-					<Text style={styles.amount}>
-						{formatAmount(item.amount, {
-							denom: item.amount.denom ?? 'iso4217:USD',
-							scale: item.amount.scale ?? 2,
-						})}
-					</Text>
+					<Amount
+						value={item.amount}
+						unit={{ denom: item.amount.denom, scale: item.amount.scale }}
+					/>
 				) : null}
 			</View>
-			<Text style={styles.meta}>{item.summary}</Text>
-			<Text style={needsYou ? styles.needsYou : styles.meta}>
-				{needsYou ? t(`attention.kind-${item.kind}`) : t('attention.waiting-on-them')}
-			</Text>
-		</Pressable>
+			<View style={styles.itemMeta}>
+				<Chip
+					label={
+						needsYou
+							? t('screens.attention.needs-you')
+							: t('screens.attention.waiting-on-them')
+					}
+					urgent={needsYou}
+				/>
+				<Text style={styles.meta}>
+					{t('screens.attention.waiting-days', { count: item.waitingDays, days: item.waitingDays })}
+				</Text>
+			</View>
+		</OpenableRow>
 	)
 }
 
-function makeStyles(tokens: Tokens) {
-	return StyleSheet.create({
-		screen: { flex: 1, backgroundColor: tokens.background },
-		item: {
-			padding: spacing[3],
-			borderBottomWidth: StyleSheet.hairlineWidth,
-			borderBottomColor: tokens.border,
-			gap: spacing[0],
-		},
-		itemTop: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing[2] },
-		body: { ...typography.body, color: tokens.textPrimary, flexShrink: 1 },
-		amount: { ...typography.body, color: tokens.textPrimary, fontVariant: ['tabular-nums'] },
-		meta: { ...typography.small, color: tokens.textSecondary },
-		needsYou: { ...typography.small, color: tokens.accent },
-		sectionNote: { ...typography.small, color: tokens.textSecondary, padding: spacing[3] },
-		footer: { paddingTop: spacing[2] },
-	})
-}
+const make = (tokens: Tokens) => ({
+	screen: { flex: 1, backgroundColor: tokens.background },
+	itemTop: {
+		flexDirection: 'row' as const,
+		justifyContent: 'space-between' as const,
+		alignItems: 'baseline' as const,
+		gap: spacing[2],
+	},
+	itemMeta: {
+		flexDirection: 'row' as const,
+		alignItems: 'center' as const,
+		gap: spacing[1],
+		marginTop: spacing[0],
+	},
+	body: { ...typography.body, color: tokens.textPrimary, flexShrink: 1 },
+	meta: { ...typography.small, color: tokens.textSecondary },
+	sectionNote: { ...typography.caption, color: tokens.textSecondary, padding: spacing[3] },
+	footer: { paddingTop: spacing[2] },
+})

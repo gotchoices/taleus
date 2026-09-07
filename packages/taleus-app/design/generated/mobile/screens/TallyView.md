@@ -48,12 +48,30 @@ same `{ route, navigation }` shape screens would get from the real library. Trac
 
 Acting on terms, closing, paying, and the amendment history (stories 03, 05, 20) — separate screens.
 
-## Defensive loading
+## Revised after review
 
-Each screen's load is wrapped so an unexpected throw becomes the failed state with its message,
-rather than a spinner that never resolves. This came out of watching a screen hang on a device with
-nothing in the log: in a release build an unhandled rejection is silent, and a permanent spinner is
-the worst of both worlds — no information for the user and none for us.
+- **Both effective dates.** The screen printed `terms.mine.effective` and dropped `terms.theirs`,
+  which is a different day. Story 07 step 3 wants the date the terms took effect; there are two.
+- **Dates are dates.** `effective` is a calendar day, not an instant: `2026-03-02` rendered through
+  the reader's zone came out as March 1. `interfaces.md` § Dates and instants now says which is
+  which, and `formatCivilDate` reads days in UTC while `formatInstant` reads moments locally.
+- **Unreachable is not unreadable.** The error variant rendered *this tally could not be read*, which
+  story 04 path C explicitly rules out — it is this party's record too. The fixture now returns the
+  tally with `counterpartyReachable: false` and a list of what is pending, and the screen says so
+  without hiding anything. The story's own variant line said "terms cannot be read"; that line was
+  the root of the defect and was fixed too.
+- **Requests say which way they run.** The section was headed "Being asked of you" and listed a
+  request this party had made. `PaymentRequest.direction` was typed, in the fixture, and never read.
+- **Next actions** remain absent, deliberately: Pay, Request, and Terms are unsliced, and a button
+  that routes nowhere is worse than no button. Recorded here rather than stubbed.
+
+## Loading
+
+`src/hooks/useLoad.ts`. Five screens had five copies of the same state machine, and three of them
+dropped `result.error` — losing both the message and the adapter's word on whether retrying could
+help. One hook now owns it, so the next twenty-five screens inherit the fix rather than the bug. It
+still wraps the load defensively: in a release build an unhandled rejection is silent, and a
+permanent spinner is the worst of both worlds.
 
 ## Validation
 

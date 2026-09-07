@@ -9,7 +9,6 @@
       },
       "memo": "Wheel truing",
       "asked": "2026-08-30T10:00:00Z",
-      "outstandingDays": 6,
       "applied": {
         "units": 0
       },
@@ -17,6 +16,23 @@
         "units": 6000
       },
       "state": "waiting"
+    },
+    {
+      "id": "request:jan-sam-40",
+      "tallyId": "tally:sam-bike",
+      "direction": "asked-by-me",
+      "amount": {
+        "units": 4000
+      },
+      "memo": "Tube and fitting",
+      "asked": "2026-08-28T09:00:00Z",
+      "applied": {
+        "units": 4000
+      },
+      "stillAsked": {
+        "units": 0
+      },
+      "state": "answered"
     },
     {
       "id": "request:mara-95",
@@ -29,9 +45,8 @@
       "amount": {
         "units": 9500
       },
-      "memo": "Repair \u2014 brake service",
+      "memo": "Repair — brake service",
       "asked": "2026-09-04T11:05:00Z",
-      "outstandingDays": 1,
       "applied": {
         "units": 7000
       },
@@ -49,7 +64,6 @@
       },
       "memo": "Consulting, August",
       "asked": "2026-06-02T09:00:00Z",
-      "outstandingDays": 95,
       "applied": {
         "units": 0
       },

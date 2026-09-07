@@ -12,7 +12,9 @@ Everything waiting on this party, across every tally, so nothing has to be hunte
 
 ## Behavior (user-observable)
 
-- Each item says who it involves, what it is, and what it would cost.
+- Each item says who it involves, what it is, what it would cost, and how long it has been waiting.
+- Each item gets the party to the thing itself. A list that only names what is waiting is half a
+  screen.
 - Items waiting on this party are separated from items waiting on the counterparty. The second group
   is visible but never presented as a demand.
 - Automated settling never appears here. It was authorized in advance and needs nothing.

@@ -16,13 +16,26 @@ screenshots:
     deps:
       - apps/mobile/src/screens/TallyList.tsx
       - mock/data/tallies.empty.json
-  - route: TallyView
+  - route: TallyView/tally:sam-bike
     variant: happy
     file: tally-view-happy.png
     deps:
       - apps/mobile/src/screens/TallyView.tsx
       - mock/data/tally.happy.json
-  - route: TallyHistory
+      - mock/data/requests.happy.json
+  - route: TallyView/tally:priya-new
+    variant: happy
+    file: tally-view-new.png
+    deps:
+      - apps/mobile/src/screens/TallyView.tsx
+      - mock/data/tally.happy.json
+  - route: TallyView/tally:sam-bike
+    variant: error
+    file: tally-view-unreachable.png
+    deps:
+      - apps/mobile/src/screens/TallyView.tsx
+      - mock/data/tally.error.json
+  - route: TallyHistory/tally:sam-bike
     variant: happy
     file: tally-history-happy.png
     deps:
@@ -46,17 +59,23 @@ screenshots:
 # Screenshots
 
 Captured from a release build on `emulator-5560` (the AVD named in `.env.ports.local`), driven by
-deep link — `taleus://screen/<Route>[?variant=…]`.
+deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 
-| Screen | Variant | Preview |
-|--------|---------|---------|
-| Tally list | happy | ![](tally-list-happy.png) |
-| Tally list | empty | ![](tally-list-empty.png) |
-| Tally view | happy | ![](tally-view-happy.png) |
-| Tally history | happy | ![](tally-history-happy.png) |
-| Attention | happy | ![](attention-happy.png) |
-| Position | happy | ![](position-happy.png) |
+| Screen | Variant | Shows | Preview |
+|--------|---------|-------|---------|
+| Tally list | happy | six tallies, one offered and figureless | ![](tally-list-happy.png) |
+| Tally list | empty | nothing yet, and what to do about it | ![](tally-list-empty.png) |
+| Tally view | happy | a tally with history, terms both ways | ![](tally-view-happy.png) |
+| Tally view | new tally | story 04's actual scene: zero, explained | ![](tally-view-new.png) |
+| Tally view | unreachable | story 04 path C: reads anyway, pending marked | ![](tally-view-unreachable.png) |
+| Tally history | happy | entries with the side of each balance | ![](tally-history-happy.png) |
+| Attention | happy | what waits, how long, and reachable | ![](attention-happy.png) |
+| Position | happy | per unit, then a marked estimate | ![](position-happy.png) |
 
-Note: `appeus/scripts/build-images.sh` expects a debug build talking to Metro. These were captured
-from a release build instead, because the app bundles its JS and needs no dev server — simpler to
-reproduce and closer to what a reviewer would install.
+Notes:
+
+- `appeus/scripts/build-images.sh` expects a debug build talking to Metro. These were captured from a
+  release build instead, because the app bundles its JS and needs no dev server — simpler to
+  reproduce and closer to what a reviewer would install.
+- The app takes about five seconds from cold start to first paint on this AVD; a capture taken any
+  sooner is a picture of the splash screen. An earlier round of these images was exactly that.
