@@ -35,14 +35,18 @@ depHashes: {}
 - **Requests are a section, not a ledger line**, with a note that only signed entries move the balance (story 24, `rules.md` § Requests).
 - Sections are plain cards; `global/ui.md` owns the tokens and nothing here hardcodes a colour.
 
-## Navigation, and why it is not React Navigation
+## Navigation
 
-This slice introduced the second screen, which is where a navigator earns its keep. React Navigation
-is what `global/toolchain.md` names, but `react-native-screens@4.27.0` fails codegen against React
-Native 0.82.1 and only nightlies exist beyond it. The app therefore carries a small navigator of its
-own (`src/navigation/`) with no native dependencies: one stack per tab, deep-link parsing, and the
-same `{ route, navigation }` shape screens would get from the real library. Tracked as
-`debt-mobile-navigation-library`.
+This slice introduced the second screen, which is where a navigator earns its keep. It first shipped
+with a hand-rolled one, because `react-native-screens` failed codegen against the React Native the
+app was on. That turned out to be the app's problem rather than the library's — current libraries
+declare native commands with React 19's `React.ComponentRef<>`, which React Native's codegen accepts
+only from 0.84 onward.
+
+React Native was upgraded 0.82.1 → 0.87.1 and the local navigator deleted. `src/navigation/` is now
+React Navigation: a bottom-tab navigator over three native stacks, deep links in `linking.ts`, route
+types in `routes.ts`. Screens were written against `{ route, navigation }` from the start, so the
+swap did not touch them. `debt-mobile-navigation-library` carries the detail.
 
 ## Not built here
 

@@ -33,13 +33,14 @@ slices rather than papered over now.
 
 | Item | Why not now |
 |------|-------------|
-| Tab-bar icons | **Agreed** — three words on a hairline is the weakest wayfinding, and it will not hold five tabs. Not blocked technically (`react-native-vector-icons` generates a TurboModule spec, so RN 0.82 builds it), but sequenced behind the React Native upgrade, because React Navigation's `bottom-tabs` supplies the tab bar the icons go in and doing it twice is waste. `debt-mobile-icon-set`. Text glyphs cover the chevron and the direction of an amount meanwhile. |
+| ~~Tab-bar icons~~ | **Agreed, and done.** Ionicons, icon and label together, after the React Native upgrade landed the tab bar they sit in. `debt-mobile-icon-set` is complete. |
 | i18next, device locale, namespaced plurals | The local `t()` now does namespaced keys and `Intl.PluralRules`, which is what the spec actually required. The library itself earns its place at the settings/language slice. `debt-mobile-i18n-library`. |
-| React Navigation | Unchanged: `debt-mobile-navigation-library`. Hardware back and replace-if-same-route are now handled by the local navigator, which was the urgent part. |
+| ~~React Navigation~~ | **Done.** The blocker was the app's React Native (0.82.1), not the library — current libraries need 0.84+ codegen. Upgraded to 0.87.1; the local navigator is deleted. `debt-mobile-navigation-library` is complete, and carries the corrected diagnosis. |
 | Pull-to-refresh, `ListEmptyComponent` under a filter | Both belong to the story-06 sort/search work, which is unsliced. |
 | Progressive disclosure of captions | Agreed, and agreed not yet. `Card` has the footnote slot it would hang off. |
-| `navigation/linking.ts`, `navigation/types.ts` split | Cosmetic against the reference layout, and the whole directory is replaced when React Navigation lands. |
-| `TallyView` title from loaded data | Taken differently: the header now says "Tally" from every entry point, and the counterparty's name leads the screen body — so a notification and a list tap look the same, which was the actual complaint. |
+| ~~`navigation/linking.ts` split~~ | **Done** as part of the React Navigation port; deep links live at the reference path. Route types stayed in `routes.ts` rather than `types.ts`, since that name is already the app's own. |
+| `TallyView` title from loaded data | Taken differently: the header says "Tally" from every entry point, and the counterparty's name leads the screen body — so a notification and a list tap look the same, which was the actual complaint. |
+| Replace-if-same-route | Now React Navigation's concern rather than hand-rolled. A deep link to a tally lands with the list beneath it (`initialRouteName`), so back goes somewhere sensible instead of out of the app — verified on device. |
 
 ## Fixtures that were wrong, not just screens
 

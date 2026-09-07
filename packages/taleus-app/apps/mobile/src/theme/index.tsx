@@ -49,9 +49,11 @@ export function useTokens(): Tokens {
  * Styles built once per token set rather than once per render — `TallyRow` was
  * calling `StyleSheet.create` for every row on the list.
  */
-export function useStyles<T extends StyleSheet.NamedStyles<T>>(factory: (tokens: Tokens) => T): T {
+export function useStyles<T extends Parameters<typeof StyleSheet.create>[0]>(
+	factory: (tokens: Tokens) => T,
+): T {
 	const tokens = useTokens()
-	return useMemo(() => StyleSheet.create(factory(tokens)), [tokens, factory])
+	return useMemo(() => StyleSheet.create(factory(tokens)), [tokens, factory]) as T
 }
 
 export * from './tokens'

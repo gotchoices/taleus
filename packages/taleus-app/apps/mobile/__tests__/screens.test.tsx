@@ -5,13 +5,12 @@ import { Position } from '../src/screens/Position'
 import { TallyHistory } from '../src/screens/TallyHistory'
 import { TallyList } from '../src/screens/TallyList'
 import { TallyView } from '../src/screens/TallyView'
-import { noNavigation, renderScreen } from '../testUtils'
+import { renderScreen, screenProps } from '../testUtils'
 
 test('history keeps requests beside the ledger, each saying which way it runs', async () => {
 	const view = await renderScreen(
 		<TallyHistory
-			route={{ name: 'TallyHistory', params: { tallyId: 'tally:sam-bike' } }}
-			navigation={noNavigation}
+			{...screenProps('TallyHistory', { tallyId: 'tally:sam-bike' })}
 		/>,
 	)
 	await waitFor(() => expect(view.getByText('Bike')).toBeTruthy())
@@ -25,8 +24,7 @@ test('history keeps requests beside the ledger, each saying which way it runs', 
 test('a balance after an entry states its side, never a bare figure', async () => {
 	const view = await renderScreen(
 		<TallyHistory
-			route={{ name: 'TallyHistory', params: { tallyId: 'tally:sam-bike' } }}
-			navigation={noNavigation}
+			{...screenProps('TallyHistory', { tallyId: 'tally:sam-bike' })}
 		/>,
 	)
 	await waitFor(() => expect(view.getByText('Bike')).toBeTruthy())
@@ -35,14 +33,14 @@ test('a balance after an entry states its side, never a bare figure', async () =
 
 test('the tally list shows the tally asked for, not the only one in a fixture', async () => {
 	const view = await renderScreen(
-		<TallyView route={{ name: 'TallyView', params: { tallyId: 'tally:mara-shop' } }} navigation={noNavigation} />,
+		<TallyView {...screenProps('TallyView', { tallyId: 'tally:mara-shop' })} />,
 	)
 	await waitFor(() => expect(view.getByText(/You owe Mara's Bike Shop/)).toBeTruthy())
 })
 
 test('both directions of terms are shown, each with its own effective date', async () => {
 	const view = await renderScreen(
-		<TallyView route={{ name: 'TallyView', params: { tallyId: 'tally:sam-bike' } }} navigation={noNavigation} />,
+		<TallyView {...screenProps('TallyView', { tallyId: 'tally:sam-bike' })} />,
 	)
 	await waitFor(() => expect(view.getByText('Terms in force')).toBeTruthy())
 	expect(view.getByText(/In force since Mar 2, 2026/)).toBeTruthy()
@@ -50,7 +48,7 @@ test('both directions of terms are shown, each with its own effective date', asy
 })
 
 test('an offered tally is not shown with a balance', async () => {
-	const view = await renderScreen(<TallyList route={{ name: 'TallyList', params: undefined }} navigation={noNavigation} />)
+	const view = await renderScreen(<TallyList {...screenProps('TallyList', undefined)} />)
 	await waitFor(() => expect(view.getByText('Rae Whitfield')).toBeTruthy())
 	expect(view.getByText('Offered')).toBeTruthy()
 	expect(view.queryByText('0.000 CHIP')).toBeNull()
@@ -58,7 +56,7 @@ test('an offered tally is not shown with a balance', async () => {
 })
 
 test('every tally row says when it last moved', async () => {
-	const view = await renderScreen(<TallyList route={{ name: 'TallyList', params: undefined }} navigation={noNavigation} />)
+	const view = await renderScreen(<TallyList {...screenProps('TallyList', undefined)} />)
 	await waitFor(() => expect(view.getByText('Sam Ortiz')).toBeTruthy())
 	expect(view.getAllByText(/Last activity/).length).toBe(6)
 })
@@ -66,7 +64,7 @@ test('every tally row says when it last moved', async () => {
 test('attention items are reachable and say how long they have waited', async () => {
 	const navigate = jest.fn()
 	const view = await renderScreen(
-		<Attention route={{ name: 'Attention', params: undefined }} navigation={{ ...noNavigation, navigate }} />,
+		<Attention {...screenProps('Attention', undefined, navigate)} />,
 	)
 	await waitFor(() => expect(view.getByText('Rae Whitfield proposed terms')).toBeTruthy())
 	expect(view.getAllByText(/Waiting \d+ days?/).length).toBeGreaterThan(0)

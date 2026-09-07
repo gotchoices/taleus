@@ -18,31 +18,22 @@ Specs say what the app should do. They do not record what has not been done yet.
 
 | Deferred | Why | Tracked as |
 |----------|-----|-----------|
-| React Navigation | The app's React Native is older than the library requires — see below | `debt-mobile-navigation-library` |
-| Icon set (Ionicons) | `global/ui.md` names four places icons belong; none are drawn yet | `debt-mobile-icon-set` |
+| An iOS build of the React Native upgrade | The upgrade diff's `ios/` hunks were not applied; the iOS tree has never been built, and patching a project file blind is worse than doing it when someone first runs `pod install` | — |
 | i18next, device-locale detection | The local `t()` meets the spec's rules today; the library earns its place at the language slice (42) | `debt-mobile-i18n-library` |
 | Sort, filter, search on the tally list | Story 06's own paths; belongs to a slice of its own | — |
+| `bundle install` after the Gemfile gained `nkf` | Only matters for iOS tooling, which is untouched | — |
 | Next actions on `TallyView` | Pay, Request, and Terms are unsliced; a button routing nowhere is worse than none | — |
 | Progressive disclosure of captions | Right idea, wrong time — `Card` has the slot it would hang off | — |
-| An iOS build | Never attempted. Android has carried every slice so far | — |
 | Scenario docs under `generated/mobile/scenarios/` | Screenshots cover the same ground for now | — |
 | Story 25, *My records in my books* | Waiting on how sApps share between strands | — |
 
-## The React Native version
+## The React Native version — resolved
 
-The app is on **0.82.1** (Oct 2025). Current is **0.87.1**.
+The app is on **0.87.1**, upgraded from 0.82.1. That upgrade is what unblocked React Navigation and
+the icon set; both tickets are in `tickets/complete/`.
 
-This is the root of the navigation problem, and the diagnosis in the original ticket was backwards.
-`react-native-screens` is not behind — 4.27.0 shipped in Aug 2026 and is current. It declares its
-native command as `React.ComponentRef<ComponentType>`, which is what React 19 replaced `ElementRef`
-with. React Native's codegen accepts `ComponentRef` from **0.84.0** onward; 0.82 and 0.83 accept
-`ElementRef` only, and reject the library outright:
-
-```
-The first argument of method showColumn must be of type React.ElementRef<>
-```
-
-So the fix is not a newer `react-native-screens`. It is React Native 0.84 or later. Anything else
-built for a current React Native will hit the same wall.
-
-Decision pending — see `debt-mobile-navigation-library`.
+The constraint worth remembering: **0.84 is the floor.** Current libraries declare native commands
+with React 19's `React.ComponentRef<>`, and React Native's codegen only accepts that from 0.84
+onward. Below it, anything with a Fabric component command fails to build. The original diagnosis
+here — that `react-native-screens` was behind — was backwards, and would have meant waiting for a
+release that was never the problem.

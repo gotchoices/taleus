@@ -5,8 +5,7 @@ import { Amount, Chip, Empty, Failed, Loading, OpenableRow } from '../components
 import { listAttention, type AttentionItem } from '../data/attention'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
-import type { RouteName, ScreenProps } from '../navigation/routes'
-import { isRoute } from '../navigation/routes'
+import { isTallyRoute, type ScreenProps } from '../navigation/routes'
 import { useStyles, spacing, type as typography, type Tokens } from '../theme'
 
 type Props = ScreenProps<'Attention'>
@@ -43,10 +42,14 @@ export function Attention({ navigation }: Props): React.JSX.Element {
 	}
 
 	const open = (item: AttentionItem) => {
-		// Story 23 step 4: the point of the list is getting to the thing. Routes
-		// that are not sliced yet fall back to the tally they belong to.
-		const target: RouteName = isRoute(item.route) ? (item.route as RouteName) : 'TallyView'
-		navigation.navigate(target, { tallyId: item.tallyId } as never)
+		// Story 23 step 4: the point of the list is getting to the thing. The
+		// routes attention items name — ReviewOffer, RequestView — are not sliced
+		// yet, so they fall back to the tally the item belongs to rather than
+		// navigating into nothing.
+		navigation.navigate('Tallies', {
+			screen: isTallyRoute(item.route) ? item.route : 'TallyView',
+			params: { tallyId: item.tallyId },
+		})
 	}
 
 	return (
@@ -57,7 +60,7 @@ export function Attention({ navigation }: Props): React.JSX.Element {
 			ListHeaderComponent={
 				mine.length === 0 ? (
 					<Text style={styles.sectionNote}>{t('screens.attention.none-for-you')}</Text>
-				) : null
+				) : undefined
 			}
 			renderItem={({ item }) => <Item item={item} needsYou onOpen={() => open(item)} />}
 			ListFooterComponent={
@@ -68,7 +71,7 @@ export function Attention({ navigation }: Props): React.JSX.Element {
 							<Item key={item.id} item={item} onOpen={() => open(item)} />
 						))}
 					</View>
-				) : null
+				) : undefined
 			}
 		/>
 	)

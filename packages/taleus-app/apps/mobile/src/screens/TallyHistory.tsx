@@ -76,7 +76,7 @@ export function TallyHistory({ route }: Props): React.JSX.Element {
 			data={entries}
 			keyExtractor={entry => entry.id}
 			ListHeaderComponent={
-				requests.length > 0 ? <Asked requests={requests} unit={tally.unit} /> : null
+				requests.length > 0 ? <Asked requests={requests} unit={tally.unit} /> : undefined
 			}
 			renderItem={({ item }) => <EntryRow entry={item} unit={tally.unit} />}
 		/>

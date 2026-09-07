@@ -15,10 +15,9 @@ function Themed(): React.JSX.Element {
 	const { tokens, isDark } = useTheme()
 	return (
 		<View style={{ flex: 1, backgroundColor: tokens.background }}>
-			<StatusBar
-				barStyle={isDark ? 'light-content' : 'dark-content'}
-				backgroundColor={tokens.background}
-			/>
+			{/* No backgroundColor: React Native 0.87 draws edge-to-edge, so the bar is
+			    transparent and the view beneath it supplies the colour. */}
+			<StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 			<AppNavigator />
 		</View>
 	)
