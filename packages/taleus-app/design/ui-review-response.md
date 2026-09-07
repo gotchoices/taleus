@@ -33,7 +33,7 @@ slices rather than papered over now.
 
 | Item | Why not now |
 |------|-------------|
-| Tab-bar icons | Needs a native icon package that has to be checked against RN 0.82 — the check `react-native-screens` failed. `debt-mobile-icon-set`. Text glyphs cover the chevron and the direction of an amount in the meantime. |
+| Tab-bar icons | **Agreed** — three words on a hairline is the weakest wayfinding, and it will not hold five tabs. Not blocked technically (`react-native-vector-icons` generates a TurboModule spec, so RN 0.82 builds it), but sequenced behind the React Native upgrade, because React Navigation's `bottom-tabs` supplies the tab bar the icons go in and doing it twice is waste. `debt-mobile-icon-set`. Text glyphs cover the chevron and the direction of an amount meanwhile. |
 | i18next, device locale, namespaced plurals | The local `t()` now does namespaced keys and `Intl.PluralRules`, which is what the spec actually required. The library itself earns its place at the settings/language slice. `debt-mobile-i18n-library`. |
 | React Navigation | Unchanged: `debt-mobile-navigation-library`. Hardware back and replace-if-same-route are now handled by the local navigator, which was the urgent part. |
 | Pull-to-refresh, `ListEmptyComponent` under a filter | Both belong to the story-06 sort/search work, which is unsliced. |

@@ -46,11 +46,6 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
 ## Final wiring
 - [ ] Production data wiring is implemented and tested
 
-## Known gaps carried forward
-- Icons: `ui.md` names four places for them and the app has none — `debt-mobile-icon-set`
-- i18next and device-locale detection — `debt-mobile-i18n-library`
-- React Navigation — `debt-mobile-navigation-library`
-- No iOS build has been attempted
-- Sort, filter, and search on the tally list (story 06) are unsliced
+Deliberate deferrals are recorded in [`design/STATUS.md`](../../STATUS.md), not here.
 
 

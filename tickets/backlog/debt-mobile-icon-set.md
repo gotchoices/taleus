@@ -15,9 +15,15 @@ any screen looks tappable.
 
 ## What would resolve it
 
-Install the icon set (`react-native-vector-icons`, or `@expo/vector-icons` if the app ever moves to
-Expo), confirm it builds against the React Native version in use — the same check that
-`debt-mobile-navigation-library` failed — and use it in exactly the four places above.
+Install `react-native-vector-icons` (10.3.0 is current) and use it in exactly the four places above.
 
-Text glyphs (`›`, `↑`, `↓`) stand in until then, which is enough for the chevron and the direction
-of an amount but not for a tab bar.
+Unlike `react-native-screens`, this one is **not** blocked by the app's React Native version: its
+`codegenConfig` declares `"type": "modules"`, so it generates a TurboModule spec and never goes
+through the component-command path that rejects `react-native-screens` on React Native 0.82
+(`debt-mobile-navigation-library`). It should install and build as-is.
+
+Worth sequencing behind the React Native upgrade anyway, because React Navigation's `bottom-tabs`
+supplies the tab bar the icons would go in, and doing the tab bar twice is wasted work.
+
+Text glyphs (`›`, `+`, `−`) stand in until then, which is enough for the chevron and the direction of
+an amount but not for a tab bar.
