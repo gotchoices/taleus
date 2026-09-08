@@ -36,8 +36,6 @@ export interface UnitNames {
 	drawn?: 'chip'
 	/** The long human name, where there is room for it. */
 	label: string
-	/** True when the mark leads the figure, as `$` does in English. */
-	markLeads: boolean
 	/**
 	 * False when the app cannot vouch for the unit, so its code or label must
 	 * accompany the mark rather than the mark standing alone.
@@ -59,19 +57,17 @@ export function namesFor(unit: Unit, locale = getLocale()): UnitNames {
 			code,
 			mark: currencyMark(code, locale),
 			label: currencyLabel(code, locale),
-			markLeads: currencyLeads(code, locale),
 			standard: true,
 		}
 	}
 	if (unit.denom === 'CHIP') {
-		return { code: 'CHIP', drawn: 'chip', label: 'CHIP', markLeads: false, standard: true }
+		return { code: 'CHIP', drawn: 'chip', label: 'CHIP', standard: true }
 	}
 	const mark = unit.mark && !currencySymbol.test(unit.mark) ? unit.mark : undefined
 	return {
 		code: unit.code ?? unit.label ?? unit.denom,
 		mark,
 		label: unit.label ?? unit.denom,
-		markLeads: false,
 		standard: false,
 	}
 }
@@ -173,15 +169,6 @@ function currencyMark(code: string, locale: string): string | undefined {
 		return part && part.value !== code ? part.value : undefined
 	} catch {
 		return undefined
-	}
-}
-
-function currencyLeads(code: string, locale: string): boolean {
-	try {
-		const parts = new Intl.NumberFormat(locale, { style: 'currency', currency: code }).formatToParts(1)
-		return parts.findIndex(p => p.type === 'currency') < parts.findIndex(p => p.type === 'integer')
-	} catch {
-		return true
 	}
 }
 

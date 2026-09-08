@@ -1,5 +1,6 @@
-export { Amount, ChitMark, amountText, directionOf, unitNamesFor } from './Amount'
+export { Amount, amountText, directionOf, unitNamesFor } from './Amount'
 export { Action, Card, OpenableRow, Row } from './Card'
+export { ChitMark } from './ChitMark'
 export { Chip } from './Chip'
 export { ErrorBoundary } from './ErrorBoundary'
 export { Empty, Failed, Loading } from './Screen'

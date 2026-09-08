@@ -52,7 +52,9 @@ test('an offered tally is not shown with a balance', async () => {
 	const view = await renderScreen(<TallyList {...screenProps('TallyList', undefined)} />)
 	await waitFor(() => expect(view.getByText('Rae Whitfield')).toBeTruthy())
 	expect(view.getByText('Offered')).toBeTruthy()
-	expect(view.queryByText('0')).toBeNull()
+	// An offer has no balance: the CHIP unit would appear beside a figure if one
+	// were rendered, and no figure is.
+	expect(view.queryByText('CHIP')).toBeNull()
 	expect(view.getByText('Nothing traded yet')).toBeTruthy()
 })
 

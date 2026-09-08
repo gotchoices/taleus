@@ -29,13 +29,13 @@
         "design/specs/mobile/screens/attention.md": "387cbb5edd19daaf50eb93258d5dbf2d32bc5dbf0d518b4d15a07cc53df5afc2",
         "design/specs/mobile/global/ui.md": "a9959730caf79a9d137b32e0d8f8aa4f1024dbafe7e1cca903c4744bdc38be84",
         "design/specs/mobile/global/i18n.md": "b458555de0bf0895e25bf87224d6e4eeb8af4fbf008376015d46bf8bc865b332",
-        "design/specs/mobile/global/toolchain.md": "58ceacc39188a14b5ec7077f104192dff7fd79b7328538a0210a1e3aa4989cd0",
+        "design/specs/mobile/global/toolchain.md": "fd5dc4bdb4375b7ff69c4a3294e34809382c861107805c9843115079a94ee0aa",
         "design/stories/mobile/23-what-needs-my-attention.md": "e755289c2cbbcab9256b98c694396e5ea9cf72df902835f4a99b5eeb41013452",
         "design/generated/mobile/screens/Attention.md": "dfcf2a9e2079040292fc872ae1c41aaf4fa174510455979090f2a689cb6fe20b",
         "mock/data/attention.happy.json": "5df9fa68c9bbb1419f7b682937fa14660444111257375da80439c9149f1b49c0",
         "mock/data/attention.empty.json": "ec1e603b43180a77198c36b7ad99ebf6db1d70c02401e7f77f03a9285f64a384",
         "design/specs/mobile/components/index.md": "11b6b3226c60f6c8ec999abb240151c11d51eb67503503919aa9ffe15eca0bc1",
-        "design/specs/domain/amounts.md": "aaa842e706f915cedae78b4f41dee35bd1a0c9b7cf8a769b790a2563b75881db"
+        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09"
       }
     },
     {
@@ -68,14 +68,14 @@
         "design/specs/mobile/screens/position.md": "1909775a0fea247c4db4b5d6fb39162193012ae7cf8ff1df416c7d1bee8eddbe",
         "design/specs/mobile/global/ui.md": "a9959730caf79a9d137b32e0d8f8aa4f1024dbafe7e1cca903c4744bdc38be84",
         "design/specs/mobile/global/i18n.md": "b458555de0bf0895e25bf87224d6e4eeb8af4fbf008376015d46bf8bc865b332",
-        "design/specs/mobile/global/toolchain.md": "58ceacc39188a14b5ec7077f104192dff7fd79b7328538a0210a1e3aa4989cd0",
+        "design/specs/mobile/global/toolchain.md": "fd5dc4bdb4375b7ff69c4a3294e34809382c861107805c9843115079a94ee0aa",
         "design/stories/mobile/40-my-position.md": "14d9665c1b7871ab750e15a255fdb601f9874477d4392c1c069738f42a7eb787",
         "design/stories/mobile/41-my-exchange-rates.md": "e4748006b0d010ef7d77081ff377c841870b0e2d3c461da717a68a89fe80727c",
         "design/generated/mobile/screens/Position.md": "2c226d75aebe3b6934458ad31dca4c300b6e413fbf446eabef4eebda45545a28",
         "mock/data/position.happy.json": "4de0af93345afdd979e3481a2aed7af4864d7cf78b7efe2cd646ce665c5d530f",
         "mock/data/position.empty.json": "949232ad2626c3c1a7ee6a43f26003fe8961d31a68027713cfac52288eb655be",
         "design/specs/mobile/components/index.md": "11b6b3226c60f6c8ec999abb240151c11d51eb67503503919aa9ffe15eca0bc1",
-        "design/specs/domain/amounts.md": "aaa842e706f915cedae78b4f41dee35bd1a0c9b7cf8a769b790a2563b75881db"
+        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09"
       }
     },
     {
@@ -109,7 +109,7 @@
         "design/specs/mobile/screens/tally-history.md": "c13fdd04111c7c8321a9b89dc456020e5db1393e348ad4b024aa22cbf4b15f3a",
         "design/specs/mobile/global/ui.md": "a9959730caf79a9d137b32e0d8f8aa4f1024dbafe7e1cca903c4744bdc38be84",
         "design/specs/mobile/global/i18n.md": "b458555de0bf0895e25bf87224d6e4eeb8af4fbf008376015d46bf8bc865b332",
-        "design/specs/mobile/global/toolchain.md": "58ceacc39188a14b5ec7077f104192dff7fd79b7328538a0210a1e3aa4989cd0",
+        "design/specs/mobile/global/toolchain.md": "fd5dc4bdb4375b7ff69c4a3294e34809382c861107805c9843115079a94ee0aa",
         "design/stories/mobile/24-tally-history.md": "3001943d8cef8efe7347f2d6b6f1a6a23a295e13da5c16bb66b574852028988b",
         "design/generated/mobile/screens/TallyHistory.md": "b81dea05875332014951c96989c0f222441caa9f0e8585d0675ef12841960357",
         "mock/data/entries.happy.json": "7b9e46c9014a0740699e5a2fb1e181d3827ce688385a6771aecd798a33160b5d",
@@ -117,7 +117,7 @@
         "mock/data/requests.happy.json": "834b1d0b88397484d8f1369e005868f9ccf67e7cdbcf8f45ee2017638b7b81ae",
         "design/specs/mobile/components/index.md": "11b6b3226c60f6c8ec999abb240151c11d51eb67503503919aa9ffe15eca0bc1",
         "design/stories/mobile/21-ask-to-be-paid.md": "16e3b799c5042893aca9cab300eb63940a7db154804c803aa4c646906b4112ff",
-        "design/specs/domain/amounts.md": "aaa842e706f915cedae78b4f41dee35bd1a0c9b7cf8a769b790a2563b75881db"
+        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09"
       }
     },
     {
@@ -151,7 +151,7 @@
         "design/specs/mobile/screens/tally-list.md": "6701576d78ab4a29f924223d49c002fe3b39d1600069d01affed50ac88587346",
         "design/specs/mobile/global/ui.md": "a9959730caf79a9d137b32e0d8f8aa4f1024dbafe7e1cca903c4744bdc38be84",
         "design/specs/mobile/global/i18n.md": "b458555de0bf0895e25bf87224d6e4eeb8af4fbf008376015d46bf8bc865b332",
-        "design/specs/mobile/global/toolchain.md": "58ceacc39188a14b5ec7077f104192dff7fd79b7328538a0210a1e3aa4989cd0",
+        "design/specs/mobile/global/toolchain.md": "fd5dc4bdb4375b7ff69c4a3294e34809382c861107805c9843115079a94ee0aa",
         "design/stories/mobile/04-first-look-at-an-open-tally.md": "bfcb9e8ace94e78b11fdb73b07fcc67f814df5dc793932d59ff103c6d95ecfcc",
         "design/stories/mobile/06-find-a-tally.md": "fde515a009819b815840bd1e4be5898c59efd2c553769b673c8249ef042e6ec7",
         "design/generated/mobile/screens/TallyList.md": "f7771bdd7f96bd05bd3311dde244d55689c3252eb9c0f180fd8eaebe3fe44440",
@@ -159,7 +159,7 @@
         "mock/data/tallies.empty.json": "d8cc662307c9d780d5b01e726b6dcae0010cf83afed085b2d0412d07b719bbc4",
         "mock/data/tallies.error.json": "01da118fe2a946924a5dcbf26cd96622ffdd899f614c44fca5e3e1c9c7e510bd",
         "design/specs/mobile/components/index.md": "11b6b3226c60f6c8ec999abb240151c11d51eb67503503919aa9ffe15eca0bc1",
-        "design/specs/domain/amounts.md": "aaa842e706f915cedae78b4f41dee35bd1a0c9b7cf8a769b790a2563b75881db"
+        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09"
       }
     },
     {
@@ -194,7 +194,7 @@
         "design/specs/mobile/screens/tally-view.md": "0c9b9c5a2e9062b1b0cf52c26591a8321d75342e416ee5aa17ddc25cce41a395",
         "design/specs/mobile/global/ui.md": "a9959730caf79a9d137b32e0d8f8aa4f1024dbafe7e1cca903c4744bdc38be84",
         "design/specs/mobile/global/i18n.md": "b458555de0bf0895e25bf87224d6e4eeb8af4fbf008376015d46bf8bc865b332",
-        "design/specs/mobile/global/toolchain.md": "58ceacc39188a14b5ec7077f104192dff7fd79b7328538a0210a1e3aa4989cd0",
+        "design/specs/mobile/global/toolchain.md": "fd5dc4bdb4375b7ff69c4a3294e34809382c861107805c9843115079a94ee0aa",
         "design/stories/mobile/04-first-look-at-an-open-tally.md": "bfcb9e8ace94e78b11fdb73b07fcc67f814df5dc793932d59ff103c6d95ecfcc",
         "design/stories/mobile/07-review-the-agreement.md": "692a2d39366dc520e395ebf2b6348fb356a75387ed4e73eb2e75315d58251357",
         "design/generated/mobile/screens/TallyView.md": "1ff018dc1df6318d00e5a650e2593305255eab399f95394ad62443b91095cbec",
@@ -203,7 +203,7 @@
         "mock/data/requests.happy.json": "834b1d0b88397484d8f1369e005868f9ccf67e7cdbcf8f45ee2017638b7b81ae",
         "design/specs/mobile/components/index.md": "11b6b3226c60f6c8ec999abb240151c11d51eb67503503919aa9ffe15eca0bc1",
         "design/stories/mobile/21-ask-to-be-paid.md": "16e3b799c5042893aca9cab300eb63940a7db154804c803aa4c646906b4112ff",
-        "design/specs/domain/amounts.md": "aaa842e706f915cedae78b4f41dee35bd1a0c9b7cf8a769b790a2563b75881db"
+        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09"
       }
     },
     {

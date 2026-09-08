@@ -4,6 +4,7 @@ import { t } from '../i18n'
 import { useTokens } from '../theme'
 import type { Amount as AmountValue, Perspective, Unit } from '../data/types'
 import { amountParts, type AmountParts, type UnitNames } from '../util/amount'
+import { ChitMark } from './ChitMark'
 
 /**
  * A figure with its unit, its side, and how much it is to be trusted.
@@ -74,34 +75,38 @@ export function Amount({
 			accessibilityLabel={label(parts, perspective, estimate)}
 			style={{ flexDirection: 'row', alignItems: 'center' }}
 		>
-			<Text style={[{ fontSize: full, fontWeight: size === 'display' ? '600' : '400' }, text, style]}>
-				{estimate ? '≈ ' : ''}
-				{perspective ? glyphs[perspective] : ''}
-				{parts.negative && !perspective ? '−' : ''}
-			</Text>
-
-			{/* A leading mark comes before the figure, as `$` does. */}
-			{parts.unit.markLeads && parts.unit.drawn === 'chip' ? (
-				<ChitMark size={full} colour={ink} />
+			{estimate ? (
+				<Text style={[{ fontSize: full }, text, style]}>{'≈ '}</Text>
 			) : null}
 
-			<Text style={[{ fontSize: full, fontWeight: size === 'display' ? '600' : '400' }, text, style]}>
-				{parts.unit.markLeads ? (parts.unit.mark ?? '') : ''}
+			{/*
+			 * The unit leads, always — whatever it is and whatever the locale would
+			 * do with a currency symbol. On a list where dollars, CHIP and someone's
+			 * hours sit in adjacent rows, what a figure counts matters before how
+			 * much it is, and one position for every unit beats two.
+			 */}
+			{parts.unit.drawn === 'chip' ? (
+				<ChitMark size={full * 0.95} colour={ink} />
+			) : (
+				<Text style={[{ fontSize: full * 0.82 }, text, style]}>
+					{parts.unit.mark ?? parts.unit.code}
+				</Text>
+			)}
+
+			<Text
+				style={[
+					{ fontSize: full, fontWeight: size === 'display' ? '600' : '400', marginLeft: full * 0.2 },
+					text,
+					style,
+				]}
+			>
+				{perspective ? glyphs[perspective] : ''}
+				{parts.negative && !perspective ? '−' : ''}
 				{parts.whole}
 			</Text>
 
 			{parts.numerator ? (
 				<Fraction parts={parts} full={full} ink={ink} estimate={estimate} />
-			) : null}
-
-			{!parts.unit.markLeads && parts.unit.drawn === 'chip' ? (
-				<ChitMark size={full * 0.9} colour={ink} />
-			) : null}
-
-			{!parts.unit.markLeads && !parts.unit.drawn ? (
-				<Text style={[{ fontSize: full * 0.8, marginLeft: 4 }, text]}>
-					{parts.unit.mark ?? parts.unit.code}
-				</Text>
 			) : null}
 		</View>
 	)
@@ -157,37 +162,6 @@ function Fraction({
 					{parts.denominator}
 				</Text>
 			) : null}
-		</View>
-	)
-}
-
-/**
- * A CHIP: an `8` struck through with two vertical rules — the same idea as `$`
- * or `¥`, a letterform with strokes through it. Composed rather than shipped as
- * a font or an SVG, because Unicode has no double vertical overlay and a
- * composed mark scales with the text and inherits its colour.
- */
-export function ChitMark({ size, colour }: { size: number; colour: string }): React.JSX.Element {
-	const rule = Math.max(1, Math.round(size * 0.085))
-	const gap = size * 0.2
-	return (
-		// The gap matters: without it the mark reads as a digit of the figure —
-		// `8` then `0` looks like eighty.
-		<View style={{ justifyContent: 'center', alignItems: 'center', marginLeft: size * 0.22 }}>
-			<Text style={{ fontSize: size, color: colour, fontVariant: ['tabular-nums'] }}>8</Text>
-			{[-gap, gap].map(offset => (
-				<View
-					key={offset}
-					style={{
-						position: 'absolute',
-						width: rule,
-						height: size * 1.02,
-						left: '50%',
-						marginLeft: offset - rule / 2,
-						backgroundColor: colour,
-					}}
-				/>
-			))}
 		</View>
 	)
 }

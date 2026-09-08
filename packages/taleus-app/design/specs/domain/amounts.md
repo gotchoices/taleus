@@ -28,17 +28,17 @@ no point, no comma, no space.
 states it — two digits over the bar can only mean hundredths — so it is left implied.
 
 ```
-       50
-  $180 ──              a hundred eighty dollars and fifty cents
+         50
+  $  180 ──            a hundred eighty dollars and fifty cents
 
-      250
-  1   ───  CHIP        one CHIP and two hundred fifty millichips
+         250
+  ⑧  1  ───            one CHIP and two hundred fifty millichips
 
-       07
-  2    ──  hours       two hours and seven minutes
-       60
+          07
+  DH  6  ──            six hours and seven minutes
+          60
 
-  6 Dave-hours         six whole units; this unit has no fraction
+  WDG  6               six whole units; this unit has no fraction
 ```
 
 Reading it as a common fraction is what makes the notation principled rather than a typographic
@@ -57,7 +57,7 @@ or two and seven hundredths? — while `07/60` is not.
 - **Grouping stays, and stays local.** The whole part is grouped by the reader's locale, so a German
   sees `1.234.567` and an American `1,234,567`. That is safe now, precisely because no separator
   appears anywhere else in the figure.
-- **The unit always appears** — symbol or label, positioned as the locale puts it.
+- **The unit always leads**, before the sign and the figure, whatever the unit is. See below.
 - **Sign sits outside**, before the whole figure, along with any estimate mark: `≈ −$42` over `50`.
 
 ## One number decides all of it
@@ -104,7 +104,7 @@ shorter and more familiar. `USD` and `$` are the same unit written two ways.
 
 | Unit | Code | Mark | Where they come from |
 |------|------|------|----------------------|
-| a standard currency (`iso4217:*`) | `USD` | `$` | the standard, and the reader's locale |
+| a standard currency (`iso4217:*`) | `USD` | `$` | the standard; the locale supplies the glyph, not its position |
 | CHIP | `CHIP` | the chit mark | the app |
 | anything else | what the parties agreed | optional, what the parties agreed | the tally |
 
@@ -137,6 +137,23 @@ never stands alone.
 
 **Open:** which X-code CHIP takes. `XCH` reads well but Chia has used it publicly since 2021.
 
+### The unit goes first, always
+
+A currency symbol's position is a locale convention — `$180` in English, `180 €` in French. Taleus
+does not follow it. The unit leads every figure, before the sign, in every locale and for every kind
+of unit.
+
+The reason is what this app is: a party's list has dollars, CHIP, and somebody's hours in adjacent
+rows, and no single unit is privileged ([rules.md](rules.md)). What a figure counts is not decoration
+there — it is the first thing a reader needs, before how much. One position for every unit also means
+a reader never has to work out whether a given row puts it before or after, which is exactly the
+confusion the old arrangement produced: `$180` but `6 07/60 DH`.
+
+The cost is real and worth stating: a French reader expects `€` after the number and will not get it.
+That is a familiarity cost, not a correctness one — unlike the decimal separator, which was
+genuinely ambiguous. The unit is always present and always in the same place, which is the property
+that matters here.
+
 ### A tally's mark can never impersonate a standard one
 
 A mark for a unit nobody standardises is a string a counterparty wrote. If it could be `$`, a list
@@ -162,11 +179,15 @@ rather than typed — which is why the chit mark below is.
 
 ### The chit mark
 
-Taleus writes a CHIP as an `8` struck through with two vertical rules — the figure MyCHIPs draws, and
-the same idea as `$` or `¥`: a letterform with strokes through it. Unicode has no double vertical
-overlay to type it with, so the app draws the rules over ordinary text. That way it scales with
-whatever size the figure is set in, inherits its colour, and needs no glyph coverage or font on the
-reader's device.
+CHIP has a mark of its own: two lobes crossed by two vertical rules — the same idea as `$` or `¥`, a
+form with strokes through it, and the figure MyCHIPs already draws. It is a drawn glyph, sized from
+the text it sits with and inheriting its colour, so it scales with the figure and needs no font on
+the reader's device.
+
+It was first attempted as an overstruck `8`, which is what the shape resembles and what Unicode could
+nearly express. That failed for a reason worth recording: an `8` is a digit, and a digit immediately
+beside a number is read as part of it — `⑧0` renders as eighty. A unit's mark has to be a form no
+reader will mistake for a numeral, which rules out composing one from digits.
 
 Where a custom code and mark live is the tally's business — the parties agreed the unit, so they
 agreed what to call it. See [interfaces.md](interfaces.md) § Units.

@@ -8,6 +8,7 @@ navigation: react-navigation (native-stack per tab, bottom-tabs)
 state: none — screens read through the data adapters; React context for what is genuinely app-wide
 i18n: i18next + react-i18next (device locale via react-native-localize)
 icons: Ionicons (`@react-native-vector-icons/ionicons`)
+vectorGraphics: react-native-svg — for the chit mark, and drawn marks generally
 
 notes:
 - No HTTP client: all state comes from the taleus engine (`design/specs/domain/interfaces.md`).
