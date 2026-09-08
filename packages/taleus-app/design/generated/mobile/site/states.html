@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>States</title>
+  <style>
+    body { margin: 20px; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #222; }
+    a { color: #0066cc; text-decoration: none; }
+    article img { width: 360px; max-width: 100%; height: auto; display: block; margin: 12px auto; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    code, pre { background: #f7f7f7; padding: 2px 4px; border-radius: 4px; }
+    pre { padding: 12px; overflow: auto; }
+    h1,h2,h3 { line-height: 1.25; }
+    .appeus-nav { font-size: 14px; color: #666; padding-bottom: 8px; border-bottom: 1px solid #eee; margin-bottom: 16px; }
+    .appeus-nav .appeus-device { float: right; }
+    .appeus-nav select { font: inherit; }
+    .muted { color: #888; }
+    table.states { border-collapse: collapse; width: 100%; }
+    table.states th, table.states td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid #eee; }
+    table.states img.thumb { width: 120px; height: auto; border: 1px solid #ddd; border-radius: 6px; }
+    .appeus-toast { position: fixed; right: 16px; bottom: 16px; max-width: 60vw; padding: 10px 14px; border-radius: 8px; font-size: 14px; color: #fff; background: #333; box-shadow: 0 2px 12px rgba(0,0,0,0.25); }
+    .appeus-toast.ok { background: #2a7a2a; }
+    .appeus-toast.err { background: #a83232; }
+  </style>
+</head>
+<body>
+  <nav class="appeus-nav"><a href="scenarios/index.html">Scenarios</a> · <a href="states.html">States</a></nav>
+  <article>
+    <h1>States</h1><p>Every reviewable state registered for this target (20). Open a link on a device that has the app installed. Scenarios: <a href="scenarios/index.html">index</a>.</p><table class="states"><thead><tr><th></th><th>Screen</th><th>Variant</th><th>Note</th><th>Link</th></tr></thead><tbody><tr><td><a href="taleus://screen/Welcome?variant=empty"><img class="thumb" src="images/welcome-first-run.png" alt="welcome-first-run"></a></td><td><code>Welcome</code></td><td>empty</td><td></td><td><a href="taleus://screen/Welcome?variant=empty">open</a><br><small><code>taleus://screen/Welcome?variant=empty</code></small></td></tr>
+<tr><td><a href="taleus://screen/ChooseName?variant=empty"><img class="thumb" src="images/choose-name.png" alt="choose-name"></a></td><td><code>ChooseName</code></td><td>empty</td><td></td><td><a href="taleus://screen/ChooseName?variant=empty">open</a><br><small><code>taleus://screen/ChooseName?variant=empty</code></small></td></tr>
+<tr><td><a href="taleus://screen/ChooseName?variant=empty"><img class="thumb" src="images/choose-name-filled.png" alt="choose-name-filled"></a></td><td><code>ChooseName</code></td><td>empty</td><td></td><td><a href="taleus://screen/ChooseName?variant=empty">open</a><br><small><code>taleus://screen/ChooseName?variant=empty</code></small></td></tr>
+<tr><td><a href="taleus://screen/TallyList?variant=happy"><img class="thumb" src="images/tally-list-happy.png" alt="tally-list-happy"></a></td><td><code>TallyList</code></td><td>happy</td><td></td><td><a href="taleus://screen/TallyList?variant=happy">open</a><br><small><code>taleus://screen/TallyList?variant=happy</code></small></td></tr>
+<tr><td><a href="taleus://screen/TallyList?variant=empty"><img class="thumb" src="images/tally-list-empty.png" alt="tally-list-empty"></a></td><td><code>TallyList</code></td><td>empty</td><td></td><td><a href="taleus://screen/TallyList?variant=empty">open</a><br><small><code>taleus://screen/TallyList?variant=empty</code></small></td></tr>
+<tr><td><a href="taleus://screen/TallyList?variant=error"><img class="thumb" src="images/tally-list-error.png" alt="tally-list-error"></a></td><td><code>TallyList</code></td><td>error</td><td></td><td><a href="taleus://screen/TallyList?variant=error">open</a><br><small><code>taleus://screen/TallyList?variant=error</code></small></td></tr>
+<tr><td><a href="taleus://screen/TallyView/tally%3Asam-bike?variant=happy"><img class="thumb" src="images/tally-view-happy.png" alt="tally-view-happy"></a></td><td><code>TallyView/tally%3Asam-bike</code></td><td>happy</td><td></td><td><a href="taleus://screen/TallyView/tally%3Asam-bike?variant=happy">open</a><br><small><code>taleus://screen/TallyView/tally%3Asam-bike?variant=happy</code></small></td></tr>
+<tr><td><a href="taleus://screen/TallyView/tally%3Apriya-new?variant=happy"><img class="thumb" src="images/tally-view-new.png" alt="tally-view-new"></a></td><td><code>TallyView/tally%3Apriya-new</code></td><td>happy</td><td></td><td><a href="taleus://screen/TallyView/tally%3Apriya-new?variant=happy">open</a><br><small><code>taleus://screen/TallyView/tally%3Apriya-new?variant=happy</code></small></td></tr>
+<tr><td><a href="taleus://screen/TallyView/tally%3Asam-bike?variant=error"><img class="thumb" src="images/tally-view-unreachable.png" alt="tally-view-unreachable"></a></td><td><code>TallyView/tally%3Asam-bike</code></td><td>error</td><td></td><td><a href="taleus://screen/TallyView/tally%3Asam-bike?variant=error">open</a><br><small><code>taleus://screen/TallyView/tally%3Asam-bike?variant=error</code></small></td></tr>
+<tr><td><a href="taleus://screen/TallyView/tally%3Adave-hours?variant=happy"><img class="thumb" src="images/tally-view-hours.png" alt="tally-view-hours"></a></td><td><code>TallyView/tally%3Adave-hours</code></td><td>happy</td><td></td><td><a href="taleus://screen/TallyView/tally%3Adave-hours?variant=happy">open</a><br><small><code>taleus://screen/TallyView/tally%3Adave-hours?variant=happy</code></small></td></tr>
+<tr><td><a href="taleus://screen/TallyHistory/tally%3Asam-bike?variant=happy"><img class="thumb" src="images/tally-history-happy.png" alt="tally-history-happy"></a></td><td><code>TallyHistory/tally%3Asam-bike</code></td><td>happy</td><td></td><td><a href="taleus://screen/TallyHistory/tally%3Asam-bike?variant=happy">open</a><br><small><code>taleus://screen/TallyHistory/tally%3Asam-bike?variant=happy</code></small></td></tr>
+<tr><td><a href="taleus://screen/Attention?variant=happy"><img class="thumb" src="images/attention-happy.png" alt="attention-happy"></a></td><td><code>Attention</code></td><td>happy</td><td></td><td><a href="taleus://screen/Attention?variant=happy">open</a><br><small><code>taleus://screen/Attention?variant=happy</code></small></td></tr>
+<tr><td><a href="taleus://screen/Position?variant=happy"><img class="thumb" src="images/position-happy.png" alt="position-happy"></a></td><td><code>Position</code></td><td>happy</td><td></td><td><a href="taleus://screen/Position?variant=happy">open</a><br><small><code>taleus://screen/Position?variant=happy</code></small></td></tr>
+<tr><td><a href="taleus://screen/Attention?variant=empty"><img class="thumb" src="images/attention-empty.png" alt="attention-empty"></a></td><td><code>Attention</code></td><td>empty</td><td></td><td><a href="taleus://screen/Attention?variant=empty">open</a><br><small><code>taleus://screen/Attention?variant=empty</code></small></td></tr>
+<tr><td><a href="taleus://screen/Position?variant=empty"><img class="thumb" src="images/position-empty.png" alt="position-empty"></a></td><td><code>Position</code></td><td>empty</td><td></td><td><a href="taleus://screen/Position?variant=empty">open</a><br><small><code>taleus://screen/Position?variant=empty</code></small></td></tr>
+<tr><td><a href="taleus://screen/TallyHistory/tally%3Apriya-new?variant=happy"><img class="thumb" src="images/tally-history-empty.png" alt="tally-history-empty"></a></td><td><code>TallyHistory/tally%3Apriya-new</code></td><td>happy</td><td></td><td><a href="taleus://screen/TallyHistory/tally%3Apriya-new?variant=happy">open</a><br><small><code>taleus://screen/TallyHistory/tally%3Apriya-new?variant=happy</code></small></td></tr>
+<tr><td><span class="muted">no screenshot</span></td><td><code>TallyView/tally%3Amara-shop</code></td><td>happy</td><td>the other side of a balance — what this party owes</td><td><a href="taleus://screen/TallyView/tally%3Amara-shop?variant=happy">open</a><br><small><code>taleus://screen/TallyView/tally%3Amara-shop?variant=happy</code></small></td></tr>
+<tr><td><span class="muted">no screenshot</span></td><td><code>TallyView/tally%3Asupplier-parts</code></td><td>happy</td><td>a tally that is closing</td><td><a href="taleus://screen/TallyView/tally%3Asupplier-parts?variant=happy">open</a><br><small><code>taleus://screen/TallyView/tally%3Asupplier-parts?variant=happy</code></small></td></tr>
+<tr><td><span class="muted">no screenshot</span></td><td><code>TallyHistory/tally%3Amara-shop</code></td><td>happy</td><td>an entry that answered a request</td><td><a href="taleus://screen/TallyHistory/tally%3Amara-shop?variant=happy">open</a><br><small><code>taleus://screen/TallyHistory/tally%3Amara-shop?variant=happy</code></small></td></tr>
+<tr><td><span class="muted">no screenshot</span></td><td><code>TallyList</code></td><td>happy</td><td>locale override, for checking a translation</td><td><a href="taleus://screen/TallyList?variant=happy">open</a><br><small><code>taleus://screen/TallyList?variant=happy</code></small></td></tr></tbody></table>
+  </article>
+  
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Rules: Scenarios</title>
+  <style>
+    body { margin: 20px; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #222; }
+    a { color: #0066cc; text-decoration: none; }
+    article img { width: 360px; max-width: 100%; height: auto; display: block; margin: 12px auto; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    code, pre { background: #f7f7f7; padding: 2px 4px; border-radius: 4px; }
+    pre { padding: 12px; overflow: auto; }
+    h1,h2,h3 { line-height: 1.25; }
+    .appeus-nav { font-size: 14px; color: #666; padding-bottom: 8px; border-bottom: 1px solid #eee; margin-bottom: 16px; }
+    .appeus-nav .appeus-device { float: right; }
+    .appeus-nav select { font: inherit; }
+    .muted { color: #888; }
+    table.states { border-collapse: collapse; width: 100%; }
+    table.states th, table.states td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid #eee; }
+    table.states img.thumb { width: 120px; height: auto; border: 1px solid #ddd; border-radius: 6px; }
+    .appeus-toast { position: fixed; right: 16px; bottom: 16px; max-width: 60vw; padding: 10px 14px; border-radius: 8px; font-size: 14px; color: #fff; background: #333; box-shadow: 0 2px 12px rgba(0,0,0,0.25); }
+    .appeus-toast.ok { background: #2a7a2a; }
+    .appeus-toast.err { background: #a83232; }
+  </style>
+</head>
+<body>
+  <nav class="appeus-nav"><a href="../scenarios/index.html">Scenarios</a> · <a href="../states.html">States</a></nav>
+  <article>
+    <h1>Agent Rules: Scenarios</h1>
+<p>You are in scenario generation: storyboards whose screenshots link to the deep link that produced them. Locally those links open the running app.</p>
+<h2>Canonical paths</h2>
+<ul>
+<li>State registry: <code>design/generated/&lt;target&gt;/images/index.md</code> (frontmatter: <code>appId</code>, <code>scheme</code>, <code>screenshots:</code>)</li>
+<li>Screenshots: <code>design/generated/&lt;target&gt;/images/*.png</code></li>
+<li>Scenario docs + review order: <code>design/generated/&lt;target&gt;/scenarios/*.md</code>, <code>index.md</code></li>
+</ul>
+<h2>What to confirm first</h2>
+<ul>
+<li>Target is explicit (<code>--target &lt;target&gt;</code> when several exist); deep links are wired in the app (<code>appeus/reference/codegen.md</code> → “Deep Links”).</li>
+<li>Every variant a spec declares has a fixture: <code>appeus/scripts/check-variants.sh --target &lt;target&gt;</code>.</li>
+</ul>
+<h2>Method (index)</h2>
+<ol>
+<li>Register each reviewable state in <code>images/index.md</code> — <code>route</code>, <code>variant</code>, <code>params</code>, <code>file</code>, <code>deps</code>; <code>capture: false</code> + <code>note</code> for states to open but not photograph.</li>
+<li><code>appeus/scripts/open-deeplink.sh --target &lt;target&gt; --id &lt;entry&gt;</code> to verify a link on the device (<code>--device &lt;id&gt;</code> when several are connected).</li>
+<li><code>appeus/scripts/build-images.sh --target &lt;target&gt; --reuse</code> to capture missing/stale images (<code>--dry-run</code> to see what and why).</li>
+<li>Write scenario docs: cite the story; embed <code>![alt](../images/file.png)</code> — the renderer links it from the registry. Keep <code>scenarios/index.md</code> in review order.</li>
+<li><code>appeus/scripts/preview-scenarios.sh --target &lt;target&gt;</code> — click links to open states on the device; <code>publish-scenarios.sh</code> for a static site (raw links).</li>
+</ol>
+<p>Formats, options and the deep-link formula: <code>appeus/reference/scenarios.md</code>. Lane workflow: <code>appeus/reference/scenarios-agent-workflow.md</code>.</p>
+
+  </article>
+  
+</body>
+</html>

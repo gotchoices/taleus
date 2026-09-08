@@ -1,5 +1,6 @@
 ---
 provides: ["screen:TallyList"]
+mocks: [tallies]
 dependsOn:
   - design/specs/project.md
   - design/specs/domain/interfaces.md

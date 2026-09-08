@@ -1,5 +1,6 @@
 ---
 provides: ["screen:Position"]
+mocks: [position]
 dependsOn:
   - design/specs/project.md
   - design/specs/domain/interfaces.md

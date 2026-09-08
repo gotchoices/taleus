@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scenario: What needs me, and how I am doing</title>
+  <style>
+    body { margin: 20px; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #222; }
+    a { color: #0066cc; text-decoration: none; }
+    article img { width: 360px; max-width: 100%; height: auto; display: block; margin: 12px auto; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    code, pre { background: #f7f7f7; padding: 2px 4px; border-radius: 4px; }
+    pre { padding: 12px; overflow: auto; }
+    h1,h2,h3 { line-height: 1.25; }
+    .appeus-nav { font-size: 14px; color: #666; padding-bottom: 8px; border-bottom: 1px solid #eee; margin-bottom: 16px; }
+    .appeus-nav .appeus-device { float: right; }
+    .appeus-nav select { font: inherit; }
+    .muted { color: #888; }
+    table.states { border-collapse: collapse; width: 100%; }
+    table.states th, table.states td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid #eee; }
+    table.states img.thumb { width: 120px; height: auto; border: 1px solid #ddd; border-radius: 6px; }
+    .appeus-toast { position: fixed; right: 16px; bottom: 16px; max-width: 60vw; padding: 10px 14px; border-radius: 8px; font-size: 14px; color: #fff; background: #333; box-shadow: 0 2px 12px rgba(0,0,0,0.25); }
+    .appeus-toast.ok { background: #2a7a2a; }
+    .appeus-toast.err { background: #a83232; }
+  </style>
+</head>
+<body>
+  <nav class="appeus-nav"><a href="../scenarios/index.html">Scenarios</a> · <a href="../states.html">States</a></nav>
+  <article>
+    <h1>Scenario: What needs me, and how I am doing</h1>
+<p>Source: <a href="../../../stories/mobile/23-what-needs-my-attention.md">23-what-needs-my-attention.md</a>,
+<a href="../../../stories/mobile/40-my-position.md">40-my-position.md</a></p>
+<h2>Step 1: Everything waiting, across every tally</h2>
+<p>Each item says who it involves, what it is, what it would cost, and how long it has waited. Items
+waiting on somebody else appear plainly marked and never as a demand. Automated settling never
+appears at all — it was authorized in advance and needs nothing.</p>
+<p><a href="taleus://screen/Attention?variant=happy"><img src="../images/attention-happy.png" alt="Attention"></a></p>
+<h2>Step 2: Nothing waiting</h2>
+<p>A good state, and it reads like one rather than like a failure to load.</p>
+<p><a href="taleus://screen/Attention?variant=empty"><img src="../images/attention-empty.png" alt="Nothing waiting"></a></p>
+<h2>Step 3: How the party is doing</h2>
+<p>Owed and owing as two quantities, per unit, where they are exact. The cross-unit figure below them is
+an estimate and looks like one — a leading <code>≈</code>, the secondary colour — and it names what it left out
+for want of a rate. Credit available is never mixed into what the party holds.</p>
+<p><a href="taleus://screen/Position?variant=happy"><img src="../images/position-happy.png" alt="Position"></a></p>
+<h2>Step 4: Nothing yet</h2>
+<p>Told what this will show, rather than shown zeros.</p>
+<p><a href="taleus://screen/Position?variant=empty"><img src="../images/position-empty.png" alt="Nothing yet"></a></p>
+<h2>Not shown</h2>
+<p>Setting an item aside, deadlines, and the record of past items (story 23 paths E and F); position
+over time and concentration by counterparty (story 40 paths C–E). All unsliced.</p>
+
+  </article>
+  
+</body>
+</html>

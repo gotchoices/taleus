@@ -32,6 +32,12 @@ screenshots:
     deps:
       - apps/mobile/src/screens/TallyList.tsx
       - mock/data/tallies.empty.json
+  - route: TallyList
+    variant: error
+    file: tally-list-error.png
+    deps:
+      - apps/mobile/src/screens/TallyList.tsx
+      - mock/data/tallies.error.json
   - route: TallyView/tally%3Asam-bike
     variant: happy
     file: tally-view-happy.png
@@ -76,6 +82,41 @@ screenshots:
     deps:
       - apps/mobile/src/screens/Position.tsx
       - mock/data/position.happy.json
+  - route: Attention
+    variant: empty
+    file: attention-empty.png
+    deps:
+      - apps/mobile/src/screens/Attention.tsx
+      - mock/data/attention.empty.json
+  - route: Position
+    variant: empty
+    file: position-empty.png
+    deps:
+      - apps/mobile/src/screens/Position.tsx
+      - mock/data/position.empty.json
+  - route: TallyHistory/tally%3Apriya-new
+    variant: happy
+    file: tally-history-empty.png
+    deps:
+      - apps/mobile/src/screens/TallyHistory.tsx
+      - mock/data/entries.happy.json
+  - route: TallyView/tally%3Amara-shop
+    variant: happy
+    capture: false
+    note: the other side of a balance — what this party owes
+  - route: TallyView/tally%3Asupplier-parts
+    variant: happy
+    capture: false
+    note: a tally that is closing
+  - route: TallyHistory/tally%3Amara-shop
+    variant: happy
+    capture: false
+    note: an entry that answered a request
+  - route: TallyList
+    variant: happy
+    locale: en
+    capture: false
+    note: locale override, for checking a translation
 ---
 
 # Screenshots
@@ -109,6 +150,9 @@ Notes:
   (`taleus://screen/TallyView/tally%3Asam-bike`) or React Navigation's linking will not match.
 - Cold start after a fresh install takes ~20s to first paint on this AVD; warm launches ~13s. Launch
   once to warm the app before a capture run, or the first image is a blank screen.
+- **Capture does not restart the app**, and a variant change is ignored by a route that is already
+  mounted: `?variant=error` on a warm `TallyList` re-renders the happy list. Force-stop between
+  captures that change variant on the same route.
 - First run is reachable only with `?variant=empty` — the happy party fixture is an established
   identity, so the app goes straight to the tabs. The `ChooseName` captures are taken by walking the
   flow (`input tap`), not by deep link: onboarding screens have no linking config, by design.

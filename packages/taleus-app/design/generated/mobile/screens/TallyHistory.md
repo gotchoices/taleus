@@ -1,5 +1,6 @@
 ---
 provides: ["screen:TallyHistory"]
+mocks: [tally, entries, requests]
 dependsOn:
   - design/specs/project.md
   - design/specs/domain/interfaces.md

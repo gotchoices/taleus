@@ -1,5 +1,6 @@
 ---
 provides: ["screen:Attention"]
+mocks: [attention]
 dependsOn:
   - design/specs/project.md
   - design/specs/domain/interfaces.md

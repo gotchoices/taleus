@@ -1,5 +1,6 @@
 ---
 provides: ["screen:TallyView"]
+mocks: [tally, requests]
 dependsOn:
   - design/specs/project.md
   - design/specs/domain/interfaces.md

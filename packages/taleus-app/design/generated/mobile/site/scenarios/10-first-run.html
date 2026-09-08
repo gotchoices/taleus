@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scenario: First run</title>
+  <style>
+    body { margin: 20px; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #222; }
+    a { color: #0066cc; text-decoration: none; }
+    article img { width: 360px; max-width: 100%; height: auto; display: block; margin: 12px auto; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    code, pre { background: #f7f7f7; padding: 2px 4px; border-radius: 4px; }
+    pre { padding: 12px; overflow: auto; }
+    h1,h2,h3 { line-height: 1.25; }
+    .appeus-nav { font-size: 14px; color: #666; padding-bottom: 8px; border-bottom: 1px solid #eee; margin-bottom: 16px; }
+    .appeus-nav .appeus-device { float: right; }
+    .appeus-nav select { font: inherit; }
+    .muted { color: #888; }
+    table.states { border-collapse: collapse; width: 100%; }
+    table.states th, table.states td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid #eee; }
+    table.states img.thumb { width: 120px; height: auto; border: 1px solid #ddd; border-radius: 6px; }
+    .appeus-toast { position: fixed; right: 16px; bottom: 16px; max-width: 60vw; padding: 10px 14px; border-radius: 8px; font-size: 14px; color: #fff; background: #333; box-shadow: 0 2px 12px rgba(0,0,0,0.25); }
+    .appeus-toast.ok { background: #2a7a2a; }
+    .appeus-toast.err { background: #a83232; }
+  </style>
+</head>
+<body>
+  <nav class="appeus-nav"><a href="../scenarios/index.html">Scenarios</a> · <a href="../states.html">States</a></nav>
+  <article>
+    <h1>Scenario: First run</h1>
+<p>Source: <a href="../../../stories/mobile/10-first-run.md">10-first-run.md</a></p>
+<p>Steve has followed MyCHIPs for years and installs Taleus out of curiosity. He has no invitation
+waiting, nobody to tally with, and no idea what the app expects of him.</p>
+<p>Reachable only with <code>variant=empty</code> — the default party fixture is an established identity, so the
+app otherwise goes straight to the tabs.</p>
+<h2>Step 1: Told what this is, before being asked for anything</h2>
+<p>Two lines about what a tally is and what value means here — enough to decide whether to continue.
+Story path D is the constraint: he can read this <em>without anything having been created</em>. No identity
+exists at this point.</p>
+<p><a href="taleus://screen/Welcome?variant=empty"><img src="../images/welcome-first-run.png" alt="Welcome, first run"></a></p>
+<h2>Step 2: An identity exists, and he is told so</h2>
+<p>Tapping through creates it. There were no keys to understand, no algorithm to choose, nothing to
+name — step 3 is emphatic that this is bookkeeping the app does. He is then told, once, that it
+lives on this device and what that implies before he holds anything of value (step 4).</p>
+<p>Below that sits the one thing he is asked for (step 5), and the promise that makes deferring the rest
+honest: anything more is asked for when it matters, and he will be told who is asking.</p>
+<p><a href="taleus://screen/ChooseName?variant=empty"><img src="../images/choose-name.png" alt="Choose a name"></a></p>
+<h2>Step 3: A name, and nothing else</h2>
+<p>The prompt below the button is gone once there is a name. There is no optional field here at all —
+an optional field is still an ask.</p>
+<p><a href="taleus://screen/ChooseName?variant=empty"><img src="../images/choose-name-filled.png" alt="A name entered"></a></p>
+<h2>Step 4: No tallies, and what he needs</h2>
+<p>First run ends here (step 6). Rather than an empty list he is told what he needs — someone to tally
+with — and offered both ways to get there.</p>
+<p><a href="taleus://screen/TallyList?variant=empty"><img src="../images/tally-list-empty.png" alt="No tallies yet"></a></p>
+<p>Steve is not ready to invite anyone. Nothing he has done obliges him to anybody (step 7).</p>
+<h2>Alternates</h2>
+<p><strong>Path A — Sam&#39;s route, invitation first.</strong> Sam installs because Jan sent him something. Setting up
+happens on the way to answering, and he lands on Jan&#39;s invitation rather than on an empty app. The
+link is held while first run completes and re-delivered after; <code>ReviewInvitation</code> is not yet sliced,
+so there is nothing to photograph.</p>
+<p><strong>Path B — an identity already exists.</strong> Continuing as himself on a replacement phone rather than
+starting over. Stories 13 and 50; unsliced, and deliberately not offered as a button that goes
+nowhere.</p>
+<p><strong>Path C — no connectivity.</strong> Nothing in this scenario needs the network. Identity creation is local,
+so the whole flow above completes on a plane.</p>
+<p><strong>Path E — being findable.</strong> Publishing an invitation others can take up, before ever having tallied.
+<code>StandingInvitation</code>; unsliced.</p>
+
+  </article>
+  
+</body>
+</html>

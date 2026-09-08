@@ -1,5 +1,6 @@
 ---
 provides: ["screen:ChooseName"]
+mocks: [party]
 dependsOn:
   - design/specs/project.md
   - design/specs/domain/interfaces.md
