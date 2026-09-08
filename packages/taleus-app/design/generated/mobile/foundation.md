@@ -41,6 +41,8 @@ it is exactly the code twenty-five more screens will inherit.
 | `src/navigation/index.tsx` | tabs over three native stacks | `navigation.md` |
 | `src/data/config.ts` | the one mock/engine switch | `interfaces.md` § Run modes |
 | `src/data/types.ts` | app-side shapes mirroring the domain contract | `interfaces.md` |
+| `src/data/party.ts` | who this party is; the first adapter that writes | `interfaces.md` |
+| `src/session/index.tsx` | whether a party exists — the root state the navigator gates on | story 10 |
 | `src/mock/variant.ts` | variant from a deep link; screens never see it | `appeus/reference/mock-variants.md` |
 | `App.tsx`, `index.js` | providers, error boundary, entry point | — |
 | `testUtils.tsx` | `renderScreen`, typed navigation stubs for tests | — |
@@ -57,6 +59,9 @@ it is exactly the code twenty-five more screens will inherit.
 - **Amounts go through one component.** Colour, sign, the fraction notation, the estimate mark and
   the spoken form are decided once. Three screens previously coloured figures by three different
   rules, with colour as the only cue.
+- **Launch parameters are applied before any data is read.** `?variant=` decides which fixtures
+  answer, and React Navigation supplies the initial URL only after its container mounts — too late
+  for anything read at startup. `applyLaunchParams()` runs at the head of the session's load.
 - **An error boundary, because release builds are silent.** A render error shows a blank screen with
   nothing in logcat. That cost two debugging sessions before the boundary existed.
 

@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { ErrorBoundary } from './src/components/ErrorBoundary'
 import { AppNavigator } from './src/navigation'
+import { SessionProvider } from './src/session'
 import { ThemeProvider, useTheme } from './src/theme'
 
 function Themed(): React.JSX.Element {
@@ -30,7 +31,9 @@ function App(): React.JSX.Element {
 	return (
 		<SafeAreaProvider>
 			<ThemeProvider>
-				<Themed />
+				<SessionProvider>
+					<Themed />
+				</SessionProvider>
 			</ThemeProvider>
 		</SafeAreaProvider>
 	)

@@ -123,5 +123,21 @@
   "screens.tally-history.balance-owed-to-me-suffix": "owed to you",
   "screens.tally-history.balance-owed-by-me-prefix": "Balance after:",
   "screens.tally-history.balance-owed-by-me-suffix": "you owe",
-  "amount.a11y-estimate": "about {amount}"
+  "amount.a11y-estimate": "about {amount}",
+  "screens.welcome.title": "Taleus",
+  "screens.welcome.what-it-is": "A tally is a running account between you and one other person.",
+  "screens.welcome.what-value-is": "Value here is what people owe each other — not money sitting in an account somewhere.",
+  "screens.welcome.no-obligation": "Setting up obliges you to nobody. You can look around first.",
+  "screens.welcome.start": "Get started",
+  "screens.welcome.have-identity": "I already have an identity",
+  "screens.welcome.failed-title": "Setup could not finish",
+  "screens.choose-name.title": "One thing to choose",
+  "screens.choose-name.identity-made": "An identity has been set up for you. There was nothing for you to decide — no keys, no algorithm, no jargon.",
+  "screens.choose-name.on-this-device": "It lives on this device. Before you hold anything of value, protecting it is worth doing.",
+  "screens.choose-name.ask": "What should people you tally with see?",
+  "screens.choose-name.placeholder": "A name they will recognise",
+  "screens.choose-name.deferred": "Nothing else is needed yet. Anything more is asked for when it matters, and you will be told who is asking.",
+  "screens.choose-name.continue": "Continue",
+  "screens.choose-name.needed": "A name is needed before you can continue.",
+  "screens.choose-name.failed-title": "That name could not be saved"
 }

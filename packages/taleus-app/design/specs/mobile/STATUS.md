@@ -33,8 +33,10 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
 - [x] The shared layer every screen sits on is recorded in
   [`design/generated/mobile/foundation.md`](../../generated/mobile/foundation.md) and is a dependency
   of all five slices, so changing it marks them stale
-- [ ] The remaining 25 screens in `screens/index.md`; next by the suggested order are `Welcome` and
-  `ChooseName`, then the invitation arc
+- [x] `Welcome` and `ChooseName` — first run, built from story 10 with **no screen spec**: the story
+  was enough, so nothing was written to override it
+- [ ] The remaining 23 screens in `screens/index.md`; next by the suggested order is the invitation
+  arc — `CreateInvitation`, `ReviewInvitation`, `ReviewOffer`
 
 ## Mock mode (this target)
 - [x] `mock/data/` carries the first fixtures — party, tallies, tally, entries, requests, attention,

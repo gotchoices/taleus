@@ -11,8 +11,8 @@ and should not acquire one.
 
 | Screen Name | Route | Spec File | Stories | Variants | Status |
 |-------------|-------|-----------|---------|----------|--------|
-| Welcome | Welcome | — | 10 | happy | draft |
-| Choose name | ChooseName | — | 10, 11 | happy, error | draft |
+| Welcome | Welcome | — | 10 | happy, empty | generated |
+| Choose name | ChooseName | — | 10, 11 | happy, empty | generated |
 | Tally list | TallyList | tally-list.md | 06, 04 | happy, empty, error | generated |
 | Tally view | TallyView | tally-view.md | 04, 07 | happy, error | generated |
 | Tally history | TallyHistory | — | 24 | happy, empty, error | generated |

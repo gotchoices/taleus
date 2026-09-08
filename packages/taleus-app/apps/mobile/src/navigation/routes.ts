@@ -16,6 +16,12 @@ export type AttentionParams = {
 	Attention: undefined
 }
 
+/** Outside the tabs, shown until a party exists (`navigation.md` § Sitemap). */
+export type OnboardingParams = {
+	Welcome: undefined
+	ChooseName: undefined
+}
+
 export type PositionParams = {
 	Position: undefined
 }
@@ -91,3 +97,8 @@ interface ScreenPropsByRoute {
 }
 
 export type ScreenProps<R extends RouteName> = ScreenPropsByRoute[R]
+
+export type OnboardingProps<R extends keyof OnboardingParams> = NativeStackScreenProps<
+	OnboardingParams,
+	R
+>

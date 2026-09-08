@@ -33,9 +33,7 @@ export const linking: LinkingOptions<TabParams> = {
 			PositionTab: { screens: { Position: 'screen/Position' } },
 		},
 	},
-	async getInitialURL() {
-		return consume((await Linking.getInitialURL()) ?? null)
-	},
+	getInitialURL: applyLaunchParams,
 	subscribe(listener) {
 		const sub = Linking.addEventListener('url', ({ url }) => {
 			consume(url)
@@ -43,6 +41,29 @@ export const linking: LinkingOptions<TabParams> = {
 		})
 		return () => sub.remove()
 	},
+}
+
+/**
+ * The launch URL, read and applied once.
+ *
+ * This has to happen *before* anything reads data, because `?variant=` decides
+ * which fixtures answer. The navigation container asks for the initial URL only
+ * after it mounts, by which time the session has already read the party — so the
+ * session applies the launch parameters first and the container reuses the
+ * result.
+ */
+let launched: string | null | undefined
+
+export async function applyLaunchParams(): Promise<string | null> {
+	if (launched === undefined) {
+		launched = consume((await Linking.getInitialURL()) ?? null)
+	}
+	return launched
+}
+
+/** The launch URL, once `applyLaunchParams` has run. */
+export function launchUrl(): string | null {
+	return launched ?? null
 }
 
 /** Applies the parameters that are not navigation, and returns the URL unchanged. */

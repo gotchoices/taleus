@@ -4,6 +4,22 @@ appId: org.sereus.taleus
 scheme: taleus
 
 screenshots:
+  - route: Welcome
+    variant: empty
+    file: welcome-first-run.png
+    deps:
+      - apps/mobile/src/screens/Welcome.tsx
+      - mock/data/party.empty.json
+  - route: ChooseName
+    variant: empty
+    file: choose-name.png
+    deps:
+      - apps/mobile/src/screens/ChooseName.tsx
+  - route: ChooseName
+    variant: empty
+    file: choose-name-filled.png
+    deps:
+      - apps/mobile/src/screens/ChooseName.tsx
   - route: TallyList
     variant: happy
     file: tally-list-happy.png
@@ -69,6 +85,9 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 
 | Screen | Variant | Shows | Preview |
 |--------|---------|-------|---------|
+| Welcome | first run | what this is, before anything is asked | ![](welcome-first-run.png) |
+| Choose name | first run | told it exists and lives here; asked one thing | ![](choose-name.png) |
+| Choose name | named | the prompt gone once there is a name | ![](choose-name-filled.png) |
 | Tally list | happy | six tallies, one offered and figureless | ![](tally-list-happy.png) |
 | Tally list | empty | nothing yet, and what to do about it | ![](tally-list-empty.png) |
 | Tally view | happy | a tally with history, terms both ways | ![](tally-view-happy.png) |
@@ -90,5 +109,8 @@ Notes:
   (`taleus://screen/TallyView/tally%3Asam-bike`) or React Navigation's linking will not match.
 - Cold start after a fresh install takes ~20s to first paint on this AVD; warm launches ~13s. Launch
   once to warm the app before a capture run, or the first image is a blank screen.
+- First run is reachable only with `?variant=empty` — the happy party fixture is an established
+  identity, so the app goes straight to the tabs. The `ChooseName` captures are taken by walking the
+  flow (`input tap`), not by deep link: onboarding screens have no linking config, by design.
 - Captured after the React Native 0.87 upgrade, so the tab bar has icons and the headers are React
   Navigation's own.

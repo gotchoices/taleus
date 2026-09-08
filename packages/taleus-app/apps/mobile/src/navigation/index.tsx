@@ -1,18 +1,31 @@
+import { useEffect } from 'react'
 import Ionicons from '@react-native-vector-icons/ionicons'
 import { NavigationContainer, type Theme } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { Image, StyleSheet } from 'react-native'
+import { Image, StyleSheet, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Attention } from '../screens/Attention'
+import { ChooseName } from '../screens/ChooseName'
+import { Welcome } from '../screens/Welcome'
 import { Position } from '../screens/Position'
 import { TallyHistory } from '../screens/TallyHistory'
 import { TallyList } from '../screens/TallyList'
 import { TallyView } from '../screens/TallyView'
 import { t } from '../i18n'
 import { useTokens, type as typography, type Tokens } from '../theme'
+import { isOnboarded, useSession } from '../session'
+import { Loading } from '../components'
 import { linking } from './linking'
-import { tabs, type AttentionParams, type PositionParams, type TabParams, type TalliesParams } from './routes'
+import {
+	tabs,
+	type AttentionParams,
+	type OnboardingParams,
+	type PositionParams,
+	type TabParams,
+	type TalliesParams,
+} from './routes'
 
 /**
  * Navigation, per `design/specs/mobile/navigation.md`.
@@ -27,6 +40,28 @@ const Tallies = createNativeStackNavigator<TalliesParams>()
 const AttentionStack = createNativeStackNavigator<AttentionParams>()
 const PositionStack = createNativeStackNavigator<PositionParams>()
 const Tabs = createBottomTabNavigator<TabParams>()
+const Onboarding = createNativeStackNavigator<OnboardingParams>()
+
+/**
+ * First run, outside the tabs (`navigation.md` § Sitemap). Shown until there is
+ * an identity with a name on it; story 10 is what happens here.
+ */
+function OnboardingStack(): React.JSX.Element {
+	const session = useSession()
+	const insets = useSafeAreaInsets()
+	return (
+		// First run has no header, so nothing else keeps content out from under
+		// the status bar — React Native 0.87 draws edge-to-edge.
+		<View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
+		<Onboarding.Navigator screenOptions={{ ...useStackOptions(), headerShown: false }}>
+			<Onboarding.Screen name="Welcome" component={Welcome} />
+			<Onboarding.Screen name="ChooseName">
+				{props => <ChooseName {...props} onDone={session.reload} />}
+			</Onboarding.Screen>
+		</Onboarding.Navigator>
+		</View>
+	)
+}
 
 /**
  * The one branded corner in the app — the mark on the home header, the way the
@@ -95,6 +130,29 @@ function PositionRoot(): React.JSX.Element {
 
 export function AppNavigator(): React.JSX.Element {
 	const tokens = useTokens()
+	const session = useSession()
+	const onboarded = isOnboarded(session.party)
+
+	// A link that arrived before there was an identity is held and re-delivered
+	// once the tabs exist, so the party lands on it (story 10 path A).
+	useEffect(() => {
+		if (onboarded) {
+			session.resume()
+		}
+	}, [onboarded, session])
+
+	if (session.loading) {
+		return <Loading />
+	}
+
+	if (!onboarded) {
+		return (
+			<NavigationContainer theme={navigationTheme(tokens)}>
+				<OnboardingStack />
+			</NavigationContainer>
+		)
+	}
+
 	return (
 		<NavigationContainer linking={linking} theme={navigationTheme(tokens)}>
 			<Tabs.Navigator

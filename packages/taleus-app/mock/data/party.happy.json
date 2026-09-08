@@ -1,14 +1,25 @@
 {
-  "sid": "sid:jan-7f3a",
-  "displayName": "Jan Kessler",
-  "displayUnit": "iso4217:USD",
-  "disclosed": {
-    "name": "Jan Kessler",
-    "phone": "+1-555-0142",
-    "email": "jan@example.org"
-  },
-  "devices": [
-    { "id": "dev:phone-1", "name": "Jan's phone", "lastActive": "2026-09-05T08:12:00Z" },
-    { "id": "dev:node-1", "name": "Home node", "lastActive": "2026-09-05T09:01:00Z", "alwaysOn": true }
-  ]
+  "party": {
+    "sid": "sid:jan-7f3a",
+    "displayName": "Jan Kessler",
+    "displayUnit": "iso4217:USD",
+    "disclosed": {
+      "name": "Jan Kessler",
+      "phone": "+1-555-0142",
+      "email": "jan@example.org"
+    },
+    "devices": [
+      {
+        "id": "dev:phone-1",
+        "name": "Jan's phone",
+        "lastActive": "2026-09-05T08:12:00Z"
+      },
+      {
+        "id": "dev:node-1",
+        "name": "Home node",
+        "lastActive": "2026-09-05T09:01:00Z",
+        "alwaysOn": true
+      }
+    ]
+  }
 }

@@ -1,10 +1,13 @@
 {
   "namespace": "party",
   "variants": [
-    "happy"
+    "happy",
+    "empty"
   ],
   "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
   "notes": [
-    "the reading party: who I am, my display unit, what I have disclosed (stories 10, 11, 42)"
+    "the reading party: who I am, my display unit, what I have disclosed (stories 10, 11, 42)",
+    "`party: null` is the empty variant — no identity yet, which is what first run is about",
+    "mock writes (creating an identity, setting a name) are held in memory and do not survive a restart"
   ]
 }
