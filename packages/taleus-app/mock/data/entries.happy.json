@@ -86,12 +86,12 @@
         "kind": "direct",
         "issuer": "them",
         "amount": {
-          "units": 6
+          "units": 367
         },
         "date": "2026-07-19T14:22:00Z",
         "memo": "Deck framing",
         "balanceAfter": {
-          "units": 6,
+          "units": 367,
           "perspective": "owed-to-me"
         }
       }

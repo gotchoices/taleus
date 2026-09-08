@@ -35,6 +35,12 @@ screenshots:
     deps:
       - apps/mobile/src/screens/TallyView.tsx
       - mock/data/tally.error.json
+  - route: TallyView/tally%3Adave-hours
+    variant: happy
+    file: tally-view-hours.png
+    deps:
+      - apps/mobile/src/components/Amount.tsx
+      - mock/data/tally.happy.json
   - route: TallyHistory/tally%3Asam-bike
     variant: happy
     file: tally-history-happy.png
@@ -68,6 +74,7 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Tally view | happy | a tally with history, terms both ways | ![](tally-view-happy.png) |
 | Tally view | new tally | story 04's actual scene: zero, explained | ![](tally-view-new.png) |
 | Tally view | unreachable | story 04 path C: reads anyway, pending marked | ![](tally-view-unreachable.png) |
+| Tally view | hours | a unit that divides by sixty — `6 07/60` | ![](tally-view-hours.png) |
 | Tally history | happy | entries with the side of each balance | ![](tally-history-happy.png) |
 | Attention | happy | what waits, how long, and reachable | ![](attention-happy.png) |
 | Position | happy | per unit, then a marked estimate | ![](position-happy.png) |
@@ -81,5 +88,7 @@ Notes:
   sooner is a picture of the splash screen. An earlier round of these images was exactly that.
 - A tally id contains a colon, which a URL path treats as a scheme separator — encode it as `%3A`
   (`taleus://screen/TallyView/tally%3Asam-bike`) or React Navigation's linking will not match.
+- Cold start after a fresh install takes ~20s to first paint on this AVD; warm launches ~13s. Launch
+  once to warm the app before a capture run, or the first image is a blank screen.
 - Captured after the React Native 0.87 upgrade, so the tab bar has icons and the headers are React
   Navigation's own.

@@ -5,6 +5,9 @@ import { engineAbsent, type Amount, type Result, type UnitAmount } from './types
 export interface PerUnitPosition {
 	denom: string
 	scale: number
+	divisor?: number
+	code?: string
+	mark?: string
 	label?: string
 	owedToMe: Amount
 	owedByMe: Amount

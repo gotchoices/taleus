@@ -102,7 +102,9 @@ const make = (tokens: Tokens) => ({
 	rowMain: {
 		flexDirection: 'row' as const,
 		justifyContent: 'space-between' as const,
-		alignItems: 'baseline' as const,
+		// Not 'baseline': `Amount` is a View (the fraction is stacked), and Yoga
+		// gives a baseline row containing a non-text child zero height.
+		alignItems: 'center' as const,
 		gap: spacing[2],
 	},
 	rowName: { ...typography.body, color: tokens.textPrimary, flexShrink: 1 },

@@ -95,8 +95,6 @@
   "screens.tally-view.request-asked-by-me": "You are asking them",
   "screens.tally-history.request-asked-of-me": "Asked of you",
   "screens.tally-history.request-asked-by-me": "Asked by you",
-  "screens.tally-history.balance-owed-to-me": "Balance after: {balance} owed to you",
-  "screens.tally-history.balance-owed-by-me": "Balance after: {balance} you owe",
   "screens.tally-history.balance-level": "Balance after: settled",
   "screens.tally-history.answered": "Answered a request",
   "screens.tally-history.unsettled": "Not yet settled",
@@ -123,5 +121,10 @@
   "screens.position.estimate-owed-to-me": "Owed to you",
   "screens.position.estimate-owed-by-me": "You owe",
   "screens.position.estimate-overall": "Leaving you",
-  "screens.position.nothing-either-way": "Nothing either way"
+  "screens.position.nothing-either-way": "Nothing either way",
+  "screens.tally-history.balance-owed-to-me-prefix": "Balance after:",
+  "screens.tally-history.balance-owed-to-me-suffix": "owed to you",
+  "screens.tally-history.balance-owed-by-me-prefix": "Balance after:",
+  "screens.tally-history.balance-owed-by-me-suffix": "you owe",
+  "amount.a11y-estimate": "about {amount}"
 }

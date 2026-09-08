@@ -121,3 +121,10 @@ most missed later. See `feat-engine-run-modes`.
    the time. Either the engine distinguishes them in its types, or it tells the app which fields are
    which. (This is not hypothetical — the mobile app shipped "Mar 1" for a `2026-03-02` effective
    date until the fixtures were changed to carry dates as days.)
+
+7. **A unit's divisor.** Every unit needs one number the apps do not currently get: how many of its
+   smallest parts make one whole. For dollars that is 100, for CHIP 1000 — both recoverable from
+   `scale`. But a community unit may divide some other way; an hour into sixty minutes is the obvious
+   case, and no exponent expresses it. Declaring `divisor` outright covers both and makes `scale`
+   derived rather than primary. The apps need it for arithmetic *and* for display, since it decides
+   how a figure is written — see `packages/taleus-app/design/specs/domain/amounts.md`.

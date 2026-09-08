@@ -46,10 +46,13 @@
       "unit": {
         "denom": "cid:bafy-dave-hours",
         "scale": 0,
+        "divisor": 60,
+        "code": "DVH",
+        "mark": "DH",
         "label": "Dave-hours"
       },
       "balance": {
-        "units": 6,
+        "units": 367,
         "perspective": "owed-to-me"
       },
       "state": "Open",

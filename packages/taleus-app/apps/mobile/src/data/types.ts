@@ -41,9 +41,26 @@ export interface Balance extends Amount {
 	perspective: Perspective
 }
 
+/**
+ * A unit of account, as the apps need it — `design/specs/domain/amounts.md`.
+ *
+ * `divisor` is how many smallest parts make one whole and is the general fact;
+ * `scale` states it as a power of ten, which covers every unit the engine hands
+ * over today. A unit that divides some other way — sixty minutes to an hour —
+ * carries `divisor` instead, and is the reason the apps prefer it.
+ */
 export interface Unit {
 	denom: string
 	scale: number
+	/** Overrides `10 ** scale`; the only way to say a non-decimal subdivision. */
+	divisor?: number
+	/** Short code, always safe to show. Standard units take theirs from the standard. */
+	code?: string
+	/**
+	 * Short mark the parties write it with. Ignored if it contains a currency
+	 * symbol — a counterparty cannot make a unit look like dollars.
+	 */
+	mark?: string
 	/** Human label for a unit whose identifier is not self-explanatory. */
 	label?: string
 }

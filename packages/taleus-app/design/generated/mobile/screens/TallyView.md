@@ -69,6 +69,14 @@ Acting on terms, closing, paying, and the amendment history (stories 03, 05, 20)
 - **Next actions** remain absent, deliberately: Pay, Request, and Terms are unsliced, and a button
   that routes nowhere is worse than no button. Recorded here rather than stubbed.
 
+## Amount notation
+
+Figures are written as a whole number and a common fraction, per
+[`domain/amounts.md`](../../../specs/domain/amounts.md) — no decimal point anywhere, because
+`1.000 CHIP` is one CHIP to an American and a thousand to a German. `src/util/amount.ts` splits by
+integer arithmetic (quotient and remainder against the unit's divisor, sign held aside) and
+`components/Amount.tsx` draws it. No screen does either itself.
+
 ## Loading
 
 `src/hooks/useLoad.ts`. Five screens had five copies of the same state machine, and three of them

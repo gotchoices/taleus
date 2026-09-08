@@ -8,6 +8,7 @@
 import { StatusBar, View } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
+import { ErrorBoundary } from './src/components/ErrorBoundary'
 import { AppNavigator } from './src/navigation'
 import { ThemeProvider, useTheme } from './src/theme'
 
@@ -18,7 +19,9 @@ function Themed(): React.JSX.Element {
 			{/* No backgroundColor: React Native 0.87 draws edge-to-edge, so the bar is
 			    transparent and the view beneath it supplies the colour. */}
 			<StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-			<AppNavigator />
+			<ErrorBoundary>
+				<AppNavigator />
+			</ErrorBoundary>
 		</View>
 	)
 }

@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { FlatList, Text, View } from 'react-native'
 
-import { Amount, Chip, Empty, Failed, Loading, directionOf } from '../components'
+import { Amount, Chip, Empty, Failed, Loading, amountText, directionOf } from '../components'
 import { listEntries, type Entry } from '../data/entries'
 import { listRequests, type PaymentRequest } from '../data/requests'
 import { readTally, type TallyDetail } from '../data/tally'
@@ -10,7 +10,6 @@ import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, spacing, type as typography, type Tokens } from '../theme'
-import { formatAmount } from '../util/amount'
 import { formatInstant } from '../util/date'
 
 type Props = ScreenProps<'TallyHistory'>
@@ -100,7 +99,7 @@ function Asked({ requests, unit }: { requests: PaymentRequest[]; unit: Unit }): 
 							{request.applied.units > 0
 								? t('screens.tally-history.applied', {
 										count: request.outstandingDays,
-										applied: formatAmount(request.applied, unit),
+										applied: amountText(request.applied, unit),
 										days: request.outstandingDays,
 									})
 								: t('screens.tally-history.outstanding-days', {
@@ -135,13 +134,25 @@ function EntryRow({ entry, unit }: { entry: Entry; unit: Unit }): React.JSX.Elem
 						? t('screens.tally-history.routed')
 						: t(`screens.tally-history.by-${entry.issuer}`)}
 				</Text>
-				<Text style={styles.meta}>
-					{after.perspective === 'level'
-						? t('screens.tally-history.balance-level')
-						: t(`screens.tally-history.balance-${after.perspective}`, {
-								balance: formatAmount(after, unit),
-							})}
-				</Text>
+				{/* The balance after states its side; a bare "Balance $180.00" would
+				    put the sign back on the reader, which is the one thing this app
+				    does not do. Rendered rather than interpolated, so the fraction
+				    keeps its notation inside the sentence. */}
+				<View style={styles.balanceAfter}>
+					<Text style={styles.meta}>
+						{after.perspective === 'level'
+							? t('screens.tally-history.balance-level')
+							: t(`screens.tally-history.balance-${after.perspective}-prefix`)}
+					</Text>
+					{after.perspective === 'level' ? null : (
+						<Amount value={after} unit={unit} size="small" />
+					)}
+					{after.perspective === 'level' ? null : (
+						<Text style={styles.meta}>
+							{t(`screens.tally-history.balance-${after.perspective}-suffix`)}
+						</Text>
+					)}
+				</View>
 			</View>
 			{entry.answers?.length || entry.unsettled ? (
 				<View style={styles.entryChips}>
@@ -172,7 +183,8 @@ const make = (tokens: Tokens) => ({
 		gap: spacing[0],
 	},
 	entryTop: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, gap: spacing[2] },
-	entryMeta: { flexDirection: 'row' as const, gap: spacing[2], flexWrap: 'wrap' as const },
+	entryMeta: { flexDirection: 'row' as const, gap: spacing[2], flexWrap: 'wrap' as const, alignItems: 'center' as const },
+	balanceAfter: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 3 },
 	entryChips: { flexDirection: 'row' as const, gap: spacing[1], marginTop: spacing[0] },
 	body: { ...typography.body, color: tokens.textPrimary, flexShrink: 1 },
 	caption: { ...typography.caption, color: tokens.textSecondary },

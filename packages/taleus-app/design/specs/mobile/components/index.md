@@ -8,6 +8,8 @@ written; implementation mapping lives in `design/generated/mobile/screens/*.md`.
 | Component Name | Spec File | Used By | Status |
 |----------------|-----------|---------|--------|
 | Amount | amount.md | TallyList, TallyView, TallyHistory, Attention, Position | built |
+| Chit mark | amount.md | Amount, wherever CHIP appears | built |
+| Error boundary | screen-states.md | the whole app | built |
 | Chip | chip.md | TallyList, TallyView, TallyHistory, Attention | built |
 | Card / Row | card.md | TallyView, Position | built |
 | Openable row | card.md | TallyList, Attention | built |
@@ -18,6 +20,8 @@ written; implementation mapping lives in `design/generated/mobile/screens/*.md`.
 
 Wherever a figure appears. Guarantees, in one place, what every screen would otherwise re-decide:
 
+- The figure is written as a whole number and a common fraction, per
+  [`domain/amounts.md`](../../domain/amounts.md) — never with a decimal point.
 - The figure always carries its unit. A bare number is never shown.
 - A figure with a **side** shows it three ways — the word, a sign, and colour — so no reader depends
   on colour ([`global/ui.md`](../global/ui.md)). Zero has no side and takes none of the three.
@@ -35,6 +39,11 @@ on this party, plain when it is merely a fact. Story 06 path A is the reason it 
 The card vocabulary the screens share: a titled block, a label-and-value line, a line that opens
 something (and wears a chevron because it does), and a primary action. Anything tappable meets the
 platform touch minimum and shows a pressed state; anything that is not tappable wears neither.
+
+## Error boundary
+
+A render error in a release build is silent — no redbox, nothing in the log, just a blank screen.
+The app shows what failed instead, because twice now that silence has cost a debugging session.
 
 ## Loading / Failed / Empty
 

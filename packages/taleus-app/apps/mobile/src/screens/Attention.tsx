@@ -122,7 +122,7 @@ const make = (tokens: Tokens) => ({
 	itemTop: {
 		flexDirection: 'row' as const,
 		justifyContent: 'space-between' as const,
-		alignItems: 'baseline' as const,
+		alignItems: 'center' as const,
 		gap: spacing[2],
 	},
 	itemMeta: {

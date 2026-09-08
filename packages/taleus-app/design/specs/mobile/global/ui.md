@@ -47,8 +47,14 @@ The captions are the product's voice, not chrome. They do not get the metadata s
 
 ## Amounts
 
+**How an amount is written is not this file's decision** — see
+[`domain/amounts.md`](../../domain/amounts.md), which every Taleus target follows: whole part at full
+size, fraction smaller and raised over a bar, and no decimal point anywhere. This file owns only how
+that figure is sized and coloured.
+
 Every amount appears with its unit of account — a party holds tallies in more than one
-(`design/specs/domain/rules.md`). Amounts use tabular figures so columns align.
+(`design/specs/domain/rules.md`). The whole part uses tabular figures so columns align; the fraction
+is fixed-width per unit, so it aligns too.
 
 Figures converted into the display unit are estimates and are marked as such, distinctly enough
 that an estimate is never mistaken for a signed balance: a leading `≈` and the secondary text

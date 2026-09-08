@@ -49,6 +49,14 @@ Narrowing by period, size, exact amount, or purpose; entry detail; export (story
   tally* was corrected. Entries are now keyed by tally, so that class of mistake does not recur.
 - **Requests are labelled by direction**, as on `TallyView`.
 
+## Amount notation
+
+Figures are written as a whole number and a common fraction, per
+[`domain/amounts.md`](../../../specs/domain/amounts.md) — no decimal point anywhere, because
+`1.000 CHIP` is one CHIP to an American and a thousand to a German. `src/util/amount.ts` splits by
+integer arithmetic (quotient and remainder against the unit's divisor, sign held aside) and
+`components/Amount.tsx` draws it. No screen does either itself.
+
 ## Loading
 
 `src/hooks/useLoad.ts`. Five screens had five copies of the same state machine, and three of them

@@ -65,7 +65,14 @@ export function Position(): React.JSX.Element {
 }
 
 function UnitCard({ position }: { position: PerUnitPosition }): React.JSX.Element {
-	const unit: Unit = { denom: position.denom, scale: position.scale, label: position.label }
+	const unit: Unit = {
+		denom: position.denom,
+		scale: position.scale,
+		divisor: position.divisor,
+		code: position.code,
+		mark: position.mark,
+		label: position.label,
+	}
 	return (
 		<Card title={unitLabel(position.denom, position.label)}>
 			<Row

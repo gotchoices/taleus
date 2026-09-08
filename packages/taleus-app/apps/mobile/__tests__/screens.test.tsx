@@ -28,7 +28,8 @@ test('a balance after an entry states its side, never a bare figure', async () =
 		/>,
 	)
 	await waitFor(() => expect(view.getByText('Bike')).toBeTruthy())
-	expect(view.getAllByText(/Balance after: .* owed to you/).length).toBeGreaterThan(0)
+	expect(view.getAllByText('Balance after:').length).toBeGreaterThan(0)
+	expect(view.getAllByText('owed to you').length).toBeGreaterThan(0)
 })
 
 test('the tally list shows the tally asked for, not the only one in a fixture', async () => {
@@ -51,7 +52,7 @@ test('an offered tally is not shown with a balance', async () => {
 	const view = await renderScreen(<TallyList {...screenProps('TallyList', undefined)} />)
 	await waitFor(() => expect(view.getByText('Rae Whitfield')).toBeTruthy())
 	expect(view.getByText('Offered')).toBeTruthy()
-	expect(view.queryByText('0.000 CHIP')).toBeNull()
+	expect(view.queryByText('0')).toBeNull()
 	expect(view.getByText('Nothing traded yet')).toBeTruthy()
 })
 
@@ -78,4 +79,6 @@ test('position separates owed from owing in the estimate too, and marks it', asy
 	expect(view.getByText('Leaving you')).toBeTruthy()
 	expect(view.queryByText('Net')).toBeNull()
 	expect(view.getAllByText(/^≈/).length).toBe(3)
+	// Six hours and seven minutes, not six-and-seven-hundredths.
+	expect(view.getAllByText('60').length).toBeGreaterThan(0)
 })
