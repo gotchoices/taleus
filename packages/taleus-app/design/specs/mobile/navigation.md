@@ -80,7 +80,4 @@ stories in `design/stories/mobile/`; each area below names the stories it serves
 
 ## Notes
 
-- Tab set is derived from what the stories say a party does, not from the MyCHIPs app; the closest
-  precedent (`mc/mychips/client/chark`) used Tally / Request / Scan / Invite / Settings
-- Attention is a tab rather than a badge because 23 makes it the thing a party opens the app for
 - Nothing here implies visual treatment; `design/specs/mobile/global/ui.md` owns that

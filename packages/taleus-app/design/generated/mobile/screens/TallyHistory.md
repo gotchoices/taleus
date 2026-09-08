@@ -6,7 +6,6 @@ dependsOn:
   - design/specs/domain/rules.md
   - design/specs/mobile/navigation.md
   - design/specs/mobile/screens/index.md
-  - design/specs/mobile/screens/tally-history.md
   - design/specs/mobile/global/ui.md
   - design/specs/mobile/global/i18n.md
   - design/specs/mobile/global/toolchain.md
