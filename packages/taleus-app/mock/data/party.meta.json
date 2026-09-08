@@ -1,0 +1,10 @@
+{
+  "namespace": "party",
+  "variants": [
+    "happy"
+  ],
+  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "notes": [
+    "the reading party: who I am, my display unit, what I have disclosed (stories 10, 11, 42)"
+  ]
+}

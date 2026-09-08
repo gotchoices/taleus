@@ -30,6 +30,9 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
   and accessibility roles. Responses and deferrals: `design/ui-review-response.md`.
 - [x] React Native upgraded 0.82.1 → 0.87.1, which unblocked React Navigation and Ionicons. The
   hand-rolled navigator is deleted; the tab bar has icons; back is the platform's own.
+- [x] The shared layer every screen sits on is recorded in
+  [`design/generated/mobile/foundation.md`](../../generated/mobile/foundation.md) and is a dependency
+  of all five slices, so changing it marks them stale
 - [ ] The remaining 25 screens in `screens/index.md`; next by the suggested order are `Welcome` and
   `ChooseName`, then the invitation arc
 

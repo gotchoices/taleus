@@ -18,7 +18,8 @@
         "mock/data/attention.happy.json",
         "mock/data/attention.empty.json",
         "design/specs/mobile/components/index.md",
-        "design/specs/domain/amounts.md"
+        "design/specs/domain/amounts.md",
+        "design/generated/mobile/foundation.md"
       ],
       "depHashes": {
         "design/specs/project.md": "8346e7fac02294e8937fd38bf077d950da332e6669ed8ee2212da84f3daba3cd",
@@ -35,7 +36,8 @@
         "mock/data/attention.happy.json": "5df9fa68c9bbb1419f7b682937fa14660444111257375da80439c9149f1b49c0",
         "mock/data/attention.empty.json": "ec1e603b43180a77198c36b7ad99ebf6db1d70c02401e7f77f03a9285f64a384",
         "design/specs/mobile/components/index.md": "11b6b3226c60f6c8ec999abb240151c11d51eb67503503919aa9ffe15eca0bc1",
-        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09"
+        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
+        "design/generated/mobile/foundation.md": "35c16f495f6566cfc8c0895c9d11f99c1537370006053a27599cb4c99e5011dd"
       }
     },
     {
@@ -57,7 +59,8 @@
         "mock/data/position.happy.json",
         "mock/data/position.empty.json",
         "design/specs/mobile/components/index.md",
-        "design/specs/domain/amounts.md"
+        "design/specs/domain/amounts.md",
+        "design/generated/mobile/foundation.md"
       ],
       "depHashes": {
         "design/specs/project.md": "8346e7fac02294e8937fd38bf077d950da332e6669ed8ee2212da84f3daba3cd",
@@ -75,7 +78,8 @@
         "mock/data/position.happy.json": "4de0af93345afdd979e3481a2aed7af4864d7cf78b7efe2cd646ce665c5d530f",
         "mock/data/position.empty.json": "949232ad2626c3c1a7ee6a43f26003fe8961d31a68027713cfac52288eb655be",
         "design/specs/mobile/components/index.md": "11b6b3226c60f6c8ec999abb240151c11d51eb67503503919aa9ffe15eca0bc1",
-        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09"
+        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
+        "design/generated/mobile/foundation.md": "35c16f495f6566cfc8c0895c9d11f99c1537370006053a27599cb4c99e5011dd"
       }
     },
     {
@@ -98,7 +102,8 @@
         "mock/data/requests.happy.json",
         "design/specs/mobile/components/index.md",
         "design/stories/mobile/21-ask-to-be-paid.md",
-        "design/specs/domain/amounts.md"
+        "design/specs/domain/amounts.md",
+        "design/generated/mobile/foundation.md"
       ],
       "depHashes": {
         "design/specs/project.md": "8346e7fac02294e8937fd38bf077d950da332e6669ed8ee2212da84f3daba3cd",
@@ -117,7 +122,8 @@
         "mock/data/requests.happy.json": "834b1d0b88397484d8f1369e005868f9ccf67e7cdbcf8f45ee2017638b7b81ae",
         "design/specs/mobile/components/index.md": "11b6b3226c60f6c8ec999abb240151c11d51eb67503503919aa9ffe15eca0bc1",
         "design/stories/mobile/21-ask-to-be-paid.md": "16e3b799c5042893aca9cab300eb63940a7db154804c803aa4c646906b4112ff",
-        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09"
+        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
+        "design/generated/mobile/foundation.md": "35c16f495f6566cfc8c0895c9d11f99c1537370006053a27599cb4c99e5011dd"
       }
     },
     {
@@ -140,7 +146,8 @@
         "mock/data/tallies.empty.json",
         "mock/data/tallies.error.json",
         "design/specs/mobile/components/index.md",
-        "design/specs/domain/amounts.md"
+        "design/specs/domain/amounts.md",
+        "design/generated/mobile/foundation.md"
       ],
       "depHashes": {
         "design/specs/project.md": "8346e7fac02294e8937fd38bf077d950da332e6669ed8ee2212da84f3daba3cd",
@@ -159,7 +166,8 @@
         "mock/data/tallies.empty.json": "d8cc662307c9d780d5b01e726b6dcae0010cf83afed085b2d0412d07b719bbc4",
         "mock/data/tallies.error.json": "01da118fe2a946924a5dcbf26cd96622ffdd899f614c44fca5e3e1c9c7e510bd",
         "design/specs/mobile/components/index.md": "11b6b3226c60f6c8ec999abb240151c11d51eb67503503919aa9ffe15eca0bc1",
-        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09"
+        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
+        "design/generated/mobile/foundation.md": "35c16f495f6566cfc8c0895c9d11f99c1537370006053a27599cb4c99e5011dd"
       }
     },
     {
@@ -183,7 +191,8 @@
         "mock/data/requests.happy.json",
         "design/specs/mobile/components/index.md",
         "design/stories/mobile/21-ask-to-be-paid.md",
-        "design/specs/domain/amounts.md"
+        "design/specs/domain/amounts.md",
+        "design/generated/mobile/foundation.md"
       ],
       "depHashes": {
         "design/specs/project.md": "8346e7fac02294e8937fd38bf077d950da332e6669ed8ee2212da84f3daba3cd",
@@ -203,7 +212,8 @@
         "mock/data/requests.happy.json": "834b1d0b88397484d8f1369e005868f9ccf67e7cdbcf8f45ee2017638b7b81ae",
         "design/specs/mobile/components/index.md": "11b6b3226c60f6c8ec999abb240151c11d51eb67503503919aa9ffe15eca0bc1",
         "design/stories/mobile/21-ask-to-be-paid.md": "16e3b799c5042893aca9cab300eb63940a7db154804c803aa4c646906b4112ff",
-        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09"
+        "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
+        "design/generated/mobile/foundation.md": "35c16f495f6566cfc8c0895c9d11f99c1537370006053a27599cb4c99e5011dd"
       }
     },
     {

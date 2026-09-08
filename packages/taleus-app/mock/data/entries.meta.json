@@ -1,0 +1,13 @@
+{
+  "namespace": "entries",
+  "variants": [
+    "happy",
+    "empty"
+  ],
+  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "notes": [
+    "keyed by tally id, like tally is; an entry only ever answers a request on its own tally",
+    "amount is signed from the reading party's side: positive moved value toward them",
+    "balanceAfter states its perspective — story 24 step 4"
+  ]
+}

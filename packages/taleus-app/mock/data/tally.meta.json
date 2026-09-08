@@ -1,0 +1,13 @@
+{
+  "namespace": "tally",
+  "variants": [
+    "happy",
+    "error"
+  ],
+  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "notes": [
+    "keyed by tally id, because a screen asks about one tally and readTally must answer for that one",
+    "the error variant is NOT unreadable: story 04 path C keeps the tally readable and marks pending work pending",
+    "units may carry divisor/code/mark — see design/specs/domain/amounts.md"
+  ]
+}

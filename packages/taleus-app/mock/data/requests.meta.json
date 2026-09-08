@@ -1,0 +1,12 @@
+{
+  "namespace": "requests",
+  "variants": [
+    "happy",
+    "empty"
+  ],
+  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "notes": [
+    "direction says which way each runs: asked-of-me or asked-by-me (story 21)",
+    "outstandingDays is NOT stored — the adapter derives it from `asked`, as the engine mode will"
+  ]
+}
