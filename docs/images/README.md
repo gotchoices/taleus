@@ -15,8 +15,8 @@ diamond on a light background square (not a "white mark on indigo"). Regenerate 
 
 ```bash
 cd ../../packages/taleus-app/apps/mobile
-npm run icons:android    # scripts/logo-gen-android.sh  → adaptive + legacy launcher icons, in-app logo.png
-npm run icons:ios        # scripts/logo-gen-ios.sh      → ios AppIcon.appiconset
+yarn icons:android    # scripts/logo-gen-android.sh  → adaptive + legacy launcher icons, in-app logo.png
+yarn icons:ios        # scripts/logo-gen-ios.sh      → ios AppIcon.appiconset
 ```
 
 Both read `logo4.svg` from here. Background colour and mark scale are variables at the
