@@ -10,7 +10,7 @@ screen is sliced, not up front.
 | Welcome | Welcome | welcome.md | 10 | happy | draft |
 | Choose name | ChooseName | choose-name.md | 10, 11 | happy, error | draft |
 | Tally list | TallyList | tally-list.md | 06, 04 | happy, empty, error | generated |
-| Tally view | TallyView | tally-view.md | 04, 07 | happy, new, unreachable | generated |
+| Tally view | TallyView | tally-view.md | 04, 07 | happy, error | generated |
 | Tally history | TallyHistory | tally-history.md | 24 | happy, empty, error | generated |
 | Entry detail | EntryDetail | entry-detail.md | 24 | happy | draft |
 | Tally terms | TallyTerms | tally-terms.md | 07, 03 | happy, error | draft |

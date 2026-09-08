@@ -3,7 +3,7 @@
 ---
 id: tally-view
 route: TallyView
-variants: [happy, new, unreachable]
+variants: [happy, error]
 ---
 
 ## Description
@@ -43,3 +43,6 @@ the other party is, and what is being asked (stories 04, 07).
 ## Notes
 
 - Acting on terms (`ReviewOffer`), closing, and paying are separate screens, not yet sliced.
+- Two scenes worth reviewing are not data variants but different tallies inside the happy fixture:
+  a **new** tally (zero balance, explained) and one in a **unit that divides by sixty**. The `error`
+  variant is the unreachable counterparty.
