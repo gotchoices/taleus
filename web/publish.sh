@@ -38,7 +38,8 @@ ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # ── 1. Page content → sereus.org/taleus ──────────────────────────────────────
 # --delete is safe here: it only ever affects taleus's own directory.  Exclude
 # .well-known (handled separately by merge below), the scripts, README, and the
-# APK (published separately into the same dir).
+# APK and the scenario storyboards (apps/mobile `yarn publish:scenarios` → preview/),
+# both published separately into the same dir.
 echo "Publishing page content to ${REMOTE}:${DEST_SITE} ..."
 ssh "$REMOTE" "mkdir -p '$DEST_SITE'"
 PAGE_EXCLUDES=(
@@ -47,6 +48,7 @@ PAGE_EXCLUDES=(
   "--exclude" "server.sh"
   "--exclude" "README.md"
   "--exclude" "taleus.apk"
+  "--exclude" "preview/"
 )
 if command -v rsync >/dev/null 2>&1; then
   rsync -avz --delete "${PAGE_EXCLUDES[@]}" "$ROOT_DIR/" "$REMOTE:$DEST_SITE/"

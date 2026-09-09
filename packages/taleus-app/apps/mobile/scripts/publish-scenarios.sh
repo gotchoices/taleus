@@ -3,8 +3,8 @@ set -eu
 
 # Publish the mobile scenario storyboards to the web.
 #
-#   npm run publish:scenarios              deploy to $SCENARIOS_DEST
-#   npm run publish:scenarios -- --dry-run render only; print the rsync it would run
+#   yarn publish:scenarios                 deploy to $SCENARIOS_DEST
+#   yarn publish:scenarios --dry-run       render only; print the rsync it would run
 #
 # Destination comes from env-defaults.sh (override in .env.ports.local), and is a
 # directory of its own under the taleus page — see below.
@@ -37,7 +37,7 @@ done
 case "${SCENARIOS_DEST##*:}" in
   */taleus) echo "Refusing: SCENARIOS_DEST is the taleus page root, and this publish deletes." >&2
             echo "  It would remove index.html, invite.html, styles.css, images/ and the APK." >&2
-            echo "  Use a subdirectory, e.g. ${SCENARIOS_DEST}/scenarios" >&2
+            echo "  Use a subdirectory, e.g. ${SCENARIOS_DEST}/preview" >&2
             exit 2 ;;
   */) echo "Refusing: SCENARIOS_DEST ends in a slash; give a directory path." >&2; exit 2 ;;
 esac
@@ -59,7 +59,6 @@ ssh "$REMOTE" "mkdir -p '$REMOTE_PATH'"
 cd "$APP_DIR"
 echo
 echo "Published. If the page is at https://sereus.org/taleus/, the storyboards are at"
-echo "  https://sereus.org/taleus/scenarios/"
+echo "  https://sereus.org/taleus/preview/  (appeus lays out scenarios/ and states.html beneath it)"
 echo
-echo "Note: web/publish.sh rsyncs web/ with --delete and does not exclude scenarios/."
-echo "Running it after this will remove them unless it gains --exclude 'scenarios/'."
+echo "Note: web/publish.sh rsyncs web/ with --delete; it excludes preview/ so this survives it."

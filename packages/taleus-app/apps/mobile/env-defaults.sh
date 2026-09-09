@@ -34,7 +34,7 @@
 : "${PUBLISH_USER:=root}"
 : "${PUBLISH_HOST:=gotchoices.org}"
 : "${SEREUS_ROOT:=/var/www/sereus.org}"
-: "${SCENARIOS_DEST:=${PUBLISH_USER}@${PUBLISH_HOST}:${SEREUS_ROOT}/taleus/scenarios}"
+: "${SCENARIOS_DEST:=${PUBLISH_USER}@${PUBLISH_HOST}:${SEREUS_ROOT}/taleus/preview}"
 
 # (3): project-local overrides, not committed. Sourced from the project root
 # (the package.json scripts run there). The leading "./" is required: POSIX `.`
