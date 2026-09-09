@@ -41,6 +41,18 @@ screenshots:
     deps:
       - apps/mobile/src/screens/ReviewInvitation.tsx
       - mock/data/invitation.expired.json
+  - route: ReviewOffer/tally%3Arae-offer
+    variant: happy
+    file: review-offer.png
+    deps:
+      - apps/mobile/src/screens/ReviewOffer.tsx
+      - mock/data/offer.happy.json
+  - route: ReviewOffer/tally%3Arae-offer
+    variant: superseded
+    file: review-offer-superseded.png
+    deps:
+      - apps/mobile/src/screens/ReviewOffer.tsx
+      - mock/data/offer.superseded.json
   - route: TallyList
     variant: happy
     file: tally-list-happy.png
@@ -156,6 +168,8 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Create invitation | first | the party's first-ever invitation | ![](create-invitation-first.png) |
 | Review invitation | happy | the invitee's side, before disclosing | ![](review-invitation.png) |
 | Review invitation | expired | explained, with a way forward | ![](review-invitation-expired.png) |
+| Review offer | happy | what changed, then the terms | ![](review-offer.png) |
+| Review offer | superseded | two signed; the later one governs | ![](review-offer-superseded.png) |
 | Tally list | happy | six tallies, one offered and figureless | ![](tally-list-happy.png) |
 | Tally list | empty | nothing yet, and what to do about it | ![](tally-list-empty.png) |
 | Tally view | happy | a tally with history, terms both ways | ![](tally-view-happy.png) |

@@ -1,0 +1,16 @@
+{
+  "namespace": "offer",
+  "variants": [
+    "happy",
+    "empty",
+    "superseded"
+  ],
+  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "notes": [
+    "an outstanding proposal on a tally, keyed by tally id (story 03)",
+    "`changes` is what differs from the previous offer — story 03 step 3 wants exactly what changed, nothing else",
+    "`inForce` is null while a tally is still forming; on an open tally it carries the terms that keep working while an offer is pending (path C)",
+    "`superseded` is path A: two proposals fully signed, and the LATER-DRAFTED one governs. Precedence follows the proposal's own version order, not signature arrival — docs/architecture.md § Offer semantics",
+    "a counter is a new proposal, never an edit: the app must not present it as changing a live agreement"
+  ]
+}

@@ -10,6 +10,7 @@ import { Attention } from '../screens/Attention'
 import { ChooseName } from '../screens/ChooseName'
 import { CreateInvitation } from '../screens/CreateInvitation'
 import { ReviewInvitation } from '../screens/ReviewInvitation'
+import { ReviewOffer } from '../screens/ReviewOffer'
 import { Welcome } from '../screens/Welcome'
 import { Position } from '../screens/Position'
 import { TallyHistory } from '../screens/TallyHistory'
@@ -106,6 +107,11 @@ function TalliesStack(): React.JSX.Element {
 				name="CreateInvitation"
 				component={CreateInvitation}
 				options={{ title: t('screens.create-invitation.title') }}
+			/>
+			<Tallies.Screen
+				name="ReviewOffer"
+				component={ReviewOffer}
+				options={{ title: t('screens.review-offer.title') }}
 			/>
 			<Tallies.Screen
 				name="ReviewInvitation"

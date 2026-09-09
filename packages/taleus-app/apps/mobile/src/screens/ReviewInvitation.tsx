@@ -56,7 +56,7 @@ export function ReviewInvitation({ route }: Props): React.JSX.Element {
 		return (
 			<Empty
 				title={t(`screens.review-invitation.${outcome}`)}
-				body={outcome === 'refused' ? t('screens.review-invitation.counter-not-built') : undefined}
+				body={outcome === 'refused' ? t('screens.review-invitation.refused-onward') : undefined}
 			/>
 		)
 	}
@@ -149,7 +149,6 @@ export function ReviewInvitation({ route }: Props): React.JSX.Element {
 			/>
 			{name ? null : <Text style={styles.caption}>{t('screens.review-invitation.name-needed')}</Text>}
 			<Action label={t('screens.review-invitation.refuse')} onPress={() => void respond('refuse')} secondary />
-			<Text style={styles.caption}>{t('screens.review-invitation.counter-not-built')}</Text>
 		</ScrollView>
 	)
 }

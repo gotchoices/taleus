@@ -1,0 +1,72 @@
+{
+  "offers": {
+    "tally:rae-offer": {
+      "id": "offer:rae-2",
+      "tallyId": "tally:rae-offer",
+      "counterparty": {
+        "sid": "sid:rae-55f0",
+        "name": "Rae Whitfield"
+      },
+      "waitingOn": "nobody",
+      "drafted": "2026-09-05T07:30:00Z",
+      "expires": "2026-09-12T07:30:00Z",
+      "unit": {
+        "denom": "CHIP",
+        "scale": 3
+      },
+      "agreement": {
+        "id": "cid:bafy-standard-tally-v1",
+        "title": "Standard Tally Agreement",
+        "publisher": "taleus.org",
+        "language": "en"
+      },
+      "proposed": {
+        "mine": {
+          "creditLimit": {
+            "units": 0
+          },
+          "noticeDays": 21
+        },
+        "theirs": {
+          "creditLimit": {
+            "units": 100000
+          },
+          "noticeDays": 21
+        }
+      },
+      "inForce": null,
+      "previous": {
+        "id": "offer:rae-1",
+        "drafted": "2026-09-04T16:10:00Z",
+        "by": "me"
+      },
+      "changes": [
+        {
+          "field": "theirs.noticeDays",
+          "from": 14,
+          "to": 21
+        }
+      ],
+      "signedByBoth": true,
+      "supersededBy": {
+        "id": "offer:rae-3",
+        "drafted": "2026-09-05T09:02:00Z",
+        "by": "them",
+        "proposed": {
+          "mine": {
+            "creditLimit": {
+              "units": 0
+            },
+            "noticeDays": 21
+          },
+          "theirs": {
+            "creditLimit": {
+              "units": 100000
+            },
+            "noticeDays": 28
+          }
+        }
+      }
+    }
+  }
+}

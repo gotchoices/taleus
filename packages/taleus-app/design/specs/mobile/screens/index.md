@@ -22,7 +22,7 @@ and should not acquire one.
 | Close tally | CloseTally | — | 05 | happy, empty, error | draft |
 | Create invitation | CreateInvitation | — | 01 | happy, empty | generated |
 | Review invitation | ReviewInvitation | — | 02 | happy, expired | generated |
-| Review offer | ReviewOffer | — | 03, 02 | happy, error | draft |
+| Review offer | ReviewOffer | — | 03, 02 | happy, empty, superseded | generated |
 | Standing invitation | StandingInvitation | — | 01, 10, 21 | happy, empty | draft |
 | Attention | Attention | — | 23 | happy, empty, error | generated |
 | Attention history | AttentionHistory | — | 23 | happy, empty | draft |
