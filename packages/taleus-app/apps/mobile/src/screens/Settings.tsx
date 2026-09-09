@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { ScrollView, Text } from 'react-native'
 
-import { Amount, Card, Failed, Loading, Options, OpenableRow } from '../components'
+import { Action, Amount, Card, Failed, Loading, Options, OpenableRow } from '../components'
 import { readSettings, writeSettings, type HeldUnit, type Settings as Prefs } from '../data/settings'
 import { useLoad } from '../hooks/useLoad'
 import { setLocale } from '../i18n'
@@ -106,6 +106,13 @@ export function Settings({ navigation }: Props): React.JSX.Element {
 							})}
 						</Text>
 						<Text style={styles.caption}>{t('screens.settings.no-rate-fix')}</Text>
+						{/* Path B says the way forward is offered, not merely described.
+						    Until this slice there was no screen to offer. */}
+						<Action
+							label={t('screens.settings.rates-open')}
+							onPress={() => navigation.navigate('PositionTab', { screen: 'ExchangeRates' })}
+							secondary
+						/>
 					</>
 				) : null}
 			</Card>

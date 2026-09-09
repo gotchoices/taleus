@@ -1,0 +1,15 @@
+{
+  "namespace": "rates",
+  "variants": ["happy", "error"],
+  "shape": "apps/mobile/src/data/rates.ts",
+  "notes": [
+    "A rate is what a unit is worth *to this party*, in the unit their overall figures are read in. Private to them: no counterparty sees one, and nobody else's rates are ever applied to their holdings (story 41 § Roles)",
+    "`accept` and `part` are the two directions, in the smallest parts of `against` per one whole of the unit. `part` is the larger: parting with something you would rather keep costs more, and that difference is the party's own reluctance, not a fee. Estimates take `part` — the less flattering side",
+    "One set of rates serves trading and the party's own figures. There is deliberately no separate display rate to keep in step",
+    "`basis: source` is story 41 step 8 — a published source plus the party's own margin, rather than a number they must remember to maintain. What they signed is the instruction, not each day's figure, which is why `signed` is older than `updated`",
+    "`widelyTraded` drives the market-position warning (path G): pricing a unit many people hold makes the party the one taking the other side of every conversion at their price. `circleOnly` is path F, the low-risk case a unit used by one pair or one circle actually is",
+    "`permitsMovement` is separable from having a rate at all (path D). Valuing a unit and letting value route across it are different decisions, and the second is a signed permission that lives with trading settings",
+    "`error` is the story's own: a source that cannot be reached, and a fixed rate signed in 2024 and never revisited — a live instruction, not a dormant preference",
+    "No `empty` fixture: a party holding one unit has nothing to price, which the screen reads from what they hold rather than from a second copy of it"
+  ]
+}

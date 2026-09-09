@@ -33,7 +33,7 @@ and should not acquire one.
 | Request view | RequestView | — | 21, 22 | happy | generated |
 | Scan | Scan | — | 02, 21, 30 | happy, error | draft |
 | Position | Position | — | 40 | happy, empty, error | generated |
-| Exchange rates | ExchangeRates | — | 41 | happy, empty | draft |
+| Exchange rates | ExchangeRates | — | 41 | happy, error | generated |
 | Settings | Settings | — | 42 | happy | generated |
 | Profile | Profile | — | 11 | happy, empty, error | generated |
 | Disclosure view | DisclosureView | — | 11 | happy, empty | generated |

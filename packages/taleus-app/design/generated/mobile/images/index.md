@@ -274,6 +274,19 @@ screenshots:
     variant: happy
     capture: false
     note: an entry neither party typed — value routed through this tally
+  - route: ExchangeRates
+    variant: happy
+    file: exchange-rates.png
+    deps:
+      - apps/mobile/src/screens/ExchangeRates.tsx
+      - mock/data/rates.happy.json
+      - mock/data/settings.happy.json
+  - route: ExchangeRates
+    variant: error
+    file: exchange-rates-stale.png
+    deps:
+      - apps/mobile/src/screens/ExchangeRates.tsx
+      - mock/data/rates.error.json
 ---
 
 # Screenshots
@@ -317,6 +330,8 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Terms | error | the contract unreachable; terms still readable | ![](tally-terms-no-contract.png) |
 | Entry | happy | one entry, who signed it, what it answered | ![](entry-detail.png) |
 | Entry | unsettled | movement that has not committed | ![](entry-detail-unsettled.png) |
+| Rates | happy | a unit priced against a source, one left outside | ![](exchange-rates.png) |
+| Rates | error | a source unreachable, and a rate left to go stale | ![](exchange-rates-stale.png) |
 
 Notes:
 

@@ -31,7 +31,8 @@ party's to change. A display unit only decides what the *overall* figures are es
 where a rate exists.
 
 Picking Dave-hours is path B: Jan has never priced it, so his overall figures cannot be estimated in
-it. He is told so plainly and pointed at rates, rather than being refused the choice.
+it. He is told so plainly and offered the way to fix it — [rates](41-my-exchange-rates.md) — rather
+than being refused the choice.
 
 ## Step 4: Mark or code
 
@@ -53,7 +54,6 @@ a party who comes looking finds that sentence rather than a gap.
 
 ## Not shown
 
-Exchange rates (story 41), the screen path B points at; notifications (43), devices (13), the cadre
-(14), recovery (12) and the standing invitation. All are rows of this tab that no slice has built,
-and none is shown as a link that goes nowhere. A second language, and therefore step 7's second
+Notifications (43), devices (13), the cadre (14), recovery (12) and the standing invitation. All are
+rows of this tab that no slice has built, and none is shown as a link that goes nowhere. A second language, and therefore step 7's second
 device arriving already in Spanish, needs a second bundle to exist.

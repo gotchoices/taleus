@@ -5,12 +5,33 @@
     "unitStyle": "mark",
     "appearance": "system",
     "availableLocales": [
-      { "tag": "en", "name": "English" }
+      {
+        "tag": "en",
+        "name": "English"
+      }
     ],
     "unitsHeld": [
-      { "denom": "iso4217:USD", "scale": 2, "label": "US dollars", "priced": true },
-      { "denom": "cid:bafy-dave-hours", "scale": 0, "divisor": 60, "code": "DVH", "mark": "DH", "label": "Dave-hours", "priced": false },
-      { "denom": "CHIP", "scale": 3, "label": "CHIP", "priced": false }
+      {
+        "denom": "iso4217:USD",
+        "scale": 2,
+        "label": "US dollars",
+        "priced": true
+      },
+      {
+        "denom": "cid:bafy-dave-hours",
+        "scale": 0,
+        "divisor": 60,
+        "code": "DVH",
+        "mark": "DH",
+        "label": "Dave-hours",
+        "priced": false
+      },
+      {
+        "denom": "CHIP",
+        "scale": 3,
+        "label": "CHIP",
+        "priced": true
+      }
     ]
   }
 }

@@ -54,7 +54,11 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
   could not reach. Story 07's whole subject is *when* a figure governs: in force, agreed and waiting,
   or merely proposed, with a reduction that never reaches back. Story 24 path C is the entry nobody
   remembers
-- [ ] The remaining 11 screens in `screens/index.md`
+- [x] `ExchangeRates` — the app's last dead end. `Settings` path B described where rates live because
+  no screen existed, and `Position`'s estimate named what it excluded with nothing to do about it.
+  Story 41 is only half about setting a number: the other half is being told that a rate is the price
+  value actually converts at through you, and how to limit that
+- [ ] The remaining 10 screens in `screens/index.md`
 
 ## Mock mode (this target)
 - [x] `mock/data/` carries the first fixtures — party, tallies, tally, entries, requests, attention,

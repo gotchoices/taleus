@@ -41,6 +41,8 @@ export type OnboardingParams = {
 
 export type PositionParams = {
 	Position: undefined
+	/** What units are worth to this party — `navigation.md` puts it under POSITION. */
+	ExchangeRates: undefined
 }
 
 export type SettingsParams = {
@@ -78,6 +80,7 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	CloseTally: 'Tallies',
 	Attention: 'AttentionTab',
 	Position: 'PositionTab',
+	ExchangeRates: 'PositionTab',
 	Settings: 'SettingsTab',
 	Profile: 'SettingsTab',
 	DisclosureView: 'SettingsTab',
@@ -164,6 +167,10 @@ interface ScreenPropsByRoute {
 	>
 	Position: CompositeScreenProps<
 		NativeStackScreenProps<PositionParams, 'Position'>,
+		BottomTabScreenProps<TabParams>
+	>
+	ExchangeRates: CompositeScreenProps<
+		NativeStackScreenProps<PositionParams, 'ExchangeRates'>,
 		BottomTabScreenProps<TabParams>
 	>
 	Settings: SettingsScreenProps<'Settings'>

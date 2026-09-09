@@ -49,7 +49,13 @@ export const linking: LinkingOptions<TabParams & OnboardingParams> = {
 				},
 			},
 			AttentionTab: { screens: { Attention: 'screen/Attention' } },
-			PositionTab: { screens: { Position: 'screen/Position' } },
+			PositionTab: {
+				initialRouteName: 'Position',
+				screens: {
+					Position: 'screen/Position',
+					ExchangeRates: 'screen/ExchangeRates',
+				},
+			},
 			SettingsTab: {
 				// Same reason as the tallies stack: a link to one counterparty's
 				// disclosure lands with the profile beneath it.

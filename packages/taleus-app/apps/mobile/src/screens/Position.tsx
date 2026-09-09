@@ -1,13 +1,16 @@
 import { useCallback } from 'react'
 import { ScrollView, Text } from 'react-native'
 
-import { Amount, Card, Empty, Failed, Loading, Row } from '../components'
+import { Action, Amount, Card, Empty, Failed, Loading, Row } from '../components'
 import { readPosition, type Estimate, type PerUnitPosition } from '../data/position'
 import type { Perspective, Unit, UnitAmount } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
+import type { ScreenProps } from '../navigation/routes'
 import { useStyles, spacing, type as typography, type Tokens } from '../theme'
 import { unitLabel } from '../util/amount'
+
+type Props = ScreenProps<'Position'>
 
 /**
  * Position (story 40) — how a party is doing overall.
@@ -18,7 +21,7 @@ import { unitLabel } from '../util/amount'
  * that both looks like one and names what it leaves out; and credit available
  * is never mixed into what the party holds.
  */
-export function Position(): React.JSX.Element {
+export function Position({ navigation }: Props): React.JSX.Element {
 	const styles = useStyles(make)
 	const { state, value, error, reload } = useLoad(useCallback(() => readPosition(), []))
 
@@ -40,6 +43,12 @@ export function Position(): React.JSX.Element {
 				<UnitCard key={unit.denom} position={unit} />
 			))}
 			{value.estimate ? <EstimateCard estimate={value.estimate} /> : null}
+			<Action
+				label={t('screens.position.see-rates')}
+				onPress={() => navigation.navigate('ExchangeRates')}
+				secondary
+			/>
+
 			{value.spendingPower ? (
 				<Card
 					title={t('screens.position.spending-title')}

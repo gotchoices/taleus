@@ -11,6 +11,7 @@ import { CreateInvitation } from '../screens/CreateInvitation'
 import { ReviewInvitation } from '../screens/ReviewInvitation'
 import { CreateRequest } from '../screens/CreateRequest'
 import { DisclosureView } from '../screens/DisclosureView'
+import { ExchangeRates } from '../screens/ExchangeRates'
 import { EntryDetail } from '../screens/EntryDetail'
 import { Profile } from '../screens/Profile'
 import { Settings } from '../screens/Settings'
@@ -181,6 +182,11 @@ function PositionRoot(): React.JSX.Element {
 				name="Position"
 				component={Position}
 				options={{ title: t('tab.position') }}
+			/>
+			<PositionStack.Screen
+				name="ExchangeRates"
+				component={ExchangeRates}
+				options={{ title: t('screens.rates.title') }}
 			/>
 		</PositionStack.Navigator>
 	)

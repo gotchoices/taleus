@@ -31,6 +31,7 @@ Told what this will show, rather than shown empty totals.
 
 ## Not shown
 
-Tracing the estimate to what was converted at what rate; position over time; concentration by
-counterparty; settled value distinguished from movement not yet complete (paths C to E).
-`ExchangeRates` is unsliced, so the rates behind the estimate cannot be opened.
+The rates behind the estimate now open from here — see
+[what units are worth to me](41-my-exchange-rates.md). Still unshown: position over time,
+concentration by counterparty, and settled value distinguished from movement not yet complete
+(paths C to E).

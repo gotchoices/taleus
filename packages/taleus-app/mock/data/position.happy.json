@@ -49,16 +49,13 @@
       "units": 13750
     },
     "covers": [
-      "iso4217:USD"
+      "iso4217:USD",
+      "CHIP"
     ],
     "excluded": [
       {
         "denom": "cid:bafy-dave-hours",
         "label": "Dave-hours",
-        "reason": "no rate set"
-      },
-      {
-        "denom": "CHIP",
         "reason": "no rate set"
       }
     ],

@@ -76,7 +76,7 @@ test('attention items are reachable and say how long they have waited', async ()
 })
 
 test('position separates owed from owing in the estimate too, and marks it', async () => {
-	const view = await renderScreen(<Position />)
+	const view = await renderScreen(<Position {...screenProps('Position', undefined)} />)
 	await waitFor(() => expect(view.getByText('Estimated overall')).toBeTruthy())
 	expect(view.getByText('Leaving you')).toBeTruthy()
 	expect(view.queryByText('Net')).toBeNull()
