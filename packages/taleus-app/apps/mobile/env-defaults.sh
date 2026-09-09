@@ -23,6 +23,10 @@
 : "${EMULATOR_PORT:=5554}"
 : "${DEVICE_SERIAL:=emulator-5554}"
 : "${AVD_NAME:=Pixel_A}"
+# The appeus scenario previewer. It binds a port and drives one device, so both
+# belong here for the same reason the Metro port does: two projects previewing at
+# once must not collide, and links must open on this project's emulator.
+: "${PREVIEW_PORT:=8080}"
 
 # (3): project-local overrides, not committed. Sourced from the project root
 # (the package.json scripts run there). The leading "./" is required: POSIX `.`
@@ -31,4 +35,4 @@ if [ -f ./.env.ports.local ]; then
   . ./.env.ports.local
 fi
 
-export METRO_PORT EMULATOR_PORT DEVICE_SERIAL AVD_NAME
+export METRO_PORT EMULATOR_PORT DEVICE_SERIAL AVD_NAME PREVIEW_PORT
