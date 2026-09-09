@@ -28,10 +28,33 @@ export interface Amount {
 	scale?: number
 }
 
-/** An amount that carries its own unit and needs no tally to be read. */
+/**
+ * An amount that carries its own unit and needs no tally to be read.
+ *
+ * It has to carry the *whole* unit, not just the denomination: a figure in a
+ * unit that divides by sixty renders as six hundred rather than ten without its
+ * divisor, and one with a mark of its own loses it. `denom` and `scale` alone
+ * were enough only while every such amount happened to be dollars.
+ */
 export interface UnitAmount extends Amount {
 	denom: string
 	scale: number
+	divisor?: number
+	code?: string
+	mark?: string
+	label?: string
+}
+
+/** The unit an amount carries, for handing to `Amount`. */
+export function unitOf(amount: UnitAmount): Unit {
+	return {
+		denom: amount.denom,
+		scale: amount.scale,
+		divisor: amount.divisor,
+		code: amount.code,
+		mark: amount.mark,
+		label: amount.label,
+	}
 }
 
 /** A balance always states whose side it is read from. */

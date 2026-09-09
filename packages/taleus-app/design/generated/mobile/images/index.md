@@ -336,6 +336,22 @@ screenshots:
     deps:
       - apps/mobile/src/screens/Cadre.tsx
       - mock/data/party.single-device.json
+  - route: AttentionHistory
+    variant: happy
+    file: attention-history.png
+    deps:
+      - apps/mobile/src/screens/AttentionHistory.tsx
+      - mock/data/attention.happy.json
+  - route: Attention
+    variant: error
+    file: attention-backlog.png
+    deps:
+      - apps/mobile/src/screens/Attention.tsx
+      - mock/data/attention.error.json
+  - route: AttentionHistory
+    variant: empty
+    capture: false
+    note: nothing has been through the list yet — a good state, and it reads like one
 ---
 
 # Screenshots
@@ -389,6 +405,8 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Devices | one | a phone and nothing else, and what that costs | ![](devices-one.png) |
 | Cadre | happy | what survives elsewhere, and what does not | ![](cadre.png) |
 | Cadre | one | the fragile half, on one machine | ![](cadre-one.png) |
+| Attention | backlog | eleven after a week away, deadlines marked | ![](attention-backlog.png) |
+| Attention history | happy | what left the list, and what became of each | ![](attention-history.png) |
 
 Notes:
 

@@ -17,7 +17,7 @@ opens that state on that device.
 11. [Closing a tally](05-close-a-tally.md) — winding down, and what nobody can refuse (05)
 12. [Tally history](24-tally-history.md) — following the balance back, and one entry (24)
 13. [Review the agreement](07-review-the-agreement.md) — terms in force, how they got there, what was signed (07)
-14. [What needs my attention](23-what-needs-my-attention.md) — across every tally (23)
+14. [What needs my attention](23-what-needs-my-attention.md) — across every tally, and what became of the rest (23)
 15. [What reaches you](43-notifications.md) — what interrupts, and what waits (43)
 16. [What can act as me](13-my-devices.md) — devices, and what being awake is for (13)
 17. [Where my records live](14-my-cadre.md) — what survives elsewhere, and what does not (14, 51)
@@ -31,10 +31,10 @@ photographed.
 
 ## Coverage
 
-One doc per story, for every story a coded screen serves. Twenty-four screens are built — `Welcome`,
+One doc per story, for every story a coded screen serves. Twenty-five screens are built — `Welcome`,
 `ChooseName`, `CreateInvitation`, `ReviewInvitation`, `ReviewOffer`, `TallyList`, `TallyView`,
 `TallyHistory`, `PayPartner`, `CreateRequest`, `RequestView`, `CloseTally`, `Attention`, `Position`,
-`Settings`, `Profile`, `DisclosureView`, `TallyTerms`, `EntryDetail`, `ExchangeRates`, `StandingInvitation`, `Notifications`, `Devices`, `Cadre` — covering stories 01, 02,
+`Settings`, `Profile`, `DisclosureView`, `TallyTerms`, `EntryDetail`, `ExchangeRates`, `StandingInvitation`, `Notifications`, `Devices`, `Cadre`, `AttentionHistory` — covering stories 01, 02,
 03, 04, 05, 06, 07, 10, 11, 13, 14, 20, 21, 22, 23, 24, 40, 41, 42, 43 and 51. The whole tally lifecycle is here: offered, negotiated, opened, traded on,
 billed for, and wound down; and all four tabs now have a root.
 

@@ -6,6 +6,7 @@ import { Image, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Attention } from '../screens/Attention'
+import { AttentionHistory } from '../screens/AttentionHistory'
 import { ChooseName } from '../screens/ChooseName'
 import { CreateInvitation } from '../screens/CreateInvitation'
 import { ReviewInvitation } from '../screens/ReviewInvitation'
@@ -174,6 +175,11 @@ function AttentionRoot(): React.JSX.Element {
 				name="Attention"
 				component={Attention}
 				options={{ title: t('tab.attention') }}
+			/>
+			<AttentionStack.Screen
+				name="AttentionHistory"
+				component={AttentionHistory}
+				options={{ title: t('screens.attention-history.title') }}
 			/>
 		</AttentionStack.Navigator>
 	)

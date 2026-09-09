@@ -1,0 +1,272 @@
+{
+  "items": [
+    {
+      "id": "att:backlog-0",
+      "kind": "request",
+      "tallyId": "tally:sam-bike",
+      "counterparty": {
+        "name": "Sam Ortiz"
+      },
+      "amount": {
+        "units": 1500,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "waitingSince": "2026-09-01T09:00:00Z",
+      "route": "RequestView",
+      "waitingOn": "me",
+      "requestId": "request:backlog-0",
+      "expires": "2026-09-10T17:00:00Z"
+    },
+    {
+      "id": "att:backlog-1",
+      "kind": "offer",
+      "tallyId": "tally:mara-shop",
+      "counterparty": {
+        "name": "Mara's Bike Shop"
+      },
+      "amount": {
+        "units": 2200,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "waitingSince": "2026-09-02T09:00:00Z",
+      "route": "ReviewOffer",
+      "waitingOn": "me"
+    },
+    {
+      "id": "att:backlog-2",
+      "kind": "request",
+      "tallyId": "tally:dave-hours",
+      "counterparty": {
+        "name": "Dave Lin"
+      },
+      "amount": {
+        "units": 2900,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "waitingSince": "2026-09-03T09:00:00Z",
+      "route": "RequestView",
+      "waitingOn": "me",
+      "requestId": "request:backlog-2",
+      "expires": "2026-09-10T17:00:00Z"
+    },
+    {
+      "id": "att:backlog-3",
+      "kind": "offer",
+      "tallyId": "tally:priya-new",
+      "counterparty": {
+        "name": "Priya Raman"
+      },
+      "amount": {
+        "units": 3600,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "waitingSince": "2026-09-04T09:00:00Z",
+      "route": "ReviewOffer",
+      "waitingOn": "me"
+    },
+    {
+      "id": "att:backlog-4",
+      "kind": "request",
+      "tallyId": "tally:rae-offer",
+      "counterparty": {
+        "name": "Rae Whitfield"
+      },
+      "amount": {
+        "units": 4300,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "waitingSince": "2026-09-05T09:00:00Z",
+      "route": "RequestView",
+      "waitingOn": "me",
+      "requestId": "request:backlog-4",
+      "expires": "2026-09-26T17:00:00Z"
+    },
+    {
+      "id": "att:backlog-5",
+      "kind": "offer",
+      "tallyId": "tally:supplier-parts",
+      "counterparty": {
+        "name": "Northwind Parts"
+      },
+      "amount": {
+        "units": 5000,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "waitingSince": "2026-09-06T09:00:00Z",
+      "route": "ReviewOffer",
+      "waitingOn": "me"
+    },
+    {
+      "id": "att:backlog-6",
+      "kind": "request",
+      "tallyId": "tally:sam-bike",
+      "counterparty": {
+        "name": "Sam Ortiz"
+      },
+      "amount": {
+        "units": 5700,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "waitingSince": "2026-09-07T09:00:00Z",
+      "route": "RequestView",
+      "waitingOn": "me",
+      "requestId": "request:backlog-6",
+      "expires": "2026-09-26T17:00:00Z"
+    },
+    {
+      "id": "att:backlog-7",
+      "kind": "offer",
+      "tallyId": "tally:mara-shop",
+      "counterparty": {
+        "name": "Mara's Bike Shop"
+      },
+      "amount": {
+        "units": 6400,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "waitingSince": "2026-09-01T09:00:00Z",
+      "route": "ReviewOffer",
+      "waitingOn": "me"
+    },
+    {
+      "id": "att:backlog-8",
+      "kind": "request",
+      "tallyId": "tally:dave-hours",
+      "counterparty": {
+        "name": "Dave Lin"
+      },
+      "amount": {
+        "units": 7100,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "waitingSince": "2026-09-02T09:00:00Z",
+      "route": "RequestView",
+      "waitingOn": "me",
+      "requestId": "request:backlog-8",
+      "expires": "2026-09-26T17:00:00Z"
+    },
+    {
+      "id": "att:backlog-9",
+      "kind": "offer",
+      "tallyId": "tally:priya-new",
+      "counterparty": {
+        "name": "Priya Raman"
+      },
+      "amount": {
+        "units": 7800,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "waitingSince": "2026-09-03T09:00:00Z",
+      "route": "ReviewOffer",
+      "waitingOn": "me"
+    },
+    {
+      "id": "att:closing-parts",
+      "kind": "closing",
+      "tallyId": "tally:supplier-parts",
+      "counterparty": {
+        "name": "Northwind Parts"
+      },
+      "waitingOn": "them",
+      "waitingSince": "2026-08-28T09:15:00Z",
+      "route": "TallyView"
+    }
+  ],
+  "past": [
+    {
+      "id": "att:offer-priya",
+      "kind": "offer",
+      "tallyId": "tally:priya-new",
+      "counterparty": {
+        "name": "Priya Raman"
+      },
+      "amount": {
+        "units": 50000,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "route": "ReviewOffer",
+      "arrived": "2026-09-03T09:00:00Z",
+      "resolved": "2026-09-06T16:45:00Z",
+      "outcome": "answered"
+    },
+    {
+      "id": "att:request-sam-40",
+      "kind": "request",
+      "tallyId": "tally:sam-bike",
+      "counterparty": {
+        "name": "Sam Ortiz"
+      },
+      "requestId": "request:jan-sam-40",
+      "amount": {
+        "units": 4000,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "route": "RequestView",
+      "arrived": "2026-08-28T09:00:00Z",
+      "resolved": "2026-08-30T14:20:00Z",
+      "outcome": "answered"
+    },
+    {
+      "id": "att:offer-dave",
+      "kind": "offer",
+      "tallyId": "tally:dave-hours",
+      "counterparty": {
+        "name": "Dave Lin"
+      },
+      "amount": {
+        "units": 600,
+        "denom": "cid:bafy-dave-hours",
+        "scale": 0,
+        "divisor": 60,
+        "code": "DVH",
+        "mark": "DH",
+        "label": "Dave-hours"
+      },
+      "route": "ReviewOffer",
+      "arrived": "2026-08-19T10:00:00Z",
+      "resolved": "2026-08-21T08:05:00Z",
+      "outcome": "refused"
+    },
+    {
+      "id": "att:request-mara-old",
+      "kind": "request",
+      "tallyId": "tally:mara-shop",
+      "counterparty": {
+        "name": "Mara's Bike Shop"
+      },
+      "amount": {
+        "units": 1800,
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "route": "RequestView",
+      "arrived": "2026-08-12T11:00:00Z",
+      "resolved": "2026-08-13T09:30:00Z",
+      "outcome": "withdrawn"
+    },
+    {
+      "id": "att:invitation-lapsed",
+      "kind": "invitation",
+      "tallyId": "tally:sam-bike",
+      "counterparty": {
+        "name": "A stranger"
+      },
+      "route": "ReviewInvitation",
+      "arrived": "2026-07-30T15:00:00Z",
+      "resolved": "2026-08-06T15:00:00Z",
+      "outcome": "lapsed"
+    }
+  ]
+}

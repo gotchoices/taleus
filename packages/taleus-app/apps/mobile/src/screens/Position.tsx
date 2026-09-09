@@ -3,7 +3,7 @@ import { ScrollView, Text } from 'react-native'
 
 import { Action, Amount, Card, Empty, Failed, Loading, Row } from '../components'
 import { readPosition, type Estimate, type PerUnitPosition } from '../data/position'
-import type { Perspective, Unit, UnitAmount } from '../data/types'
+import { unitOf, type Perspective, type Unit } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
 import type { ScreenProps } from '../navigation/routes'
@@ -140,10 +140,6 @@ function sideOf(units: number, side: Perspective): Perspective {
  * one to read rather than a dollar to fall back on — `rules.md` privileges no
  * unit, and an amount arriving without one is an adapter bug.
  */
-function unitOf(amount: UnitAmount): Unit {
-	return { denom: amount.denom, scale: amount.scale }
-}
-
 const make = (tokens: Tokens) => ({
 	screen: { flex: 1, backgroundColor: tokens.background },
 	content: { padding: spacing[3], gap: spacing[3] },

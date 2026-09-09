@@ -48,7 +48,13 @@ export const linking: LinkingOptions<TabParams & OnboardingParams> = {
 					},
 				},
 			},
-			AttentionTab: { screens: { Attention: 'screen/Attention' } },
+			AttentionTab: {
+				initialRouteName: 'Attention',
+				screens: {
+					Attention: 'screen/Attention',
+					AttentionHistory: 'screen/AttentionHistory',
+				},
+			},
 			PositionTab: {
 				initialRouteName: 'Position',
 				screens: {

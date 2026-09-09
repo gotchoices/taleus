@@ -25,7 +25,7 @@ and should not acquire one.
 | Review offer | ReviewOffer | — | 03, 02 | happy, empty, superseded | generated |
 | Standing invitation | StandingInvitation | — | 01, 10, 11, 21 | happy, empty | generated |
 | Attention | Attention | — | 23 | happy, empty, error | generated |
-| Attention history | AttentionHistory | — | 23 | happy, empty | draft |
+| Attention history | AttentionHistory | — | 23 | happy, empty | generated |
 | Pay chooser | PayChooser | — | 20, 21, 30 | happy | draft |
 | Pay a partner | PayPartner | — | 20 | happy, error | generated |
 | Pay through the network | PayThroughNetwork | — | 30 | happy, empty, error | draft |

@@ -1,10 +1,18 @@
 {
   "namespace": "attention",
-  "variants": ["happy", "empty"],
-  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "variants": [
+    "happy",
+    "empty",
+    "error"
+  ],
+  "shape": "design/specs/domain/interfaces.md \u00a7 What the apps ask of the engine",
   "notes": [
     "items with waitingOn: them appear but never as a demand on this party (story 23 path D)",
-    "automated settling never appears here — it was authorized in advance (story 23 step 6)",
-    "route names match design/specs/mobile/navigation.md"
+    "automated settling never appears here \u2014 it was authorized in advance (story 23 step 6)",
+    "route names match design/specs/mobile/navigation.md",
+    "`expires` is what makes path B answerable without the party doing date arithmetic: a request that runs out on Friday and an offer good for another month must not look alike",
+    "`past` is path E \u2014 what has already been through the list and what became of each one. `outcome` is the whole point: answered, refused, withdrawn by the other party, lapsed unanswered, or set aside. An item leaving the list is an event with an outcome, not an absence",
+    "`requestId` lets a request item land on the request itself rather than on the tally it sits under. `RequestView` did not exist when this namespace was first written",
+    "`error` is the story's own: ten things waiting after a week away (path C), plus one whose next move is the other party's (path D)"
   ]
 }

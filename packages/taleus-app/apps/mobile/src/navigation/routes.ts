@@ -31,6 +31,8 @@ export type TalliesParams = {
 
 export type AttentionParams = {
 	Attention: undefined
+	/** What has been through the list, and what became of it (story 23 path E). */
+	AttentionHistory: undefined
 }
 
 /** Outside the tabs, shown until a party exists (`navigation.md` § Sitemap). */
@@ -87,6 +89,7 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	RequestView: 'Tallies',
 	CloseTally: 'Tallies',
 	Attention: 'AttentionTab',
+	AttentionHistory: 'AttentionTab',
 	Position: 'PositionTab',
 	ExchangeRates: 'PositionTab',
 	Settings: 'SettingsTab',
@@ -175,6 +178,10 @@ interface ScreenPropsByRoute {
 	CloseTally: TalliesScreenProps<'CloseTally'>
 	Attention: CompositeScreenProps<
 		NativeStackScreenProps<AttentionParams, 'Attention'>,
+		BottomTabScreenProps<TabParams>
+	>
+	AttentionHistory: CompositeScreenProps<
+		NativeStackScreenProps<AttentionParams, 'AttentionHistory'>,
 		BottomTabScreenProps<TabParams>
 	>
 	Position: CompositeScreenProps<
