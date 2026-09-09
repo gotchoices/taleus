@@ -64,7 +64,11 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
 - [x] `Notifications` — the thread running through everything already built. Six screens promise a
   counterparty is told something; this is where "told" is defined. The app classifies and the phone
   decides, which is why there are no quiet hours in it
-- [ ] The remaining 8 screens in `screens/index.md`
+- [x] `Devices` and `Cadre` — the pair story 43 pointed at in prose and could not link. Story 13's
+  subject is a thing a party cannot work out from the app's behaviour: settling happens on its own,
+  but only while something of theirs is awake. Story 14's is an honest split — tallies survive with
+  the counterparty, but that safety is borrowed; the party's own records survive nowhere else
+- [ ] The remaining 6 screens in `screens/index.md`
 
 ## Mock mode (this target)
 - [x] `mock/data/` carries the first fixtures — party, tallies, tally, entries, requests, attention,

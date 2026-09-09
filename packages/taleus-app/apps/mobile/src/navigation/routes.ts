@@ -54,6 +54,10 @@ export type SettingsParams = {
 	StandingInvitation: undefined
 	/** What interrupts, and what merely informs (story 43). */
 	Notifications: undefined
+	/** What can act as this party (story 13). */
+	Devices: undefined
+	/** The machines acting for this party, and what each contributes (story 14). */
+	Cadre: undefined
 }
 
 /** The tabs, each holding a stack of its own. */
@@ -90,6 +94,8 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	DisclosureView: 'SettingsTab',
 	StandingInvitation: 'SettingsTab',
 	Notifications: 'SettingsTab',
+	Devices: 'SettingsTab',
+	Cadre: 'SettingsTab',
 }
 
 /**
@@ -184,6 +190,8 @@ interface ScreenPropsByRoute {
 	DisclosureView: SettingsScreenProps<'DisclosureView'>
 	StandingInvitation: SettingsScreenProps<'StandingInvitation'>
 	Notifications: SettingsScreenProps<'Notifications'>
+	Devices: SettingsScreenProps<'Devices'>
+	Cadre: SettingsScreenProps<'Cadre'>
 }
 
 export type ScreenProps<R extends RouteName> = ScreenPropsByRoute[R]

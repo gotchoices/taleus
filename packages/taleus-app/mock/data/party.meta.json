@@ -4,6 +4,7 @@
     "happy",
     "first-run",
     "naming",
+    "empty",
     "error"
   ],
   "shape": "design/specs/domain/interfaces.md \u00a7 What the apps ask of the engine",
@@ -13,6 +14,10 @@
     "`naming` is an identity that exists but has no name yet \u2014 what ChooseName is about. Without it that screen is unreachable by link: `first-run` has no identity, so the gate lands on Welcome instead.",
     "NOT called `empty`: a variant name is global, and `empty` has to mean 'this screen has no data'. A party with no identity gates the whole app into onboarding, so `?variant=empty` on any screen would have shown first run instead of that screen's empty state.",
     "mock writes (creating an identity, setting a name) are held in memory and do not survive a restart",
-    "`error` is the happy party with the always-on node removed. Story 43 path B turns on whether the party has anything but a phone: if they do not, their tallies take part in settling only when the phone allows it, and the answer is a machine of theirs that stays on rather than a setting in this app"
+    "`devices` is what can act as this party (story 13). `kind` is what it is to a person, not what it is to a machine; `contributes` is story 14's split \u2014 durability is a copy of the party's own records, availability is something that stays on. A phone contributes the first and not the second",
+    "`thisDevice` marks the one in the party's hand, so a list of three is not three identifiers to decode",
+    "`reachable: false` on the tablet is story 13's error variant: a device that cannot be reached at the moment it needs retiring. It is reached by acting rather than by a different world, so it needs no fixture of its own",
+    "`party.single-device.json` serves both `empty` and `error`: a party whose only machine is the phone in their hand. Story 13 path A, story 14 path A, and story 43 path B are the same party seen from three screens",
+    "`hostedBy: null` is a machine the party runs themselves. Story 14 path B keeps hosting by somebody else a separate decision, so it is a separate field rather than a kind"
   ]
 }

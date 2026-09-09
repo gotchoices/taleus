@@ -312,6 +312,30 @@ screenshots:
       - apps/mobile/src/screens/Notifications.tsx
       - mock/data/notifications.error.json
       - mock/data/party.error.json
+  - route: Devices
+    variant: happy
+    file: devices.png
+    deps:
+      - apps/mobile/src/screens/Devices.tsx
+      - mock/data/party.happy.json
+  - route: Devices
+    variant: empty
+    file: devices-one.png
+    deps:
+      - apps/mobile/src/screens/Devices.tsx
+      - mock/data/party.single-device.json
+  - route: Cadre
+    variant: happy
+    file: cadre.png
+    deps:
+      - apps/mobile/src/screens/Cadre.tsx
+      - mock/data/party.happy.json
+  - route: Cadre
+    variant: empty
+    file: cadre-one.png
+    deps:
+      - apps/mobile/src/screens/Cadre.tsx
+      - mock/data/party.single-device.json
 ---
 
 # Screenshots
@@ -361,6 +385,10 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Standing | none | never published; what one is, before publishing | ![](standing-none.png) |
 | Notices | happy | what interrupts, what informs, what never does | ![](notifications.png) |
 | Notices | refused | turned off, and what that costs | ![](notifications-refused.png) |
+| Devices | happy | three machines, one quiet, one that stays on | ![](devices.png) |
+| Devices | one | a phone and nothing else, and what that costs | ![](devices-one.png) |
+| Cadre | happy | what survives elsewhere, and what does not | ![](cadre.png) |
+| Cadre | one | the fragile half, on one machine | ![](cadre-one.png) |
 
 Notes:
 

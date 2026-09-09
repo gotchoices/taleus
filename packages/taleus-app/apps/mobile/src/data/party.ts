@@ -2,12 +2,37 @@ import { mockMode } from './config'
 import { getVariant } from '../mock/variant'
 import { engineAbsent, type Instant, type Result } from './types'
 
+/**
+ * Something of this party's that can act as them (story 13).
+ *
+ * A party is not one device: several can act for the same person, and what a
+ * party can do while nobody is holding anything depends on at least one of them
+ * being available.
+ */
 export interface Device {
 	id: string
+	/** The party's own name for it. Meaningful to them, not to a machine. */
 	name: string
+	/** What it is to a person — not what it is to a machine. */
+	kind: 'phone' | 'tablet' | 'node'
 	lastActive: Instant
 	/** A device that stays reachable — a node rather than a phone. */
 	alwaysOn?: boolean
+	/** The one in the party's hand. */
+	thisDevice?: boolean
+	/**
+	 * Story 14's split: `durability` is a copy of the party's own records,
+	 * `availability` is something that stays on. A phone gives the first and not
+	 * the second.
+	 */
+	contributes: ('durability' | 'availability')[]
+	/** A provider's name, or null for a machine the party runs themselves. */
+	hostedBy?: string | null
+	/** When it last took part in settling — story 13 step 7. */
+	lastParticipated?: Instant
+	/** False when it cannot be reached right now. Never a guess about why. */
+	reachable?: boolean
+	retired?: boolean
 }
 
 /**
@@ -86,9 +111,11 @@ function fixtureFor(variant: string): { party: Party | null } {
 			return require('../../mock/data/party.first-run.json') as { party: Party | null }
 		case 'naming':
 			return require('../../mock/data/party.naming.json') as { party: Party | null }
+		case 'empty':
 		case 'error':
-			// A party whose only device is the phone in their hand — story 43 path B.
-			return require('../../mock/data/party.error.json') as { party: Party | null }
+			// A party whose only machine is the phone in their hand. Story 13 path A,
+			// story 14 path A and story 43 path B are the same party, three screens.
+			return require('../../mock/data/party.single-device.json') as { party: Party | null }
 		default:
 			return require('../../mock/data/party.happy.json') as { party: Party | null }
 	}

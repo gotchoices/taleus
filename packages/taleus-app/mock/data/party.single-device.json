@@ -11,8 +11,13 @@
     "devices": [
       {
         "id": "dev:phone-1",
-        "name": "Jan's phone",
-        "lastActive": "2026-09-05T08:12:00Z"
+        "name": "Jan’s phone",
+        "kind": "phone",
+        "lastActive": "2026-09-09T11:40:00Z",
+        "contributes": [
+          "durability"
+        ],
+        "thisDevice": true
       }
     ]
   }

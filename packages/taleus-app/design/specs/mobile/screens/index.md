@@ -37,8 +37,8 @@ and should not acquire one.
 | Settings | Settings | — | 42 | happy | generated |
 | Profile | Profile | — | 11 | happy, empty, error | generated |
 | Disclosure view | DisclosureView | — | 11 | happy, empty | generated |
-| Devices | Devices | — | 13, 12 | happy, error | draft |
-| Cadre | Cadre | — | 14, 51 | happy, empty, error | draft |
+| Devices | Devices | — | 13, 12 | happy, empty | generated |
+| Cadre | Cadre | — | 14, 51 | happy, empty | generated |
 | Recovery setup | RecoverySetup | — | 12, 50 | happy, error | draft |
 | Notifications | Notifications | — | 43 | happy, error | generated |
 
