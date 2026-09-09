@@ -32,10 +32,11 @@ type Props = ScreenProps<'PayPartner'>
 export function PayPartner({ route }: Props): React.JSX.Element {
 	const styles = useStyles(make)
 	const tokens = useTokens()
-	const { tallyId } = route.params
+	const { tallyId, amount: prefill, answers } = route.params
 	const { state, value, error, reload } = useLoad(useCallback(() => readTally(tallyId), [tallyId]))
 
-	const [text, setText] = useState('')
+	// Answering a request starts from the requester's figure, not a blank field.
+	const [text, setText] = useState(prefill ? String(prefill) : '')
 	const [memo, setMemo] = useState('')
 	const [preview, setPreview] = useState<Preview | undefined>()
 	const [done, setDone] = useState(false)
@@ -68,7 +69,12 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 
 	const sign = async () => {
 		setFailure(undefined)
-		const result = await recordEntry(tallyId, { actId, amount, memo: memo.trim() || undefined })
+		const result = await recordEntry(tallyId, {
+			actId,
+			amount,
+			memo: memo.trim() || undefined,
+			answers: answers ? [answers] : undefined,
+		})
 		if (result.ok) {
 			setDone(true)
 			return

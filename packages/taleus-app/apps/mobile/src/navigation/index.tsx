@@ -12,6 +12,7 @@ import { CreateInvitation } from '../screens/CreateInvitation'
 import { ReviewInvitation } from '../screens/ReviewInvitation'
 import { CreateRequest } from '../screens/CreateRequest'
 import { PayPartner } from '../screens/PayPartner'
+import { RequestView } from '../screens/RequestView'
 import { ReviewOffer } from '../screens/ReviewOffer'
 import { Welcome } from '../screens/Welcome'
 import { Position } from '../screens/Position'
@@ -119,6 +120,11 @@ function TalliesStack(): React.JSX.Element {
 				name="CreateRequest"
 				component={CreateRequest}
 				options={{ title: t('screens.create-request.title') }}
+			/>
+			<Tallies.Screen
+				name="RequestView"
+				component={RequestView}
+				options={{ title: t('screens.request-view.title') }}
 			/>
 			<Tallies.Screen
 				name="ReviewOffer"

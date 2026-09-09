@@ -1,5 +1,6 @@
 import { mockMode } from './config'
 import { getVariant } from '../mock/variant'
+import { applyToRequest } from './requests'
 import { readTally } from './tally'
 import { engineAbsent, type Amount, type Balance, type Instant, type Result } from './types'
 
@@ -100,7 +101,7 @@ const seen = new Set<string>()
  */
 export async function recordEntry(
 	tallyId: string,
-	entry: { actId: string; amount: Amount; memo?: string },
+	entry: { actId: string; amount: Amount; memo?: string; answers?: string[] },
 ): Promise<Result<Entry>> {
 	if (!mockMode) {
 		return { ok: false, error: engineAbsent }
@@ -135,9 +136,15 @@ export async function recordEntry(
 		amount: { units: -entry.amount.units },
 		date: new Date().toISOString(),
 		memo: entry.memo,
+		answers: entry.answers,
 		balanceAfter: preview.ok ? preview.value.balanceAfter : { units: 0, perspective: 'level' },
 	}
 	recorded = { ...recorded, [tallyId]: [made, ...(recorded[tallyId] ?? [])] }
+	// An entry that answers a request is recognisably tied to it, and the request
+	// records what was applied (story 22 path B).
+	for (const requestId of entry.answers ?? []) {
+		await applyToRequest(requestId, entry.amount)
+	}
 	return { ok: true, value: made }
 }
 

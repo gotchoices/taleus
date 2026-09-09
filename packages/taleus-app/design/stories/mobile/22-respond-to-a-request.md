@@ -17,7 +17,7 @@ an older request from a supplier he does not recognise.
 
 ## Sequence
 
-1. Sam sees that Mara is asking him for $95, what it is for, and when the request runs out.
+1. Sam sees that Mara is asking him for $95, what it is for, and how long it has been waiting.
 2. He sees what paying it would do: what he would owe afterward, and how much room that leaves him.
 3. He pays it. The amount is Mara's — he is answering her request, not deciding an amount himself.
  
@@ -69,7 +69,7 @@ an older request from a supplier he does not recognise.
 
 ## Acceptance Criteria
 
-- [ ] The payer sees the amount, the reason, who is asking, and when the request expires
+- [ ] The payer sees the amount, the reason, who is asking, and how long it has been waiting
 - [ ] The effect of paying — resulting balance and remaining room — is shown before deciding
 - [ ] The amount asked is a request, not a commitment, until the payer gives it
 - [ ] A payer may answer in full, in part, or not at all, and says which they are doing

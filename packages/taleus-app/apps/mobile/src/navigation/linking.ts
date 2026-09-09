@@ -36,6 +36,7 @@ export const linking: LinkingOptions<TabParams & OnboardingParams> = {
 					ReviewOffer: 'screen/ReviewOffer/:tallyId',
 					PayPartner: 'screen/PayPartner/:tallyId',
 					CreateRequest: 'screen/CreateRequest/:tallyId',
+					RequestView: 'screen/RequestView/:requestId',
 					// Two ways in: the scenario/deep-link form, and the universal link
 					// a person is actually sent (`navigation.md` § Deep Links).
 					ReviewInvitation: {

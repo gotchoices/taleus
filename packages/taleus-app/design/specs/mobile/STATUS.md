@@ -41,8 +41,10 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
   arc is complete: a tally can be offered, answered, negotiated and read
 - [x] `PayPartner` and `CreateRequest` — value given and value asked for. `TallyView` now offers its
   next actions (story 04 step 7), absent through five slices because there was nowhere to send them
-- [ ] The remaining 18 screens in `screens/index.md`; next is `RequestView` (stories 21, 22) —
-  answering a request, which is the half of the paying arc that is missing
+- [x] `RequestView` — answering in full, in part, or not at all, and taking one's own request back.
+  The paying arc is complete
+- [ ] The remaining 17 screens in `screens/index.md`; next is `CloseTally` (story 05) — the one act
+  a party can always take, and the only exit the offer model relies on
 
 ## Mock mode (this target)
 - [x] `mock/data/` carries the first fixtures — party, tallies, tally, entries, requests, attention,

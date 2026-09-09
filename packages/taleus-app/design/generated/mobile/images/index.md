@@ -65,6 +65,18 @@ screenshots:
     deps:
       - apps/mobile/src/screens/CreateRequest.tsx
       - mock/data/tally.happy.json
+  - route: RequestView/request%3Amara-95
+    variant: happy
+    file: request-view.png
+    deps:
+      - apps/mobile/src/screens/RequestView.tsx
+      - mock/data/requests.happy.json
+  - route: RequestView/request%3Ajan-sam-60
+    variant: happy
+    file: request-view-mine.png
+    deps:
+      - apps/mobile/src/screens/RequestView.tsx
+      - mock/data/requests.happy.json
   - route: TallyList
     variant: happy
     file: tally-list-happy.png
@@ -184,6 +196,8 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Review offer | superseded | two signed; the later one governs | ![](review-offer-superseded.png) |
 | Pay a partner | happy | value given, and its effect before signing | ![](pay-partner.png) |
 | Create request | happy | asking, with no clock to set | ![](create-request.png) |
+| Request view | asked of you | part-answered, and no clock | ![](request-view.png) |
+| Request view | asked by you | yours to take back, not to answer | ![](request-view-mine.png) |
 | Tally list | happy | six tallies, one offered and figureless | ![](tally-list-happy.png) |
 | Tally list | empty | nothing yet, and what to do about it | ![](tally-list-empty.png) |
 | Tally view | happy | a tally with history, terms both ways | ![](tally-view-happy.png) |

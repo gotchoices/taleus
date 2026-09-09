@@ -30,7 +30,7 @@ and should not acquire one.
 | Pay a partner | PayPartner | — | 20 | happy, error | generated |
 | Pay through the network | PayThroughNetwork | — | 30 | happy, empty, error | draft |
 | Create request | CreateRequest | — | 21 | happy | generated |
-| Request view | RequestView | — | 21, 22 | happy, empty, error | draft |
+| Request view | RequestView | — | 21, 22 | happy | generated |
 | Scan | Scan | — | 02, 21, 30 | happy, error | draft |
 | Position | Position | — | 40 | happy, empty, error | generated |
 | Exchange rates | ExchangeRates | — | 41 | happy, empty | draft |

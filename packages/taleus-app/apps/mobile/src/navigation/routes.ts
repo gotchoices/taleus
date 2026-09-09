@@ -14,8 +14,14 @@ export type TalliesParams = {
 	/** The universal-link landing: `https://sereus.org/taleus/invite/<token>`. */
 	ReviewInvitation: { token: string }
 	ReviewOffer: { tallyId: string }
-	PayPartner: { tallyId: string }
+	/**
+	 * `amount` and `answers` are how a request hands its figure over: story 22
+	 * step 3 — the amount is the requester's, the payer is answering rather than
+	 * deciding one.
+	 */
+	PayPartner: { tallyId: string; amount?: number; answers?: string }
 	CreateRequest: { tallyId: string }
+	RequestView: { requestId: string }
 }
 
 export type AttentionParams = {
@@ -53,6 +59,7 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	ReviewOffer: 'Tallies',
 	PayPartner: 'Tallies',
 	CreateRequest: 'Tallies',
+	RequestView: 'Tallies',
 	Attention: 'AttentionTab',
 	Position: 'PositionTab',
 }
@@ -108,6 +115,7 @@ interface ScreenPropsByRoute {
 	ReviewOffer: TalliesScreenProps<'ReviewOffer'>
 	PayPartner: TalliesScreenProps<'PayPartner'>
 	CreateRequest: TalliesScreenProps<'CreateRequest'>
+	RequestView: TalliesScreenProps<'RequestView'>
 	Attention: CompositeScreenProps<
 		NativeStackScreenProps<AttentionParams, 'Attention'>,
 		BottomTabScreenProps<TabParams>

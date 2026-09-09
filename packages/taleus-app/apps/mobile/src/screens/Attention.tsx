@@ -46,6 +46,9 @@ export function Attention({ navigation }: Props): React.JSX.Element {
 		// routes attention items name — ReviewOffer, RequestView — are not sliced
 		// yet, so they fall back to the tally the item belongs to rather than
 		// navigating into nothing.
+		// An attention item names a route from `navigation.md`. Those that are about
+		// a tally take its id; `RequestView` needs a request id, which an item does
+		// not carry — so it lands on the tally, where the request is listed.
 		navigation.navigate('Tallies', {
 			screen: isTallyRoute(item.route) ? item.route : 'TallyView',
 			params: { tallyId: item.tallyId },
