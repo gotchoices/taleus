@@ -27,18 +27,27 @@
   <article>
     <h1>Scenarios</h1>
 <p>Storyboards for review, in the order a party meets them. Each screenshot links to the deep link that
-produced it: run <code>appeus/scripts/preview-scenarios.sh --target mobile</code> and clicking one opens that
-state on the device chosen in the page header.</p>
+produced it: run <code>appeus/scripts/preview-scenarios.sh --target mobile --device &lt;id&gt;</code> and clicking one
+opens that state on that device.</p>
 <ol>
-<li><a href="10-first-run.html">First run</a> — installing, being told what this is, ending up ready</li>
-<li><a href="06-find-a-tally.html">Finding a tally, and reading one</a> — the list, a tally, its history</li>
-<li><a href="23-attention-and-position.html">What needs me, and how I am doing</a> — attention and position</li>
+<li><a href="10-first-run.html">First run</a> — installing, being told what this is, ending up ready (story 10)</li>
+<li><a href="06-find-a-tally.html">Finding a tally</a> — the list, and what it says without being opened (06)</li>
+<li><a href="04-first-look-at-an-open-tally.html">First look at an open tally</a> — what a tally is (04, 07)</li>
+<li><a href="24-tally-history.html">Tally history</a> — following the balance back (24)</li>
+<li><a href="23-what-needs-my-attention.html">What needs my attention</a> — across every tally (23)</li>
+<li><a href="40-my-position.html">My position</a> — owed, owing, and an estimate (40)</li>
 </ol>
-<p><code>/states</code> in the preview lists every registered state, including the four worth opening but not
+<p><code>/states</code> in the preview lists every registered state, including the ones worth opening but not
 photographed.</p>
+<h2>Coverage</h2>
+<p>One doc per story, for every story a coded screen serves. Seven screens are built —
+<code>Welcome</code>, <code>ChooseName</code>, <code>TallyList</code>, <code>TallyView</code>, <code>TallyHistory</code>, <code>Attention</code>, <code>Position</code> — covering
+stories 04, 06, 07, 10, 11, 23, 24 and 40. Story 11 appears only as the name asked for in first run;
+<code>Profile</code> and <code>DisclosureView</code> are unsliced.</p>
 <h2>Not yet storyboarded</h2>
 <p>The invitation arc (stories 01, 02, 03) — how a tally comes to exist — is unsliced, which is why
-these scenarios begin with tallies that already exist.</p>
+these scenarios begin with tallies that already exist. So are paying and requesting (20, 21, 22),
+which is why no scenario here shows value moving on purpose.</p>
 
   </article>
   

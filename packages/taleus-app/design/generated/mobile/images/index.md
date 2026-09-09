@@ -106,8 +106,11 @@ screenshots:
     note: a tally that is closing
   - route: TallyHistory/tally%3Amara-shop
     variant: happy
-    capture: false
-    note: an entry that answered a request
+    file: tally-history-answered.png
+    deps:
+      - apps/mobile/src/screens/TallyHistory.tsx
+      - mock/data/entries.happy.json
+      - mock/data/requests.happy.json
   - route: TallyList
     variant: happy
     locale: en
@@ -131,6 +134,7 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Tally view | unreachable | story 04 path C: reads anyway, pending marked | ![](tally-view-unreachable.png) |
 | Tally view | hours | a unit that divides by sixty — `6 07/60` | ![](tally-view-hours.png) |
 | Tally history | happy | entries with the side of each balance | ![](tally-history-happy.png) |
+| Tally history | answered | an entry recognisably tied to the request it answered | ![](tally-history-answered.png) |
 | Attention | happy | what waits, how long, and reachable | ![](attention-happy.png) |
 | Position | happy | per unit, then a marked estimate | ![](position-happy.png) |
 

@@ -24,7 +24,6 @@ Specs say what the app should do. They do not record what has not been done yet.
 | `bundle install` after the Gemfile gained `nkf` | Only matters for iOS tooling, which is untouched | — |
 | Next actions on `TallyView` | Pay, Request, and Terms are unsliced; a button routing nowhere is worse than none | — |
 | Progressive disclosure of captions | Right idea, wrong time — `Card` has the slot it would hang off | — |
-| Scenario docs under `generated/mobile/scenarios/` | Waiting on an appeus preview upgrade so a storyboard's links can reach the device — `tmp/appeus-preview-spec.md` | — |
 | Fixtures for `Attention` and `Position` error states | Declared in their specs, nothing produces them; a storyboard cannot show a state no fixture makes | — |
 | Fixtures at story scale — forty tallies, a year of entries, eleven waiting items | The happy fixtures are six, three and three; the stories describe volumes the screens have never been shown | — |
 | Story 25, *My records in my books* | Waiting on how sApps share between strands | — |

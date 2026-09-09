@@ -48,8 +48,9 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
 - [x] Screenshots for eight screen/variant pairs under `design/generated/mobile/images/`, captured
   from a release build by deep link — including story 04's own two scenes, a new tally and an
   unreachable counterparty
-- [ ] Scenario docs under `design/generated/mobile/scenarios/` — blocked on an appeus upgrade so a
-  storyboard's deep links can reach the device; spec drafted at `tmp/appeus-preview-spec.md`
+- [x] Scenario docs under `design/generated/mobile/scenarios/` — one per story, covering every story a
+  coded screen serves (04, 06, 07, 10, 23, 24, 40). Sixteen linked states, each verified to land on
+  the device through `preview-scenarios.sh`.
 
 ## Final wiring
 - [ ] Production data wiring is implemented and tested
