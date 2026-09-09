@@ -141,9 +141,25 @@ export function TallyView({ route, navigation }: Props): React.JSX.Element {
 				</Card>
 			) : null}
 
+			{/*
+			 * Story 04 step 7: what to do next. These were deliberately absent while
+			 * Pay and Request were unsliced — a button routing nowhere is worse than
+			 * no button. Changing one's own limit is still unsliced, so it is still
+			 * absent.
+			 */}
+			<Action
+				label={t('screens.tally-view.pay')}
+				onPress={() => navigation.navigate('PayPartner', { tallyId: tally.id })}
+			/>
+			<Action
+				label={t('screens.tally-view.ask')}
+				onPress={() => navigation.navigate('CreateRequest', { tallyId: tally.id })}
+				secondary
+			/>
 			<Action
 				label={t('screens.tally-view.see-history')}
 				onPress={() => navigation.navigate('TallyHistory', { tallyId: tally.id })}
+				secondary
 			/>
 		</ScrollView>
 	)

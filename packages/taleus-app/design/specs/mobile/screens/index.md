@@ -27,9 +27,9 @@ and should not acquire one.
 | Attention | Attention | — | 23 | happy, empty, error | generated |
 | Attention history | AttentionHistory | — | 23 | happy, empty | draft |
 | Pay chooser | PayChooser | — | 20, 21, 30 | happy | draft |
-| Pay a partner | PayPartner | — | 20 | happy, error | draft |
+| Pay a partner | PayPartner | — | 20 | happy, error | generated |
 | Pay through the network | PayThroughNetwork | — | 30 | happy, empty, error | draft |
-| Create request | CreateRequest | — | 21 | happy, error | draft |
+| Create request | CreateRequest | — | 21 | happy | generated |
 | Request view | RequestView | — | 21, 22 | happy, empty, error | draft |
 | Scan | Scan | — | 02, 21, 30 | happy, error | draft |
 | Position | Position | — | 40 | happy, empty, error | generated |

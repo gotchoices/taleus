@@ -14,6 +14,8 @@ export type TalliesParams = {
 	/** The universal-link landing: `https://sereus.org/taleus/invite/<token>`. */
 	ReviewInvitation: { token: string }
 	ReviewOffer: { tallyId: string }
+	PayPartner: { tallyId: string }
+	CreateRequest: { tallyId: string }
 }
 
 export type AttentionParams = {
@@ -49,6 +51,8 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	CreateInvitation: 'Tallies',
 	ReviewInvitation: 'Tallies',
 	ReviewOffer: 'Tallies',
+	PayPartner: 'Tallies',
+	CreateRequest: 'Tallies',
 	Attention: 'AttentionTab',
 	Position: 'PositionTab',
 }
@@ -69,7 +73,7 @@ export const tabs: { name: TabName; labelKey: string; icon: string; iconActive: 
 ]
 
 /** Routes about one named tally — the ones an attention item can point at. */
-export type TallyRoute = 'TallyView' | 'TallyHistory' | 'ReviewOffer'
+export type TallyRoute = 'TallyView' | 'TallyHistory' | 'ReviewOffer' | 'PayPartner' | 'CreateRequest'
 
 /**
  * Is this a route the app has, and about a single tally? Attention items name
@@ -77,7 +81,13 @@ export type TallyRoute = 'TallyView' | 'TallyHistory' | 'ReviewOffer'
  * can fall back rather than navigate into nothing.
  */
 export function isTallyRoute(name: string): name is TallyRoute {
-	return name === 'TallyView' || name === 'TallyHistory' || name === 'ReviewOffer'
+	return (
+		name === 'TallyView' ||
+		name === 'TallyHistory' ||
+		name === 'ReviewOffer' ||
+		name === 'PayPartner' ||
+		name === 'CreateRequest'
+	)
 }
 
 /**
@@ -96,6 +106,8 @@ interface ScreenPropsByRoute {
 	CreateInvitation: TalliesScreenProps<'CreateInvitation'>
 	ReviewInvitation: TalliesScreenProps<'ReviewInvitation'>
 	ReviewOffer: TalliesScreenProps<'ReviewOffer'>
+	PayPartner: TalliesScreenProps<'PayPartner'>
+	CreateRequest: TalliesScreenProps<'CreateRequest'>
 	Attention: CompositeScreenProps<
 		NativeStackScreenProps<AttentionParams, 'Attention'>,
 		BottomTabScreenProps<TabParams>

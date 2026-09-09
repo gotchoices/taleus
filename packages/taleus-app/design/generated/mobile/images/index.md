@@ -53,6 +53,18 @@ screenshots:
     deps:
       - apps/mobile/src/screens/ReviewOffer.tsx
       - mock/data/offer.superseded.json
+  - route: PayPartner/tally%3Amara-shop
+    variant: happy
+    file: pay-partner.png
+    deps:
+      - apps/mobile/src/screens/PayPartner.tsx
+      - mock/data/tally.happy.json
+  - route: CreateRequest/tally%3Asam-bike
+    variant: happy
+    file: create-request.png
+    deps:
+      - apps/mobile/src/screens/CreateRequest.tsx
+      - mock/data/tally.happy.json
   - route: TallyList
     variant: happy
     file: tally-list-happy.png
@@ -170,6 +182,8 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Review invitation | expired | explained, with a way forward | ![](review-invitation-expired.png) |
 | Review offer | happy | what changed, then the terms | ![](review-offer.png) |
 | Review offer | superseded | two signed; the later one governs | ![](review-offer-superseded.png) |
+| Pay a partner | happy | value given, and its effect before signing | ![](pay-partner.png) |
+| Create request | happy | asking, with no clock to set | ![](create-request.png) |
 | Tally list | happy | six tallies, one offered and figureless | ![](tally-list-happy.png) |
 | Tally list | empty | nothing yet, and what to do about it | ![](tally-list-empty.png) |
 | Tally view | happy | a tally with history, terms both ways | ![](tally-view-happy.png) |

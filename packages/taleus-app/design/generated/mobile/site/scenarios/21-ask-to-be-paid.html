@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scenario: Asking to be paid</title>
+  <style>
+    body { margin: 20px; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #222; }
+    a { color: #0066cc; text-decoration: none; }
+    article img { width: 360px; max-width: 100%; height: auto; display: block; margin: 12px auto; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    code, pre { background: #f7f7f7; padding: 2px 4px; border-radius: 4px; }
+    pre { padding: 12px; overflow: auto; }
+    h1,h2,h3 { line-height: 1.25; }
+    .appeus-nav { font-size: 14px; color: #666; padding-bottom: 8px; border-bottom: 1px solid #eee; margin-bottom: 16px; }
+    .appeus-nav .appeus-device { float: right; }
+    .muted { color: #888; }
+    table.states { border-collapse: collapse; width: 100%; }
+    table.states th, table.states td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid #eee; }
+    table.states img.thumb { width: 120px; height: auto; border: 1px solid #ddd; border-radius: 6px; }
+    .appeus-toast { position: fixed; right: 16px; bottom: 16px; max-width: 60vw; padding: 10px 14px; border-radius: 8px; font-size: 14px; color: #fff; background: #333; box-shadow: 0 2px 12px rgba(0,0,0,0.25); }
+    .appeus-toast.ok { background: #2a7a2a; }
+    .appeus-toast.err { background: #a83232; }
+  </style>
+</head>
+<body>
+  <nav class="appeus-nav"><a href="../scenarios/index.html">Scenarios</a> · <a href="../states.html">States</a></nav>
+  <article>
+    <h1>Scenario: Asking to be paid</h1>
+<p>Source: <a href="../../../stories/mobile/21-ask-to-be-paid.md">21-ask-to-be-paid.md</a></p>
+<p>Mara has done a repair for Sam and wants paying — through the app, not by mentioning it next time he
+is in.</p>
+<h2>Step 1: What is being asked, and what it is for</h2>
+<p>An amount, and terms Sam will recognise when he sees it.</p>
+<p>Two things are said on the screen rather than left to be worked out. A request <strong>obliges him to
+nothing by itself</strong> — only signed entries move the balance. And it <strong>does not tick</strong>: there is no
+expiry field here, because a request is not set ticking. It stands until Sam answers it or Mara takes
+it back. An unpaid bill does not stop existing because a month went by.</p>
+<p>The absence of that field is the design. Every form of this kind invites a &quot;valid until&quot; control, and
+one would have contradicted the story at the level of the data, not just the wording.</p>
+<p><a href="taleus://screen/CreateRequest/tally%3Asam-bike?variant=happy"><img src="../images/create-request.png" alt="Ask to be paid"></a></p>
+<h2>Step 2: Where it stands</h2>
+<p>Once asked, the request appears beside the ledger on <code>TallyHistory</code> — never in it — saying which way
+it runs and how long it has been outstanding. Story 24&#39;s storyboard shows that view.</p>
+<h2>Not shown</h2>
+<p>Following a request through its life — withdrawing it, watching it age, seeing it part-answered or
+refused — is <code>RequestView</code> (stories 21 and 22), unsliced. So this screen can create a request but not
+follow one.</p>
+<p>A newcomer with no tally is offered a tally rather than a request (path A). <code>CreateInvitation</code> exists
+and does exactly that, but nothing routes here to there yet.</p>
+
+  </article>
+  
+</body>
+</html>

@@ -30,7 +30,8 @@ export async function listRequests(tallyId?: string): Promise<Result<PaymentRequ
 		return { ok: false, error: engineAbsent }
 	}
 	const all = fixtureFor(getVariant()).requests ?? []
-	const mine = tallyId ? all.filter(r => r.tallyId === tallyId) : all
+	const everything = [...asked, ...all]
+	const mine = tallyId ? everything.filter(r => r.tallyId === tallyId) : everything
 	return { ok: true, value: mine.map(age) }
 }
 
@@ -45,4 +46,39 @@ function fixtureFor(variant: string): { requests?: PaymentRequest[] } {
 		default:
 			return require('../../mock/data/requests.happy.json') as { requests?: PaymentRequest[] }
 	}
+}
+
+/** Requests this party made in this session, held in memory as elsewhere. */
+let asked: PaymentRequest[] = []
+
+/**
+ * Story 21: a request is the requester's own statement of what they think is
+ * owed. It obliges the payer to nothing by itself, and it does not tick — it
+ * stands until answered or withdrawn.
+ */
+export async function createRequest(
+	tallyId: string,
+	ask: { amount: Amount; memo?: string },
+): Promise<Result<PaymentRequest>> {
+	if (!mockMode) {
+		return { ok: false, error: engineAbsent }
+	}
+	const made: PaymentRequest = {
+		id: `request:new-${Date.now().toString(36)}`,
+		tallyId,
+		direction: 'asked-by-me',
+		amount: ask.amount,
+		memo: ask.memo,
+		asked: new Date().toISOString(),
+		outstandingDays: 0,
+		applied: { units: 0 },
+		stillAsked: ask.amount,
+		state: 'waiting',
+	}
+	asked = [made, ...asked]
+	return { ok: true, value: made }
+}
+
+export function resetRequests(): void {
+	asked = []
 }
