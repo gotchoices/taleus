@@ -155,6 +155,13 @@ export function Settings({ navigation }: Props): React.JSX.Element {
 					<Text style={styles.body}>{t('screens.settings.about-me')}</Text>
 					<Text style={styles.meta}>{t('screens.settings.about-me-note')}</Text>
 				</OpenableRow>
+				<OpenableRow
+					onPress={() => navigation.navigate('StandingInvitation')}
+					accessibilityLabel={t('screens.settings.standing-open')}
+				>
+					<Text style={styles.body}>{t('screens.settings.standing-open')}</Text>
+					<Text style={styles.meta}>{t('screens.settings.standing-note')}</Text>
+				</OpenableRow>
 			</Card>
 
 			{/* Path C. Naming these here, with where they live, is the point: a party

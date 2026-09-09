@@ -287,6 +287,18 @@ screenshots:
     deps:
       - apps/mobile/src/screens/ExchangeRates.tsx
       - mock/data/rates.error.json
+  - route: StandingInvitation
+    variant: happy
+    file: standing-published.png
+    deps:
+      - apps/mobile/src/screens/StandingInvitation.tsx
+      - mock/data/standing.happy.json
+  - route: StandingInvitation
+    variant: empty
+    file: standing-none.png
+    deps:
+      - apps/mobile/src/screens/StandingInvitation.tsx
+      - mock/data/standing.empty.json
 ---
 
 # Screenshots
@@ -332,6 +344,8 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Entry | unsettled | movement that has not committed | ![](entry-detail-unsettled.png) |
 | Rates | happy | a unit priced against a source, one left outside | ![](exchange-rates.png) |
 | Rates | error | a source unreachable, and a rate left to go stale | ![](exchange-rates-stale.png) |
+| Standing | happy | one code, its terms, and who took it up | ![](standing-published.png) |
+| Standing | none | never published; what one is, before publishing | ![](standing-none.png) |
 
 Notes:
 

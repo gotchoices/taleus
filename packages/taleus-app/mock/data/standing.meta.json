@@ -1,0 +1,12 @@
+{
+  "namespace": "standing",
+  "variants": ["happy", "empty"],
+  "shape": "apps/mobile/src/data/standing.ts",
+  "notes": [
+    "One standing invitation per party, or none. `empty` is none — a party who has never published one, which is where story 10 path E starts and is the ordinary state",
+    "`creditLimit: 0` is the point of the thing (story 10 path E, story 21 path A): strangers are offered no credit, and whoever takes it up funds the tally themselves. It is still useful — they hand over value, it is recorded, and they spend it from there",
+    "`takenUp` is one entry per responder, each naming its own tally. Story 01 path C.4: they are separate relationships from the moment they open, and any of them can be negotiated individually afterward — which is why the tally's terms today need not match what was published",
+    "`disclose` goes to every responder, known and unknown. Story 11 path C calls that effectively public, and the party has to be told so before publishing rather than after",
+    "There is no error fixture. Publishing failing is the same failure as sharing an ordinary invitation, which `CreateInvitation` already carries"
+  ]
+}

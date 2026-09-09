@@ -15,6 +15,7 @@ import { ExchangeRates } from '../screens/ExchangeRates'
 import { EntryDetail } from '../screens/EntryDetail'
 import { Profile } from '../screens/Profile'
 import { Settings } from '../screens/Settings'
+import { StandingInvitation } from '../screens/StandingInvitation'
 import { PayPartner } from '../screens/PayPartner'
 import { CloseTally } from '../screens/CloseTally'
 import { RequestView } from '../screens/RequestView'
@@ -209,6 +210,11 @@ function SettingsRoot(): React.JSX.Element {
 				name="DisclosureView"
 				component={DisclosureView}
 				options={{ title: t('screens.disclosure.title') }}
+			/>
+			<SettingsStack.Screen
+				name="StandingInvitation"
+				component={StandingInvitation}
+				options={{ title: t('screens.standing.title') }}
 			/>
 		</SettingsStack.Navigator>
 	)

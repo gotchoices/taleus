@@ -58,7 +58,10 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
   no screen existed, and `Position`'s estimate named what it excluded with nothing to do about it.
   Story 41 is only half about setting a number: the other half is being told that a rate is the price
   value actually converts at through you, and how to limit that
-- [ ] The remaining 10 screens in `screens/index.md`
+- [x] `StandingInvitation` — one set of terms anyone may take up, each becoming its own tally. It
+  closes the story 11 path C deferral: the disclosure a standing invitation carries is effectively
+  public, and the party is told before publishing rather than after
+- [ ] The remaining 9 screens in `screens/index.md`
 
 ## Mock mode (this target)
 - [x] `mock/data/` carries the first fixtures — party, tallies, tally, entries, requests, attention,

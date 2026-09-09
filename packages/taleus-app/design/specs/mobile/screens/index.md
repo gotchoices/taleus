@@ -23,7 +23,7 @@ and should not acquire one.
 | Create invitation | CreateInvitation | — | 01 | happy, empty | generated |
 | Review invitation | ReviewInvitation | — | 02 | happy, expired | generated |
 | Review offer | ReviewOffer | — | 03, 02 | happy, empty, superseded | generated |
-| Standing invitation | StandingInvitation | — | 01, 10, 21 | happy, empty | draft |
+| Standing invitation | StandingInvitation | — | 01, 10, 11, 21 | happy, empty | generated |
 | Attention | Attention | — | 23 | happy, empty, error | generated |
 | Attention history | AttentionHistory | — | 23 | happy, empty | draft |
 | Pay chooser | PayChooser | — | 20, 21, 30 | happy | draft |

@@ -1,0 +1,21 @@
+{
+  "standing": {
+    "id": "standing:jan-workshop",
+    "token": "inv:jan-standing-4b2",
+    "link": "https://sereus.org/taleus/invite/inv%3Ajan-standing-4b2",
+    "state": "published",
+    "published": "2026-08-21T09:00:00Z",
+    "unit": { "denom": "iso4217:USD", "scale": 2 },
+    "creditLimit": { "units": 0 },
+    "noticeDays": 14,
+    "agreementId": "cid:bafy-standard-tally-v1",
+    "disclose": ["name", "business", "phone"],
+    "takenUp": [
+      {
+        "tallyId": "tally:priya-new",
+        "name": "Priya Raman",
+        "at": "2026-09-06T16:45:00Z"
+      }
+    ]
+  }
+}
