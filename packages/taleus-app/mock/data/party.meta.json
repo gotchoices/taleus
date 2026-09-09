@@ -3,14 +3,16 @@
   "variants": [
     "happy",
     "first-run",
-    "naming"
+    "naming",
+    "error"
   ],
-  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "shape": "design/specs/domain/interfaces.md \u00a7 What the apps ask of the engine",
   "notes": [
     "the reading party: who I am, my display unit, what I have disclosed (stories 10, 11, 42)",
-    "`first-run` is `party: null` — no identity yet, which is what story 10 is about",
-    "`naming` is an identity that exists but has no name yet — what ChooseName is about. Without it that screen is unreachable by link: `first-run` has no identity, so the gate lands on Welcome instead.",
+    "`first-run` is `party: null` \u2014 no identity yet, which is what story 10 is about",
+    "`naming` is an identity that exists but has no name yet \u2014 what ChooseName is about. Without it that screen is unreachable by link: `first-run` has no identity, so the gate lands on Welcome instead.",
     "NOT called `empty`: a variant name is global, and `empty` has to mean 'this screen has no data'. A party with no identity gates the whole app into onboarding, so `?variant=empty` on any screen would have shown first run instead of that screen's empty state.",
-    "mock writes (creating an identity, setting a name) are held in memory and do not survive a restart"
+    "mock writes (creating an identity, setting a name) are held in memory and do not survive a restart",
+    "`error` is the happy party with the always-on node removed. Story 43 path B turns on whether the party has anything but a phone: if they do not, their tallies take part in settling only when the phone allows it, and the answer is a machine of theirs that stays on rather than a setting in this app"
   ]
 }

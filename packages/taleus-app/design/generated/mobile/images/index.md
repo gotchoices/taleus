@@ -299,6 +299,19 @@ screenshots:
     deps:
       - apps/mobile/src/screens/StandingInvitation.tsx
       - mock/data/standing.empty.json
+  - route: Notifications
+    variant: happy
+    file: notifications.png
+    deps:
+      - apps/mobile/src/screens/Notifications.tsx
+      - mock/data/notifications.happy.json
+  - route: Notifications
+    variant: error
+    file: notifications-refused.png
+    deps:
+      - apps/mobile/src/screens/Notifications.tsx
+      - mock/data/notifications.error.json
+      - mock/data/party.error.json
 ---
 
 # Screenshots
@@ -346,6 +359,8 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Rates | error | a source unreachable, and a rate left to go stale | ![](exchange-rates-stale.png) |
 | Standing | happy | one code, its terms, and who took it up | ![](standing-published.png) |
 | Standing | none | never published; what one is, before publishing | ![](standing-none.png) |
+| Notices | happy | what interrupts, what informs, what never does | ![](notifications.png) |
+| Notices | refused | turned off, and what that costs | ![](notifications-refused.png) |
 
 Notes:
 

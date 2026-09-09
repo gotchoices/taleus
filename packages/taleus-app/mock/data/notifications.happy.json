@@ -1,0 +1,26 @@
+{
+  "notifications": {
+    "permission": "granted",
+    "classes": [
+      {
+        "id": "signature",
+        "delivery": "interrupt"
+      },
+      {
+        "id": "asked",
+        "delivery": "interrupt"
+      },
+      {
+        "id": "arrived",
+        "delivery": "inform"
+      },
+      {
+        "id": "automatic",
+        "delivery": "silent",
+        "fixed": true
+      }
+    ],
+    "lockScreenDetail": "minimal",
+    "backgroundParticipation": true
+  }
+}

@@ -61,7 +61,10 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
 - [x] `StandingInvitation` — one set of terms anyone may take up, each becoming its own tally. It
   closes the story 11 path C deferral: the disclosure a standing invitation carries is effectively
   public, and the party is told before publishing rather than after
-- [ ] The remaining 9 screens in `screens/index.md`
+- [x] `Notifications` — the thread running through everything already built. Six screens promise a
+  counterparty is told something; this is where "told" is defined. The app classifies and the phone
+  decides, which is why there are no quiet hours in it
+- [ ] The remaining 8 screens in `screens/index.md`
 
 ## Mock mode (this target)
 - [x] `mock/data/` carries the first fixtures — party, tallies, tally, entries, requests, attention,

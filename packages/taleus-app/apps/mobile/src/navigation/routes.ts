@@ -52,6 +52,8 @@ export type SettingsParams = {
 	DisclosureView: { tallyId: string }
 	/** One set of terms anyone may take up (story 01 path C, story 10 path E). */
 	StandingInvitation: undefined
+	/** What interrupts, and what merely informs (story 43). */
+	Notifications: undefined
 }
 
 /** The tabs, each holding a stack of its own. */
@@ -87,6 +89,7 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	Profile: 'SettingsTab',
 	DisclosureView: 'SettingsTab',
 	StandingInvitation: 'SettingsTab',
+	Notifications: 'SettingsTab',
 }
 
 /**
@@ -180,6 +183,7 @@ interface ScreenPropsByRoute {
 	Profile: SettingsScreenProps<'Profile'>
 	DisclosureView: SettingsScreenProps<'DisclosureView'>
 	StandingInvitation: SettingsScreenProps<'StandingInvitation'>
+	Notifications: SettingsScreenProps<'Notifications'>
 }
 
 export type ScreenProps<R extends RouteName> = ScreenPropsByRoute[R]

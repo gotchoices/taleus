@@ -15,6 +15,7 @@ import { ExchangeRates } from '../screens/ExchangeRates'
 import { EntryDetail } from '../screens/EntryDetail'
 import { Profile } from '../screens/Profile'
 import { Settings } from '../screens/Settings'
+import { Notifications } from '../screens/Notifications'
 import { StandingInvitation } from '../screens/StandingInvitation'
 import { PayPartner } from '../screens/PayPartner'
 import { CloseTally } from '../screens/CloseTally'
@@ -215,6 +216,11 @@ function SettingsRoot(): React.JSX.Element {
 				name="StandingInvitation"
 				component={StandingInvitation}
 				options={{ title: t('screens.standing.title') }}
+			/>
+			<SettingsStack.Screen
+				name="Notifications"
+				component={Notifications}
+				options={{ title: t('screens.notifications.title') }}
 			/>
 		</SettingsStack.Navigator>
 	)

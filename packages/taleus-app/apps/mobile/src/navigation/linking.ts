@@ -65,6 +65,7 @@ export const linking: LinkingOptions<TabParams & OnboardingParams> = {
 					Profile: 'screen/Profile',
 					DisclosureView: 'screen/DisclosureView/:tallyId',
 					StandingInvitation: 'screen/StandingInvitation',
+					Notifications: 'screen/Notifications',
 				},
 			},
 		},

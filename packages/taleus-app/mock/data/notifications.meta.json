@@ -1,0 +1,13 @@
+{
+  "namespace": "notifications",
+  "variants": ["happy", "error"],
+  "shape": "apps/mobile/src/data/notifications.ts",
+  "notes": [
+    "Four classes, because the party's real question is what deserves to interrupt them. `signature` needs them to sign something, `asked` is somebody's claim on them, `arrived` is a courtesy, and `automatic` is value moving under authority they already gave",
+    "`automatic` carries `fixed: true` and never notifies. Story 43 path A: they authorised it, there is nothing for them to do, and waking them for it would be the app deciding its own events are important",
+    "The app classifies; the phone decides what to do about it. Quiet hours are not in here, deliberately (step 6) — the party already has them where they expect them, and a second set would fight the first",
+    "`lockScreenDetail: minimal` is the default and the only safe one: a notice that lights up on a table between other people must not put an amount or a counterparty's name in front of them (path C)",
+    "`error` is the story's own: notifications refused, and background participation declined. `party.error.json` goes with it — a party whose only device is the phone in their hand, which is what makes path B's answer 'something of yours that stays on' rather than a setting",
+    "No `empty` fixture: a quiet week is the same settings with nothing arriving, and `Attention`'s empty state already shows what that looks like"
+  ]
+}

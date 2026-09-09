@@ -40,7 +40,7 @@ and should not acquire one.
 | Devices | Devices | — | 13, 12 | happy, error | draft |
 | Cadre | Cadre | — | 14, 51 | happy, empty, error | draft |
 | Recovery setup | RecoverySetup | — | 12, 50 | happy, error | draft |
-| Notifications | Notifications | — | 43 | happy | draft |
+| Notifications | Notifications | — | 43 | happy, error | generated |
 
 ## Suggested slice order
 

@@ -36,6 +36,7 @@ it is exactly the code twenty-five more screens will inherit.
 | `src/components/Screen.tsx` | `Loading`, `Failed`, `Empty` | `components/index.md` |
 | `src/components/ErrorBoundary.tsx` | says what failed instead of going blank | `components/index.md` |
 | `src/components/Options.tsx` | a set of choices, one or several at a time | story 42 |
+| `src/components/Segmented.tsx` | one choice from a few, in a row rather than a column | story 43 |
 | `src/components/Input.tsx` | a labelled text field | — |
 | `src/components/index.ts` | the barrel every screen imports from | — |
 | `src/navigation/routes.ts` | route names, params, tab set, screen prop types | `navigation.md` |
@@ -72,6 +73,10 @@ it is exactly the code twenty-five more screens will inherit.
   reads them once at startup and hands each to its owner, because a party who set them on another
   device has never opened the settings screen on this one. It gates the first paint: a party who chose
   "always dark" must not be shown a light app for a frame and then corrected.
+- **A repeated choice goes in a row, not a column.** `Options` is right when each choice needs a
+  sentence. When the same three-way choice repeats down a screen, a column turns a small table into
+  four screens of scrolling and costs the reader the comparison the table was for — `Segmented` is
+  for that case, and only that case.
 - **State updates are functional, not built from a render-time copy.** A tick and a keystroke can land
   in one batch, and two updates each built from the same copy silently undo one another. This was a
   real defect in the disclosure screen before the tests found it.

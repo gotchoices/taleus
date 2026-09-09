@@ -27,6 +27,7 @@ Specs say what the app should do. They do not record what has not been done yet.
 | Fixtures for `Attention` and `Position` error states | Declared in their specs, nothing produces them; a storyboard cannot show a state no fixture makes | — |
 | Fixtures at story scale — forty tallies, a year of entries, eleven waiting items | The happy fixtures are six, three and three; the stories describe volumes the screens have never been shown | — |
 | Story 25, *My records in my books* | Waiting on how sApps share between strands | — |
+| Raising an actual notification | No push transport, no permission request, no background task. `Notifications` is the policy those will read — the half that is a design decision rather than a platform integration | — |
 | A printable invitation link | A token carries a colon, so a link reaches a card as `inv%3A…`. Tokens without colons is an identifier decision for the engine, not something a screen should paper over | — |
 | Clipboard, share-sheet and printable codes | `CreateInvitation` and `StandingInvitation` both show a link and mark it copied. The only thing here needing a platform API rather than a decision | — |
 | Migrating six screens onto the shared `Input` | `ChooseName`, `CreateInvitation`, `ReviewInvitation`, `ReviewOffer`, `PayPartner`, `CreateRequest` and `RequestView` each grew their own labelled text field before one existed. `components/Input.tsx` is now the one worth keeping; switching them over marks all six stale and is a pass of its own, not a rider on the settings slice | — |

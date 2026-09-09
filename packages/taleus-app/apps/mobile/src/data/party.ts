@@ -86,6 +86,9 @@ function fixtureFor(variant: string): { party: Party | null } {
 			return require('../../mock/data/party.first-run.json') as { party: Party | null }
 		case 'naming':
 			return require('../../mock/data/party.naming.json') as { party: Party | null }
+		case 'error':
+			// A party whose only device is the phone in their hand — story 43 path B.
+			return require('../../mock/data/party.error.json') as { party: Party | null }
 		default:
 			return require('../../mock/data/party.happy.json') as { party: Party | null }
 	}
