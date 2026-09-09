@@ -28,6 +28,14 @@
 # once must not collide, and links must open on this project's emulator.
 : "${PREVIEW_PORT:=8080}"
 
+# Where published scenarios land. Same host and docroot as web/publish.sh, in a
+# directory of taleus's own: the publish is an `rsync --delete`, so it must never
+# be pointed at a directory that holds anything it did not put there.
+: "${PUBLISH_USER:=root}"
+: "${PUBLISH_HOST:=gotchoices.org}"
+: "${SEREUS_ROOT:=/var/www/sereus.org}"
+: "${SCENARIOS_DEST:=${PUBLISH_USER}@${PUBLISH_HOST}:${SEREUS_ROOT}/taleus/scenarios}"
+
 # (3): project-local overrides, not committed. Sourced from the project root
 # (the package.json scripts run there). The leading "./" is required: POSIX `.`
 # searches PATH for a bare name, so `. ./.env.ports.local` sources the local file.
@@ -36,3 +44,4 @@ if [ -f ./.env.ports.local ]; then
 fi
 
 export METRO_PORT EMULATOR_PORT DEVICE_SERIAL AVD_NAME PREVIEW_PORT
+export PUBLISH_USER PUBLISH_HOST SEREUS_ROOT SCENARIOS_DEST

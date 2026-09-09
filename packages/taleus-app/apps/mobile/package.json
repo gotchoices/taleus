@@ -11,6 +11,7 @@
     "ios": "react-native run-ios",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint .",
     "preview": "sh -c '. ./env-defaults.sh && ../../appeus/scripts/preview-scenarios.sh --target mobile --device \"$DEVICE_SERIAL\" --port \"$PREVIEW_PORT\" \"$@\"' --",
+    "publish:scenarios": "sh ./scripts/publish-scenarios.sh",
     "start": "sh -c '. ./env-defaults.sh && react-native start --port \"$METRO_PORT\"'",
     "test": "jest"
   },
