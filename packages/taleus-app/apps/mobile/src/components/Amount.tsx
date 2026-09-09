@@ -102,7 +102,13 @@ export function Amount({
 
 			<Text
 				style={[
-					{ fontSize: full, fontWeight: size === 'display' ? '600' : '400', marginLeft: full * 0.2 },
+					{
+						fontSize: full,
+						fontWeight: size === 'display' ? '600' : '400',
+						// Logical, not physical: in a right-to-left bundle the unit still
+						// leads and the gap still follows it.
+						marginStart: full * 0.2,
+					},
 					text,
 					style,
 				]}
@@ -174,7 +180,7 @@ function Fraction({
 		<View
 			style={{
 				alignItems: 'center',
-				marginLeft: 2,
+				marginStart: 2,
 				// With no denominator the cluster would sit low; nudging it up puts
 				// the rule near the whole part's baseline, where a fraction bar goes.
 				marginBottom: parts.denominator ? 0 : Math.round(full * 0.22),

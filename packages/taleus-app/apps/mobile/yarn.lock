@@ -1405,7 +1405,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/runtime@npm:^7.25.0":
+"@babel/runtime@npm:^7.25.0, @babel/runtime@npm:^7.29.7":
   version: 7.29.7
   resolution: "@babel/runtime@npm:7.29.7"
   checksum: 10c0/ca11572f7146b21e0bde6a9ed4bb6a89eafbee5f0944c7eb54d0d8a2dac962c33638a1d611e14faa71dfbb92b4b5f9236232208568a6b7d5c6f3f39ddb91771e
@@ -1494,6 +1494,74 @@ __metadata:
   version: 8.57.1
   resolution: "@eslint/js@npm:8.57.1"
   checksum: 10c0/b489c474a3b5b54381c62e82b3f7f65f4b8a5eaaed126546520bf2fede5532a8ed53212919fed1e9048dcf7f37167c8561d58d0ba4492a4244004e7793805223
+  languageName: node
+  linkType: hard
+
+"@formatjs/bigdecimal@npm:0.2.7":
+  version: 0.2.7
+  resolution: "@formatjs/bigdecimal@npm:0.2.7"
+  checksum: 10c0/9583a4d615553d1353284d0f66d30b6d7ab54b8d57c50f14d42db5fa48029b01c26ac7705b493c4bde716fcffbaee4d2f3cfcb6550d6c111e3a33bcc61cc719a
+  languageName: node
+  linkType: hard
+
+"@formatjs/fast-memoize@npm:3.1.7":
+  version: 3.1.7
+  resolution: "@formatjs/fast-memoize@npm:3.1.7"
+  checksum: 10c0/dee801f82eda1f6fdc166b0c907e8750c15e409e20b2006c215d9247fe0db720d84d53fcb2fb7559cec21a24932b69dda326c81ee2885aad2cde31bc25449fd0
+  languageName: node
+  linkType: hard
+
+"@formatjs/intl-displaynames@npm:^7.3.13":
+  version: 7.3.13
+  resolution: "@formatjs/intl-displaynames@npm:7.3.13"
+  dependencies:
+    "@formatjs/intl-localematcher": "npm:0.8.13"
+  checksum: 10c0/61cef4050bde5b5c416e426bfa9593b4cbc65d088478b5000271bb76866f5f44f72d68d48115db9f8b4c1039443fd4a453f83d80ca502a7dc561b825f3e787e3
+  languageName: node
+  linkType: hard
+
+"@formatjs/intl-getcanonicallocales@npm:3.2.11, @formatjs/intl-getcanonicallocales@npm:^3.2.11":
+  version: 3.2.11
+  resolution: "@formatjs/intl-getcanonicallocales@npm:3.2.11"
+  checksum: 10c0/8083c055fc4c86e307a70266f06489745e1e17f44539a5742023a5224ed6672b513905d2f1acab4b13f586e70a9416f8eb53cb4ac9eafb149a5e6055a2f96db2
+  languageName: node
+  linkType: hard
+
+"@formatjs/intl-locale@npm:^5.3.10":
+  version: 5.3.10
+  resolution: "@formatjs/intl-locale@npm:5.3.10"
+  dependencies:
+    "@formatjs/intl-getcanonicallocales": "npm:3.2.11"
+    "@formatjs/intl-supportedvaluesof": "npm:2.3.9"
+  checksum: 10c0/b2de54b5ff032b968b427ac65d45e6a0aca8aadb291819a61d4a12596c8782922d279a49eacd3d1c8c07b446127948f122f9420eb41741aee3076ca553514a6c
+  languageName: node
+  linkType: hard
+
+"@formatjs/intl-localematcher@npm:0.8.13":
+  version: 0.8.13
+  resolution: "@formatjs/intl-localematcher@npm:0.8.13"
+  dependencies:
+    "@formatjs/fast-memoize": "npm:3.1.7"
+  checksum: 10c0/8b36937837751b71c4957cfbae6f515edc9faf2ae341de0529b444aa8e1cdee19f59dce1c7c8b30f315aff082fd97dc96f27ea4e2cbadafb3c1d34247244e664
+  languageName: node
+  linkType: hard
+
+"@formatjs/intl-pluralrules@npm:^6.3.13":
+  version: 6.3.13
+  resolution: "@formatjs/intl-pluralrules@npm:6.3.13"
+  dependencies:
+    "@formatjs/bigdecimal": "npm:0.2.7"
+    "@formatjs/intl-localematcher": "npm:0.8.13"
+  checksum: 10c0/7002a52e3d0d1126ef2e1703c0078dde2a33b162170d880da6f1aeae3e559487ec832761c115b76df2cbf7a4d1b40e648f0154b762b4acb9a78315a2990b4ea9
+  languageName: node
+  linkType: hard
+
+"@formatjs/intl-supportedvaluesof@npm:2.3.9":
+  version: 2.3.9
+  resolution: "@formatjs/intl-supportedvaluesof@npm:2.3.9"
+  dependencies:
+    "@formatjs/fast-memoize": "npm:3.1.7"
+  checksum: 10c0/7b3d8fe5c16e9c7d93ee34161cda4a91facad7c9dc33d0e8cf22c3acd6a09b405d98ea838473c290bc8fcc2053e3358b0874a5e9f88336c2c3c50b9e4e7f4cdc
   languageName: node
   linkType: hard
 
@@ -1717,9 +1785,9 @@ __metadata:
   linkType: hard
 
 "@jest/react-is-19@npm:react-is@^19.2.5, react-is@npm:^19.1.0, react-is@npm:^19.2.3":
-  version: 19.2.8
-  resolution: "react-is@npm:19.2.8"
-  checksum: 10c0/ed5322c84efe035c8fc814b1614ff5ca7fb8c2872a7c045197daf99f9b1bd68f32a2c79ffcbcfcff2fc5d93924ff9f9447400898f5b1534e6302bb0736a257f0
+  version: 19.3.0
+  resolution: "react-is@npm:19.3.0"
+  checksum: 10c0/99b16fc1009222ec0bbe05286566c865908430778ea6ba90dd418c7a11594c6cbb8db58432735b9203e3c6463e3eef5a399df1317ee2d75fd96b3a88cfaa662e
   languageName: node
   linkType: hard
 
@@ -2694,11 +2762,11 @@ __metadata:
   linkType: hard
 
 "@types/node@npm:*":
-  version: 26.5.0
-  resolution: "@types/node@npm:26.5.0"
+  version: 26.5.1
+  resolution: "@types/node@npm:26.5.1"
   dependencies:
     undici-types: "npm:~8.9.0"
-  checksum: 10c0/1ab105dfe717f6442092ad8732d25d115fcf44596bb64009b3a6eb2dd988aef9ea76ad8a372e88cdf28800161681e1597c779451bade4428801f1a34129e5e37
+  checksum: 10c0/40aa7aa4c099c8a08bf39b5bcb15eaf2cc073666c2191b1d9ac8243ce6b68b23ace904a044c521f6d310b70e94514b531be5f4fc184f141a7ce7f0679ebc7bb3
   languageName: node
   linkType: hard
 
@@ -2712,20 +2780,20 @@ __metadata:
   linkType: hard
 
 "@types/react-test-renderer@npm:^19.1.0":
-  version: 19.1.0
-  resolution: "@types/react-test-renderer@npm:19.1.0"
+  version: 19.3.0
+  resolution: "@types/react-test-renderer@npm:19.3.0"
   dependencies:
     "@types/react": "npm:*"
-  checksum: 10c0/799654e430df10aeaf267d71507fb64ec151359ead7e3774111bfd4abce7e0911dba461811195c06c22a6d17496ea92537d3185320ff4112fe29954cad1b9152
+  checksum: 10c0/37f5588f698a057a33c1f4d5fd28a042f3df7f29a3554ddebb7f9c8ecd3e5fba085e5b12d14b30734c30b51959ef17544650b2a9704d629d0af251f126d8ae73
   languageName: node
   linkType: hard
 
 "@types/react@npm:*, @types/react@npm:^19.2.0":
-  version: 19.2.18
-  resolution: "@types/react@npm:19.2.18"
+  version: 19.3.0
+  resolution: "@types/react@npm:19.3.0"
   dependencies:
     csstype: "npm:^3.2.2"
-  checksum: 10c0/d04216172b4b4362b310017c210dfbe019fb4f4e7dffd0313e70b3acb3051d5c3e76e7e84e3cf4c6a3c824993ffadfe3949e589a6398a09d4200e7670e2962de
+  checksum: 10c0/fbcabf303f935ca9f36ed2dcf81751cf84744098c5a683c8a62a0fa7edd31714b48d5c46b12fd0014f7f2dfe4d9ec6de428a850748eec719a70294e51029551b
   languageName: node
   linkType: hard
 
@@ -4161,9 +4229,9 @@ __metadata:
   linkType: hard
 
 "electron-to-chromium@npm:^1.5.420":
-  version: 1.5.423
-  resolution: "electron-to-chromium@npm:1.5.423"
-  checksum: 10c0/f713dbac4237033dbdf68800eb6d21d530eb06d6859ec5f50fe6af2d47b5b9bcbd37ec9fbc95f658290487548225bca43cb3b793e493f4600267b8a2b136a0a2
+  version: 1.5.425
+  resolution: "electron-to-chromium@npm:1.5.425"
+  checksum: 10c0/c911780d2a0914a97a677e3d0782a608699aac6891d56035b1ee96fe214e1c0b9e947a87af21cb99d117c77b3343cc7bac77b9411310840838d4b62b04f56d7b
   languageName: node
   linkType: hard
 
@@ -5285,6 +5353,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"html-parse-stringify@npm:^4.0.1":
+  version: 4.0.1
+  resolution: "html-parse-stringify@npm:4.0.1"
+  checksum: 10c0/8d7267acbc8b70a50096176e28ba491af89fb31613b6a062bce4b8201b2703fd652bedfbe0db6efe90145379c89524a3319b1b58b8c96a72779b0f49e4c2c180
+  languageName: node
+  linkType: hard
+
 "http-errors@npm:^2.0.1, http-errors@npm:~2.0.1":
   version: 2.0.1
   resolution: "http-errors@npm:2.0.1"
@@ -5312,6 +5387,18 @@ __metadata:
   version: 2.1.0
   resolution: "human-signals@npm:2.1.0"
   checksum: 10c0/695edb3edfcfe9c8b52a76926cd31b36978782062c0ed9b1192b36bebc75c4c87c82e178dfcb0ed0fc27ca59d434198aac0bd0be18f5781ded775604db22304a
+  languageName: node
+  linkType: hard
+
+"i18next@npm:^26.4.2":
+  version: 26.4.2
+  resolution: "i18next@npm:26.4.2"
+  peerDependencies:
+    typescript: ^5 || ^6 || ^7
+  peerDependenciesMeta:
+    typescript:
+      optional: true
+  checksum: 10c0/f2c9613e03e09e56a84aee939d8fbe3442a58622915e11f97e47f9ab358dfa65be783230b37a21483152711f786fccfe697d7f5ea9269c54f16179dc59960e4b
   languageName: node
   linkType: hard
 
@@ -7019,8 +7106,13 @@ __metadata:
   resolution: "mobile@workspace:."
   dependencies:
     "@babel/core": "npm:^7.25.2"
+    "@babel/plugin-transform-class-static-block": "npm:^7.29.7"
     "@babel/preset-env": "npm:^7.25.3"
     "@babel/runtime": "npm:^7.25.0"
+    "@formatjs/intl-displaynames": "npm:^7.3.13"
+    "@formatjs/intl-getcanonicallocales": "npm:^3.2.11"
+    "@formatjs/intl-locale": "npm:^5.3.10"
+    "@formatjs/intl-pluralrules": "npm:^6.3.13"
     "@react-native-community/cli": "npm:20.2.0"
     "@react-native-community/cli-platform-android": "npm:20.2.0"
     "@react-native-community/cli-platform-ios": "npm:20.2.0"
@@ -7039,11 +7131,14 @@ __metadata:
     "@types/react": "npm:^19.2.0"
     "@types/react-test-renderer": "npm:^19.1.0"
     eslint: "npm:^8.19.0"
+    i18next: "npm:^26.4.2"
     jest: "npm:^29.6.3"
     prettier: "npm:2.8.8"
     react: "npm:19.2.3"
+    react-i18next: "npm:^17.0.13"
     react-native: "npm:0.87.1"
     react-native-gesture-handler: "npm:^3.2.1"
+    react-native-localize: "npm:^3.7.0"
     react-native-safe-area-context: "npm:^5.5.2"
     react-native-screens: "npm:^4.27.0"
     react-native-svg: "npm:^15.15.5"
@@ -7153,9 +7248,9 @@ __metadata:
   linkType: hard
 
 "node-releases@npm:^2.0.54":
-  version: 2.0.54
-  resolution: "node-releases@npm:2.0.54"
-  checksum: 10c0/196b54ab06fd03b742816b6ca8185c69af42735b283083036e2579682c430b8f9ff89046891fe8c625557e5885793a2032d28070100bb2e57e6d6586b2f483c1
+  version: 2.0.55
+  resolution: "node-releases@npm:2.0.55"
+  checksum: 10c0/35a779a188b3c1801820b77ea3c429d0aacac346368016a92c357dfd781f2908540fc3782b25d41647c3334dec83c976890f40d254bfd788eb5e72c3730146d1
   languageName: node
   linkType: hard
 
@@ -7739,6 +7834,28 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-i18next@npm:^17.0.13":
+  version: 17.0.13
+  resolution: "react-i18next@npm:17.0.13"
+  dependencies:
+    "@babel/runtime": "npm:^7.29.7"
+    html-parse-stringify: "npm:^4.0.1"
+    use-sync-external-store: "npm:^1.6.0"
+  peerDependencies:
+    i18next: ">= 26.2.0"
+    react: ">= 16.8.0"
+    typescript: ^5 || ^6 || ^7
+  peerDependenciesMeta:
+    react-dom:
+      optional: true
+    react-native:
+      optional: true
+    typescript:
+      optional: true
+  checksum: 10c0/58369886b4b49dd1c3c950de8d89811a15f1728f0805356f5003ec77ea96f2ef007ef25fb039fb241676d9f48664448d8be9dbc569bebfa06ad1cad5a76517ec
+  languageName: node
+  linkType: hard
+
 "react-is@npm:^16.13.1":
   version: 16.13.1
   resolution: "react-is@npm:16.13.1"
@@ -7756,6 +7873,23 @@ __metadata:
     react: "*"
     react-native: "*"
   checksum: 10c0/e20537d1eafe35206494eae7885ef85e7cd85185b32ccaac3d25f3e87beafa007ac79556c0af8da245db1140f6b5df35d20509d7fa56301d730de5a8abb1b90f
+  languageName: node
+  linkType: hard
+
+"react-native-localize@npm:^3.7.0":
+  version: 3.7.0
+  resolution: "react-native-localize@npm:3.7.0"
+  peerDependencies:
+    "@expo/config-plugins": "*"
+    react: "*"
+    react-native: "*"
+    react-native-macos: "*"
+  peerDependenciesMeta:
+    "@expo/config-plugins":
+      optional: true
+    react-native-macos:
+      optional: true
+  checksum: 10c0/a65814e95473ed25924d68fc05c8d924d3891a9c939e5f799f727f366e1feee1421b0b7b74f1032edc3c215fd5113d5bef7243757bd7a2de9f4c02a57e522a59
   languageName: node
   linkType: hard
 
@@ -9047,12 +9181,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"use-sync-external-store@npm:^1.5.0":
-  version: 1.6.0
-  resolution: "use-sync-external-store@npm:1.6.0"
+"use-sync-external-store@npm:^1.5.0, use-sync-external-store@npm:^1.6.0":
+  version: 1.7.0
+  resolution: "use-sync-external-store@npm:1.7.0"
   peerDependencies:
     react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-  checksum: 10c0/35e1179f872a53227bdf8a827f7911da4c37c0f4091c29b76b1e32473d1670ebe7bcd880b808b7549ba9a5605c233350f800ffab963ee4a4ee346ee983b6019b
+  checksum: 10c0/6bae7cb778ce611131ec830c4e469fbc2872acefc25d2e4cf1c28b8628690689770742a9f2f0642c95134f9c77041fee60f0352f81ca43f96643b0ed01774726
   languageName: node
   linkType: hard
 
@@ -9413,8 +9547,8 @@ __metadata:
   linkType: hard
 
 "zod@npm:^3.25.0 || ^4.0.0":
-  version: 4.5.4
-  resolution: "zod@npm:4.5.4"
-  checksum: 10c0/511a2a4d1a6f875dfdd70a1586989a8b14ef126776cd6218a2c760b9f65f14ef389ec20d92ee1aa4fcb4566d4ff3fa012956044f9dc503510d82e4c756a8ba92
+  version: 4.6.0
+  resolution: "zod@npm:4.6.0"
+  checksum: 10c0/845b7f375010b57153e4602bf6fd3bb18cf86818fbcf738f7852c8a2dddebc6221f645ec01856ea9cb5b9904bca7a138a57c5c5ff9757217dcaab022dc837df2
   languageName: node
   linkType: hard

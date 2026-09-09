@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native'
+import { I18nManager, Pressable, Text, View } from 'react-native'
 
 import { useStyles, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 
@@ -67,7 +67,9 @@ export function OpenableRow({
 			style={({ pressed }) => [styles.openable, pressed ? styles.pressed : null]}
 		>
 			<View style={styles.openableBody}>{children}</View>
-			<Text style={styles.chevron}>{'›'}</Text>
+			{/* An arrow is direction, not decoration: it points the way the language
+			    runs, so a right-to-left bundle gets the mirrored glyph. */}
+			<Text style={styles.chevron}>{I18nManager.isRTL ? '‹' : '›'}</Text>
 		</Pressable>
 	)
 }

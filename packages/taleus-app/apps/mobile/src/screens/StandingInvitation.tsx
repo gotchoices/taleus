@@ -192,7 +192,10 @@ function Published({
 				) : null}
 				<Row
 					label={t('screens.standing.notice')}
-					value={t('screens.standing.notice-days', { days: standing.noticeDays })}
+					value={t('screens.standing.notice-days', {
+						count: standing.noticeDays,
+						days: standing.noticeDays,
+					})}
 				/>
 				<Row
 					label={t('screens.standing.unit')}

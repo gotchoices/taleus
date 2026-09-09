@@ -79,7 +79,10 @@ export function RequestView({ route, navigation }: Props): React.JSX.Element {
 			<Card>
 				<Row label={t('screens.request-view.for')} value={request.memo ?? '—'} />
 				<Row
-					label={t('screens.request-view.waiting', { days: request.outstandingDays })}
+					label={t('screens.request-view.waiting', {
+						count: request.outstandingDays,
+						days: request.outstandingDays,
+					})}
 					value={<Chip label={t(`screens.tally-history.request-${request.direction}`)} />}
 				/>
 				{part || request.applied.units > 0 ? (

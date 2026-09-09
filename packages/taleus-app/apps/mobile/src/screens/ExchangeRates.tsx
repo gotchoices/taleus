@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { ScrollView, Text, View } from 'react-native'
+import { I18nManager, ScrollView, Text, View } from 'react-native'
 
 import { Action, Amount, Card, Chip, Failed, Input, Loading, Options, Row } from '../components'
 import {
@@ -389,7 +389,7 @@ function ConversionRow({
 		<View style={styles.block}>
 			<View style={styles.conversion}>
 				<Amount value={from} unit={from} size="small" />
-				<Text style={styles.meta}>{'→'}</Text>
+				<Text style={styles.meta}>{I18nManager.isRTL ? '←' : '→'}</Text>
 				<Amount value={to} unit={to} size="small" />
 			</View>
 			<Text style={styles.meta}>

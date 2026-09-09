@@ -19,7 +19,9 @@ Specs say what the app should do. They do not record what has not been done yet.
 | Deferred | Why | Tracked as |
 |----------|-----|-----------|
 | An iOS build of the React Native upgrade | The upgrade diff's `ios/` hunks were not applied; the iOS tree has never been built, and patching a project file blind is worse than doing it when someone first runs `pod install` | — |
-| i18next, device-locale detection | The local `t()` still meets the spec's rules, and the settings slice (42) shipped against it: with one bundle, a library would have added a dependency and no capability. It earns its place when a second locale exists | `debt-mobile-i18n-library` |
+| The `common` / `screens` namespace split | `global/i18n.md` names two namespaces; keys are flat strings that only look scoped. Splitting them rewrites every call site in the app for no user-visible change, and there is one locale to organise. Worth doing when a second bundle arrives and a translator needs smaller files | — |
+| Exercising RTL | `I18nManager.allowRTL(true)` is set and the physical margins are gone, but no right-to-left bundle exists to lay out. The logical properties are correct by construction, not by observation | — |
+| `Intl` data for locales beyond `en` | A bundle without its own plural rules is worse than no bundle: every count would silently take the `_other` form. `polyfilledLocales` names what is loaded and `isFullySupported()` exists so a half-supported locale can be refused rather than shipped | — |
 | Sort, filter, search on the tally list | Story 06's own paths; belongs to a slice of its own | — |
 | `bundle install` after the Gemfile gained `nkf` | Only matters for iOS tooling, which is untouched | — |
 | A `Closed` tally in the fixtures | Nothing produces one, so story 07 path F and story 24 path D are demonstrated on a tally that has stopped trading instead. The screens do not branch on the state, which is the substance of both paths | — |

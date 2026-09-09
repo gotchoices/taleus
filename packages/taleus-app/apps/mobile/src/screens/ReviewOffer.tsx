@@ -105,12 +105,18 @@ export function ReviewOffer({ route }: Props): React.JSX.Element {
 			>
 				<Row
 					label={t('screens.review-offer.i-extend')}
-					note={t('screens.review-offer.notice-days', { days: value.proposed.mine.noticeDays })}
+					note={t('screens.review-offer.notice-days', {
+						count: value.proposed.mine.noticeDays,
+						days: value.proposed.mine.noticeDays,
+					})}
 					value={<Amount value={value.proposed.mine.creditLimit} unit={value.unit} />}
 				/>
 				<Row
 					label={t('screens.review-offer.they-extend', { name })}
-					note={t('screens.review-offer.notice-days', { days: value.proposed.theirs.noticeDays })}
+					note={t('screens.review-offer.notice-days', {
+						count: value.proposed.theirs.noticeDays,
+						days: value.proposed.theirs.noticeDays,
+					})}
 					value={<Amount value={value.proposed.theirs.creditLimit} unit={value.unit} />}
 				/>
 				<Row label={t('screens.review-offer.counts-in')} value={unitNamesFor(value.unit).code} />
@@ -178,7 +184,10 @@ function Superseded({ offer }: { offer: Offer }): React.JSX.Element {
 			<Card title={t('screens.review-offer.superseded-governs', { date: formatInstant(governs.drafted) })}>
 				<Row
 					label={t('screens.review-offer.they-extend', { name: offer.counterparty.name })}
-					note={t('screens.review-offer.notice-days', { days: governs.proposed.theirs.noticeDays })}
+					note={t('screens.review-offer.notice-days', {
+						count: governs.proposed.theirs.noticeDays,
+						days: governs.proposed.theirs.noticeDays,
+					})}
 					value={<Amount value={governs.proposed.theirs.creditLimit} unit={offer.unit} />}
 				/>
 			</Card>
@@ -186,7 +195,10 @@ function Superseded({ offer }: { offer: Offer }): React.JSX.Element {
 			<Card title={t('screens.review-offer.superseded-was', { date: formatInstant(offer.drafted) })}>
 				<Row
 					label={t('screens.review-offer.they-extend', { name: offer.counterparty.name })}
-					note={t('screens.review-offer.notice-days', { days: offer.proposed.theirs.noticeDays })}
+					note={t('screens.review-offer.notice-days', {
+						count: offer.proposed.theirs.noticeDays,
+						days: offer.proposed.theirs.noticeDays,
+					})}
 					value={<Amount value={offer.proposed.theirs.creditLimit} unit={offer.unit} />}
 				/>
 			</Card>

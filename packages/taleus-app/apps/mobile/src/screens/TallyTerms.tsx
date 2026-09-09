@@ -301,7 +301,9 @@ function Change({
 			) : null}
 			<Text style={styles.meta}>
 				{noticeChanged && previous
-					? t('screens.tally-terms.changed-notice', {
+					? // The figure that decides the form is the one it becomes.
+						t('screens.tally-terms.changed-notice', {
+							count: change.noticeDays,
 							from: previous.noticeDays,
 							to: change.noticeDays,
 						})

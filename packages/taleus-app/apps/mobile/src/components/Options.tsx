@@ -81,7 +81,9 @@ const make = (tokens: Tokens) => ({
 	pressed: { opacity: 0.6 },
 	body: { ...typography.body, color: tokens.textPrimary },
 	meta: { ...typography.small, color: tokens.textSecondary },
-	check: { ...typography.body, color: tokens.accent, width: 20, textAlign: 'right' as const },
+	// Centred rather than right-aligned: `textAlign` has no logical value in
+	// React Native, and a tick in a 20pt column does not need one.
+	check: { ...typography.body, color: tokens.accent, width: 20, textAlign: 'center' as const },
 	unchecked: { width: 20 },
 	box: {
 		width: 22,

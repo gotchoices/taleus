@@ -45,6 +45,9 @@ it is exactly the code twenty-five more screens will inherit.
 | `src/data/config.ts` | the one mock/engine switch | `interfaces.md` § Run modes |
 | `src/data/types.ts` | app-side shapes mirroring the domain contract | `interfaces.md` |
 | `src/data/party.ts` | who this party is; the first adapter that writes | `interfaces.md` |
+| `src/i18n/index.ts` | i18next behind a two-function surface: keys in, text out | `global/i18n.md` |
+| `src/i18n/intl.ts` | the `Intl` polyfill chain Hermes needs, loaded before any string | `global/i18n.md` |
+| `jest.setup.js` | strips what Hermes lacks so tests run the device's runtime | — |
 | `src/data/settings.ts` | the party's preferences, and which follow them | story 42 |
 | `src/hooks/usePreferences.ts` | stored preferences applied before the first paint | story 42 |
 | `src/util/fields.ts` | the field vocabulary both disclosure directions read | story 11 |
@@ -68,6 +71,16 @@ it is exactly the code twenty-five more screens will inherit.
 - **Launch parameters are applied before any data is read.** `?variant=` decides which fixtures
   answer, and React Navigation supplies the initial URL only after its container mounts — too late
   for anything read at startup. `applyLaunchParams()` runs at the head of the session's load.
+- **The test runtime is held down to the device's.** Hermes ships four fewer `Intl` constructors than
+  Node. Testing against the richer one let "Waiting 1 days" ship for nineteen slices: `Intl.PluralRules`
+  was called inside a `try`, always threw on the phone, and every plural silently took the `_other`
+  form while jest resolved `_one` correctly. `jest.setup.js` now deletes what Hermes lacks before
+  loading the app's own polyfills. A capability the app wants gets polyfilled for both; one nothing
+  uses gets polyfilled for neither.
+- **Polyfills have prerequisites, and they crash without them.** `@formatjs/intl-pluralrules` and
+  `@formatjs/intl-displaynames` both call `new Intl.Locale` inside their own feature detection, so on
+  Hermes they died inside the polyfill meant to help — a native abort at startup, not a caught error.
+  `intl-getcanonicallocales` then `intl-locale` come first. Only running it on a device found this.
 - **A preference is applied where it is read, and stored beside it.** The i18n bundle owns the
   locale, `util/amount.ts` owns mark-or-code, the theme provider owns the appearance. `usePreferences`
   reads them once at startup and hands each to its owner, because a party who set them on another
