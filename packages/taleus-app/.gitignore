@@ -8,3 +8,6 @@ design/specs/README.md
 design/specs/*/README.md
 /AGENTS.md
 /CLAUDE.md
+
+# Rendered scenario site: rebuilt from scratch by publish-scenarios.sh, duplicates images/
+design/generated/*/site/
