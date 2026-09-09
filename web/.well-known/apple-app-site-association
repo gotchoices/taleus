@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "6849Q7KVP5.org.sereus.taleus",
+        "paths": [
+          "/taleus/invite/*"
+        ]
+      }
+    ]
+  }
+}
