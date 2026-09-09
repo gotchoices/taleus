@@ -77,6 +77,24 @@ screenshots:
     deps:
       - apps/mobile/src/screens/RequestView.tsx
       - mock/data/requests.happy.json
+  - route: CloseTally/tally%3Amara-shop
+    variant: happy
+    file: close-tally.png
+    deps:
+      - apps/mobile/src/screens/CloseTally.tsx
+      - mock/data/tally.happy.json
+  - route: CloseTally/tally%3Asam-bike
+    variant: closing
+    file: close-tally-closing.png
+    deps:
+      - apps/mobile/src/screens/CloseTally.tsx
+      - mock/data/tally.closing.json
+  - route: CloseTally/tally%3Adave-hours
+    variant: closing
+    file: close-tally-writeoff.png
+    deps:
+      - apps/mobile/src/screens/CloseTally.tsx
+      - mock/data/tally.closing.json
   - route: TallyList
     variant: happy
     file: tally-list-happy.png
@@ -198,6 +216,9 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Create request | happy | asking, with no clock to set | ![](create-request.png) |
 | Request view | asked of you | part-answered, and no clock | ![](request-view.png) |
 | Request view | asked by you | yours to take back, not to answer | ![](request-view-mine.png) |
+| Close tally | before | what closing costs, before asking | ![](close-tally.png) |
+| Close tally | closing | awaiting settlement, not broken | ![](close-tally-closing.png) |
+| Close tally | write-off | a remainder only its owner can give up | ![](close-tally-writeoff.png) |
 | Tally list | happy | six tallies, one offered and figureless | ![](tally-list-happy.png) |
 | Tally list | empty | nothing yet, and what to do about it | ![](tally-list-empty.png) |
 | Tally view | happy | a tally with history, terms both ways | ![](tally-view-happy.png) |

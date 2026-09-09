@@ -19,7 +19,7 @@ and should not acquire one.
 | Entry detail | EntryDetail | — | 24 | happy | draft |
 | Tally terms | TallyTerms | — | 07, 03 | happy, error | draft |
 | Trading settings | TradingSettings | — | 31 | happy, empty | draft |
-| Close tally | CloseTally | — | 05 | happy, empty, error | draft |
+| Close tally | CloseTally | — | 05 | happy, closing | generated |
 | Create invitation | CreateInvitation | — | 01 | happy, empty | generated |
 | Review invitation | ReviewInvitation | — | 02 | happy, expired | generated |
 | Review offer | ReviewOffer | — | 03, 02 | happy, empty, superseded | generated |

@@ -7,6 +7,7 @@ import { readTally } from '../data/tally'
 import type { DataError } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
+import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 
@@ -47,7 +48,7 @@ export function CreateRequest({ route }: Props): React.JSX.Element {
 		)
 	}
 
-	const units = Math.round(Number(text || '0') * 10 ** value.unit.scale)
+	const units = Math.round(Number(text || '0') * divisorOf(value.unit))
 	const ask = async () => {
 		setFailure(undefined)
 		const result = await createRequest(tallyId, {

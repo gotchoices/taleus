@@ -124,6 +124,36 @@ export async function recordEntry(
 		}
 	}
 	const already = (recorded[tallyId] ?? []).find(e => e.id === `entry:${entry.actId}`)
+	// Story 05 step 4: while closing, what each party may do has narrowed to one
+	// direction. Anything moving the balance toward zero goes through; anything
+	// moving it further from zero does not. Closing does not forgive what is owed,
+	// so settling is exactly what stays allowed.
+	if (tally.value.closing) {
+		const owedToMe = tally.value.balance.perspective === 'owed-to-me'
+		const settled = tally.value.balance.units === 0
+		// Value given moves the balance away from zero when this party is already
+		// the one owing, or when nothing is owed either way.
+		if (!owedToMe || settled) {
+			return {
+				ok: false,
+				error: {
+					kind: 'closing',
+					message: 'This tally is closing, so only what settles it can go through.',
+					retryable: false,
+				},
+			}
+		}
+		if (entry.amount.units > tally.value.balance.units) {
+			return {
+				ok: false,
+				error: {
+					kind: 'closing-overshoot',
+					message: 'That is more than is outstanding, which would move the balance past zero.',
+					retryable: false,
+				},
+			}
+		}
+	}
 	if (seen.has(entry.actId) && already) {
 		return { ok: true, value: already }
 	}

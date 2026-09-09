@@ -12,6 +12,7 @@ import {
 import type { Result, Unit } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
+import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 import { formatInstant } from '../util/date'
@@ -75,7 +76,7 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 	}
 
 	const agreement = agreementId ?? value.agreements.find(a => a.recommended)?.id ?? value.agreements[0]?.id
-	const amount = { units: Math.round(Number(limit || '0') * 10 ** unit.scale) }
+	const amount = { units: Math.round(Number(limit || '0') * divisorOf(unit)) }
 
 	const share = async () => {
 		setFailed(undefined)

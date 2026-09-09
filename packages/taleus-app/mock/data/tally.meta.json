@@ -2,12 +2,15 @@
   "namespace": "tally",
   "variants": [
     "happy",
-    "error"
+    "error",
+    "closing"
   ],
   "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
   "notes": [
     "keyed by tally id, because a screen asks about one tally and readTally must answer for that one",
     "the error variant is NOT unreadable: story 04 path C keeps the tally readable and marks pending work pending",
-    "units may carry divisor/code/mark — see design/specs/domain/amounts.md"
+    "units may carry divisor/code/mark — see design/specs/domain/amounts.md",
+    "`closing` carries who asked, when, and any date they agreed to settle by — story 05",
+    "`offerWriteOff` is the engine's judgement that a remainder is not worth anyone's time. The app must not invent a threshold: what counts as trivial depends on the unit, the parties and the amounts they trade in"
   ]
 }

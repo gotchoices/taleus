@@ -43,8 +43,11 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
   next actions (story 04 step 7), absent through five slices because there was nowhere to send them
 - [x] `RequestView` — answering in full, in part, or not at all, and taking one's own request back.
   The paying arc is complete
-- [ ] The remaining 17 screens in `screens/index.md`; next is `CloseTally` (story 05) — the one act
-  a party can always take, and the only exit the offer model relies on
+- [x] `CloseTally` — the one act neither party can refuse. The tally lifecycle is complete: offered,
+  negotiated, opened, traded on, billed for, wound down
+- [ ] The remaining 16 screens in `screens/index.md`; next is the Settings arc — `Settings`,
+  `Profile`, `DisclosureView` (stories 42, 11), which makes the theme, locale and unit-mark
+  preferences already built into the foundation reachable
 
 ## Mock mode (this target)
 - [x] `mock/data/` carries the first fixtures — party, tallies, tally, entries, requests, attention,

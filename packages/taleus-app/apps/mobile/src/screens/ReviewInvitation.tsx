@@ -5,6 +5,7 @@ import { Action, Amount, Card, Empty, Failed, Loading, Row, unitNamesFor } from 
 import { readInvitation, respondToInvitation, type OpenInvitation } from '../data/invitations'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
+import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 import { formatInstant } from '../util/date'
@@ -65,7 +66,7 @@ export function ReviewInvitation({ route }: Props): React.JSX.Element {
 	const respond = async (answer: 'accept' | 'refuse') => {
 		const result = await respondToInvitation(token, answer, {
 			disclose: disclosed,
-			creditLimit: { units: Math.round(Number(limit || '0') * 10 ** value.unit.scale) },
+			creditLimit: { units: Math.round(Number(limit || '0') * divisorOf(value.unit)) },
 			noticeDays: Number(notice || '0'),
 		})
 		if (result.ok) {

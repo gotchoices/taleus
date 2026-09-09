@@ -1,12 +1,13 @@
 import { useCallback, useState } from 'react'
 import { ScrollView, Text, TextInput, View } from 'react-native'
 
-import { Action, Amount, Card, Chip, Failed, Loading, Row } from '../components'
+import { Action, Amount, Card, Chip, Failed, Loading, Row, amountText } from '../components'
 import { declineRequest, readRequest, withdrawRequest, type PaymentRequest } from '../data/requests'
 import { readTally } from '../data/tally'
 import type { Result, Unit } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
+import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 
@@ -101,7 +102,7 @@ export function RequestView({ route, navigation }: Props): React.JSX.Element {
 				<Card>
 					<Text style={styles.body}>
 						{t(`screens.request-view.state-${request.state}`, {
-							still: `${request.stillAsked.units / 10 ** unit.scale}`,
+							still: amountText(request.stillAsked, unit),
 						})}
 					</Text>
 				</Card>
@@ -122,7 +123,7 @@ export function RequestView({ route, navigation }: Props): React.JSX.Element {
 							onPress={() =>
 								navigation.navigate('PayPartner', {
 									tallyId: request.tallyId,
-									amount: request.stillAsked.units / 10 ** unit.scale,
+									amount: request.stillAsked.units / divisorOf(unit),
 									answers: request.id,
 								})
 							}

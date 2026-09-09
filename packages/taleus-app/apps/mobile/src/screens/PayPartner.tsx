@@ -1,12 +1,13 @@
 import { useCallback, useMemo, useState } from 'react'
 import { ScrollView, Text, TextInput, View } from 'react-native'
 
-import { Action, Amount, Card, Empty, Failed, Loading, Row } from '../components'
+import { Action, Amount, Card, Empty, Failed, Loading, Row, amountText } from '../components'
 import { previewEntry, recordEntry, type Preview } from '../data/entries'
 import { readTally, type TallyDetail } from '../data/tally'
 import type { DataError } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
+import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 
@@ -53,12 +54,12 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 	}
 
 	const tally: TallyDetail = value
-	const units = Math.round(Number(text || '0') * 10 ** tally.unit.scale)
+	const units = Math.round(Number(text || '0') * divisorOf(tally.unit))
 	const amount = { units }
 
 	const look = async (next: string) => {
 		setText(next)
-		const parsed = Math.round(Number(next || '0') * 10 ** tally.unit.scale)
+		const parsed = Math.round(Number(next || '0') * divisorOf(tally.unit))
 		if (!parsed) {
 			setPreview(undefined)
 			return
@@ -149,7 +150,7 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 				<Card title={t('screens.pay-partner.beyond-title')}>
 					<Text style={styles.caption}>
 						{t('screens.pay-partner.beyond-body', {
-							amount: `${preview.beyondLimit.units / 10 ** tally.unit.scale}`,
+							amount: amountText(preview.beyondLimit, tally.unit),
 							name: tally.counterparty.name,
 						})}
 					</Text>

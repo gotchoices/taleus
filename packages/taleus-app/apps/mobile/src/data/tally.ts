@@ -29,6 +29,23 @@ export interface Agreement {
 	language: string
 }
 
+/**
+ * A close in progress (story 05). Either party may ask, at any time, without the
+ * other's agreement; the tally stays closing while any request stands.
+ */
+export interface Closing {
+	requestedBy: 'me' | 'them' | 'both'
+	requested: Instant
+	/** A date they agreed to settle by, if any. Nothing is added for missing it. */
+	settleBy?: CivilDate
+	/**
+	 * The engine's judgement that the remainder is not worth anyone's time, so
+	 * the party owed it may be offered the write-off. The app does not decide
+	 * this: what counts as trivial depends on the unit and the parties.
+	 */
+	offerWriteOff?: boolean
+}
+
 /** Work that needs the counterparty and has not reached them yet (story 04 path C). */
 export interface PendingWork {
 	kind: 'terms' | 'entry' | 'close'
@@ -53,6 +70,7 @@ export interface TallyDetail {
 	 */
 	counterpartyReachable: boolean
 	pending?: PendingWork[]
+	closing?: Closing
 }
 
 /**
@@ -73,11 +91,78 @@ export async function readTally(tallyId: string): Promise<Result<TallyDetail>> {
 			error: { kind: 'not-found', message: `No tally ${tallyId}.`, retryable: false },
 		}
 	}
-	return { ok: true, value: found }
+	const close = closes[tallyId]
+	const closing = close === undefined ? found.closing : (close ?? undefined)
+	return {
+		ok: true,
+		value: {
+			...found,
+			closing,
+			state: closing ? 'Closing' : found.state === 'Closing' ? 'Open' : found.state,
+		},
+	}
+}
+
+/** Mock writes, held in memory as elsewhere. */
+let closes: Record<string, Closing | null> = {}
+
+/**
+ * Story 05 step 1: either party may ask, without the other's agreement. A second
+ * request changes nothing (path F) — one was already enough.
+ */
+export async function requestClose(tallyId: string): Promise<Result<TallyDetail>> {
+	if (!mockMode) {
+		return { ok: false, error: engineAbsent }
+	}
+	const current = await readTally(tallyId)
+	if (!current.ok) {
+		return current
+	}
+	const already = current.value.closing
+	closes = {
+		...closes,
+		[tallyId]: {
+			requestedBy: already ? (already.requestedBy === 'me' ? 'me' : 'both') : 'me',
+			requested: already?.requested ?? new Date().toISOString(),
+			settleBy: already?.settleBy,
+			offerWriteOff: already?.offerWriteOff,
+		},
+	}
+	return readTally(tallyId)
+}
+
+/**
+ * Path E: a party may withdraw their own request while the tally is still
+ * closing. It stays closing while the other party's request stands.
+ */
+export async function withdrawClose(tallyId: string): Promise<Result<TallyDetail>> {
+	if (!mockMode) {
+		return { ok: false, error: engineAbsent }
+	}
+	const current = await readTally(tallyId)
+	if (!current.ok) {
+		return current
+	}
+	const already = current.value.closing
+	closes = {
+		...closes,
+		[tallyId]: already && already.requestedBy === 'both'
+			? { ...already, requestedBy: 'them' }
+			: null,
+	}
+	return readTally(tallyId)
+}
+
+export function resetCloses(): void {
+	closes = {}
 }
 
 function fixtureFor(variant: string): { tallies: Record<string, TallyDetail> } {
 	switch (variant) {
+		case 'closing':
+			return require('../../mock/data/tally.closing.json') as {
+				tallies: Record<string, TallyDetail>
+			}
 		case 'error':
 			return require('../../mock/data/tally.error.json') as { tallies: Record<string, TallyDetail> }
 		default:

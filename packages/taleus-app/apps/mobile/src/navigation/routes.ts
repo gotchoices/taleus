@@ -22,6 +22,7 @@ export type TalliesParams = {
 	PayPartner: { tallyId: string; amount?: number; answers?: string }
 	CreateRequest: { tallyId: string }
 	RequestView: { requestId: string }
+	CloseTally: { tallyId: string }
 }
 
 export type AttentionParams = {
@@ -60,6 +61,7 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	PayPartner: 'Tallies',
 	CreateRequest: 'Tallies',
 	RequestView: 'Tallies',
+	CloseTally: 'Tallies',
 	Attention: 'AttentionTab',
 	Position: 'PositionTab',
 }
@@ -80,7 +82,7 @@ export const tabs: { name: TabName; labelKey: string; icon: string; iconActive: 
 ]
 
 /** Routes about one named tally — the ones an attention item can point at. */
-export type TallyRoute = 'TallyView' | 'TallyHistory' | 'ReviewOffer' | 'PayPartner' | 'CreateRequest'
+export type TallyRoute = 'TallyView' | 'TallyHistory' | 'ReviewOffer' | 'PayPartner' | 'CreateRequest' | 'CloseTally'
 
 /**
  * Is this a route the app has, and about a single tally? Attention items name
@@ -93,7 +95,8 @@ export function isTallyRoute(name: string): name is TallyRoute {
 		name === 'TallyHistory' ||
 		name === 'ReviewOffer' ||
 		name === 'PayPartner' ||
-		name === 'CreateRequest'
+		name === 'CreateRequest' ||
+		name === 'CloseTally'
 	)
 }
 
@@ -116,6 +119,7 @@ interface ScreenPropsByRoute {
 	PayPartner: TalliesScreenProps<'PayPartner'>
 	CreateRequest: TalliesScreenProps<'CreateRequest'>
 	RequestView: TalliesScreenProps<'RequestView'>
+	CloseTally: TalliesScreenProps<'CloseTally'>
 	Attention: CompositeScreenProps<
 		NativeStackScreenProps<AttentionParams, 'Attention'>,
 		BottomTabScreenProps<TabParams>

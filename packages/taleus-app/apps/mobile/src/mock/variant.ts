@@ -16,12 +16,12 @@ import { bumpGeneration } from '../data/generation'
  * no identity gates the whole app into onboarding — so `?variant=empty` meant
  * to show one screen's empty state would have shown first run instead.
  */
-export type Variant = 'happy' | 'empty' | 'error' | 'first-run' | 'naming' | 'expired' | 'superseded'
+export type Variant = 'happy' | 'empty' | 'error' | 'first-run' | 'naming' | 'expired' | 'superseded' | 'closing'
 
 export const defaultVariant: Variant = 'happy'
 
 export function isVariant(value: string): value is Variant {
-	return value === 'happy' || value === 'empty' || value === 'error' || value === 'first-run' || value === 'naming' || value === 'expired' || value === 'superseded'
+	return value === 'happy' || value === 'empty' || value === 'error' || value === 'first-run' || value === 'naming' || value === 'expired' || value === 'superseded' || value === 'closing'
 }
 
 let current: Variant = defaultVariant
