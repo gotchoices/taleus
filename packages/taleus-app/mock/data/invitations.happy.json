@@ -1,0 +1,26 @@
+{
+  "invitations": [
+    {
+      "token": "inv:jan-bike-7c1",
+      "note": "bike, lunch Tuesday",
+      "state": "outstanding",
+      "unit": { "denom": "iso4217:USD", "scale": 2 },
+      "creditLimit": { "units": 50000 },
+      "noticeDays": 14,
+      "agreementId": "cid:bafy-standard-tally-v1",
+      "created": "2026-09-07T12:30:00Z",
+      "expires": "2026-09-08T12:30:00Z"
+    },
+    {
+      "token": "inv:jan-shop-2b8",
+      "note": "for the workshop counter",
+      "state": "expired",
+      "unit": { "denom": "iso4217:USD", "scale": 2 },
+      "creditLimit": { "units": 10000 },
+      "noticeDays": 7,
+      "agreementId": "cid:bafy-standard-tally-v1",
+      "created": "2026-08-20T09:00:00Z",
+      "expires": "2026-08-27T09:00:00Z"
+    }
+  ]
+}

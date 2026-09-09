@@ -10,6 +10,9 @@ export type TalliesParams = {
 	TallyList: undefined
 	TallyView: { tallyId: string }
 	TallyHistory: { tallyId: string }
+	CreateInvitation: undefined
+	/** The universal-link landing: `https://sereus.org/taleus/invite/<token>`. */
+	ReviewInvitation: { token: string }
 }
 
 export type AttentionParams = {
@@ -42,6 +45,8 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	TallyList: 'Tallies',
 	TallyView: 'Tallies',
 	TallyHistory: 'Tallies',
+	CreateInvitation: 'Tallies',
+	ReviewInvitation: 'Tallies',
 	Attention: 'AttentionTab',
 	Position: 'PositionTab',
 }
@@ -86,6 +91,8 @@ interface ScreenPropsByRoute {
 	TallyList: TalliesScreenProps<'TallyList'>
 	TallyView: TalliesScreenProps<'TallyView'>
 	TallyHistory: TalliesScreenProps<'TallyHistory'>
+	CreateInvitation: TalliesScreenProps<'CreateInvitation'>
+	ReviewInvitation: TalliesScreenProps<'ReviewInvitation'>
 	Attention: CompositeScreenProps<
 		NativeStackScreenProps<AttentionParams, 'Attention'>,
 		BottomTabScreenProps<TabParams>

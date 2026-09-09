@@ -35,8 +35,10 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
   of all five slices, so changing it marks them stale
 - [x] `Welcome` and `ChooseName` — first run, built from story 10 with **no screen spec**: the story
   was enough, so nothing was written to override it
-- [ ] The remaining 23 screens in `screens/index.md`; next by the suggested order is the invitation
-  arc — `CreateInvitation`, `ReviewInvitation`, `ReviewOffer`
+- [x] `CreateInvitation` and `ReviewInvitation` — a tally coming into existence, from both sides,
+  built from stories 01 and 02 with no screen specs
+- [ ] The remaining 21 screens in `screens/index.md`; next is `ReviewOffer` (story 03), the missing
+  half of the invitation arc — countering rather than accepting
 
 ## Mock mode (this target)
 - [x] `mock/data/` carries the first fixtures — party, tallies, tally, entries, requests, attention,

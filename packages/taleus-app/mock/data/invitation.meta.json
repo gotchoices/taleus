@@ -1,0 +1,14 @@
+{
+  "namespace": "invitation",
+  "variants": [
+    "happy",
+    "expired"
+  ],
+  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "notes": [
+    "one invitation as the invitee sees it, keyed by token — the universal-link landing (story 02)",
+    "the inviter's identity is what THEY disclosed; the invitee has disclosed nothing at this point (step 4)",
+    "`asks` is what the inviter would like told about the invitee: `required` separates what is needed from what is offered (step 5)",
+    "`expired` is its own variant because story 02 path C is a distinct screen, not an error"
+  ]
+}

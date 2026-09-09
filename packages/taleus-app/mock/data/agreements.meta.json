@@ -1,0 +1,10 @@
+{
+  "namespace": "agreements",
+  "variants": ["happy"],
+  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "notes": [
+    "published agreements a party may choose at invitation time (story 01 step 6)",
+    "nobody writes their own: story 01 path E is explicit that published agreements are what make this practical",
+    "`summary` is prose the engine will not supply — a real agreement is a document, and reading it is `TallyTerms`, unsliced"
+  ]
+}

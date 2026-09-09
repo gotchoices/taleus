@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Attention } from '../screens/Attention'
 import { ChooseName } from '../screens/ChooseName'
+import { CreateInvitation } from '../screens/CreateInvitation'
+import { ReviewInvitation } from '../screens/ReviewInvitation'
 import { Welcome } from '../screens/Welcome'
 import { Position } from '../screens/Position'
 import { TallyHistory } from '../screens/TallyHistory'
@@ -99,6 +101,16 @@ function TalliesStack(): React.JSX.Element {
 				name="TallyHistory"
 				component={TallyHistory}
 				options={{ title: t('screens.tally-history.title') }}
+			/>
+			<Tallies.Screen
+				name="CreateInvitation"
+				component={CreateInvitation}
+				options={{ title: t('screens.create-invitation.title') }}
+			/>
+			<Tallies.Screen
+				name="ReviewInvitation"
+				component={ReviewInvitation}
+				options={{ title: t('screens.review-invitation.title') }}
 			/>
 		</Tallies.Navigator>
 	)

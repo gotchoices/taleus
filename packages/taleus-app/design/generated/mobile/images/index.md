@@ -16,6 +16,31 @@ screenshots:
     deps:
       - apps/mobile/src/screens/ChooseName.tsx
       - mock/data/party.naming.json
+  - route: CreateInvitation
+    variant: happy
+    file: create-invitation.png
+    deps:
+      - apps/mobile/src/screens/CreateInvitation.tsx
+      - mock/data/agreements.happy.json
+      - mock/data/invitations.happy.json
+  - route: CreateInvitation
+    variant: empty
+    file: create-invitation-first.png
+    deps:
+      - apps/mobile/src/screens/CreateInvitation.tsx
+      - mock/data/invitations.empty.json
+  - route: ReviewInvitation/inv%3Ajan-bike-7c1
+    variant: happy
+    file: review-invitation.png
+    deps:
+      - apps/mobile/src/screens/ReviewInvitation.tsx
+      - mock/data/invitation.happy.json
+  - route: ReviewInvitation/inv%3Ajan-bike-7c1
+    variant: expired
+    file: review-invitation-expired.png
+    deps:
+      - apps/mobile/src/screens/ReviewInvitation.tsx
+      - mock/data/invitation.expired.json
   - route: TallyList
     variant: happy
     file: tally-list-happy.png
@@ -127,6 +152,10 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 |--------|---------|-------|---------|
 | Welcome | first run | what this is, before anything is asked | ![](welcome-first-run.png) |
 | Choose name | naming | told it exists and lives here; asked one thing | ![](choose-name.png) |
+| Create invitation | happy | terms, and nobody's name | ![](create-invitation.png) |
+| Create invitation | first | the party's first-ever invitation | ![](create-invitation-first.png) |
+| Review invitation | happy | the invitee's side, before disclosing | ![](review-invitation.png) |
+| Review invitation | expired | explained, with a way forward | ![](review-invitation-expired.png) |
 | Tally list | happy | six tallies, one offered and figureless | ![](tally-list-happy.png) |
 | Tally list | empty | nothing yet, and what to do about it | ![](tally-list-empty.png) |
 | Tally view | happy | a tally with history, terms both ways | ![](tally-view-happy.png) |

@@ -37,7 +37,10 @@ export function TallyList({ navigation }: Props): React.JSX.Element {
 				title={t('screens.tally-list.empty-title')}
 				body={t('screens.tally-list.empty-body')}
 			>
-				<Action label={t('screens.tally-list.empty-invite')} />
+				<Action
+					label={t('screens.tally-list.empty-invite')}
+					onPress={() => navigation.navigate('CreateInvitation')}
+				/>
 				<Action label={t('screens.tally-list.empty-accept')} secondary />
 			</Empty>
 		)

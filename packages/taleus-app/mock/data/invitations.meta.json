@@ -1,0 +1,11 @@
+{
+  "namespace": "invitations",
+  "variants": ["happy", "empty"],
+  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "notes": [
+    "invitations this party issued (story 01 step 9). No tally exists until someone responds",
+    "`note` is the inviter's private memo — never a claim about who will respond (story 01 step 1)",
+    "no counterparty field: whoever accepts becomes the other party, and their identity comes only from what they disclose",
+    "state is outstanding | expired | withdrawn | taken-up"
+  ]
+}

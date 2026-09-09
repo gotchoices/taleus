@@ -1,0 +1,19 @@
+{
+  "agreements": [
+    {
+      "id": "cid:bafy-standard-tally-v1",
+      "title": "Standard Tally Agreement",
+      "publisher": "taleus.org",
+      "language": "en",
+      "summary": "The ordinary terms for a two-party tally: what each side may be owed, how notice works, and how the record is kept.",
+      "recommended": true
+    },
+    {
+      "id": "cid:bafy-trade-tally-v2",
+      "title": "Trade Tally Agreement",
+      "publisher": "sereus.org",
+      "language": "en",
+      "summary": "For parties trading regularly in the course of business, with terms for invoicing and dispute."
+    }
+  ]
+}

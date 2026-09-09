@@ -20,8 +20,8 @@ and should not acquire one.
 | Tally terms | TallyTerms | — | 07, 03 | happy, error | draft |
 | Trading settings | TradingSettings | — | 31 | happy, empty | draft |
 | Close tally | CloseTally | — | 05 | happy, empty, error | draft |
-| Create invitation | CreateInvitation | — | 01 | happy, error | draft |
-| Review invitation | ReviewInvitation | — | 02 | happy, error | draft |
+| Create invitation | CreateInvitation | — | 01 | happy, empty | generated |
+| Review invitation | ReviewInvitation | — | 02 | happy, expired | generated |
 | Review offer | ReviewOffer | — | 03, 02 | happy, error | draft |
 | Standing invitation | StandingInvitation | — | 01, 10, 21 | happy, empty | draft |
 | Attention | Attention | — | 23 | happy, empty, error | generated |

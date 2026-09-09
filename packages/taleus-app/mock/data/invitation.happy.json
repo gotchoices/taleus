@@ -1,0 +1,28 @@
+{
+  "invitations": {
+    "inv:jan-bike-7c1": {
+      "token": "inv:jan-bike-7c1",
+      "state": "outstanding",
+      "inviter": {
+        "sid": "sid:jan-7f3a",
+        "disclosed": { "name": "Jan Kessler", "phone": "+1-555-0142" }
+      },
+      "unit": { "denom": "iso4217:USD", "scale": 2 },
+      "theirCreditLimit": { "units": 50000 },
+      "theirNoticeDays": 14,
+      "agreement": {
+        "id": "cid:bafy-standard-tally-v1",
+        "title": "Standard Tally Agreement",
+        "publisher": "taleus.org",
+        "language": "en",
+        "summary": "The ordinary terms for a two-party tally: what each side may be owed, how notice works, and how the record is kept."
+      },
+      "expires": "2026-09-08T12:30:00Z",
+      "asks": [
+        { "field": "name", "required": true },
+        { "field": "phone", "required": false },
+        { "field": "address", "required": false }
+      ]
+    }
+  }
+}

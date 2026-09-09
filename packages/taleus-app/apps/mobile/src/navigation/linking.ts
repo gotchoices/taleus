@@ -32,6 +32,13 @@ export const linking: LinkingOptions<TabParams & OnboardingParams> = {
 					TallyList: 'screen/TallyList',
 					TallyView: 'screen/TallyView/:tallyId',
 					TallyHistory: 'screen/TallyHistory/:tallyId',
+					CreateInvitation: 'screen/CreateInvitation',
+					// Two ways in: the scenario/deep-link form, and the universal link
+					// a person is actually sent (`navigation.md` § Deep Links).
+					ReviewInvitation: {
+						path: 'screen/ReviewInvitation/:token',
+						alias: ['/taleus/invite/:token'],
+					},
 				},
 			},
 			AttentionTab: { screens: { Attention: 'screen/Attention' } },
