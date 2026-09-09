@@ -13,7 +13,7 @@ dependsOn:
   - design/generated/mobile/foundation.md
   - design/generated/mobile/screens/Welcome.md
   - mock/data/party.happy.json
-  - mock/data/party.empty.json
+  - mock/data/party.first-run.json
 depHashes: {}
 ---
 
@@ -28,7 +28,7 @@ Built from story 10 with no screen spec. Nothing in the story needed overriding.
 | `src/screens/Welcome.tsx` | the screen |
 | `src/data/party.ts` | `readParty`, `createIdentity`, `setDisplayName` — the first adapter that writes |
 | `src/session/index.tsx` | whether a party exists; the root state the navigator gates on |
-| `mock/data/party.empty.json` | `party: null` — no identity yet |
+| `mock/data/party.first-run.json` | `party: null` — no identity yet |
 
 ## Decisions this slice had to make
 

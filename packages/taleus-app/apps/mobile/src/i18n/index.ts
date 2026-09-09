@@ -1,3 +1,4 @@
+import { bumpGeneration } from '../data/generation'
 import en from './locales/en.json'
 
 /**
@@ -21,9 +22,13 @@ export function getLocale(): string {
 }
 
 export function setLocale(tag: string): void {
-	if (bundles[tag]) {
-		locale = tag
+	if (!bundles[tag] || tag === locale) {
+		return
 	}
+	locale = tag
+	// Strings and `Intl` formatting are computed during render, so a reload is
+	// what gets the new locale onto screens that are already showing.
+	bumpGeneration()
 }
 
 /**

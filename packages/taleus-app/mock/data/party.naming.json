@@ -1,0 +1,21 @@
+{
+  "party": {
+    "sid": "sid:jan-7f3a",
+    "displayName": "",
+    "displayUnit": "iso4217:USD",
+    "disclosed": {},
+    "devices": [
+      {
+        "id": "dev:phone-1",
+        "name": "Jan's phone",
+        "lastActive": "2026-09-05T08:12:00Z"
+      },
+      {
+        "id": "dev:node-1",
+        "name": "Home node",
+        "lastActive": "2026-09-05T09:01:00Z",
+        "alwaysOn": true
+      }
+    ]
+  }
+}

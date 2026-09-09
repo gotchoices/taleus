@@ -14,7 +14,7 @@ dependsOn:
   - design/generated/mobile/foundation.md
   - design/generated/mobile/screens/ChooseName.md
   - mock/data/party.happy.json
-  - mock/data/party.empty.json
+  - mock/data/party.first-run.json
 depHashes: {}
 ---
 

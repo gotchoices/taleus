@@ -13,7 +13,6 @@
     h1,h2,h3 { line-height: 1.25; }
     .appeus-nav { font-size: 14px; color: #666; padding-bottom: 8px; border-bottom: 1px solid #eee; margin-bottom: 16px; }
     .appeus-nav .appeus-device { float: right; }
-    .appeus-nav select { font: inherit; }
     .muted { color: #888; }
     table.states { border-collapse: collapse; width: 100%; }
     table.states th, table.states td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid #eee; }
@@ -30,25 +29,25 @@
 <p>Source: <a href="../../../stories/mobile/10-first-run.md">10-first-run.md</a></p>
 <p>Steve has followed MyCHIPs for years and installs Taleus out of curiosity. He has no invitation
 waiting, nobody to tally with, and no idea what the app expects of him.</p>
-<p>Reachable only with <code>variant=empty</code> — the default party fixture is an established identity, so the
-app otherwise goes straight to the tabs.</p>
+<p>Two states, two variants. <code>first-run</code> is no identity at all, which is where Welcome lives.
+<code>naming</code> is an identity that exists but has no name yet, which is the only way a link can land on
+ChooseName — with <code>first-run</code> the gate sends you to Welcome instead. Neither is called <code>empty</code>,
+because a variant applies to every namespace at once and no-identity gates the whole app.</p>
 <h2>Step 1: Told what this is, before being asked for anything</h2>
 <p>Two lines about what a tally is and what value means here — enough to decide whether to continue.
 Story path D is the constraint: he can read this <em>without anything having been created</em>. No identity
 exists at this point.</p>
-<p><a href="taleus://screen/Welcome?variant=empty"><img src="../images/welcome-first-run.png" alt="Welcome, first run"></a></p>
+<p><a href="taleus://screen/Welcome?variant=first-run"><img src="../images/welcome-first-run.png" alt="Welcome, first run"></a></p>
 <h2>Step 2: An identity exists, and he is told so</h2>
 <p>Tapping through creates it. There were no keys to understand, no algorithm to choose, nothing to
 name — step 3 is emphatic that this is bookkeeping the app does. He is then told, once, that it
 lives on this device and what that implies before he holds anything of value (step 4).</p>
 <p>Below that sits the one thing he is asked for (step 5), and the promise that makes deferring the rest
 honest: anything more is asked for when it matters, and he will be told who is asking.</p>
-<p><a href="taleus://screen/ChooseName?variant=empty"><img src="../images/choose-name.png" alt="Choose a name"></a></p>
-<h2>Step 3: A name, and nothing else</h2>
-<p>The prompt below the button is gone once there is a name. There is no optional field here at all —
-an optional field is still an ask.</p>
-<p><a href="taleus://screen/ChooseName?variant=empty"><img src="../images/choose-name-filled.png" alt="A name entered"></a></p>
-<h2>Step 4: No tallies, and what he needs</h2>
+<p><a href="taleus://screen/ChooseName?variant=naming"><img src="../images/choose-name.png" alt="Choose a name"></a></p>
+<p>Typing a name clears the prompt below the button. There is no optional field here at all — an
+optional field is still an ask — so this is the whole of what first run wants from him.</p>
+<h2>Step 3: No tallies, and what he needs</h2>
 <p>First run ends here (step 6). Rather than an empty list he is told what he needs — someone to tally
 with — and offered both ways to get there.</p>
 <p><a href="taleus://screen/TallyList?variant=empty"><img src="../images/tally-list-empty.png" alt="No tallies yet"></a></p>

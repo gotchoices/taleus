@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
+import { getGeneration, subscribeGeneration } from '../data/generation'
 import type { DataError, Result } from '../data/types'
 
 export type LoadState = 'loading' | 'ready' | 'failed'
@@ -64,9 +65,13 @@ export function useLoad<T>(load: () => Promise<Result<T>>): Loaded<T> {
 		}
 	}, [load])
 
+	// Re-read when the world changes under us — a deep link switching the mock
+	// variant does not remount a screen that is already showing.
+	const generation = useSyncExternalStore(subscribeGeneration, getGeneration, getGeneration)
+
 	useEffect(() => {
 		void run()
-	}, [run])
+	}, [run, generation])
 
 	return { state, value, error, reload: () => void run() }
 }

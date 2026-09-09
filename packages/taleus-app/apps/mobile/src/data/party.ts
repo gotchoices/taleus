@@ -82,8 +82,10 @@ export function resetParty(): void {
 
 function fixtureFor(variant: string): { party: Party | null } {
 	switch (variant) {
-		case 'empty':
-			return require('../../mock/data/party.empty.json') as { party: Party | null }
+		case 'first-run':
+			return require('../../mock/data/party.first-run.json') as { party: Party | null }
+		case 'naming':
+			return require('../../mock/data/party.naming.json') as { party: Party | null }
 		default:
 			return require('../../mock/data/party.happy.json') as { party: Party | null }
 	}

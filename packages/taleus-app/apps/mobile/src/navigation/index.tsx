@@ -133,21 +133,18 @@ export function AppNavigator(): React.JSX.Element {
 	const session = useSession()
 	const onboarded = isOnboarded(session.party)
 
-	// A link that arrived before there was an identity is held and re-delivered
-	// once the tabs exist, so the party lands on it (story 10 path A).
-	useEffect(() => {
-		if (onboarded) {
-			session.resume()
-		}
-	}, [onboarded, session])
-
-	if (session.loading) {
+	// Only before the first answer. A reload keeps the navigator mounted, so a
+	// link that changed the variant is not lost while the party is re-read.
+	if (session.initialising) {
 		return <Loading />
 	}
 
+	// One container, always with `linking`. Two containers — one for onboarding
+	// without linking — meant that during first run nothing consumed incoming
+	// URLs at all, so every link after visiting first run was silently dead.
 	if (!onboarded) {
 		return (
-			<NavigationContainer theme={navigationTheme(tokens)}>
+			<NavigationContainer linking={linking} theme={navigationTheme(tokens)}>
 				<OnboardingStack />
 			</NavigationContainer>
 		)

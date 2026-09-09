@@ -5,21 +5,17 @@ scheme: taleus
 
 screenshots:
   - route: Welcome
-    variant: empty
+    variant: first-run
     file: welcome-first-run.png
     deps:
       - apps/mobile/src/screens/Welcome.tsx
-      - mock/data/party.empty.json
+      - mock/data/party.first-run.json
   - route: ChooseName
-    variant: empty
+    variant: naming
     file: choose-name.png
     deps:
       - apps/mobile/src/screens/ChooseName.tsx
-  - route: ChooseName
-    variant: empty
-    file: choose-name-filled.png
-    deps:
-      - apps/mobile/src/screens/ChooseName.tsx
+      - mock/data/party.naming.json
   - route: TallyList
     variant: happy
     file: tally-list-happy.png
@@ -127,8 +123,7 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Screen | Variant | Shows | Preview |
 |--------|---------|-------|---------|
 | Welcome | first run | what this is, before anything is asked | ![](welcome-first-run.png) |
-| Choose name | first run | told it exists and lives here; asked one thing | ![](choose-name.png) |
-| Choose name | named | the prompt gone once there is a name | ![](choose-name-filled.png) |
+| Choose name | naming | told it exists and lives here; asked one thing | ![](choose-name.png) |
 | Tally list | happy | six tallies, one offered and figureless | ![](tally-list-happy.png) |
 | Tally list | empty | nothing yet, and what to do about it | ![](tally-list-empty.png) |
 | Tally view | happy | a tally with history, terms both ways | ![](tally-view-happy.png) |
@@ -153,8 +148,9 @@ Notes:
 - **Capture does not restart the app**, and a variant change is ignored by a route that is already
   mounted: `?variant=error` on a warm `TallyList` re-renders the happy list. Force-stop between
   captures that change variant on the same route.
-- First run is reachable only with `?variant=empty` — the happy party fixture is an established
-  identity, so the app goes straight to the tabs. The `ChooseName` captures are taken by walking the
+- First run is reachable with `?variant=first-run`, not `empty`: a variant applies to every namespace
+  at once, and a party with no identity gates the whole app into onboarding — so `?variant=empty`
+  aimed at one screen's empty state would show first run instead. The `ChooseName` captures are taken by walking the
   flow (`input tap`), not by deep link: onboarding screens have no linking config, by design.
 - Captured after the React Native 0.87 upgrade, so the tab bar has icons and the headers are React
   Navigation's own.

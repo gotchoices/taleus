@@ -17,7 +17,7 @@ beforeEach(() => {
 })
 
 test('no identity is a real answer, not an error', async () => {
-	setVariant('empty')
+	setVariant('first-run')
 	const result = await readParty()
 	expect(result.ok).toBe(true)
 	if (result.ok) {
@@ -27,7 +27,7 @@ test('no identity is a real answer, not an error', async () => {
 })
 
 test('an identity is created without the party choosing anything', async () => {
-	setVariant('empty')
+	setVariant('first-run')
 	const made = await createIdentity()
 	expect(made.ok).toBe(true)
 	if (made.ok) {
@@ -39,7 +39,7 @@ test('an identity is created without the party choosing anything', async () => {
 })
 
 test('first run is not complete until a name is on the identity', async () => {
-	setVariant('empty')
+	setVariant('first-run')
 	await createIdentity()
 	const before = await readParty()
 	expect(before.ok && isOnboarded(before.value)).toBe(false)
@@ -53,7 +53,7 @@ test('first run is not complete until a name is on the identity', async () => {
 })
 
 test('Welcome explains before it asks, and creates nothing until told to', async () => {
-	setVariant('empty')
+	setVariant('first-run')
 	const view = await renderScreen(<Welcome navigation={nav} route={{ name: 'Welcome' } as never} />)
 	await waitFor(() => expect(view.getByText(/running account/)).toBeTruthy())
 	// Story 10 path D: readable without having created anything.
@@ -67,7 +67,7 @@ test('Welcome explains before it asks, and creates nothing until told to', async
 })
 
 test('ChooseName will not continue without a name, and reports when it has one', async () => {
-	setVariant('empty')
+	setVariant('first-run')
 	await createIdentity()
 	const onDone = jest.fn()
 	const view = await renderScreen(

@@ -5,8 +5,10 @@ Source: [10-first-run.md](../../../stories/mobile/10-first-run.md)
 Steve has followed MyCHIPs for years and installs Taleus out of curiosity. He has no invitation
 waiting, nobody to tally with, and no idea what the app expects of him.
 
-Reachable only with `variant=empty` — the default party fixture is an established identity, so the
-app otherwise goes straight to the tabs.
+Two states, two variants. `first-run` is no identity at all, which is where Welcome lives.
+`naming` is an identity that exists but has no name yet, which is the only way a link can land on
+ChooseName — with `first-run` the gate sends you to Welcome instead. Neither is called `empty`,
+because a variant applies to every namespace at once and no-identity gates the whole app.
 
 ## Step 1: Told what this is, before being asked for anything
 
@@ -27,14 +29,10 @@ honest: anything more is asked for when it matters, and he will be told who is a
 
 ![Choose a name](../images/choose-name.png)
 
-## Step 3: A name, and nothing else
+Typing a name clears the prompt below the button. There is no optional field here at all — an
+optional field is still an ask — so this is the whole of what first run wants from him.
 
-The prompt below the button is gone once there is a name. There is no optional field here at all —
-an optional field is still an ask.
-
-![A name entered](../images/choose-name-filled.png)
-
-## Step 4: No tallies, and what he needs
+## Step 3: No tallies, and what he needs
 
 First run ends here (step 6). Rather than an empty list he is told what he needs — someone to tally
 with — and offered both ways to get there.

@@ -3,7 +3,7 @@ import type { LinkingOptions } from '@react-navigation/native'
 
 import { setLocale } from '../i18n'
 import { setVariant, variantFromUrl } from '../mock/variant'
-import type { TabParams } from './routes'
+import type { OnboardingParams, TabParams } from './routes'
 
 /**
  * Deep links and universal links, per `design/specs/mobile/navigation.md`.
@@ -15,10 +15,15 @@ import type { TabParams } from './routes'
  * parameters — `variant`, `locale` — are applied *before* a screen mounts and
  * asks for data. Doing it in an effect would race the first load.
  */
-export const linking: LinkingOptions<TabParams> = {
+export const linking: LinkingOptions<TabParams & OnboardingParams> = {
 	prefixes: ['taleus://', 'https://sereus.org'],
 	config: {
 		screens: {
+			// First run is a real destination, not just a state the gate falls into.
+			// Without these, a link to an onboarding screen matched nothing and the
+			// party landed on whatever the stack's initial route happened to be.
+			Welcome: 'screen/Welcome',
+			ChooseName: 'screen/ChooseName',
 			Tallies: {
 				// A link straight to a tally lands with the list beneath it, so back
 				// goes somewhere sensible rather than out of the app.
@@ -37,6 +42,7 @@ export const linking: LinkingOptions<TabParams> = {
 	subscribe(listener) {
 		const sub = Linking.addEventListener('url', ({ url }) => {
 			consume(url)
+			arriving?.(url)
 			listener(url)
 		})
 		return () => sub.remove()
@@ -59,6 +65,19 @@ export async function applyLaunchParams(): Promise<string | null> {
 		launched = consume((await Linking.getInitialURL()) ?? null)
 	}
 	return launched
+}
+
+/**
+ * Every link that arrives while running, after its parameters are applied.
+ *
+ * The session needs this because a link can change who the party is — the mock
+ * variant decides whether an identity exists — and a link that arrives during
+ * first run has nowhere to land until first run is over.
+ */
+let arriving: ((url: string) => void) | undefined
+
+export function whenLinkArrives(handler: (url: string) => void): void {
+	arriving = handler
 }
 
 /** The launch URL, once `applyLaunchParams` has run. */
