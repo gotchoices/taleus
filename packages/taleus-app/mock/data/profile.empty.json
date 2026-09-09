@@ -1,0 +1,36 @@
+{
+  "profile": {
+    "held": [
+      {
+        "key": "name",
+        "value": "Jan Kessler"
+      }
+    ],
+    "disclosures": [
+      {
+        "tallyId": "tally:sam-bike",
+        "counterparty": {
+          "sid": "sid:sam-91c2",
+          "name": "Sam Ortiz"
+        },
+        "state": "Open",
+        "reachable": true,
+        "sent": [
+          {
+            "key": "name",
+            "value": "Jan Kessler",
+            "at": "2026-05-12T18:20:00Z"
+          }
+        ],
+        "received": [
+          {
+            "key": "name",
+            "value": "Sam Ortiz",
+            "at": "2026-05-12T18:20:00Z"
+          }
+        ],
+        "requests": []
+      }
+    ]
+  }
+}

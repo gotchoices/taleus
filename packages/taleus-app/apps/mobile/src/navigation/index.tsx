@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import Ionicons from '@react-native-vector-icons/ionicons'
 import { NavigationContainer, type Theme } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
@@ -11,6 +10,10 @@ import { ChooseName } from '../screens/ChooseName'
 import { CreateInvitation } from '../screens/CreateInvitation'
 import { ReviewInvitation } from '../screens/ReviewInvitation'
 import { CreateRequest } from '../screens/CreateRequest'
+import { DisclosureView } from '../screens/DisclosureView'
+import { EntryDetail } from '../screens/EntryDetail'
+import { Profile } from '../screens/Profile'
+import { Settings } from '../screens/Settings'
 import { PayPartner } from '../screens/PayPartner'
 import { CloseTally } from '../screens/CloseTally'
 import { RequestView } from '../screens/RequestView'
@@ -18,6 +21,7 @@ import { ReviewOffer } from '../screens/ReviewOffer'
 import { Welcome } from '../screens/Welcome'
 import { Position } from '../screens/Position'
 import { TallyHistory } from '../screens/TallyHistory'
+import { TallyTerms } from '../screens/TallyTerms'
 import { TallyList } from '../screens/TallyList'
 import { TallyView } from '../screens/TallyView'
 import { t } from '../i18n'
@@ -30,6 +34,7 @@ import {
 	type AttentionParams,
 	type OnboardingParams,
 	type PositionParams,
+	type SettingsParams,
 	type TabParams,
 	type TalliesParams,
 } from './routes'
@@ -46,6 +51,7 @@ import {
 const Tallies = createNativeStackNavigator<TalliesParams>()
 const AttentionStack = createNativeStackNavigator<AttentionParams>()
 const PositionStack = createNativeStackNavigator<PositionParams>()
+const SettingsStack = createNativeStackNavigator<SettingsParams>()
 const Tabs = createBottomTabNavigator<TabParams>()
 const Onboarding = createNativeStackNavigator<OnboardingParams>()
 
@@ -106,6 +112,16 @@ function TalliesStack(): React.JSX.Element {
 				name="TallyHistory"
 				component={TallyHistory}
 				options={{ title: t('screens.tally-history.title') }}
+			/>
+			<Tallies.Screen
+				name="EntryDetail"
+				component={EntryDetail}
+				options={{ title: t('screens.entry-detail.title') }}
+			/>
+			<Tallies.Screen
+				name="TallyTerms"
+				component={TallyTerms}
+				options={{ title: t('screens.tally-terms.title') }}
 			/>
 			<Tallies.Screen
 				name="CreateInvitation"
@@ -170,6 +186,28 @@ function PositionRoot(): React.JSX.Element {
 	)
 }
 
+function SettingsRoot(): React.JSX.Element {
+	return (
+		<SettingsStack.Navigator screenOptions={useStackOptions()}>
+			<SettingsStack.Screen
+				name="Settings"
+				component={Settings}
+				options={{ title: t('tab.settings') }}
+			/>
+			<SettingsStack.Screen
+				name="Profile"
+				component={Profile}
+				options={{ title: t('screens.profile.title') }}
+			/>
+			<SettingsStack.Screen
+				name="DisclosureView"
+				component={DisclosureView}
+				options={{ title: t('screens.disclosure.title') }}
+			/>
+		</SettingsStack.Navigator>
+	)
+}
+
 export function AppNavigator(): React.JSX.Element {
 	const tokens = useTokens()
 	const session = useSession()
@@ -231,6 +269,7 @@ const componentFor: Record<keyof TabParams, React.ComponentType> = {
 	Tallies: TalliesStack,
 	AttentionTab: AttentionRoot,
 	PositionTab: PositionRoot,
+	SettingsTab: SettingsRoot,
 }
 
 function useStackOptions() {

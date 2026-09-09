@@ -162,6 +162,11 @@ export function TallyView({ route, navigation }: Props): React.JSX.Element {
 				secondary
 			/>
 			<Action
+				label={t('screens.tally-view.see-terms')}
+				onPress={() => navigation.navigate('TallyTerms', { tallyId: tally.id })}
+				secondary
+			/>
+			<Action
 				label={t('screens.tally-view.see-history')}
 				onPress={() => navigation.navigate('TallyHistory', { tallyId: tally.id })}
 				secondary

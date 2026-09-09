@@ -30,6 +30,63 @@ export interface Agreement {
 }
 
 /**
+ * The contract the terms are arguments to (story 07 step 5).
+ *
+ * A tally's terms are not the agreement: they are the figures a party filled in
+ * on a document both signed. `parameters` names which figures those are, so the
+ * reader can see the join rather than being asked to assume it.
+ */
+export interface AgreementDocument extends Agreement {
+	version: string
+	parameters: string[]
+	sections: { heading: string; body: string }[]
+}
+
+/**
+ * One agreed set of terms, and what it governs.
+ *
+ * `side` is whose willingness this is, from the reading party's point of view:
+ * `mine` is what this party will let the other owe them. `governs` is the one
+ * thing a reduction makes non-obvious — a reduction does not reach back, so it
+ * governs activity from its effective date while what is already outstanding
+ * stays under the terms it was advanced under (story 07 paths D and E).
+ */
+export interface TermsChange {
+	id: string
+	side: 'mine' | 'theirs'
+	by: 'me' | 'them'
+	creditLimit: Amount
+	noticeDays: number
+	/** When the parties agreed it. */
+	agreed: CivilDate
+	/** When it takes effect — later than `agreed` only for a reduction under notice. */
+	effective: CivilDate
+	governs: 'everything' | 'new-activity'
+	restrictive?: boolean
+	/** The terms the tally opened with. */
+	opening?: boolean
+}
+
+/**
+ * Terms proposed and not answered (story 07 path A). Deliberately not part of
+ * the history: nothing about a proposal changes what either party may do today.
+ */
+export interface TermsProposal {
+	id: string
+	side: 'mine' | 'theirs'
+	by: 'me' | 'them'
+	creditLimit: Amount
+	noticeDays: number
+	proposed: CivilDate
+}
+
+export interface TermsRecord {
+	/** Newest first. */
+	history: TermsChange[]
+	proposal?: TermsProposal
+}
+
+/**
  * A close in progress (story 05). Either party may ask, at any time, without the
  * other's agreement; the tally stays closing while any request stands.
  */
@@ -100,6 +157,80 @@ export async function readTally(tallyId: string): Promise<Result<TallyDetail>> {
 			closing,
 			state: closing ? 'Closing' : found.state === 'Closing' ? 'Open' : found.state,
 		},
+	}
+}
+
+/**
+ * How a tally's terms got to where they are (story 07 steps 3-4).
+ *
+ * A tally with nothing recorded here has never been amended, which is the
+ * story's `empty` case: the two sets in force *are* the whole history, so they
+ * are derived rather than demanding a fixture that says the same thing twice.
+ */
+export async function readTerms(tallyId: string): Promise<Result<TermsRecord>> {
+	if (!mockMode) {
+		return { ok: false, error: engineAbsent }
+	}
+	const fixture = termsFixtureFor(getVariant())
+	const history = fixture.history[tallyId]
+	if (history) {
+		return { ok: true, value: { history, proposal: fixture.proposals[tallyId] } }
+	}
+	const tally = await readTally(tallyId)
+	if (!tally.ok) {
+		return tally
+	}
+	return { ok: true, value: { history: openingOnly(tally.value), proposal: fixture.proposals[tallyId] } }
+}
+
+function openingOnly(tally: TallyDetail): TermsChange[] {
+	return (['mine', 'theirs'] as const).map(side => ({
+		id: `${tally.id}-${side}-opening`,
+		side,
+		by: side === 'mine' ? ('me' as const) : ('them' as const),
+		creditLimit: tally.terms[side].creditLimit,
+		noticeDays: tally.terms[side].noticeDays,
+		agreed: tally.terms[side].effective,
+		effective: tally.terms[side].effective,
+		governs: 'everything' as const,
+		opening: true,
+	}))
+}
+
+/**
+ * The contract itself. Story 07's error case is this failing while the terms in
+ * force stay readable, so it is a separate read rather than part of the tally.
+ */
+export async function readAgreement(agreementId: string): Promise<Result<AgreementDocument>> {
+	if (!mockMode) {
+		return { ok: false, error: engineAbsent }
+	}
+	const found = termsFixtureFor(getVariant()).documents[agreementId]
+	if (!found) {
+		return {
+			ok: false,
+			error: {
+				kind: 'unretrievable',
+				message: `The agreement ${agreementId} could not be fetched.`,
+				retryable: true,
+			},
+		}
+	}
+	return { ok: true, value: found }
+}
+
+interface TermsFixture {
+	history: Record<string, TermsChange[]>
+	proposals: Record<string, TermsProposal>
+	documents: Record<string, AgreementDocument>
+}
+
+function termsFixtureFor(variant: string): TermsFixture {
+	switch (variant) {
+		case 'error':
+			return require('../../mock/data/terms.error.json') as TermsFixture
+		default:
+			return require('../../mock/data/terms.happy.json') as TermsFixture
 	}
 }
 

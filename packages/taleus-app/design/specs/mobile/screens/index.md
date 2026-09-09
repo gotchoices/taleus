@@ -16,8 +16,8 @@ and should not acquire one.
 | Tally list | TallyList | tally-list.md | 06, 04 | happy, empty, error | generated |
 | Tally view | TallyView | tally-view.md | 04, 07 | happy, error | generated |
 | Tally history | TallyHistory | — | 24 | happy, empty, error | generated |
-| Entry detail | EntryDetail | — | 24 | happy | draft |
-| Tally terms | TallyTerms | — | 07, 03 | happy, error | draft |
+| Entry detail | EntryDetail | — | 24 | happy, error | generated |
+| Tally terms | TallyTerms | — | 07, 03 | happy, error | generated |
 | Trading settings | TradingSettings | — | 31 | happy, empty | draft |
 | Close tally | CloseTally | — | 05 | happy, closing | generated |
 | Create invitation | CreateInvitation | — | 01 | happy, empty | generated |
@@ -34,9 +34,9 @@ and should not acquire one.
 | Scan | Scan | — | 02, 21, 30 | happy, error | draft |
 | Position | Position | — | 40 | happy, empty, error | generated |
 | Exchange rates | ExchangeRates | — | 41 | happy, empty | draft |
-| Settings | Settings | — | 42 | happy | draft |
-| Profile | Profile | — | 11 | happy, empty | draft |
-| Disclosure view | DisclosureView | — | 11 | happy, empty | draft |
+| Settings | Settings | — | 42 | happy | generated |
+| Profile | Profile | — | 11 | happy, empty, error | generated |
+| Disclosure view | DisclosureView | — | 11 | happy, empty | generated |
 | Devices | Devices | — | 13, 12 | happy, error | draft |
 | Cadre | Cadre | — | 14, 51 | happy, empty, error | draft |
 | Recovery setup | RecoverySetup | — | 12, 50 | happy, error | draft |

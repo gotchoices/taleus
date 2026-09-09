@@ -35,13 +35,18 @@ it is exactly the code twenty-five more screens will inherit.
 | `src/components/Chip.tsx` | state and waiting-on chips | `components/index.md` |
 | `src/components/Screen.tsx` | `Loading`, `Failed`, `Empty` | `components/index.md` |
 | `src/components/ErrorBoundary.tsx` | says what failed instead of going blank | `components/index.md` |
+| `src/components/Options.tsx` | a set of choices, one or several at a time | story 42 |
+| `src/components/Input.tsx` | a labelled text field | — |
 | `src/components/index.ts` | the barrel every screen imports from | — |
 | `src/navigation/routes.ts` | route names, params, tab set, screen prop types | `navigation.md` |
 | `src/navigation/linking.ts` | deep links and universal links | `navigation.md` § Deep Links |
-| `src/navigation/index.tsx` | tabs over three native stacks | `navigation.md` |
+| `src/navigation/index.tsx` | tabs over four native stacks | `navigation.md` |
 | `src/data/config.ts` | the one mock/engine switch | `interfaces.md` § Run modes |
 | `src/data/types.ts` | app-side shapes mirroring the domain contract | `interfaces.md` |
 | `src/data/party.ts` | who this party is; the first adapter that writes | `interfaces.md` |
+| `src/data/settings.ts` | the party's preferences, and which follow them | story 42 |
+| `src/hooks/usePreferences.ts` | stored preferences applied before the first paint | story 42 |
+| `src/util/fields.ts` | the field vocabulary both disclosure directions read | story 11 |
 | `src/session/index.tsx` | whether a party exists — the root state the navigator gates on | story 10 |
 | `src/mock/variant.ts` | variant from a deep link; screens never see it | `appeus/reference/mock-variants.md` |
 | `App.tsx`, `index.js` | providers, error boundary, entry point | — |
@@ -62,6 +67,14 @@ it is exactly the code twenty-five more screens will inherit.
 - **Launch parameters are applied before any data is read.** `?variant=` decides which fixtures
   answer, and React Navigation supplies the initial URL only after its container mounts — too late
   for anything read at startup. `applyLaunchParams()` runs at the head of the session's load.
+- **A preference is applied where it is read, and stored beside it.** The i18n bundle owns the
+  locale, `util/amount.ts` owns mark-or-code, the theme provider owns the appearance. `usePreferences`
+  reads them once at startup and hands each to its owner, because a party who set them on another
+  device has never opened the settings screen on this one. It gates the first paint: a party who chose
+  "always dark" must not be shown a light app for a frame and then corrected.
+- **State updates are functional, not built from a render-time copy.** A tick and a keystroke can land
+  in one batch, and two updates each built from the same copy silently undo one another. This was a
+  real defect in the disclosure screen before the tests found it.
 - **An error boundary, because release builds are silent.** A render error shows a blank screen with
   nothing in logcat. That cost two debugging sessions before the boundary existed.
 

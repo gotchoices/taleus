@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { ScrollView, Text, TextInput, View } from 'react-native'
+import { ScrollView, Text, TextInput } from 'react-native'
 
 import { Action, Amount, Card, Chip, Failed, Loading, Row, amountText } from '../components'
 import { declineRequest, readRequest, withdrawRequest, type PaymentRequest } from '../data/requests'

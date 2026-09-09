@@ -8,21 +8,22 @@
 import { StatusBar, View } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
+import { Loading } from './src/components'
 import { ErrorBoundary } from './src/components/ErrorBoundary'
+import { useStoredPreferences } from './src/hooks/usePreferences'
 import { AppNavigator } from './src/navigation'
 import { SessionProvider } from './src/session'
 import { ThemeProvider, useTheme } from './src/theme'
 
 function Themed(): React.JSX.Element {
 	const { tokens, isDark } = useTheme()
+	const ready = useStoredPreferences()
 	return (
 		<View style={{ flex: 1, backgroundColor: tokens.background }}>
 			{/* No backgroundColor: React Native 0.87 draws edge-to-edge, so the bar is
 			    transparent and the view beneath it supplies the colour. */}
 			<StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-			<ErrorBoundary>
-				<AppNavigator />
-			</ErrorBoundary>
+			<ErrorBoundary>{ready ? <AppNavigator /> : <Loading />}</ErrorBoundary>
 		</View>
 	)
 }

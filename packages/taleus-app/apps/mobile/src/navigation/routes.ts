@@ -10,6 +10,10 @@ export type TalliesParams = {
 	TallyList: undefined
 	TallyView: { tallyId: string }
 	TallyHistory: { tallyId: string }
+	/** One entry, on its own — story 24 path C. */
+	EntryDetail: { tallyId: string; entryId: string }
+	/** Terms in force, how they got there, and the contract behind them. */
+	TallyTerms: { tallyId: string }
 	CreateInvitation: undefined
 	/** The universal-link landing: `https://sereus.org/taleus/invite/<token>`. */
 	ReviewInvitation: { token: string }
@@ -39,14 +43,22 @@ export type PositionParams = {
 	Position: undefined
 }
 
+export type SettingsParams = {
+	Settings: undefined
+	Profile: undefined
+	/** What passed between this party and one counterparty (story 11). */
+	DisclosureView: { tallyId: string }
+}
+
 /** The tabs, each holding a stack of its own. */
 export type TabParams = {
 	Tallies: NavigatorScreenParams<TalliesParams>
 	AttentionTab: NavigatorScreenParams<AttentionParams>
 	PositionTab: NavigatorScreenParams<PositionParams>
+	SettingsTab: NavigatorScreenParams<SettingsParams>
 }
 
-export type RouteParams = TalliesParams & AttentionParams & PositionParams
+export type RouteParams = TalliesParams & AttentionParams & PositionParams & SettingsParams
 export type RouteName = keyof RouteParams
 export type TabName = keyof TabParams
 
@@ -55,6 +67,8 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	TallyList: 'Tallies',
 	TallyView: 'Tallies',
 	TallyHistory: 'Tallies',
+	EntryDetail: 'Tallies',
+	TallyTerms: 'Tallies',
 	CreateInvitation: 'Tallies',
 	ReviewInvitation: 'Tallies',
 	ReviewOffer: 'Tallies',
@@ -64,6 +78,9 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	CloseTally: 'Tallies',
 	Attention: 'AttentionTab',
 	Position: 'PositionTab',
+	Settings: 'SettingsTab',
+	Profile: 'SettingsTab',
+	DisclosureView: 'SettingsTab',
 }
 
 /**
@@ -79,10 +96,23 @@ export const tabs: { name: TabName; labelKey: string; icon: string; iconActive: 
 		iconActive: 'notifications',
 	},
 	{ name: 'PositionTab', labelKey: 'tab.position', icon: 'wallet-outline', iconActive: 'wallet' },
+	{
+		name: 'SettingsTab',
+		labelKey: 'tab.settings',
+		icon: 'settings-outline',
+		iconActive: 'settings',
+	},
 ]
 
 /** Routes about one named tally — the ones an attention item can point at. */
-export type TallyRoute = 'TallyView' | 'TallyHistory' | 'ReviewOffer' | 'PayPartner' | 'CreateRequest' | 'CloseTally'
+export type TallyRoute =
+	| 'TallyView'
+	| 'TallyHistory'
+	| 'TallyTerms'
+	| 'ReviewOffer'
+	| 'PayPartner'
+	| 'CreateRequest'
+	| 'CloseTally'
 
 /**
  * Is this a route the app has, and about a single tally? Attention items name
@@ -93,6 +123,7 @@ export function isTallyRoute(name: string): name is TallyRoute {
 	return (
 		name === 'TallyView' ||
 		name === 'TallyHistory' ||
+		name === 'TallyTerms' ||
 		name === 'ReviewOffer' ||
 		name === 'PayPartner' ||
 		name === 'CreateRequest' ||
@@ -109,10 +140,17 @@ export type TalliesScreenProps<R extends keyof TalliesParams> = CompositeScreenP
 	BottomTabScreenProps<TabParams>
 >
 
+export type SettingsScreenProps<R extends keyof SettingsParams> = CompositeScreenProps<
+	NativeStackScreenProps<SettingsParams, R>,
+	BottomTabScreenProps<TabParams>
+>
+
 interface ScreenPropsByRoute {
 	TallyList: TalliesScreenProps<'TallyList'>
 	TallyView: TalliesScreenProps<'TallyView'>
 	TallyHistory: TalliesScreenProps<'TallyHistory'>
+	EntryDetail: TalliesScreenProps<'EntryDetail'>
+	TallyTerms: TalliesScreenProps<'TallyTerms'>
 	CreateInvitation: TalliesScreenProps<'CreateInvitation'>
 	ReviewInvitation: TalliesScreenProps<'ReviewInvitation'>
 	ReviewOffer: TalliesScreenProps<'ReviewOffer'>
@@ -128,6 +166,9 @@ interface ScreenPropsByRoute {
 		NativeStackScreenProps<PositionParams, 'Position'>,
 		BottomTabScreenProps<TabParams>
 	>
+	Settings: SettingsScreenProps<'Settings'>
+	Profile: SettingsScreenProps<'Profile'>
+	DisclosureView: SettingsScreenProps<'DisclosureView'>
 }
 
 export type ScreenProps<R extends RouteName> = ScreenPropsByRoute[R]

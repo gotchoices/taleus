@@ -32,6 +32,8 @@ export const linking: LinkingOptions<TabParams & OnboardingParams> = {
 					TallyList: 'screen/TallyList',
 					TallyView: 'screen/TallyView/:tallyId',
 					TallyHistory: 'screen/TallyHistory/:tallyId',
+					EntryDetail: 'screen/EntryDetail/:tallyId/:entryId',
+					TallyTerms: 'screen/TallyTerms/:tallyId',
 					CreateInvitation: 'screen/CreateInvitation',
 					ReviewOffer: 'screen/ReviewOffer/:tallyId',
 					PayPartner: 'screen/PayPartner/:tallyId',
@@ -48,6 +50,16 @@ export const linking: LinkingOptions<TabParams & OnboardingParams> = {
 			},
 			AttentionTab: { screens: { Attention: 'screen/Attention' } },
 			PositionTab: { screens: { Position: 'screen/Position' } },
+			SettingsTab: {
+				// Same reason as the tallies stack: a link to one counterparty's
+				// disclosure lands with the profile beneath it.
+				initialRouteName: 'Settings',
+				screens: {
+					Settings: 'screen/Settings',
+					Profile: 'screen/Profile',
+					DisclosureView: 'screen/DisclosureView/:tallyId',
+				},
+			},
 		},
 	},
 	getInitialURL: applyLaunchParams,

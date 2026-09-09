@@ -1,0 +1,169 @@
+{
+  "history": {
+    "tally:sam-bike": [
+      {
+        "id": "terms:sam-m5",
+        "side": "mine",
+        "by": "me",
+        "creditLimit": {
+          "units": 20000
+        },
+        "noticeDays": 21,
+        "agreed": "2026-09-06",
+        "effective": "2026-10-01",
+        "governs": "new-activity",
+        "restrictive": true
+      },
+      {
+        "id": "terms:sam-m4",
+        "side": "mine",
+        "by": "me",
+        "creditLimit": {
+          "units": 25000
+        },
+        "noticeDays": 21,
+        "agreed": "2026-09-02",
+        "effective": "2026-09-23",
+        "governs": "new-activity",
+        "restrictive": true
+      },
+      {
+        "id": "terms:sam-m3",
+        "side": "mine",
+        "by": "me",
+        "creditLimit": {
+          "units": 50000
+        },
+        "noticeDays": 21,
+        "agreed": "2026-03-02",
+        "effective": "2026-03-02",
+        "governs": "everything"
+      },
+      {
+        "id": "terms:sam-m2",
+        "side": "mine",
+        "by": "me",
+        "creditLimit": {
+          "units": 30000
+        },
+        "noticeDays": 21,
+        "agreed": "2025-12-08",
+        "effective": "2025-12-08",
+        "governs": "everything"
+      },
+      {
+        "id": "terms:sam-m1",
+        "side": "mine",
+        "by": "me",
+        "creditLimit": {
+          "units": 20000
+        },
+        "noticeDays": 14,
+        "agreed": "2025-11-14",
+        "effective": "2025-11-14",
+        "governs": "everything",
+        "opening": true
+      },
+      {
+        "id": "terms:sam-t1",
+        "side": "theirs",
+        "by": "them",
+        "creditLimit": {
+          "units": 0
+        },
+        "noticeDays": 21,
+        "agreed": "2025-11-14",
+        "effective": "2025-11-14",
+        "governs": "everything",
+        "opening": true
+      }
+    ],
+    "tally:mara-shop": [
+      {
+        "id": "terms:mara-t2",
+        "side": "theirs",
+        "by": "them",
+        "creditLimit": {
+          "units": 20000
+        },
+        "noticeDays": 30,
+        "agreed": "2026-01-19",
+        "effective": "2026-01-19",
+        "governs": "everything"
+      },
+      {
+        "id": "terms:mara-t1",
+        "side": "theirs",
+        "by": "them",
+        "creditLimit": {
+          "units": 10000
+        },
+        "noticeDays": 30,
+        "agreed": "2025-08-03",
+        "effective": "2025-08-03",
+        "governs": "everything",
+        "opening": true
+      },
+      {
+        "id": "terms:mara-m1",
+        "side": "mine",
+        "by": "me",
+        "creditLimit": {
+          "units": 0
+        },
+        "noticeDays": 30,
+        "agreed": "2025-08-03",
+        "effective": "2025-08-03",
+        "governs": "everything",
+        "opening": true
+      }
+    ]
+  },
+  "proposals": {
+    "tally:mara-shop": {
+      "id": "terms:mara-p1",
+      "side": "mine",
+      "by": "me",
+      "creditLimit": {
+        "units": 20000
+      },
+      "noticeDays": 30,
+      "proposed": "2026-09-04"
+    }
+  },
+  "documents": {
+    "cid:bafy-standard-tally-v1": {
+      "id": "cid:bafy-standard-tally-v1",
+      "title": "Standard Tally Agreement",
+      "publisher": "taleus.org",
+      "language": "en",
+      "version": "1.0",
+      "parameters": [
+        "creditLimit",
+        "noticeDays"
+      ],
+      "sections": [
+        {
+          "heading": "What this is",
+          "body": "A record of value owed between two parties, kept by both. Each entry in it is signed by the party who gave the value. Neither party keeps the only copy, and neither can alter it alone."
+        },
+        {
+          "heading": "What each may be owed",
+          "body": "Each party states a limit: the most they are willing to be owed by the other. A party may raise their own limit at any time, and it takes effect at once. A party may lower it, and the lower figure governs activity from the day it takes effect; value already outstanding stays under the limit it was advanced under."
+        },
+        {
+          "heading": "Notice",
+          "body": "A reduction takes effect after the notice period each party stated, counted in days from the day it was made. Where nothing is outstanding, there is no runway to shorten and the reduction applies at once."
+        },
+        {
+          "heading": "Closing",
+          "body": "Either party may ask to close at any time, without the other agreeing. Closing stops new value from being added. What is owed does not go away, and closing does not forgive it."
+        },
+        {
+          "heading": "Disputes",
+          "body": "The record is what both parties signed. A party who disagrees with an entry may say so on the tally; nothing is removed, and both statements stand."
+        }
+      ]
+    }
+  }
+}

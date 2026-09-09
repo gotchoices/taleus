@@ -36,10 +36,31 @@ export async function listEntries(tallyId: string): Promise<Result<Entry[]>> {
 	}
 }
 
+/** One entry, for the screen that shows nothing else (story 24 path C). */
+export async function readEntry(tallyId: string, entryId: string): Promise<Result<Entry>> {
+	const all = await listEntries(tallyId)
+	if (!all.ok) {
+		return all
+	}
+	const found = all.value.find(entry => entry.id === entryId)
+	if (!found) {
+		return {
+			ok: false,
+			error: { kind: 'not-found', message: `No entry ${entryId}.`, retryable: false },
+		}
+	}
+	return { ok: true, value: found }
+}
+
 function fixtureFor(variant: string): { entries: Record<string, Entry[]> } {
 	switch (variant) {
 		case 'empty':
 			return require('../../mock/data/entries.empty.json') as { entries: Record<string, Entry[]> }
+		case 'error':
+			// Story 24 path A: movement that has not committed. The chip and the
+			// prospective balance were built five slices ago and never exercised,
+			// because no fixture produced one.
+			return require('../../mock/data/entries.error.json') as { entries: Record<string, Entry[]> }
 		default:
 			return require('../../mock/data/entries.happy.json') as { entries: Record<string, Entry[]> }
 	}

@@ -3,7 +3,7 @@ import { Text, View, type TextStyle } from 'react-native'
 import { t } from '../i18n'
 import { useTokens } from '../theme'
 import type { Amount as AmountValue, Perspective, Unit } from '../data/types'
-import { amountParts, type AmountParts, type UnitNames } from '../util/amount'
+import { amountParts, unitFace, type AmountParts, type UnitNames, type UnitStyle } from '../util/amount'
 import { ChitMark } from './ChitMark'
 
 /**
@@ -24,6 +24,11 @@ export interface AmountProps {
 	estimate?: boolean
 	size?: 'small' | 'body' | 'display'
 	style?: TextStyle
+	/**
+	 * Overrides the party's own mark-or-code preference. Only the screen that
+	 * offers that choice needs this — it has to show both forms at once.
+	 */
+	unitStyle?: UnitStyle
 }
 
 const wholeSize = { small: 12, body: 16, display: 34 } as const
@@ -49,6 +54,7 @@ export function Amount({
 	estimate,
 	size = 'body',
 	style,
+	unitStyle,
 }: AmountProps): React.JSX.Element {
 	const tokens = useTokens()
 	const parts = amountParts(value, unit)
@@ -85,13 +91,14 @@ export function Amount({
 			 * hours sit in adjacent rows, what a figure counts matters before how
 			 * much it is, and one position for every unit beats two.
 			 */}
-			{parts.unit.drawn === 'chip' ? (
-				<ChitMark size={full * 0.95} colour={ink} />
-			) : (
-				<Text style={[{ fontSize: full * 0.82 }, text, style]}>
-					{parts.unit.mark ?? parts.unit.code}
-				</Text>
-			)}
+			<UnitFace
+				names={parts.unit}
+				full={full}
+				ink={ink}
+				text={text}
+				style={style}
+				unitStyle={unitStyle}
+			/>
 
 			<Text
 				style={[
@@ -110,6 +117,33 @@ export function Amount({
 			) : null}
 		</View>
 	)
+}
+
+/**
+ * The unit, mark or code by the reader's preference (`amounts.md`; story 42).
+ * CHIP's mark is drawn rather than typed, so under the code preference it falls
+ * back to the letters like any other unit.
+ */
+function UnitFace({
+	names,
+	full,
+	ink,
+	text,
+	style,
+	unitStyle,
+}: {
+	names: UnitNames
+	full: number
+	ink: string
+	text: TextStyle
+	style?: TextStyle
+	unitStyle?: UnitStyle
+}): React.JSX.Element {
+	const face = unitFace(names, unitStyle)
+	if (face.drawn === 'chip') {
+		return <ChitMark size={full * 0.95} colour={ink} />
+	}
+	return <Text style={[{ fontSize: full * 0.82 }, text, style]}>{face.text}</Text>
 }
 
 /**

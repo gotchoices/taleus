@@ -1,0 +1,12 @@
+{
+  "namespace": "terms",
+  "variants": ["happy", "error"],
+  "shape": "apps/mobile/src/data/tally.ts",
+  "notes": [
+    "Separate from `tally` because a tally carries the terms *in force*; this carries how they got there. Keeping them apart also keeps the agreement document out of every tally read",
+    "`history` is newest first, per tally, and each entry names the side it governs — `mine` is what this party will let the other owe them. A tally with no entry here falls back to the two sets in force, derived by the adapter: a tally that has never been amended has no history to show, which is story 07's `empty` case and needs no fixture",
+    "`terms:sam-m4` and `terms:sam-m5` are story 07 paths B and E: two reductions agreed, neither yet in force, each stacking on the future rather than the past. `governs: new-activity` is what says so",
+    "`proposals` is path A — proposed, not agreed, and changing nothing about what either party may do today. Kept out of `history` for that reason",
+    "`documents` is the contract the terms are arguments to (step 5). The `error` fixture drops it while keeping the history: the story's error case is a contract that cannot be retrieved with the terms in force still readable"
+  ]
+}

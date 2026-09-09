@@ -1,3 +1,4 @@
+import { bumpGeneration } from '../data/generation'
 import { getLocale } from '../i18n'
 import type { Amount, Unit } from '../data/types'
 
@@ -10,6 +11,43 @@ import type { Amount, Unit } from '../data/types'
  * choice of separator is safe. This module produces the pieces; drawing them is
  * `components/Amount.tsx`, and no screen does either itself.
  */
+
+/**
+ * Whether a figure wears the unit's mark or its code — `amounts.md` § Code and
+ * mark. This is the reader's choice, not the tally's: the default is the mark,
+ * because `$180` is what people read fluently, and a party who prefers
+ * `USD 180` sets it once (story 42) and gets it everywhere. Either way the unit
+ * is present, which is the rule that actually matters.
+ */
+export type UnitStyle = 'mark' | 'code'
+
+let unitStyle: UnitStyle = 'mark'
+
+export function getUnitStyle(): UnitStyle {
+	return unitStyle
+}
+
+export function setUnitStyle(style: UnitStyle): void {
+	if (style === unitStyle) {
+		return
+	}
+	unitStyle = style
+	// Figures are composed during render, so a reload is what gets the new form
+	// onto screens already showing.
+	bumpGeneration()
+}
+
+/**
+ * What to actually put in front of the unit's figure. A unit whose mark is
+ * drawn rather than typed keeps its code under the code preference, so choosing
+ * codes really does mean codes everywhere.
+ */
+export function unitFace(names: UnitNames, style = unitStyle): { text?: string; drawn?: 'chip' } {
+	if (style === 'code') {
+		return { text: names.code }
+	}
+	return names.drawn ? { drawn: names.drawn } : { text: names.mark ?? names.code }
+}
 
 /** How many of a unit's smallest parts make one whole. */
 export function divisorOf(unit: Unit): number {
@@ -56,7 +94,9 @@ export function namesFor(unit: Unit, locale = getLocale()): UnitNames {
 		return {
 			code,
 			mark: currencyMark(code, locale),
-			label: currencyLabel(code, locale),
+			// `Intl.DisplayNames` is absent from some Hermes builds and answers with
+			// the code itself. A name the unit carries beats repeating the code.
+			label: currencyLabel(code, locale) === code ? (unit.label ?? code) : currencyLabel(code, locale),
 			standard: true,
 		}
 	}

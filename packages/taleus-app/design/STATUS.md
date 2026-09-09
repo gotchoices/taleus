@@ -19,14 +19,16 @@ Specs say what the app should do. They do not record what has not been done yet.
 | Deferred | Why | Tracked as |
 |----------|-----|-----------|
 | An iOS build of the React Native upgrade | The upgrade diff's `ios/` hunks were not applied; the iOS tree has never been built, and patching a project file blind is worse than doing it when someone first runs `pod install` | — |
-| i18next, device-locale detection | The local `t()` meets the spec's rules today; the library earns its place at the language slice (42) | `debt-mobile-i18n-library` |
+| i18next, device-locale detection | The local `t()` still meets the spec's rules, and the settings slice (42) shipped against it: with one bundle, a library would have added a dependency and no capability. It earns its place when a second locale exists | `debt-mobile-i18n-library` |
 | Sort, filter, search on the tally list | Story 06's own paths; belongs to a slice of its own | — |
 | `bundle install` after the Gemfile gained `nkf` | Only matters for iOS tooling, which is untouched | — |
-| Next actions on `TallyView` | Pay, Request, and Terms are unsliced; a button routing nowhere is worse than none | — |
+| A `Closed` tally in the fixtures | Nothing produces one, so story 07 path F and story 24 path D are demonstrated on a tally that has stopped trading instead. The screens do not branch on the state, which is the substance of both paths | — |
 | Progressive disclosure of captions | Right idea, wrong time — `Card` has the slot it would hang off | — |
 | Fixtures for `Attention` and `Position` error states | Declared in their specs, nothing produces them; a storyboard cannot show a state no fixture makes | — |
 | Fixtures at story scale — forty tallies, a year of entries, eleven waiting items | The happy fixtures are six, three and three; the stories describe volumes the screens have never been shown | — |
 | Story 25, *My records in my books* | Waiting on how sApps share between strands | — |
+| Migrating six screens onto the shared `Input` | `ChooseName`, `CreateInvitation`, `ReviewInvitation`, `ReviewOffer`, `PayPartner`, `CreateRequest` and `RequestView` each grew their own labelled text field before one existed. `components/Input.tsx` is now the one worth keeping; switching them over marks all six stale and is a pass of its own, not a rider on the settings slice | — |
+| Choosing what to disclose while a tally is being formed | Story 11 steps 3-5 and an inviter stating what they expect. `CreateInvitation` and `ReviewInvitation` were built before story 11 was sliced; the state exists in the fixtures and reads correctly, but the choice is not offered in that flow | — |
 
 ## The React Native version — resolved
 

@@ -1,0 +1,13 @@
+{
+  "namespace": "profile",
+  "variants": ["happy", "empty", "error"],
+  "shape": "apps/mobile/src/data/profile.ts",
+  "notes": [
+    "`held` is what the party has about themselves. Nothing in it has been disclosed by the act of holding it — story 11 step 2 is explicit, and the two lists are separate here for that reason",
+    "`sent` is per counterparty and carries `at`, so 'what I told whom, and when' is answerable after the fact (step 6). `pending: true` is disclosure chosen at formation on a tally not yet countersigned",
+    "`received` is what the counterparty says about themselves. It is their claim, not something Taleus verified (path E), and a key absent from it is absent — the fixture cannot say whether it was withheld or never held, because neither can the app",
+    "`requests` runs both ways: `from: them` is path B, an ask that turns silence into a yes or no; `from: me` is path E step 4. An answer of `refused` carries no value and is not a failure",
+    "`held` deliberately has no `taxId`: Northwind's standing request is path A, something the party is not willing to give, and refusing must be a first-class answer",
+    "`reachable: false` in the `error` variant is the story's error case — a correction that cannot be delivered right now. It is per counterparty, because only some of a set will fail"
+  ]
+}

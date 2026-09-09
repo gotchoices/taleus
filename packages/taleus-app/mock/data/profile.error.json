@@ -1,0 +1,239 @@
+{
+  "profile": {
+    "held": [
+      {
+        "key": "name",
+        "value": "Jan Kessler"
+      },
+      {
+        "key": "phone",
+        "value": "+1-555-0142"
+      },
+      {
+        "key": "email",
+        "value": "jan@example.org"
+      },
+      {
+        "key": "address",
+        "value": "84 Wells Row, Kearney NE 68845"
+      },
+      {
+        "key": "business",
+        "value": "Kessler Carpentry"
+      }
+    ],
+    "disclosures": [
+      {
+        "tallyId": "tally:sam-bike",
+        "counterparty": {
+          "sid": "sid:sam-91c2",
+          "name": "Sam Ortiz"
+        },
+        "state": "Open",
+        "reachable": true,
+        "sent": [
+          {
+            "key": "name",
+            "value": "Jan Kessler",
+            "at": "2026-05-12T18:20:00Z"
+          },
+          {
+            "key": "phone",
+            "value": "+1-555-0142",
+            "at": "2026-05-12T18:20:00Z"
+          }
+        ],
+        "received": [
+          {
+            "key": "name",
+            "value": "Sam Ortiz",
+            "at": "2026-05-12T18:20:00Z"
+          },
+          {
+            "key": "phone",
+            "value": "+1-555-0188",
+            "at": "2026-05-12T18:20:00Z"
+          }
+        ],
+        "requests": []
+      },
+      {
+        "tallyId": "tally:supplier-parts",
+        "counterparty": {
+          "sid": "sid:northwind-8e04",
+          "name": "Northwind Parts"
+        },
+        "state": "Closing",
+        "reachable": true,
+        "sent": [
+          {
+            "key": "name",
+            "value": "Jan Kessler",
+            "at": "2026-06-01T14:02:00Z"
+          },
+          {
+            "key": "business",
+            "value": "Kessler Carpentry",
+            "at": "2026-06-01T14:02:00Z"
+          },
+          {
+            "key": "address",
+            "value": "84 Wells Row, Kearney NE 68845",
+            "at": "2026-06-01T14:02:00Z"
+          }
+        ],
+        "received": [
+          {
+            "key": "name",
+            "value": "Northwind Parts",
+            "at": "2026-06-01T14:02:00Z"
+          },
+          {
+            "key": "business",
+            "value": "Northwind Parts LLC",
+            "at": "2026-06-01T14:02:00Z"
+          },
+          {
+            "key": "address",
+            "value": "1200 Depot St, Lincoln NE 68508",
+            "at": "2026-06-01T14:02:00Z"
+          }
+        ],
+        "requests": [
+          {
+            "id": "req:northwind-taxid",
+            "key": "taxId",
+            "from": "them",
+            "why": "Our accounts team files a 1099 for every trade partner over $600 in a year.",
+            "asked": "2026-06-01T14:40:00Z"
+          }
+        ]
+      },
+      {
+        "tallyId": "tally:mara-shop",
+        "counterparty": {
+          "sid": "sid:mara-4d10",
+          "name": "Mara's Bike Shop"
+        },
+        "state": "Open",
+        "reachable": true,
+        "sent": [
+          {
+            "key": "name",
+            "value": "Jan Kessler",
+            "at": "2026-08-30T10:15:00Z"
+          }
+        ],
+        "received": [
+          {
+            "key": "name",
+            "value": "Mara's Bike Shop",
+            "at": "2026-08-30T10:15:00Z"
+          },
+          {
+            "key": "business",
+            "value": "Mara's Bike Shop",
+            "at": "2026-08-30T10:15:00Z"
+          }
+        ],
+        "requests": []
+      },
+      {
+        "tallyId": "tally:dave-hours",
+        "counterparty": {
+          "sid": "sid:dave-2b77",
+          "name": "Dave Lin"
+        },
+        "state": "Open",
+        "reachable": false,
+        "sent": [
+          {
+            "key": "name",
+            "value": "Jan Kessler",
+            "at": "2026-07-19T14:22:00Z"
+          },
+          {
+            "key": "phone",
+            "value": "+1-555-0142",
+            "at": "2026-07-19T14:22:00Z"
+          }
+        ],
+        "received": [
+          {
+            "key": "name",
+            "value": "Dave Lin",
+            "at": "2026-07-19T14:22:00Z"
+          }
+        ],
+        "requests": [
+          {
+            "id": "req:dave-address",
+            "key": "address",
+            "from": "me",
+            "why": "Asked Dave where to send the tools back.",
+            "asked": "2026-09-01T09:30:00Z",
+            "answer": {
+              "kind": "refused",
+              "at": "2026-09-01T17:11:00Z"
+            }
+          }
+        ]
+      },
+      {
+        "tallyId": "tally:priya-new",
+        "counterparty": {
+          "sid": "sid:priya-6a55",
+          "name": "Priya Raman"
+        },
+        "state": "Open",
+        "reachable": true,
+        "sent": [
+          {
+            "key": "name",
+            "value": "Jan Kessler",
+            "at": "2026-09-03T12:00:00Z"
+          }
+        ],
+        "received": [
+          {
+            "key": "name",
+            "value": "Priya Raman",
+            "at": "2026-09-03T12:00:00Z"
+          }
+        ],
+        "requests": []
+      },
+      {
+        "tallyId": "tally:rae-offer",
+        "counterparty": {
+          "sid": "sid:rae-3f19",
+          "name": "Rae Whitfield"
+        },
+        "state": "Offered",
+        "reachable": true,
+        "sent": [
+          {
+            "key": "name",
+            "value": "Jan Kessler",
+            "at": "2026-09-06T08:45:00Z",
+            "pending": true
+          },
+          {
+            "key": "email",
+            "value": "jan@example.org",
+            "at": "2026-09-06T08:45:00Z",
+            "pending": true
+          }
+        ],
+        "received": [
+          {
+            "key": "name",
+            "value": "Rae Whitfield",
+            "at": "2026-09-06T08:45:00Z"
+          }
+        ],
+        "requests": []
+      }
+    ]
+  }
+}

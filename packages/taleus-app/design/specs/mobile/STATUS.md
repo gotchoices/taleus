@@ -45,9 +45,16 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
   The paying arc is complete
 - [x] `CloseTally` — the one act neither party can refuse. The tally lifecycle is complete: offered,
   negotiated, opened, traded on, billed for, wound down
-- [ ] The remaining 16 screens in `screens/index.md`; next is the Settings arc — `Settings`,
-  `Profile`, `DisclosureView` (stories 42, 11), which makes the theme, locale and unit-mark
-  preferences already built into the foundation reachable
+- [x] `Settings`, `Profile`, `DisclosureView` — the Settings arc, and the fourth tab. Three
+  preferences already built into the foundation became reachable: the theme choice, the locale, and
+  the mark-or-code choice `amounts.md` calls the reader's. Story 11 is the substantial half —
+  disclosure per counterparty, asking rather than only refusing, and a correction that goes only
+  where it is authorized
+- [x] `TallyTerms` and `EntryDetail` — the two screens six earlier slices already pointed at and
+  could not reach. Story 07's whole subject is *when* a figure governs: in force, agreed and waiting,
+  or merely proposed, with a reduction that never reaches back. Story 24 path C is the entry nobody
+  remembers
+- [ ] The remaining 11 screens in `screens/index.md`
 
 ## Mock mode (this target)
 - [x] `mock/data/` carries the first fixtures — party, tallies, tally, entries, requests, attention,
@@ -60,8 +67,9 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
   from a release build by deep link — including story 04's own two scenes, a new tally and an
   unreachable counterparty
 - [x] Scenario docs under `design/generated/mobile/scenarios/` — one per story, covering every story a
-  coded screen serves (04, 06, 07, 10, 23, 24, 40). Sixteen linked states, each verified to land on
-  the device through `preview-scenarios.sh`.
+  coded screen serves (01, 02, 03, 04, 05, 06, 07, 10, 11, 20, 21, 22, 23, 24, 40, 42). Thirty-nine
+  registered states, thirty-four photographed, each verified to land on the device through
+  `preview-scenarios.sh`.
 
 ## Final wiring
 - [ ] Production data wiring is implemented and tested

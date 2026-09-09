@@ -2,12 +2,14 @@
   "namespace": "entries",
   "variants": [
     "happy",
-    "empty"
+    "empty",
+    "error"
   ],
-  "shape": "design/specs/domain/interfaces.md § What the apps ask of the engine",
+  "shape": "design/specs/domain/interfaces.md \u00a7 What the apps ask of the engine",
   "notes": [
     "keyed by tally id, like tally is; an entry only ever answers a request on its own tally",
     "amount is signed from the reading party's side: positive moved value toward them",
-    "balanceAfter states its perspective — story 24 step 4"
+    "balanceAfter states its perspective \u2014 story 24 step 4",
+    "`error` is the happy history with one routed entry that has not committed \u2014 story 24 path A. It is the only fixture that makes `unsettled` true, and the balance it carries is the prospective one, not a settled figure"
   ]
 }

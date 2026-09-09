@@ -45,7 +45,7 @@ const goodFor = [
  * note exists so a party can tell their outstanding invitations apart; it is a
  * memo, never a claim.
  */
-export function CreateInvitation({ navigation }: Props): React.JSX.Element {
+export function CreateInvitation(_props: Props): React.JSX.Element {
 	const styles = useStyles(make)
 	const load = useCallback(async (): Promise<Result<Page>> => {
 		const [agreements, invitations] = await Promise.all([listAgreements(), listInvitations()])

@@ -44,6 +44,9 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 	const [failure, setFailure] = useState<DataError | undefined>()
 
 	// One id per attempt at one act: retrying must not record it twice (path D).
+	// `tallyId` is a key here rather than a dependency — arriving at a different
+	// tally must mint a fresh id, which is the whole point of the array.
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const actId = useMemo(() => Math.random().toString(36).slice(2), [tallyId])
 
 	if (state === 'loading') {

@@ -1,0 +1,12 @@
+{
+  "namespace": "settings",
+  "variants": ["happy"],
+  "shape": "apps/mobile/src/data/settings.ts",
+  "notes": [
+    "Preferences only, per story 42. What a party lets a partner owe, and how value may move, are agreements and signed permissions — they live with the tally and with trading settings, never here (path C)",
+    "`locale`, `displayUnit` and `unitStyle` follow the party; `appearance` belongs to the device in hand (steps 6-7)",
+    "`availableLocales` is what the app actually has. Path A: a party is told what is available rather than left with a half-translated app, so this lists only complete bundles — one, today",
+    "`priced` says whether the party has given the unit a rate (story 41). Choosing an unpriced unit as the display unit is path B: reachable by tapping, so it needs no variant of its own",
+    "No `empty` or `error` fixture: the story's `empty` is these same defaults unchanged, and its `error` states are both reached by interaction rather than by a different world"
+  ]
+}

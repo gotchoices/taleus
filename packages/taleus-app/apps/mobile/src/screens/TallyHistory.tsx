@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { FlatList, Text, View } from 'react-native'
+import { FlatList, Pressable, Text, View } from 'react-native'
 
 import { Amount, Chip, Empty, Failed, Loading, amountText, directionOf } from '../components'
 import { listEntries, type Entry } from '../data/entries'
@@ -30,7 +30,7 @@ interface HistoryPage {
  * thing this app does not do. Outstanding requests sit *alongside* the entries,
  * never in them, and each says which way it runs.
  */
-export function TallyHistory({ route }: Props): React.JSX.Element {
+export function TallyHistory({ route, navigation }: Props): React.JSX.Element {
 	const styles = useStyles(make)
 	const { tallyId } = route.params
 
@@ -77,7 +77,13 @@ export function TallyHistory({ route }: Props): React.JSX.Element {
 			ListHeaderComponent={
 				requests.length > 0 ? <Asked requests={requests} unit={tally.unit} /> : undefined
 			}
-			renderItem={({ item }) => <EntryRow entry={item} unit={tally.unit} />}
+			renderItem={({ item }) => (
+				<EntryRow
+					entry={item}
+					unit={tally.unit}
+					onOpen={() => navigation.navigate('EntryDetail', { tallyId, entryId: item.id })}
+				/>
+			)}
 		/>
 	)
 }
@@ -116,13 +122,33 @@ function Asked({ requests, unit }: { requests: PaymentRequest[]; unit: Unit }): 
 	)
 }
 
-function EntryRow({ entry, unit }: { entry: Entry; unit: Unit }): React.JSX.Element {
+function EntryRow({
+	entry,
+	unit,
+	onOpen,
+}: {
+	entry: Entry
+	unit: Unit
+	onOpen: () => void
+}): React.JSX.Element {
 	const styles = useStyles(make)
 	const direction = directionOf(entry.amount)
 	const after = entry.balanceAfter
 
+	// The row keeps its own layout rather than becoming an `OpenableRow`: what a
+	// reader scans here is the figure and the balance after it, and a chevron
+	// column would push both.
 	return (
-		<View style={styles.entry}>
+		<Pressable
+			accessibilityRole="button"
+			accessibilityLabel={t('screens.tally-history.open-entry', {
+				memo: entry.memo ?? t('screens.tally-history.entry-generic'),
+				date: formatInstant(entry.date),
+			})}
+			android_ripple={{ borderless: false }}
+			onPress={onOpen}
+			style={({ pressed }) => [styles.entry, pressed ? styles.pressed : null]}
+		>
 			<View style={styles.entryTop}>
 				<Text style={styles.body}>{entry.memo ?? t('screens.tally-history.entry-generic')}</Text>
 				<Amount value={entry.amount} unit={unit} perspective={direction} />
@@ -160,7 +186,7 @@ function EntryRow({ entry, unit }: { entry: Entry; unit: Unit }): React.JSX.Elem
 					{entry.unsettled ? <Chip label={t('screens.tally-history.unsettled')} urgent /> : null}
 				</View>
 			) : null}
-		</View>
+		</Pressable>
 	)
 }
 
@@ -186,6 +212,7 @@ const make = (tokens: Tokens) => ({
 	entryMeta: { flexDirection: 'row' as const, gap: spacing[2], flexWrap: 'wrap' as const, alignItems: 'center' as const },
 	balanceAfter: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 3 },
 	entryChips: { flexDirection: 'row' as const, gap: spacing[1], marginTop: spacing[0] },
+	pressed: { opacity: 0.6 },
 	body: { ...typography.body, color: tokens.textPrimary, flexShrink: 1 },
 	caption: { ...typography.caption, color: tokens.textSecondary },
 	meta: { ...typography.small, color: tokens.textSecondary },

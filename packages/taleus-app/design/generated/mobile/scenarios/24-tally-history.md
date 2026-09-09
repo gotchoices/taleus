@@ -30,7 +30,32 @@ that bill".
 
 ![An answered request](../images/tally-history-answered.png)
 
-## Step 4: A tally with no history
+## Step 4: One entry, opened
+
+Any row opens. The screen exists for path C — the entry from November nobody remembers — so it
+answers the questions a reader would ask in the order they would ask them, and ends by saying that is
+everything the record holds. Nothing in the history is anonymous.
+
+The party who gave the value signed the entry, so the screen states the rule alongside the name
+rather than only the name.
+
+![One entry](../images/entry-detail.png)
+
+## Step 5: An entry neither of them typed
+
+Value that moved because a payment found its way through this tally. "You gave Mara this" would be
+false for it, so it is said differently.
+
+[Routed through](taleus://screen/EntryDetail/tally%3Asam-bike/entry%3A0005?variant=happy)
+
+## Step 6: Movement that has not finished
+
+Path A. Marked as not committed, with what it would come to — not misleading the reader into thinking
+it is done, nor into thinking the tally is broken because a figure is moving.
+
+![Not finished](../images/entry-detail-unsettled.png)
+
+## Step 7: A tally with no history
 
 Normal, not an error.
 
@@ -38,6 +63,5 @@ Normal, not an error.
 
 ## Not shown
 
-Narrowing by period, size, amount or purpose (path B); the running balance as a curve; an unfinished
-routed payment with its prospective effect (path A) — no fixture has ever carried one; export for an
-accountant (path E). `EntryDetail` is unsliced, so an entry cannot yet be opened.
+Narrowing by period, size, amount or purpose (path B); the running balance as a curve; export for an
+accountant (path E).

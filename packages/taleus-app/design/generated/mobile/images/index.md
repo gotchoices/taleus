@@ -195,6 +195,85 @@ screenshots:
     locale: en
     capture: false
     note: locale override, for checking a translation
+  - route: Settings
+    variant: happy
+    file: settings-happy.png
+    deps:
+      - apps/mobile/src/screens/Settings.tsx
+      - apps/mobile/src/components/Options.tsx
+      - mock/data/settings.happy.json
+  - route: Profile
+    variant: happy
+    file: profile-happy.png
+    deps:
+      - apps/mobile/src/screens/Profile.tsx
+      - apps/mobile/src/components/Options.tsx
+      - mock/data/profile.happy.json
+  - route: Profile
+    variant: empty
+    file: profile-empty.png
+    deps:
+      - apps/mobile/src/screens/Profile.tsx
+      - apps/mobile/src/components/Options.tsx
+      - mock/data/profile.empty.json
+  - route: DisclosureView/tally%3Asupplier-parts
+    variant: happy
+    file: disclosure-supplier.png
+    deps:
+      - apps/mobile/src/screens/DisclosureView.tsx
+      - apps/mobile/src/components/Options.tsx
+      - mock/data/profile.happy.json
+  - route: DisclosureView/tally%3Apriya-new
+    variant: happy
+    file: disclosure-missing.png
+    deps:
+      - apps/mobile/src/screens/DisclosureView.tsx
+      - apps/mobile/src/components/Options.tsx
+      - mock/data/profile.happy.json
+  - route: DisclosureView/tally%3Adave-hours
+    variant: happy
+    capture: false
+    note: a request this party made, answered with a refusal — the same card, other way round
+  - route: DisclosureView/tally%3Arae-offer
+    variant: happy
+    capture: false
+    note: disclosure chosen at formation, on a tally not yet countersigned
+  - route: TallyTerms/tally%3Asam-bike
+    variant: happy
+    file: tally-terms.png
+    deps:
+      - apps/mobile/src/screens/TallyTerms.tsx
+      - mock/data/terms.happy.json
+  - route: TallyTerms/tally%3Asam-bike
+    variant: error
+    file: tally-terms-no-contract.png
+    deps:
+      - apps/mobile/src/screens/TallyTerms.tsx
+      - mock/data/terms.error.json
+  - route: TallyTerms/tally%3Amara-shop
+    variant: happy
+    capture: false
+    note: a proposal nobody has answered — story 07 path A
+  - route: TallyTerms/tally%3Apriya-new
+    variant: happy
+    capture: false
+    note: a tally neither party has amended; the opening terms are the whole history
+  - route: EntryDetail/tally%3Amara-shop/entry%3A0101
+    variant: happy
+    file: entry-detail.png
+    deps:
+      - apps/mobile/src/screens/EntryDetail.tsx
+      - mock/data/entries.happy.json
+  - route: EntryDetail/tally%3Asam-bike/entry%3A0007
+    variant: error
+    file: entry-detail-unsettled.png
+    deps:
+      - apps/mobile/src/screens/EntryDetail.tsx
+      - mock/data/entries.error.json
+  - route: EntryDetail/tally%3Asam-bike/entry%3A0005
+    variant: happy
+    capture: false
+    note: an entry neither party typed — value routed through this tally
 ---
 
 # Screenshots
@@ -229,6 +308,15 @@ deep link — `taleus://screen/<Route>[/<id>][?variant=&locale=]`.
 | Tally history | answered | an entry recognisably tied to the request it answered | ![](tally-history-answered.png) |
 | Attention | happy | what waits, how long, and reachable | ![](attention-happy.png) |
 | Position | happy | per unit, then a marked estimate | ![](position-happy.png) |
+| Settings | happy | grouped by what follows you and what does not | ![](settings-happy.png) |
+| About me | happy | what I hold, and what each partner has | ![](profile-happy.png) |
+| About me | empty | a name, told to one person | ![](profile-empty.png) |
+| Disclosure | supplier | both directions, and a standing request | ![](disclosure-supplier.png) |
+| Disclosure | missing | what is not here, without saying which kind | ![](disclosure-missing.png) |
+| Terms | happy | in force, coming, proposed, and the contract | ![](tally-terms.png) |
+| Terms | error | the contract unreachable; terms still readable | ![](tally-terms-no-contract.png) |
+| Entry | happy | one entry, who signed it, what it answered | ![](entry-detail.png) |
+| Entry | unsettled | movement that has not committed | ![](entry-detail-unsettled.png) |
 
 Notes:
 
