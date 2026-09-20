@@ -39,6 +39,10 @@ what Quereus is, or that Optimystic exists. Names mean the same thing everywhere
 same shapes. A thing that can fail returns why rather than throwing an exception the caller must
 catalogue.
 
+**Drafted, not implemented**: `src/api/types.ts` is the surface and `API.md` is the argument for
+it. `src/index.ts` exports those types and nothing from `src/store/` or `src/tally/` — the row
+builders are below the seam and stay there.
+
 ### 2. Asynchronous where anything can happen
 
 Every operation that touches a store, a peer or a signature the caller did not already have is
@@ -103,9 +107,10 @@ capability.
 The point of the seam is version independence: when Sereus changes its plugin, its formation
 contract or its transactor, the change lands in one adapter here rather than in every app.
 
-**Status: the seam does not exist yet.** `openStrandFrom` opens a bare in-memory Quereus database.
-Nothing binds a strand, and there is no interface a Sereus-backed store could implement. See § Where
-Sereus plugs in.
+**Status: the interface exists; the adapter does not.** `TallyStore` / `StoreProvider` in
+`src/api/types.ts` are what a Sereus-backed store must implement, written that way deliberately —
+the API draft is what determined their shape. Today nothing implements them: `openStrandFrom` opens
+a bare in-memory Quereus database and binds no strand. See § Where Sereus plugs in.
 
 ### 7. Tests drive the shape
 
@@ -127,7 +132,8 @@ while claiming to prove an authorization rule.
 | `src/transport/` | ChipNet protocol and comms | no |
 | `src/store/` | the Quereus strand: host scalars, statement loading, row writes | no |
 | `src/store/schema-node.ts` | reading `.qsql` off a filesystem | **yes — only here** |
-| `src/tally/` | formation, keys, negotiation, chits | no |
+| `src/tally/` | formation, keys, negotiation, chits — **schema-facing row builders** | no |
+| `src/api/` | the declared consumer surface (`API.md`) — names no table, column or constraint | no |
 | `schema/*.qsql` | the sApp schema — the deployable artifact, and the source of truth | — |
 
 ## Where Sereus plugs in

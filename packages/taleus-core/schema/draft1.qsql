@@ -524,8 +524,8 @@ create table Ledger (
     Reference text, -- JSON object
     Memo text,
     InvoiceId text null,   -- set when this chit answers an invoice (see InvoiceLink)
-    SignerKey text,        -- authorized PartyKey of the issuing party (Kind='direct' only; null for a finalize)
-    Signature text,        -- issuer chit signature (Kind='direct' only; null for a finalize)
+    SignerKey text null,   -- authorized PartyKey of the issuing party (Kind='direct' only; null for a finalize)
+    Signature text null,   -- issuer chit signature (Kind='direct' only; null for a finalize)
     Balance integer,
     -- Lift chits (feat-schema-lift-chits). A direct chit is issuer-signed; a lift chit is a FINALIZE of a
     -- PendingLift pledge, authorized by the referee's commit signature + the pre-signed pledge (no fresh

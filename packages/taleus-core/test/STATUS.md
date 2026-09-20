@@ -51,10 +51,15 @@ One question left, and it shapes the API:
 Parked upstream: `feat-multi-use-tally-invitation` — Sereus offers closed **XOR** multi-use, and a
 vendor's printed QR needs both.
 
-### Step 3 — design the API surface
+### Step 3 — design the API surface *(drafted)*
+
+`packages/taleus-core/API.md` is the argument; `src/api/types.ts` is the surface, compiling and
+exported from `src/index.ts`. Nothing behind it is implemented. It was drafted ahead of step 2 on
+purpose: the store seam (`TallyStore` / `StoreProvider`) is the interface the Sereus adapter has to
+satisfy, and designing the API is what determines its shape.
 
 Criterion 1 of `SPEC.md`. Not by extrapolating from the row-builders in `src/tally/` — that is how
-table names leak through the seam. Two requirements that are already known:
+table names leak through the seam. Two requirements that were already known, both honoured:
 
 - **Async wherever anything can happen** (`SPEC.md` § 2). Sync only for pure computation over values
   in hand.
@@ -231,6 +236,22 @@ Things the tests turned up that are design questions rather than test failures.
   open, `WithinReservedCredit` on the *Ledger*) answered before the constraint under test. The
   fixture's default `samGrants: 0` is the cause: Jan cannot issue at all. Pass `samGrants` whenever
   a test needs the stock side to issue and the gate under test is not the credit gate.
+
+- **`Ledger.SignerKey` and `Signature` were NOT NULL, so a lift finalize could never be inserted.**
+  Both columns are documented "null for a finalize", and `KindColumnsConsistent` *requires* them
+  null when `Kind = 'lift'` — but neither carried the `null` marker the schema uses elsewhere
+  (`InvoiceId text null`, `LiftId text null`), so the two rules contradicted each other and the
+  whole lift settlement path was uninsertable. Same class as the `TallyContract` defect: a table
+  nothing had ever executed. **Fixed** (two `null` markers). Found while probing the projected-
+  balance question, not by a test — § 10 keeps lifts stubbed, so nothing in this suite finalizes
+  one. Worth a test when `feat-lift-referee-commit` re-grounds that path.
+- **Opposite-direction lift pledges net, and the netting can breach a credit limit.** Sequentially,
+  with one writer: pledge 10000 out, pledge 25000 in, let the incoming one finalize (finalizes are
+  exempt from the credit gates by design) and the outgoing one void, and the settled balance lands
+  past the limit the counterparty granted. `ReservedBalance` is one signed number and both reserved
+  gates read it; a credit limit needs the one-sided worst case per direction instead. Filed as
+  `feat-schema-directional-reserve`. Not the deferred-CHECK isolation question — this fails in
+  order, with nothing racing.
 
 ## 1. Substrate
 
