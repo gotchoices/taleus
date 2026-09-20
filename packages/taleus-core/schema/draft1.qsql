@@ -322,16 +322,16 @@ create table TallyContract (
 
     primary key (Number),
     -- Each named terms revision must exist for its grantor.
-    constraint StockTermsExist check on insert, update (New.StockCreditTermsRevision in (select Revision from CreditTerms CT where CT.Sid = StockSid)),
-    constraint FoilTermsExist  check on insert, update (New.FoilCreditTermsRevision  in (select Revision from CreditTerms CT where CT.Sid = FoilSid)),
+    constraint StockTermsExist check on insert, update (New.StockCreditTermsRevision in (select Revision from CreditTerms CT where CT.Sid = (select StockSid from TallyCore))),
+    constraint FoilTermsExist  check on insert, update (New.FoilCreditTermsRevision  in (select Revision from CreditTerms CT where CT.Sid = (select FoilSid from TallyCore))),
     -- Each side's SignerKey resolves against ITS OWN party's authorized set, independently.
-    constraint StockSignerAuthorized check on insert, update (New.StockSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = StockSid)),
+    constraint StockSignerAuthorized check on insert, update (New.StockSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = (select StockSid from TallyCore))),
     constraint StockSignatureValid check on insert, update (SignatureValid(
         Digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         StockSignature,
         New.StockSignerKey
     )),
-    constraint FoilSignerAuthorized check on insert, update (New.FoilSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = FoilSid)),
+    constraint FoilSignerAuthorized check on insert, update (New.FoilSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = (select FoilSid from TallyCore))),
     constraint FoilSignatureValid check on insert, update (SignatureValid(
         Digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         FoilSignature,

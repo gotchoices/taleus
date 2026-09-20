@@ -1,4 +1,4 @@
-import { openStrand, rows, statementsOf, schemaPath } from './strand.js'
+import { functionsCalledBy, openStrand, rows, statementsOf, schemaPath, stripComments } from './strand.js'
 import { readFileSync } from 'node:fs'
 
 /**
@@ -25,6 +25,52 @@ describe('the schema loads into Quereus', () => {
 	})
 })
 
+describe('every scalar the schema calls is registered', () => {
+	// A function used only inside a column CHECK is planned lazily, so a missing one is
+	// invisible until the first insert into that table -- `ValidDenomination` was missing
+	// and the load test above passed regardless. Read the schema, not memory.
+	const HOST_SCALARS = [
+		'DayNumber',
+		'Digest',
+		'Greatest',
+		'Least',
+		'SignatureValid',
+		'Today',
+		'ValidDate',
+		'ValidDenomination',
+	]
+	it.each(['draft1', 'portfolio'] as const)('%s.qsql calls nothing the host does not provide', name => {
+		for (const fn of functionsCalledBy(readFileSync(schemaPath(name), 'utf8'))) {
+			expect(HOST_SCALARS).toContain(fn)
+		}
+	})
+
+	it('the tally schema really does call them — the scan is not vacuous', () => {
+		// Without this, a scanner that matched nothing would pass the check above forever.
+		// (`portfolio.qsql` calls none, which is why the check above cannot assert a count.)
+		const called = functionsCalledBy(readFileSync(schemaPath('draft1'), 'utf8'))
+		expect(called).toEqual(expect.arrayContaining(['Digest', 'SignatureValid', 'DayNumber']))
+	})
+
+	it('and every one of them is actually registered', async () => {
+		const db = await openStrand('draft1')
+		// Arity differs, so call each with what it takes; the point is that it resolves.
+		const calls = [
+			"DayNumber('2026-03-02')",
+			"Digest('a','b')",
+			'Greatest(1, 2)',
+			'Least(1, 2)',
+			"SignatureValid('d','s','k')",
+			'Today()',
+			"ValidDate('2026-03-02')",
+			"ValidDenomination('CHIP')",
+		]
+		for (const call of calls) {
+			await expect(rows(db, `select ${call} as v`)).resolves.toHaveLength(1)
+		}
+	})
+})
+
 /**
  * Determinism is not a style preference here. Every replica of a strand re-validates every
  * write; a gate that read a clock would have replicas disagree about the same row. Quereus
@@ -32,11 +78,7 @@ describe('the schema loads into Quereus', () => {
  */
 describe('constraints are deterministic', () => {
 	it('no constraint or default reads a clock or a random source', () => {
-		const sql = readFileSync(schemaPath('draft1'), 'utf8')
-		const code = sql
-			.split('\n')
-			.filter(line => !line.trim().startsWith('--'))
-			.join('\n')
+		const code = stripComments(readFileSync(schemaPath('draft1'), 'utf8'))
 		expect(code).not.toMatch(/\bjulianday\s*\(/)
 		expect(code).not.toMatch(/\bRandomUUID\s*\(/)
 		expect(code).not.toMatch(/\bnow\s*\(\s*\)/)

@@ -68,6 +68,25 @@ Things the tests turned up that are design questions rather than test failures.
   signature is checked against keys registered *on that strand*; what it costs is the Sid's
   portability, which is the entire point of a content address. Fixing it means pinning the Sid's
   encoding system-wide, so it is Nate's call rather than a test's.
+- **`TallyContract` had never been insertable.** Four of its constraints referenced a bare
+  `StockSid` / `FoilSid`, which exist only on `TallyCore` — `Column not found: StockSid` on the first
+  insert. So the row that turns an offer into a tally could not be written at all. **Fixed**: spelled
+  `(select StockSid from TallyCore)`, which is how every other table in the schema does the same
+  lookup. Unambiguous repair of broken SQL, not a design change.
+- **There is no counter-offer.** `TallyContractProposal` is `primary key (/* 1 row */)` with
+  constraints `on insert, update` — one row, replaced in place. `docs/architecture.md` describes
+  offers with identity, ordering and expiry, several outstanding at once, and the later-drafted one
+  governing when two end up signed. None of that exists: a counter destroys the offer it answers,
+  nothing expires, and no history survives. This is `feat-offer-lifecycle`, and it is the MyCHIPs
+  signing dance the reboot left implicit. **Not fixed** — it is a design decision.
+- **A host scalar used only inside a column CHECK is invisible until the first insert.**
+  `ValidDenomination` was never registered and the schema-loads test passed regardless, because
+  Quereus plans column CHECKs lazily. A test now reads the schema for every function it calls and
+  asserts the host provides it.
+- **Four columns documented "optional" are declared NOT NULL**: `CreditTerms.Args`,
+  `Ledger.Reference`, `Ledger.Memo`, and `Invoice`'s pair. The schema's convention is an explicit
+  `null` (six columns have it); these do not, so they cannot be omitted. The core passes empty text
+  and the signature covers that — worth settling before anything signs in anger.
 - **`PartyKeyRevocation.NotLastKey` never runs.** Every in-process route to an empty authorized set
   is closed earlier by `RevokerAuthorized`: the live `AuthorizedKey` view already excludes the
   in-flight revocation, so a key cannot revoke itself, and in a batch the first revocation excludes
@@ -132,27 +151,36 @@ Things the tests turned up that are design questions rather than test failures.
 
 ## 4. Negotiation
 
-- [ ] A proposal is signed by its proposer and carries its own identity and ordering
-- [ ] Either party may counter; each proposal is a new row, not a mutation
-- [ ] Countersigning any unexpired outstanding proposal opens the tally
-- [ ] Two proposals fully signed at once: the later-drafted one governs, and **both parties compute
-      the same winner without a clock**
-- [ ] An expired proposal cannot be countersigned
+- [x] A proposal is signed by the side it claims to come from; the other side's key is refused
+- [x] An offer carries **both** parties' terms revisions, so it is a complete proposition
+- [x] Countersigning makes a tally: one `TallyContract` row carrying both signatures over one digest
+- [x] One signature is not a tally — the same party signing both halves is refused
+- [x] A contract cannot lock terms revisions that were never published
+- [x] A key revoked before countersigning cannot complete the contract — authority is checked when
+      the row is written, not when the key was issued
+- [x] The denomination accepts `CHIP`, `iso4217:AAA` and `cid:<address>`, shape only, and refuses
+      `iso4217:usd`, `iso4217:US`, `iso4217:USDX`, `cid:` and bare words
+- [x] **FINDING** — there is no counter-offer, no offer history and no expiry; see § 0
+- [ ] Two proposals fully signed at once: the later-drafted one governs *(unreachable — one proposal
+      row exists; `feat-offer-lifecycle`)*
+- [ ] An expired proposal cannot be countersigned *(nothing expires)*
 - [ ] A refusal is visible to the offeror *(open: `feat-offer-lifecycle`)*
 - [ ] Derived state reads `Forming` before any contract, `Open` after *(blocked on
-      `feat-schema-tally-state`: the reboot materializes only Closing/Closed, and this is the first
-      thing the MyCHIPs tests will ask for)*
+      `feat-schema-tally-state`)*
 - [ ] Renegotiation: a later countersigned proposal becomes a new `TallyContract` revision
 
 ## 5. Credit terms
 
-- [ ] A grantor's terms are unilateral — grantor-signed, no countersignature
-- [ ] Revision 1 takes effect on its own date
-- [ ] A permissive change (limit up, notice up) takes effect immediately
-- [ ] A restrictive change may not take effect sooner than the *prior* notice period
+- [x] A grantor's terms are unilateral — grantor-signed, and the counterparty's engine accepts them
+      without having agreed to anything
+- [x] A party cannot publish terms in the other's name (`SignerAuthorized`)
+- [x] A stranger to the tally cannot publish terms at all (`PartyOfTally`)
+- [x] A permissive change (limit up, notice unchanged) takes effect at once
+- [x] A restrictive change must wait out the notice period *already agreed* — one day short is
+      refused
+- [x] Shortening the notice period is itself restrictive, so it waits like any reduction
 - [ ] Absent any `CreditTerms` row the effective limit is zero, so the first nonzero chit fails
-- [ ] A future-dated restrictive revision and a later immediate permissive one coexist correctly:
-      the permissive one has the higher revision and supersedes
+- [ ] A future-dated restrictive revision and a later immediate permissive one coexist correctly
 
 ## 6. Direct chits
 

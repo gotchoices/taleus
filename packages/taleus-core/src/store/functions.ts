@@ -84,6 +84,36 @@ export function digest(...args: unknown[]): string {
 }
 
 /**
+ * Whether a string names a unit of account a tally may be denominated in.
+ *
+ * Prefix dispatch over three namespaces and nothing else -- no parser, no currency table:
+ *
+ * - `CHIP` -- the network reference unit. The one bare token, no prefix.
+ * - `iso4217:AAA` -- a national currency, where `AAA` is exactly three uppercase ASCII
+ *   letters. **Shape only**: it is deliberately not checked against a currency table, so a
+ *   private or future code passes while `iso4217:US`, `iso4217:usd` and `iso4217:USDX` do not.
+ * - `cid:<address>` -- anything else, named by the content address of a descriptor document.
+ *   The address must be non-empty. Content addressing makes it globally unique by
+ *   construction; what the unit *means* is settled by both parties at negotiation, not here.
+ *   Nothing in this function fetches anything.
+ */
+export function validDenomination(id: unknown): number {
+	if (typeof id !== 'string') {
+		return 0
+	}
+	if (id === 'CHIP') {
+		return 1
+	}
+	if (id.startsWith('iso4217:')) {
+		return /^[A-Z]{3}$/.test(id.slice('iso4217:'.length)) ? 1 : 0
+	}
+	if (id.startsWith('cid:')) {
+		return id.length > 'cid:'.length ? 1 : 0
+	}
+	return 0
+}
+
+/**
  * Two-argument min and max. SQL has no scalar `min`/`max` -- SQLite's are an extension, and
  * Quereus treats both as aggregates -- so the schema's economics (`LiftLading`) would
  * otherwise be spelled as nested `case when` and become unreadable. The names are
