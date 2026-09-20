@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 import { Database } from '@quereus/quereus'
 
-import { dayNumber, digest, greatest, least, signatureValid, validDate } from './functions.js'
+import { dayNumber, digest, greatest, least, signatureValid, today, validDate } from './functions.js'
 
 /**
  * A Taleus strand, open in Quereus.
@@ -48,6 +48,8 @@ export function statementsOf(sql: string): string[] {
 export function registerFunctions(db: Database): void {
 	db.createScalarFunction('DayNumber', { numArgs: 1, deterministic: true }, date => dayNumber(date))
 	db.createScalarFunction('ValidDate', { numArgs: 1, deterministic: true }, date => validDate(date))
+	// The one volatile scalar: plain views only, never a constraint. See functions.ts.
+	db.createScalarFunction('Today', { numArgs: 0, deterministic: false }, () => today())
 	db.createScalarFunction('SignatureValid', { numArgs: 3, deterministic: true }, (d, s, k) =>
 		signatureValid(d, s, k),
 	)
@@ -87,4 +89,18 @@ export async function row<T = Record<string, unknown>>(
 	params?: unknown[],
 ): Promise<T | undefined> {
 	return (await rows<T>(db, sql, params))[0]
+}
+
+/** A row to insert, named by its table. Values are bound, never interpolated. */
+export interface RowWrite {
+	table: string
+	row: Record<string, unknown>
+}
+
+export function insertStatement({ table, row }: RowWrite): { sql: string; params: unknown[] } {
+	const columns = Object.keys(row)
+	return {
+		sql: `insert into ${table} (${columns.join(', ')}) values (${columns.map(() => '?').join(', ')})`,
+		params: columns.map(c => row[c]),
+	}
 }

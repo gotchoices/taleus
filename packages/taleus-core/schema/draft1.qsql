@@ -403,7 +403,7 @@ create table TradingVariable (
 -- real-world notice it owes before a restrictive change bites. This is inherent to a
 -- unilateral, grantor-signed timestamp -- both parties replicate this strand and observe the
 -- signed Date, so a backdate is disputable, not silently exploitable. Not solved
--- cryptographically here; if a bound is later wanted, gate Date against date('now') -- but that
+-- cryptographically here; if a bound is later wanted, gate Date against Today() -- but that
 -- makes the insert volatile (non-deterministic), so it is deliberately left off.
 create table CreditTerms (
     Sid text,               -- grantor (party extending credit)
@@ -1007,14 +1007,14 @@ create view CurrentTradingVariable as
 -- Advisory only -- fuels LiftLading capacity advertisement; the hard safety gate is the
 -- deterministic, chit-dated Ledger.WithinCreditLimits below. Effective limit = CreditLimit of
 -- the highest-Revision CreditTerms row whose EffectiveDate <= now; absent any row -> 0.
--- NOTE: DayNumber('now')/date('now') are VOLATILE -- fine in a plain view; NOT allowed in a
+-- NOTE: Today()/date('now') are VOLATILE -- fine in a plain view; NOT allowed in a
 -- MATERIALIZED view (Quereus hard-rejects volatile there). If a future runner rejects
 -- volatile-in-view, fall back to computing the effective revision in the lift agent
 -- (application) and keep the deterministic chit-dated Ledger gate as the safety boundary.
 create view CurrentCreditLimit as
     select P.Sid,
         coalesce((select CT.CreditLimit from CreditTerms CT
-                  where CT.Sid = P.Sid and DayNumber(CT.EffectiveDate) <= DayNumber('now')
+                  where CT.Sid = P.Sid and DayNumber(CT.EffectiveDate) <= Today()
                   order by CT.Revision desc limit 1), 0) as CreditLimit
     from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
 
@@ -1121,7 +1121,7 @@ create view LiftLading as
 -- Invoice state, derived from the tables (never stored). Precedence paid > declined > expired > open.
 -- 'paid' is checked first, so the derived state stays deterministic even if a decline and a chit both
 -- somehow commit (self-inflicted -- both are the payer's own actions; see InvoiceLink / InvoiceDecline).
--- 'expired' is time-derived (DayNumber('now') is VOLATILE -- fine in a plain view, NOT allowed in a
+-- 'expired' is time-derived (Today() is VOLATILE -- fine in a plain view, NOT allowed in a
 -- MATERIALIZED view; same caveat as CurrentCreditLimit at schema/draft1.qsql:504). It is deliberately
 -- NOT gated at chit insert -- a late payment still succeeds and 'paid' wins by precedence.
 create view InvoiceState as
@@ -1129,7 +1129,7 @@ create view InvoiceState as
         case
             when exists (select 1 from Ledger L where L.InvoiceId = I.Id) then 'paid'
             when exists (select 1 from InvoiceDecline D where D.InvoiceId = I.Id) then 'declined'
-            when I.ExpiryDate is not null and DayNumber(I.ExpiryDate) < DayNumber('now') then 'expired'
+            when I.ExpiryDate is not null and DayNumber(I.ExpiryDate) < Today() then 'expired'
             else 'open'
         end as State
     from Invoice I;

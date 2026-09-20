@@ -33,6 +33,20 @@ export function dayNumber(date: unknown): number | null {
 	return Number.isNaN(ms) ? null : Math.floor(ms / 86_400_000)
 }
 
+/**
+ * Today, as a day number. **Volatile by design** -- it is the one function here that reads a
+ * clock, and it is therefore usable only where Quereus permits volatility: a plain view.
+ * A CHECK constraint or a materialized view must never call it, because every replica would
+ * answer differently and the strand would diverge.
+ *
+ * `DayNumber` is deliberately separate and pure, so the split is visible in the schema: a
+ * gate calls `DayNumber(SomeColumn)`, a report calls `Today()`. There is no spelling that
+ * lets a constraint read the clock by accident.
+ */
+export function today(now: number = Date.now()): number {
+	return Math.floor(now / 86_400_000)
+}
+
 /** Whether a value is a calendar date the schema will accept. */
 export function validDate(date: unknown): number {
 	return dayNumber(date) === null ? 0 : 1
