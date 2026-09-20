@@ -1,13 +1,15 @@
 import {
+	digest,
+	newKey,
+	signText,
+} from '../store/index.js'
+import {
 	DisagreementError,
 	Tally,
-	digest,
 	newInvitation,
-	newKey,
 	newParty,
-	signText,
 	type Party,
-} from '../store/index.js'
+} from '../store/test-harness.js'
 import { createTally, genesisKey, seatFoil, seatStock, tallyCid } from './formation.js'
 
 /**

@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
 import { schemaPath } from './schema-node.js'
 
@@ -33,17 +33,44 @@ function codeOf(path: string): string {
 }
 
 describe('SPEC § 3 — no platform-specific dependency', () => {
+	// Test files are free to import whatever they like -- the rule is about what ships.
+	// `test-harness.ts` is test machinery too, and `tsconfig.build.json` excludes it; the
+	// build check below is what actually proves it stays out.
+	const SHIPPED = (file: string) =>
+		!file.endsWith('schema-node.ts') && !file.endsWith('test-harness.ts')
+
 	it('only schema-node.ts imports node:', () => {
 		const offenders = sourceFiles(SRC)
-			.filter(file => !file.endsWith('schema-node.ts'))
+			.filter(SHIPPED)
 			.filter(file => /from 'node:/.test(codeOf(file)))
 		expect(offenders).toEqual([])
 	})
 
-	it('nothing uses Buffer', () => {
+	it('nothing the package entry point reaches imports node:', () => {
+		// The real guarantee: a bundler following `src/index.ts` must never arrive at
+		// `node:anything`. `schema-node.ts` exists for Node hosts and is deliberately not
+		// exported from any index, so nothing pulls it in by accident.
+		const seen = new Set<string>()
+		const visit = (file: string) => {
+			if (seen.has(file)) return
+			seen.add(file)
+			const code = codeOf(file)
+			expect({ file, imports: /from 'node:/.test(code) }).toEqual({ file, imports: false })
+			for (const match of code.matchAll(/from '(\.[^']+)\.js'/g)) {
+				const resolved = join(dirname(file), `${match[1]}.ts`)
+				if (existsSync(resolved)) visit(resolved)
+			}
+		}
+		visit(join(SRC, 'index.ts'))
+		expect(seen.size).toBeGreaterThan(5)
+	})
+
+	it('nothing shipped uses Buffer', () => {
 		// Absent from the browser and from React Native without a polyfill, and the easiest
 		// way to break portability without noticing. `Uint8Array` and `TextEncoder` instead.
-		const offenders = sourceFiles(SRC).filter(file => /\bBuffer\b/.test(codeOf(file)))
+		const offenders = sourceFiles(SRC)
+			.filter(SHIPPED)
+			.filter(file => /\bBuffer\b/.test(codeOf(file)))
 		expect(offenders).toEqual([])
 	})
 })

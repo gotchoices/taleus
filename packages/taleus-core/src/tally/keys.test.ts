@@ -1,14 +1,16 @@
 import {
-	Tally,
 	digest,
-	newInvitation,
 	newKey,
-	newParty,
 	sidFor,
 	signText,
 	type KeyPairText,
-	type Party,
 } from '../store/index.js'
+import {
+	Tally,
+	newInvitation,
+	newParty,
+	type Party,
+} from '../store/test-harness.js'
 import { seatFoil, seatStock } from './formation.js'
 import { addKey, adoptKey, revokeKey } from './keys.js'
 

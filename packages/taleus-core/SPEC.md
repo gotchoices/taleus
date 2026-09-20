@@ -56,15 +56,19 @@ for it is the easiest way to break this rule without noticing.
 
 Use `Uint8Array`, `TextEncoder`/`TextDecoder`, and the encoders in `src/lift/digest.ts`.
 
-**One exception, named:** `src/store/schema-node.ts` reads schema files off a filesystem. It is the
-only file permitted to import `node:` anything, and it is named for its platform so a reviewer can
-see it. The check is one line:
+**This is about what ships, not about the repository.** Tests and test machinery may import
+whatever is convenient — they run in Node and nowhere else. Two files are therefore exempt, and both
+are excluded from the build by `tsconfig.build.json`:
 
-```sh
-grep -rn "from 'node:" src/ | grep -v schema-node   # must be empty
-```
+- `src/store/schema-node.ts` — reads schema files off a filesystem. A React Native host bundles the
+  `.qsql` text instead; a browser fetches it. Both call `openStrandFrom`. It ships (a Node consumer
+  wants it) but **is exported from no index**, so nothing reaches it by accident.
+- `src/store/test-harness.ts` — the two-replica harness. Test machinery that happens to live in
+  `src/`, following the convention `src/lift/test-harness.ts` already set.
 
-A React Native host bundles the `.qsql` text; a browser fetches it. Both call `openStrandFrom`.
+The guarantee that matters is about the **entry point**: a bundler following `src/index.ts` must
+never arrive at `node:` anything. `src/store/spec.test.ts` walks the import graph from there and
+asserts it.
 
 ### 4. One encoding, one digest, one spelling
 

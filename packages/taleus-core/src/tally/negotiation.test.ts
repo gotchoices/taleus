@@ -1,4 +1,12 @@
-import { Tally, newInvitation, newKey, newParty, type Party } from '../store/index.js'
+import {
+	newKey,
+} from '../store/index.js'
+import {
+	Tally,
+	newInvitation,
+	newParty,
+	type Party,
+} from '../store/test-harness.js'
 import { createTally, seatFoil, seatStock, tallyCid } from './formation.js'
 import { proposeContract, publishCreditTerms, signContract } from './negotiation.js'
 

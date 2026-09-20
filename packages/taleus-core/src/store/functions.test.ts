@@ -1,6 +1,6 @@
 import { generateKeyPair, type KeyPair } from '../crypto/index.js'
 import { publicKeyText } from '../lift/digest.js'
-import { signText } from './tally.js'
+import { signText } from './identity.js'
 import { bytesToHex, digest as canonicalDigest } from '../lift/digest.js'
 import { dayNumber, digest, greatest, least, signatureValid, validDate } from './functions.js'
 
