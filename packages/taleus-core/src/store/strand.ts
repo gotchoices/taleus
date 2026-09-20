@@ -1,7 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-
 import { Database } from '@quereus/quereus'
 
 import {
@@ -24,18 +20,14 @@ import {
  * two parties disagreeing -- so anything about concurrent writers belongs in a test that
  * opens two of these and moves rows between them by hand.
  *
- * The schema is loaded as text and split on statement boundaries because a `.qsql` file
- * is the deployable artifact; parsing it here is what keeps the file the source of truth
- * rather than a copy of one.
+ * The schema arrives as **text**. Nothing here reads a file: this package runs in React
+ * Native and the browser as well as Node, and a core that imports `node:fs` is a core that
+ * runs in one of the three. Where the text comes from -- a bundled string, a fetch, the
+ * filesystem -- is the host's business; `src/store/schema-node.ts` is the Node answer and
+ * is the only file in the package that knows what a path is.
  */
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-
 export type SchemaName = 'draft1' | 'portfolio'
-
-export function schemaPath(name: SchemaName): string {
-	return join(HERE, '..', '..', 'schema', `${name}.qsql`)
-}
 
 /**
  * Strip SQL comments, whole-line and trailing alike.
@@ -85,11 +77,17 @@ export function registerFunctions(db: Database): void {
 	db.createScalarFunction('Digest', { numArgs: -1, deterministic: true }, (...args) => digest(...args))
 }
 
-/** Open an in-memory database with the named schema loaded and its scalars registered. */
-export async function openStrand(name: SchemaName = 'draft1'): Promise<Database> {
+/**
+ * Open an in-memory database with a schema loaded and its scalars registered.
+ *
+ * In memory is the whole story for now. A real deployment binds the strand to Sereus's
+ * Quereus plugin and the Optimystic transactor instead, and that seam does not exist yet
+ * -- see `SPEC.md` § Where Sereus plugs in.
+ */
+export async function openStrandFrom(sql: string): Promise<Database> {
 	const db = new Database()
 	registerFunctions(db)
-	for (const statement of statementsOf(readFileSync(schemaPath(name), 'utf8'))) {
+	for (const statement of statementsOf(sql)) {
 		await db.exec(statement)
 	}
 	return db

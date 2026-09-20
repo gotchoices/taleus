@@ -1,5 +1,5 @@
-import { functionsCalledBy, openStrand, rows, statementsOf, schemaPath, stripComments } from './strand.js'
-import { readFileSync } from 'node:fs'
+import { openStrand, readSchema } from './schema-node.js'
+import { functionsCalledBy, rows, statementsOf, stripComments } from './strand.js'
 
 /**
  * The schema is the thing everything else stands on, and until this suite existed nothing
@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs'
  */
 describe('the schema loads into Quereus', () => {
 	it('every statement in draft1.qsql executes', async () => {
-		const statements = statementsOf(readFileSync(schemaPath('draft1'), 'utf8'))
+		const statements = statementsOf(readSchema('draft1'))
 		expect(statements.length).toBeGreaterThan(20)
 		await expect(openStrand('draft1')).resolves.toBeDefined()
 	})
@@ -40,7 +40,7 @@ describe('every scalar the schema calls is registered', () => {
 		'ValidDenomination',
 	]
 	it.each(['draft1', 'portfolio'] as const)('%s.qsql calls nothing the host does not provide', name => {
-		for (const fn of functionsCalledBy(readFileSync(schemaPath(name), 'utf8'))) {
+		for (const fn of functionsCalledBy(readSchema(name))) {
 			expect(HOST_SCALARS).toContain(fn)
 		}
 	})
@@ -48,7 +48,7 @@ describe('every scalar the schema calls is registered', () => {
 	it('the tally schema really does call them — the scan is not vacuous', () => {
 		// Without this, a scanner that matched nothing would pass the check above forever.
 		// (`portfolio.qsql` calls none, which is why the check above cannot assert a count.)
-		const called = functionsCalledBy(readFileSync(schemaPath('draft1'), 'utf8'))
+		const called = functionsCalledBy(readSchema('draft1'))
 		expect(called).toEqual(expect.arrayContaining(['Digest', 'SignatureValid', 'DayNumber']))
 	})
 
@@ -78,7 +78,7 @@ describe('every scalar the schema calls is registered', () => {
  */
 describe('constraints are deterministic', () => {
 	it('no constraint or default reads a clock or a random source', () => {
-		const code = stripComments(readFileSync(schemaPath('draft1'), 'utf8'))
+		const code = stripComments(readSchema('draft1'))
 		expect(code).not.toMatch(/\bjulianday\s*\(/)
 		expect(code).not.toMatch(/\bRandomUUID\s*\(/)
 		expect(code).not.toMatch(/\bnow\s*\(\s*\)/)

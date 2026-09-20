@@ -1,6 +1,11 @@
-import { generateKeyPair, sign } from '../crypto/index.js'
-import { digest as canonicalDigest } from '../lift/digest.js'
+import { generateKeyPair, type KeyPair } from '../crypto/index.js'
+import { publicKeyText } from '../lift/digest.js'
+import { signText } from './tally.js'
+import { bytesToHex, digest as canonicalDigest } from '../lift/digest.js'
 import { dayNumber, digest, greatest, least, signatureValid, validDate } from './functions.js'
+
+/** A generated pair in the text form the schema stores. */
+const asText = (pair: KeyPair) => ({ publicKey: publicKeyText(pair.publicKey), secretKey: pair.secretKey })
 
 /**
  * The host scalars are the seam between the schema and the host, and a schema constraint
@@ -53,9 +58,7 @@ describe('Digest', () => {
 		// A divergence here means every signature silently fails to verify, and the failure
 		// looks like a permissions problem rather than an encoding one. So this asserts the
 		// scalar delegates rather than reimplements.
-		expect(digest('a', 'b', 'c')).toBe(
-			Buffer.from(canonicalDigest(['a', 'b', 'c'])).toString('base64url'),
-		)
+		expect(digest('a', 'b', 'c')).toBe(bytesToHex(canonicalDigest(['a', 'b', 'c'])))
 	})
 
 	it('distinguishes text from the integer that prints the same', () => {
@@ -72,30 +75,28 @@ describe('SignatureValid', () => {
 	it('accepts a real signature over the digest it covers', () => {
 		const keys = generateKeyPair()
 		const d = digest('tally:1', 'F', 18000, '2026-03-02')
-		const signature = Buffer.from(sign(keys.secretKey, Buffer.from(d, 'utf8'))).toString('base64url')
-		const publicKey = Buffer.from(keys.publicKey).toString('base64url')
-		expect(signatureValid(d, signature, publicKey)).toBe(1)
+		expect(signatureValid(d, signText(asText(keys), d), publicKeyText(keys.publicKey))).toBe(1)
 	})
 
 	it('refuses a signature over different content', () => {
 		const keys = generateKeyPair()
 		const signed = digest('tally:1', 'F', 18000, '2026-03-02')
 		const other = digest('tally:1', 'F', 99999, '2026-03-02')
-		const signature = Buffer.from(sign(keys.secretKey, Buffer.from(signed, 'utf8'))).toString('base64url')
-		expect(signatureValid(other, signature, Buffer.from(keys.publicKey).toString('base64url'))).toBe(0)
+		expect(
+			signatureValid(other, signText(asText(keys), signed), publicKeyText(keys.publicKey)),
+		).toBe(0)
 	})
 
 	it('refuses another party’s key', () => {
 		const mine = generateKeyPair()
 		const theirs = generateKeyPair()
 		const d = digest('tally:1')
-		const signature = Buffer.from(sign(mine.secretKey, Buffer.from(d, 'utf8'))).toString('base64url')
-		expect(signatureValid(d, signature, Buffer.from(theirs.publicKey).toString('base64url'))).toBe(0)
+		expect(signatureValid(d, signText(asText(mine), d), publicKeyText(theirs.publicKey))).toBe(0)
 	})
 
 	it('returns 0 rather than throwing on rubbish', () => {
 		expect(signatureValid(null, 'x', 'y')).toBe(0)
-		expect(signatureValid('d', 'not-base64url!!', 'also-not')).toBe(0)
+		expect(signatureValid('d', 'not-hex!!', 'also-not')).toBe(0)
 	})
 })
 

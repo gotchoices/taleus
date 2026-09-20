@@ -1,5 +1,24 @@
 import { verify } from '../crypto/index.js'
-import { digest as canonicalDigest, type DigestField } from '../lift/digest.js'
+import {
+	bytesToHex,
+	digest as canonicalDigest,
+	hexToBytes,
+	type DigestField,
+} from '../lift/digest.js'
+
+/**
+ * Text encoding, once.
+ *
+ * Keys, signatures and digests reach the schema as **hex** -- `src/lift/digest.ts` already
+ * fixes that (`publicKeyText` is "a public key in the schema's text form (hex of the raw
+ * ed25519 key)"). A second encoding here would mean the same key is two different strings
+ * depending on which path wrote it, which is the same failure as a second digest: rows that
+ * should match silently do not.
+ *
+ * `TextEncoder` rather than `Buffer`: this package runs in React Native and the browser as
+ * well as Node, and `Buffer` exists in neither without a polyfill.
+ */
+const utf8 = new TextEncoder()
 
 /**
  * The host-registered scalars the schema calls.
@@ -80,7 +99,7 @@ export function digest(...args: unknown[]): string {
 		// than pick an encoding here.
 		throw new Error(`Digest received an unsupported value: ${typeof arg}`)
 	})
-	return Buffer.from(canonicalDigest(fields)).toString('base64url')
+	return bytesToHex(canonicalDigest(fields))
 }
 
 /**
@@ -145,14 +164,9 @@ export function signatureValid(
 		return 0
 	}
 	try {
-		return verify(
-			Buffer.from(publicKey, 'base64url'),
-			Buffer.from(digestText, 'utf8'),
-			Buffer.from(signature, 'base64url'),
-		)
-			? 1
-			: 0
+		return verify(hexToBytes(publicKey), utf8.encode(digestText), hexToBytes(signature)) ? 1 : 0
 	} catch {
+		// Malformed hex throws rather than returning false; a bad signature is a 0, not a crash.
 		return 0
 	}
 }
