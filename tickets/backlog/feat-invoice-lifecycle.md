@@ -17,6 +17,10 @@ because a month passed — it **ages**, which is exactly the information a busin
 Requiring payment in full also creates accounting problems that do not exist on paper: a part payment
 has to masquerade as an unrelated transfer, and the bill has to be refused to keep the record honest.
 
+Current behaviour is pinned by `packages/taleus-core/src/tally/invoices.test.ts` (§ 7 of
+`packages/taleus-core/test/STATUS.md`): those tests are a record of the schema as it stands, and the
+ones on exact-match payment and expiry are expected to change when this lands.
+
 ## Outcomes we're after
 
 - A party can pay part of what was asked, saying that is what they are doing, and both sides see what

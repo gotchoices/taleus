@@ -1,8 +1,7 @@
 import { digest, signText } from '../store/index.js'
-import { Tally, newInvitation, newParty } from '../store/test-harness.js'
-import { chitDelta, issueChit, type Chit } from './chits.js'
-import { createTally, seatFoil, seatStock, tallyCid } from './formation.js'
-import { proposeContract, publishCreditTerms, signContract } from './negotiation.js'
+import { chitDelta, issueChit } from './chits.js'
+import { publishCreditTerms } from './negotiation.js'
+import { TODAY, balanceOf, trading } from './test-harness.js'
 
 /**
  * Direct chits: the ledger, the balance chain, and the credit gate.
@@ -13,82 +12,8 @@ import { proposeContract, publishCreditTerms, signContract } from './negotiation
  * always the stock party's perspective; `Units` is always positive and direction comes from
  * `Issuer`.
  *
- * Jan is stock and lets Sam owe him 50000. Sam is foil and lets Jan owe nothing.
+ * The two-party setup lives in `./test-harness.ts` -- Jan is stock and lets Sam owe him 50000.
  */
-
-const TODAY = '2026-03-02'
-const PROTOCOL = 'taleus/1'
-const CONTRACT = 'cid:standard-tally-v1'
-
-async function trading({ janGrants = 50000, samGrants = 0 } = {}) {
-	const jan = newParty('jan')
-	const sam = newParty('sam')
-	const invitation = newInvitation()
-	const tally = await Tally.open([jan, sam])
-	await tally.propose(seatStock({ sid: jan.sid, genesis: jan.keys[0], invitation }))
-	await tally.propose(seatFoil({ sid: sam.sid, genesis: sam.keys[0], invitation }))
-	const identity = { stockSid: jan.sid, foilSid: sam.sid, protocolVersion: PROTOCOL, createdAt: TODAY }
-	await tally.propose(createTally({ ...identity, signer: jan.keys[0] }))
-	const cid = tallyCid(identity)
-
-	for (const [sid, signer, creditLimit] of [
-		[jan.sid, jan.keys[0], janGrants],
-		[sam.sid, sam.keys[0], samGrants],
-	] as const) {
-		await tally.propose([
-			publishCreditTerms({
-				sid,
-				tallyCid: cid,
-				revision: 1,
-				creditLimit,
-				callDays: 21,
-				date: TODAY,
-				effectiveDate: TODAY,
-				signer,
-			}),
-		])
-	}
-	await tally.propose([
-		proposeContract({
-			tallyCid: cid,
-			sequenceNumber: 1,
-			contractCid: CONTRACT,
-			proposer: 'S',
-			stockCreditTermsRevision: 1,
-			foilCreditTermsRevision: 1,
-			signer: jan.keys[0],
-		}),
-	])
-	await tally.propose([
-		signContract({
-			tallyCid: cid,
-			number: 1,
-			contractCid: CONTRACT,
-			stockCreditTermsRevision: 1,
-			foilCreditTermsRevision: 1,
-			stockSigner: jan.keys[0],
-			foilSigner: sam.keys[0],
-		}),
-	])
-
-	/** Build a chit from whichever side is giving. */
-	const chit = (over: Partial<Chit> & Pick<Chit, 'number' | 'issuer' | 'units' | 'balance'>) => {
-		const party = over.issuer === 'F' ? sam : jan
-		return issueChit({
-			tallyCid: cid,
-			contractNumber: 1,
-			id: `chit:${over.number}`,
-			date: TODAY,
-			signer: party.keys[0],
-			issuerSid: party.sid,
-			...over,
-		})
-	}
-	return { jan, sam, tally, cid, chit }
-}
-
-const balanceOf = (tally: Tally, party: ReturnType<typeof newParty>) =>
-	tally.seesOne<{ Balance: number }>(party, 'select Balance from Ledger order by Number desc limit 1')
 
 describe('the balance chain', () => {
 	it('accumulates, and both parties read the same running total', async () => {

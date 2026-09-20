@@ -13,11 +13,13 @@ test doubles, and re-grounding that on the real schema comes after direct chits 
 Where this is going, in order. Written to survive a context compaction: enough detail that the
 next session can pick up without re-deriving the reasoning.
 
-### Step 1 — direct chits, at the schema level *(in progress)*
+### Step 1 — direct chits, at the schema level *(complete)*
 
-Finish § 6 below on the current substrate. The credit gate is the heart of the system and the
-row-level harness is the right tool for it: an API does not yet exist, and building one over an
-unexercised gate would bake in whatever is wrong with it.
+§§ 1–9 below are done: substrate, identity and keys, formation, negotiation, credit terms, direct
+chits, invoices, close, reading. 240 tests over 20 suites. The credit gate is the heart of the
+system and the row-level harness was the right tool for it — an API does not yet exist, and
+building one over an unexercised gate would have baked in whatever was wrong with it. Five schema
+defects and a handful of open questions came out of it; they are all in § 0.
 
 ### Step 2 — the Sereus seam
 
@@ -97,8 +99,13 @@ wants "and the counterparty's engine accepted it too".
 - `src/**/*.test.ts` — co-located with the code, run by `yarn workspace taleus-core test`.
 - `src/store/strand.ts` — opens the real `schema/*.qsql` in Quereus, in memory, with the host
   scalars registered. Everything below that touches persistence goes through it.
+- `src/store/test-harness.ts` — the two-replica model: `Party`, `Tally.propose/refuses/sees/onlyOn`.
+- `src/tally/test-harness.ts` — the *fixture* the ledger suites share: an open tally between Jan
+  (stock, granting 50000) and Sam (foil, granting nothing), with `chit` / `invoice` / `decline` /
+  `close` row builders bound to it. Both files match the `src/**/test-harness.ts` build exclude, so
+  neither ships in `dist/`.
 
-**Negotiation is always two parties.** `src/store/tally.ts` opens one replica per party, and an act
+**Negotiation is always two parties.** `src/store/test-harness.ts` opens one replica per party, and an act
 is *proposed* to both: each engine re-validates it against its own copy of the schema, and the row
 stands only if both accept. That is the real safety model — the counterparty's engine is what stops a
 forgery — and a test on one shared database would be testing a system nobody will run. A partial
@@ -200,6 +207,30 @@ Things the tests turned up that are design questions rather than test failures.
   cannot reach. **The last-key guarantee therefore rests entirely on Optimystic re-evaluating the
   deferred CHECK against the latest committed snapshot**, which `docs/STATUS.md` § Cross-repo lists
   as unconfirmed. A test records this so it is not mistaken for covered.
+- **The invoice tests pin behaviour `feat-invoice-lifecycle` intends to replace.** Today's schema
+  models a request as a small contract: exact-match payment, no withdrawal, and a time-derived
+  expiry. The § 7 tests confirm all three hold *as written* — one chit, exact units, only the payer
+  may decline (`DeclinerIsPayer`), and a requester who invoices the wrong amount has no way to
+  retract it. The ticket argues a request is not a contract and asks for part payment, withdrawal
+  and aging instead of expiry. So these tests are a faithful record of the current schema, not an
+  endorsement of it, and the ones on exactness and expiry are the ones that will change when that
+  ticket lands. Noted here so a later failure reads as intended, not as a regression.
+- **The credit gate can mask `InvoiceLink`.** A refusal test asserting a specific constraint has to
+  make sure the earlier gates pass first: a requester-issued chit answering its own invoice fails
+  `WithinCreditLimits` before `InvoiceLink` is reached whenever the counterparty granted no credit.
+  Not a schema defect — a note about how to write these tests, since the first draft of that one
+  passed for the wrong reason.
+
+- **A zero balance reads as negative zero on the foil side.** `PerspectiveBalance` computes
+  `Balance * -1` for the foil, and `0 * -1` is `-0` in JavaScript; it comes back through Quereus as
+  one. Harmless in arithmetic, in `===`, and in JSON (`-0` serializes as `0`), but `Object.is(b, 0)`
+  is false for it and so is a naive deep-equality comparison — which is how it was found. Not worth
+  a schema change; a display or API layer should normalize (`b + 0`) rather than assume.
+- **Close and invoice tests both hit the credit gate first.** Twice now a refusal test asserting a
+  specific constraint passed for the wrong reason because `WithinCreditLimits` (or, once a pledge is
+  open, `WithinReservedCredit` on the *Ledger*) answered before the constraint under test. The
+  fixture's default `samGrants: 0` is the cause: Jan cannot issue at all. Pass `samGrants` whenever
+  a test needs the stock side to issue and the gate under test is not the credit gate.
 
 ## 1. Substrate
 
@@ -314,32 +345,84 @@ Things the tests turned up that are design questions rather than test failures.
 
 ## 7. Invoices
 
-- [ ] An invoice is signed by the party asking to be paid
-- [ ] It is answered by exactly one chit, from the opposite side, for the exact units
-- [ ] Partial payment is refused; an unlinked chit of a different amount leaves it open
-- [ ] A decline is recorded and visible
-- [ ] State precedence is `paid > declined > expired > open`
-- [ ] A late payment of an expired invoice succeeds and reads as `paid`
-- [ ] An invoice may exceed current capacity; only the answering chit is credit-gated
+`src/tally/invoices.ts` + `invoices.test.ts` (24 tests). Jan (stock) invoices Sam (foil); Sam issues
+the answering chit, which is the one that has to fit inside the credit Jan granted. See the § 0
+finding on `feat-invoice-lifecycle` before changing any of this.
+
+- [x] An invoice is signed by the party asking to be paid — `SignerAuthorized` resolves the key
+      against the *requester's* own set, so Sam cannot write himself a bill in Jan's name
+- [x] Altering the units after signing breaks `SignatureValid`
+- [x] `ExpiryValid` refuses an expiry before the invoice date
+- [x] It is answered by exactly one chit, from the opposite side, for the exact units — a
+      requester-issued chit, a second chit, and a chit naming an unknown invoice all fail
+      `InvoiceLink`
+- [x] Partial payment is refused; an unlinked chit of a different amount settles value and leaves
+      the invoice `open`
+- [x] A decline is recorded and visible to both parties; only the payer may file it
+      (`DeclinerIsPayer`), at most one per invoice (the primary key, not a named constraint), never
+      after payment (`NotPaid`), and a declined invoice can no longer be paid (`InvoiceLink`)
+- [x] `InvoiceExists` and `SignatureValid` gate the decline the same way
+- [x] State precedence is `paid > declined > expired > open` — covered at `paid > expired` and
+      `declined > expired`; `paid > declined` is unreachable in-process (each excludes the other at
+      insert) and exists only for the concurrent case, same shape as `NotLastKey` above
+- [x] A late payment of an expired invoice succeeds and reads as `paid`
+- [x] An invoice may exceed current capacity; only the answering chit is credit-gated
+      (`WithinCreditLimits`)
+- [x] `OpenInvoice` lists the open ones and nothing else
+
+Expiry leans on `Today()`, the schema's one volatile function. The tests pin it with a date that has
+already passed and always will have, rather than by faking a clock.
 
 ## 8. Close
 
-- [ ] Either party may file a `CloseRequest` at any time, without the other agreeing
-- [ ] While closing, a chit that moves the balance toward zero is admitted
-- [ ] While closing, a chit that moves it away from zero is refused
-- [ ] `CloseState` reads `closing` with a request filed, `closed` once settled with nothing pending
-- [ ] A settled close is terminal *(`debt-tally-close-no-reopen`)*
+`src/tally/close.ts` + `close.test.ts` (13 tests). The claim under test is that a *unilateral*
+close is safe, which rests on closing freezing balance growth while always permitting reduction.
+
+- [x] Either party may file a `CloseRequest` at any time, without the other agreeing; both may
+      file, each once (the primary key), and both replicas read `closing` immediately
+- [x] `SignerAuthorized` and `SignatureValid` gate it the same way as `Invoice` / `InvoiceDecline`
+- [x] While closing, a chit that moves the balance toward zero is admitted — from a positive
+      balance and from a negative one, so whichever party holds value can always collect it
+- [x] While closing, a chit that moves it away from zero is refused (`ClosingReducesBalance`)
+- [x] A sign-flip overshoot is refused — `+30000 → -5000` reduces the number but mints new credit
+      in the other direction, which is what the same-sign form exists to stop
+- [x] The lift half of the safety argument: a pledge that reduces the *reserved* balance is
+      admitted, one that grows it is refused (`ClosingReducesReserved`) — so the counterparty can
+      lift the value out as well as be paid down
+- [x] `CloseState` reads `open` with no request, `closing` with one, `closed` once settled at zero
+      with no open pledge; a settled zero with a pledge still open stays `closing` (the
+      load-bearing clause — otherwise a later finalize would bump a "closed" tally off zero)
+- [x] A settled close is terminal *(`debt-tally-close-no-reopen`)* — at a prior balance of zero
+      both arms of `ClosingReducesBalance` are false, so every further direct chit is rejected with
+      no separate constraint
+- [x] Withdrawing credit is **not** a close: it is restrictive, so it owes the counterparty its
+      `CallDays` of notice before it binds, it is reversible, and `CloseState` stays `open`
+
+The pledge rows here are built by hand in the test — `src/tally/` has no lift surface yet (§ 10),
+and these exercise a *close* gate rather than starting one.
 
 ## 9. Reading
 
-- [ ] `PerspectiveBalance` states the same figure oppositely to each party
-- [ ] `CurrentCreditLimit` returns the terms in force, not the latest filed
-- [ ] `ReservedBalance` includes open pledges; `PerspectiveBalance` does not
-- [ ] Reading a tally with no activity returns a coherent zero, not an error
+`src/tally/reading.test.ts` (8 tests). Every view is derived; nothing here writes state a later
+read depends on.
+
+- [x] `PerspectiveBalance` states the same figure oppositely to each party, and reads identically
+      on both replicas rather than only on the reader's own
+- [x] `CurrentCreditLimit` returns the terms in force, not the latest filed — a future-effective
+      withdrawal is ignored until it binds, a raise (which owes no notice) is picked up at once,
+      and a party who granted nothing reads zero
+- [x] `ReservedBalance` includes open pledges; `PerspectiveBalance` does not — an open pledge
+      shrinks what a party can still commit without moving what it is owed
+- [x] Reading a tally with no activity returns a coherent zero, not an error: formation and nothing
+      else, and every view still answers
+- [x] A zero balance reads as `-0` to the foil side (see § 0)
 
 ## 10. Stubs — not built, asserted absent
 
-- [ ] Lift pledge/finalize/void constraints exist in the schema and are exercised only by
-      `src/lift/*` against doubles; re-grounding them on a real strand is deferred
-- [ ] Network discovery, routes and referees: `src/lift/` covers the protocol in process; nothing
+- [x] Lift pledge/finalize/void constraints are exercised by `src/lift/*` against doubles. § 8
+      inserts a real `PendingLift` on a real strand — enough to drive the two close gates and the
+      `OpenPendingLift` / `ReservedBalance` views — but nothing here finalizes or voids one, and
+      `src/tally/` carries no lift surface. Re-grounding the resolution path is deferred to
+      `feat-lift-referee-commit`.
+- [x] Network discovery, routes and referees: `src/lift/` covers the protocol in process; nothing
       here opens a socket

@@ -57,8 +57,13 @@ module keeps its in-process suite against doubles until direct chits work on a r
   in-memory double its own harness calls "schema-EMULATING".
 - [x] `docs/timestamps.md` — the creator asserts and signs the time; what backdating buys a byzantine
   party on a direct chit, and what bounds it.
-- [ ] Work the inventory in [`packages/taleus-core/test/STATUS.md`](../packages/taleus-core/test/STATUS.md):
-  a test, then the feature it needs. Identity and keys next, then formation.
+- [x] **The low-level suite is complete** — §§ 1–9 of
+  [`packages/taleus-core/test/STATUS.md`](../packages/taleus-core/test/STATUS.md): substrate,
+  identity and keys, formation, negotiation, credit terms, direct chits, invoices, close, reading.
+  240 tests over 20 suites, every act proposed to two replicas that each re-validate it. Five schema
+  defects were found and fixed along the way (see that file's § 0).
+- [ ] Next: `feat-formation-over-sereus-strand` (the Sereus seam), then the API surface — sequencing
+  in that file's § Roadmap.
 - [ ] Mine `mc/mychips/test/auto` for scenarios (5,543 lines; the code does not transfer, the
   scenarios do).
 

@@ -83,6 +83,23 @@ over one digest, the recovering party proving possession and the counterparty at
 only recovery path when every device is gone. There is no third party in a two-party strand to
 appeal to, which is why the counterparty's attestation is the ceremony rather than a convenience.
 
+## The last resort is a new tally, not a heroic recovery
+
+None of the above is the primary answer to a compromise. **A tally can itself be rotated.** If the
+parties believe one is compromised, the right move is usually to recognise that, open a fresh tally,
+carry the balance across, and close or abandon the old one.
+
+That is available because of who the parties are: a tally is between **trusted associates**, not
+strangers, and the two of them can simply agree to start again. It is also why losing a tally is not
+a catastrophe — the record is *evidence*, held by both sides, not an enforcement mechanism. Where
+the parties disagree about what it says, the recourse is a court or whatever process they would use
+for any other disputed record, each bringing their own signed copy.
+
+Key rotation and counterparty adoption therefore exist to avoid *needing* that, not because
+everything fails without them. They keep a working tally working through an ordinary mishap — a lost
+phone, a stolen laptop. They are not load-bearing against a determined adversary, and they should
+not be designed as though they were.
+
 ## An unresolved concurrency hole, in both layers
 
 Taleus's `PartyKeyRevocation.NotLastKey` guards against revoking a party's last key. It is
