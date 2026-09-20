@@ -62,6 +62,20 @@ Things the tests turned up that are design questions rather than test failures.
 - **The store's `Digest` delegates to `src/lift/digest.ts`.** The first draft carried a second
   encoding; that is precisely the divergence that file warns about, and it would have shown up as
   every signature failing to verify while looking like a permissions bug.
+- **A `Sid` is not held to being a content address.** `docs/architecture.md` says it *is* "the hash
+  of the genesis (Revision 1) public key", and `PartyKey.Sid`'s own comment repeats it. Nothing
+  enforces it — a party may seat under any string. Contained within a strand, because every
+  signature is checked against keys registered *on that strand*; what it costs is the Sid's
+  portability, which is the entire point of a content address. Fixing it means pinning the Sid's
+  encoding system-wide, so it is Nate's call rather than a test's.
+- **`PartyKeyRevocation.NotLastKey` never runs.** Every in-process route to an empty authorized set
+  is closed earlier by `RevokerAuthorized`: the live `AuthorizedKey` view already excludes the
+  in-flight revocation, so a key cannot revoke itself, and in a batch the first revocation excludes
+  the second's signer. The case `NotLastKey` was written for — two *concurrent* transactions, A
+  revoking B while B revokes A, colliding on no primary key — is one this harness structurally
+  cannot reach. **The last-key guarantee therefore rests entirely on Optimystic re-evaluating the
+  deferred CHECK against the latest committed snapshot**, which `docs/STATUS.md` § Cross-repo lists
+  as unconfirmed. A test records this so it is not mistaken for covered.
 
 ## 1. Substrate
 
@@ -77,14 +91,23 @@ Things the tests turned up that are design questions rather than test failures.
 
 ## 2. Identity and keys
 
-- [ ] Genesis: `Sid` is the hash of the Revision-1 public key
-- [ ] An authorized key can add another; an unauthorized one cannot
-- [ ] `Revision` is monotonic per `Sid`; a gap or reuse is refused
-- [ ] A revoked key cannot be re-added (the insert-only row makes the count 2)
-- [ ] A revoked key cannot authorize, sign, or revoke
-- [ ] The last remaining key cannot be revoked
+- [x] An authorized key admits another, and the **counterparty's** engine accepts it unprompted —
+      which is what makes a revocation containable without the counterparty noticing
+- [x] A key cannot admit itself (`AuthKeyAuthorized`, read against the committed snapshot)
+- [x] Authority does not cross the party boundary: the counterparty's key cannot admit one
+- [x] `Revision` is contiguous — a gap fails `RevisionMonotonicInt`, a reuse collides on the PK
+- [x] The same key cannot be registered twice (`UniqueKey`)
+- [x] A surviving device retires a lost one; both engines stop accepting it
+- [x] A revoked key cannot authorize, cannot revoke, and can never be re-added
+- [x] A key cannot revoke itself, so the last key survives — by `RevokerAuthorized`, **not** by
+      `NotLastKey`; see § 0
+- [x] Counterparty adoption: two signatures over one digest — possession by the recovering party,
+      attestation by the counterparty. Neither alone is enough
+- [x] An adopted key can authorize fresh device keys, so recovery does not stop one step short
+- [x] A party cannot attest for itself (`CounterpartyIsOther`); an adopted key is revocable like
+      any other
 - [ ] *needs-transactor* — concurrent double-revocation: exactly one commits, the party keeps a key
-- [ ] Counterparty adoption lets a recovered party authorize fresh device keys
+- [ ] A `Sid` is the hash of its genesis key *(claimed by the docs, unenforced — see § 0)*
 
 ## 3. Formation
 

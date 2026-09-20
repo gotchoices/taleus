@@ -191,10 +191,21 @@ export function messageOf(error: unknown): string {
 }
 
 /**
- * A party with one genesis key. The `sid` is a digest of that key, which is what the
- * architecture says a Sid is -- the tests do not fake identity where the real rule is cheap.
+ * A party with one genesis key.
+ *
+ * The `sid` **is** the digest of that key, which is what `docs/architecture.md` says a Sid
+ * is: "the hash of the genesis (Revision 1) public key". The tests do not fake identity
+ * where the real rule is this cheap -- and building it correctly here is what lets a test
+ * ask whether the schema actually holds anyone to it.
+ *
+ * `label` is for reading test output; it is not part of the identity.
  */
-export function newParty(label: string): Party {
+export function newParty(label: string): Party & { label: string } {
 	const genesis = newKey()
-	return { sid: `sid:${label}:${digest(genesis.publicKey).slice(0, 16)}`, keys: [genesis] }
+	return { sid: sidFor(genesis.publicKey), keys: [genesis], label }
+}
+
+/** A party identity: the content address of its genesis key. */
+export function sidFor(genesisPublicKey: string): string {
+	return `sid:${digest(genesisPublicKey)}`
 }
