@@ -8,6 +8,90 @@ Scope for now: **tally negotiation, tally management, and direct payments.** Net
 lifts are stubs; the lift module already has its own in-process suite (`src/lift/*.test.ts`) against
 test doubles, and re-grounding that on the real schema comes after direct chits work.
 
+## Roadmap — agreed sequencing
+
+Where this is going, in order. Written to survive a context compaction: enough detail that the
+next session can pick up without re-deriving the reasoning.
+
+### Step 1 — direct chits, at the schema level *(in progress)*
+
+Finish § 6 below on the current substrate. The credit gate is the heart of the system and the
+row-level harness is the right tool for it: an API does not yet exist, and building one over an
+unexercised gate would bake in whatever is wrong with it.
+
+### Step 2 — the Sereus seam
+
+**Formation is settled**: [`docs/formation.md`](../../../docs/formation.md) states the model, and
+`feat-formation-over-sereus-strand` is the work. Taleus's seating sits *inside* Sereus's formation
+rather than duplicating it — `Stock.InvitationKey` **is** `Strand.Invite.Key`, one keypair at two
+layers — the Taleus schema becomes `declare schema App { … }` beside `Strand` in one strand database,
+and `TallyContract` is gated on the strand being sealed. Both mechanisms were verified against
+Quereus rather than assumed: a sApp CHECK reads the `Strand` namespace, and `draft1.qsql` wraps with
+no qualification changes.
+
+**Identity is settled** too: `docs/identity.md`. A `Sid` is strand-local and anchored on the Sereus
+`Member.Key`; `PartyKey` holds the keys that may sign as it. The two are *not* redundant, and the
+reason is sharp — a sealed strand refuses `addMemberByManager`, so a party's Sereus membership key
+can never be rotated for the life of a tally. Key rotation after a compromise is therefore Taleus's
+job, and `PartyKeyAdoption` is the only recovery path.
+
+**Atomic seating is settled**: Sereus's writers take `joinOpenTransaction` (default true), so
+`consumeInvite` + `Foil` + genesis key commit as one act.
+
+One question left, and it shapes the API:
+
+1. **Which transactor backs a tally strand?** `docs/STATUS.md` records that it *must* be the
+   synchronous Optimystic network transactor: the `quereus-sync` CRDT path writes column deltas
+   straight to storage and **fires no SQL constraints at all**, which silently voids every
+   signature gate in the schema. That choice lives in the Sereus adapter and is easy to get wrong
+   by default.
+
+Parked upstream: `feat-multi-use-tally-invitation` — Sereus offers closed **XOR** multi-use, and a
+vendor's printed QR needs both.
+
+### Step 3 — design the API surface
+
+Criterion 1 of `SPEC.md`. Not by extrapolating from the row-builders in `src/tally/` — that is how
+table names leak through the seam. Two requirements that are already known:
+
+- **Async wherever anything can happen** (`SPEC.md` § 2). Sync only for pure computation over values
+  in hand.
+- **The error value must carry the engine's refusal reason**, not merely that something was refused.
+  The row-level tests assert *which* constraint fired, and that has earned its keep twice: it caught
+  a test passing on a SQL typo, and it caught `NotLastKey` being dead code. If the API flattens that
+  into `{ kind: 'refused' }`, the suite gets weaker the moment it moves up.
+
+### Step 4 — migrate the suite up, do not duplicate it
+
+The dividing line is **not** "happy path versus refusal". Most refusals express fine through an API,
+because the API must take keys and signers as parameters — a party holds several keys and chooses
+which signs. The line is: **does the API compute the field under test?** If it does, the test has to
+sit below it.
+
+| Where | Roughly | Which |
+|---|---|---|
+| Stays below, always | ~27 | `src/store/*.test.ts` — host scalars, schema loading, determinism, spec rules, digest delegation. The core's internals; no API touches them |
+| Moves up | ~36 | Most of `src/tally/*.test.ts`, refusals included. They improve: domain assertions instead of `select ... from AuthorizedKey` |
+| Stays below | ~9 | Listed next. The reason a row-level layer exists at all |
+
+The nine that stay are where the API computes the thing under attack, or the concept is row-shaped:
+
+- `formation`: *refuses a genesis key that authorizes itself* (the API always signs genesis with the
+  invitation key); *refuses a Cid that does not address its own founding fields* (the API computes
+  the Cid); *cannot seat a party one row at a time* (documents why the API must be atomic)
+- `keys`: *the fresh key must prove it is held* (forges a signature the API would never emit);
+  *a batch that would empty the set* (batching is row-shaped); both `FINDING:` tests
+- `negotiation`: the `FINDING:` counter-offer test (a PK collision on a second row)
+
+These are not duplicates of anything. They answer *"what happens when a peer sends a row no honest
+client would produce"* — which is why the schema validates rather than trusting the sender, and a
+path an API test can never reach because the API **is** the honest path.
+
+The two-replica harness (`src/store/test-harness.ts`) stays regardless: an API-level test still
+wants "and the counterparty's engine accepted it too".
+
+---
+
 ## Where tests live
 
 - `src/**/*.test.ts` — co-located with the code, run by `yarn workspace taleus-core test`.
@@ -62,12 +146,12 @@ Things the tests turned up that are design questions rather than test failures.
 - **The store's `Digest` delegates to `src/lift/digest.ts`.** The first draft carried a second
   encoding; that is precisely the divergence that file warns about, and it would have shown up as
   every signature failing to verify while looking like a permissions bug.
-- **A `Sid` is not held to being a content address.** `docs/architecture.md` says it *is* "the hash
-  of the genesis (Revision 1) public key", and `PartyKey.Sid`'s own comment repeats it. Nothing
-  enforces it — a party may seat under any string. Contained within a strand, because every
-  signature is checked against keys registered *on that strand*; what it costs is the Sid's
-  portability, which is the entire point of a content address. Fixing it means pinning the Sid's
-  encoding system-wide, so it is Nate's call rather than a test's.
+- **A `Sid` is not held to being anything — now with an answer.** Nothing enforces what a `Sid` is;
+  a party may seat under any string. `docs/architecture.md` said it should be the hash of the
+  genesis key, which assumed a portable identity. **That assumption is now reversed**
+  (`docs/identity.md`): a `Sid` is **strand-local**, one person is deliberately not one identity,
+  and the fix is to anchor it on the party's Sereus `Member.Key` — checkable, because a sApp CHECK
+  can read the `Strand` namespace. Work is in `feat-formation-over-sereus-strand`.
 - **`TallyContract` had never been insertable.** Four of its constraints referenced a bare
   `StockSid` / `FoilSid`, which exist only on `TallyCore` — `Column not found: StockSid` on the first
   insert. So the row that turns an offer into a tally could not be written at all. **Fixed**: spelled
@@ -87,6 +171,27 @@ Things the tests turned up that are design questions rather than test failures.
   `Ledger.Reference`, `Ledger.Memo`, and `Invoice`'s pair. The schema's convention is an explicit
   `null` (six columns have it); these do not, so they cannot be omitted. The core passes empty text
   and the signature covers that — worth settling before anything signs in anger.
+- **`Ledger.BalanceCorrect` did not chain — the most serious defect found so far.** It read
+  `(select Balance from Ledger where Number = Number - 1)`; both `Number`s resolve to the subquery's
+  own column, so the predicate was `Number = Number - 1` — never true. The lookup always returned
+  nothing, `Coalesce` made it `0`, and **every chit's `Balance` had to equal its own delta**. The
+  consequences compound: `PerspectiveBalance` reads the latest row's `Balance`, so it reported the
+  last chit's amount rather than the tally balance; and `WithinCreditLimits` gates against that, so
+  **the credit limit was per-chit, not cumulative — any limit could be exceeded by issuing enough
+  small chits.** **Fixed**: `where L.Number = New.Number - 1`. The closing gate three constraints
+  below already spelled it correctly, which is what makes this a typo rather than a design choice.
+- **`Ledger.ValidIssuer` referenced a column that does not exist**, making the table uninsertable
+  exactly as `TallyContract` was. The schema's own comment flagged it as a draft placeholder from
+  when the ledger stored the issuer's Sid rather than an `'S'`/`'F'` side code, left for separate
+  triage. It could never be evaluated, so it had no semantics to preserve, and the only validation
+  it plausibly intended is already done by the column check `Issuer in ('S','F')` plus
+  `SignerAuthorized`. **Removed** as dead code, with the reasoning left in its place.
+- **A chit's digest names the issuer under an alias saying recipient.**
+  `Ledger.SignatureValid` computes `case when Issuer = 'F' then FoilSid else StockSid end
+  RecipientSid` — the foil's Sid for a foil-issued chit, which is the *issuer's*. Cryptographically
+  harmless (both sides compute the same thing), but a trap for anyone writing a second
+  implementation from the schema, which is precisely how signature divergence happens. **Recorded,
+  not changed** — renaming it changes no bytes, but it should be renamed deliberately.
 - **`PartyKeyRevocation.NotLastKey` never runs.** Every in-process route to an empty authorized set
   is closed earlier by `RevokerAuthorized`: the live `AuthorizedKey` view already excludes the
   in-flight revocation, so a key cannot revoke itself, and in a batch the first revocation excludes
@@ -184,19 +289,28 @@ Things the tests turned up that are design questions rather than test failures.
 
 ## 6. Direct chits
 
-- [ ] A chit is signed by the party it makes worse off, and needs no countersignature
-- [ ] `Units` must be positive; direction comes from `Issuer`, not the sign of the amount
-- [ ] `Balance` chains contiguously off the prior row; a gap or wrong total is refused
-- [ ] An unsigned chit, a chit signed by an unauthorized key, or one signed over different content
-      is refused
-- [ ] The credit gate admits a chit inside the grantor's effective limit and refuses one outside it
-- [ ] The gate reads the limit effective **as of the chit's own date**
-- [ ] `DateMonotonic`: a chit dated before its predecessor is refused *(`docs/timestamps.md`)*
-- [ ] Backdating past a restrictive reduction is bounded by the previous chit's date
-- [ ] A chit's `Id` is inside its signed digest, so it cannot be assigned by the store
-- [ ] The zero-credit default: the very first chit on a tally with no terms is refused
+- [x] A chit is signed by the party it makes worse off, and needs no countersignature — one
+      signature moves the tally
+- [x] The other party cannot sign it (`SignerAuthorized`) — Jan cannot put Sam into debt
+- [x] A signature over different content is refused (`SignatureValid`) — the shape of a chit
+      tampered with in flight
+- [x] `Units` must be positive; direction comes from `Issuer`, not the sign of the amount
+- [x] `Balance` chains: it accumulates, both parties read the same running total, and a balance
+      equal to the chit's own delta is refused
+- [x] Wrong arithmetic is refused in either direction
+- [x] The credit gate admits a chit inside the grantor's effective limit and refuses one past it
+- [x] The gate is **cumulative, not per chit** — the consequence of the chain bug above
+- [x] Each side binds separately: a party that granted nothing may be owed nothing
+- [x] With no terms published, nothing may be owed
+- [x] `DateMonotonic`: a chit dated before its predecessor is refused; the same day is fine
+      *(`docs/timestamps.md`)*
+- [x] The date selects the credit epoch — a chit dated before a restrictive cut takes effect gets
+      the old limit, one dated after gets the new one
+- [x] A chit's `Id` is inside its signed digest, so it cannot be assigned by the store
+- [x] **FINDING** — the digest names the issuer under an alias saying recipient; see § 0
 - [x] Every act is validated independently by both parties' engines *(the harness does this for
       every test; `DisagreementError` is raised where they differ)*
+- [ ] *needs-transactor* — the same chit reaching both replicas concurrently
 
 ## 7. Invoices
 

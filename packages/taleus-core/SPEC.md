@@ -139,11 +139,17 @@ machinery this core must sit on rather than reinvent: `formStrand()` and `OpenIn
 formation, `registerMember`, the formation-approval hook, and `quereus-plugin-sereus` for binding a
 Quereus database to a replicated strand.
 
-Two questions to settle before writing the adapter, both of which change the API's shape:
+**Question 1 is settled** — see [`docs/formation.md`](../../docs/formation.md). Taleus's seating
+sits *inside* Sereus's formation and shares its invitation key: `Stock.InvitationKey` **is**
+`Strand.Invite.Key`, one keypair used at two layers. The Taleus schema becomes an sApp schema
+(`declare schema App`) applied beside `Strand` in one strand database, and `TallyContract` is gated
+on the strand being sealed — verified: a sApp CHECK can read the `Strand` namespace. The work is
+`feat-formation-over-sereus-strand`.
 
-1. **Does Taleus's `Stock`/`Foil` seating duplicate Sereus's strand formation, or sit inside it?**
-   The schema has its own invitation key and out-of-band secret; Sereus has tokens, disclosure and
-   `FormationUsage`. If they are the same ceremony described twice, one of them is wrong.
+What remains to settle before writing the adapter:
+
+1. **Can redemption and Taleus seating be one act?** If not, a strand can hold a member who is not
+   yet a party, and the seam must reconcile it.
 2. **Which transactor backs a tally strand?** `docs/STATUS.md` records that tally strands *must*
    bind to the synchronous Optimystic network transactor — the `quereus-sync` CRDT path writes
    column deltas straight to storage and **fires no SQL constraints at all**, which would silently

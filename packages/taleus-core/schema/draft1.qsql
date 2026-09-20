@@ -563,9 +563,16 @@ create table Ledger (
     ),
     -- Applies to EVERY Ledger row (direct + finalized lift both carry a real signed delta): the running
     -- Balance chains contiguously off the prior row.
+    -- The prior row is `New.Number - 1`. Without the `New.` the predicate reads
+    -- `Number = Number - 1` against the subquery's own column -- never true, so the lookup
+    -- always returned nothing, Coalesce made it 0, and every chit's Balance had to equal its
+    -- OWN delta. The chain did not chain: PerspectiveBalance read the last chit's amount
+    -- rather than the tally balance, and WithinCreditLimits gated against that, making the
+    -- credit limit per-chit instead of cumulative -- so any limit could be exceeded by
+    -- issuing enough small chits. The closing gate below already spelled it `New.Number - 1`.
     constraint BalanceCorrect check on insert (
-        Coalesce((select Balance from Ledger where Number = Number - 1), 0)
-            + (Units * case when Issuer = 'F' then 1 else -1 end) = Balance
+        Coalesce((select L.Balance from Ledger L where L.Number = New.Number - 1), 0)
+            + (New.Units * case when New.Issuer = 'F' then 1 else -1 end) = New.Balance
     ),
     -- Time bound (docs/timestamps.md). A chit may not be dated before the chit preceding it in the
     -- chain. Deterministic -- it compares two signed values already in the strand, never a clock --
@@ -659,11 +666,12 @@ create table Ledger (
             and New.Balance <= 0
             and New.Balance > Coalesce((select Balance from Ledger where Number = New.Number - 1), 0))
     ),
-    -- Kind='direct' only.
-    -- NOTE (pre-existing, unrelated to lifts): this references IssuerSid, but the column is Issuer ('S'/'F')
-    -- and there is no IssuerSid column -- looks like a draft placeholder. NOT touched by this ticket (out of
-    -- scope for lift chits); flagged in the feat-schema-lift-chits review handoff for separate triage.
-    constraint ValidIssuer check on insert (New.Kind = 'lift' or IssuerSid in (select StockSid from TallyCore)),
+    -- REMOVED: `ValidIssuer` referenced an `IssuerSid` column that does not exist -- a draft
+    -- placeholder from when the ledger stored the issuer's Sid rather than a side code. It could
+    -- never be evaluated (`Column not found: IssuerSid`), so the table was uninsertable, and it had
+    -- no semantics to preserve. The only validation it plausibly intended is already done by the
+    -- column check `Issuer in ('S', 'F')`, and *which* party that side names is enforced by
+    -- SignerAuthorized above. Removing dead code, not relaxing a rule. See test/STATUS.md § 0.
     -- If this chit answers an invoice: the invoice must exist, the chit must be issued by the PAYER
     -- (opposite side from the requester -- a foil-issued chit raises Balance toward stock, so if Stock
     -- requested payment Foil must issue), pledge EXACTLY the invoiced Units (partial payment is

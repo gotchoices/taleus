@@ -19,6 +19,11 @@ system) and flags its own open questions.
   the balance number-line, and how lift/drop fees compose.
 - **[denominations.md](denominations.md)** — quantifying an arbitrary unit of account: designator,
   integer sub-units, and the unit multiplier; the descriptor that carries a unit's *meaning*.
+- **[formation.md](formation.md)** — how a tally comes into existence over a Sereus closed strand:
+  one invitation key serving both layers, and why the tally cannot open until the strand is sealed.
+- **[identity.md](identity.md)** — why a party's identity is local to one strand, why real-world
+  identifiers are payload rather than protocol, and why Taleus manages signing keys that Sereus
+  cannot rotate once a tally seals.
 - **[tally-lifecycle.md](tally-lifecycle.md)** — the negotiation state machine (draft → offer → open →
   closing → closed) and the **rights invariant** that governs every state transition, plus the
   taxonomy of ways a tally can (and cannot) get wedged.

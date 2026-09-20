@@ -26,7 +26,10 @@
 -- Singleton marker + owner identity. Presence of this row is how the app recognizes
 -- a strand as *the* portfolio (vs a tally strand, which has TallyCore instead).
 create table PortfolioCore (
-    OwnerSid text,        -- this party's Sid; same identity used in its tally strands
+    OwnerSid text,        -- this party's Sid IN THIS PORTFOLIO's own strand. A Sid is strand-local
+                          -- (docs/identity.md): the same human holds a different Sid in every tally,
+                          -- deliberately, so nobody can correlate their tallies. Do NOT read this as
+                          -- an identity shared with the party's tally strands -- it is not one.
     Version integer,      -- portfolio schema/protocol version
     Created text,
     primary key (/* 1 row */),
@@ -40,7 +43,10 @@ create table TallyRegistry (
     StrandId text,                       -- the tally strand's id
     Revision integer,
     Role text check (Role in ('S', 'F')),  -- this party's seat: Stock or Foil
-    CounterpartySid text,
+    CounterpartySid text, -- the counterparty's Sid IN THAT TALLY's strand. Strand-local, so it
+                          -- answers "who is this on that tally" and never "is this the same person
+                          -- as on another tally" -- recognising that is the party's own job, from
+                          -- what the counterparty disclosed (docs/identity.md).
     Denomination text,                   -- cached from the tally's accepted contract
     DenominationScale integer,
     State text,                          -- forming|open|closing|closed|void (cached)
