@@ -43,6 +43,25 @@ citations) is prepared separately for transmission to Nathan; this is the digest
 Possible future split: break `architecture.md` into topic files if it grows unwieldy (manageable as one
 file for now).
 
+## Core build — bottom-up (started)
+
+Direct chits, tally negotiation and management. Network queries and lifts stay stubbed; the lift
+module keeps its in-process suite against doubles until direct chits work on a real strand.
+
+- [x] `packages/taleus` renamed **`taleus-core`** — platform-neutral, Node/RN/browser. "Engine" is
+  now the generic notion; an app-specific layer belongs *in the app*, not in a core library.
+- [x] `docs/drafts/engine-api.md` moved to `packages/taleus-app/design/notes/core-asks.md` — it was
+  written from the app's side and is one app's wish-list, not a core specification.
+- [x] **The schema executes.** All 28 statements of `draft1.qsql` load into Quereus in memory, with
+  host scalars registered (`src/store/`). Nothing had ever run it before — the lift suite uses an
+  in-memory double its own harness calls "schema-EMULATING".
+- [x] `docs/timestamps.md` — the creator asserts and signs the time; what backdating buys a byzantine
+  party on a direct chit, and what bounds it.
+- [ ] Work the inventory in [`packages/taleus-core/test/STATUS.md`](../packages/taleus-core/test/STATUS.md):
+  a test, then the feature it needs. Identity and keys next, then formation.
+- [ ] Mine `mc/mychips/test/auto` for scenarios (5,543 lines; the code does not transfer, the
+  scenarios do).
+
 ## Taleus open decisions / small items
 
 - [ ] **Rename `chipnet` → `tallyNet`** (or similar): branding sweep across docs, code (`src/lift/`,
@@ -83,8 +102,9 @@ Filed as tickets from the app design pass:
   recorded at all (`TallyContractProposal` is a single mutable row today, with no expiry).
 - `feat-formation-lifecycle` — what an invitation nobody accepts leaves behind.
 - `feat-standing-invitation` — a vendor's reusable invitation; Sereus records one use per invite today.
-- `feat-engine-tally-api` — the app-facing surface for the whole tally lifecycle (`packages/taleus-core/src`
-  currently exports crypto, transport, and the lift agent only).
+- `feat-engine-tally-api` — the app-facing surface for the whole tally lifecycle. Re-scoped by the
+  bottom-up build: `taleus-core` grows the tally surface from the schema up, and reconciliation with
+  what any one app wants comes after, not before.
 - `feat-engine-run-modes`, `feat-attention-signals`, `feat-position-and-estimates`,
   `feat-disclosure-selection`, `feat-device-and-recovery-surface` — the rest of what the drafted
   stories need.

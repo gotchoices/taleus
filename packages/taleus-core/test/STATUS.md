@@ -40,11 +40,12 @@ code does not transfer (PostgreSQL, `LISTEN`/`NOTIFY`, peer server processes, `j
 - [x] Every statement in `draft1.qsql` executes in Quereus
 - [x] Every statement in `portfolio.qsql` executes
 - [x] No constraint or default reads a clock or a random source
-- [ ] Host scalars agree with the schema's expectations: `DayNumber` ordering, `ValidDate` rejects
-      non-dates, `Digest` is injective across argument boundaries, `SignatureValid` round-trips a
-      real key pair
-- [ ] `Digest` here and `src/lift/digest.ts` produce identical bytes for the same input *(a
-      divergence makes every signature fail to verify, and it looks like a permissions bug)*
+- [x] Host scalars agree with the schema's expectations: `DayNumber` ordering and UTC reading,
+      `ValidDate` rejects non-dates, `Digest` is injective across argument boundaries and across
+      types, `SignatureValid` round-trips a real key pair and refuses the wrong key or content
+- [x] `Digest` here and `src/lift/digest.ts` produce identical bytes — the store scalar *delegates*
+      to the lift module's canonical encoding rather than carrying a second one *(the first draft
+      did carry a second one; the test caught it)*
 
 ## 2. Identity and keys
 
