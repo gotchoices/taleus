@@ -1,6 +1,6 @@
 description: Let people choose what personal information they reveal to each trading partner, and add more later as trust grows, rather than disclosing everything to everyone.
 prereq: feat-engine-tally-api
-files: packages/taleus/schema/draft1.qsql, docs/architecture.md, packages/taleus-app/design/stories/mobile/02-respond-to-an-invitation.md, packages/taleus-app/design/stories/mobile/11-my-profile-and-disclosure.md
+files: packages/taleus-core/schema/draft1.qsql, docs/architecture.md, packages/taleus-app/design/stories/mobile/02-respond-to-an-invitation.md, packages/taleus-app/design/stories/mobile/11-my-profile-and-disclosure.md
 difficulty: medium
 ----
 ## Why this ticket exists

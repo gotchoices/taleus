@@ -1,6 +1,6 @@
 description: Let a party find out what is waiting on them across all their tallies, and make sure a phone wakes up in time to take part in a transaction that needs it.
 prereq: feat-engine-tally-api
-files: packages/taleus/src/index.ts, packages/taleus/schema/portfolio.qsql, packages/taleus-app/design/stories/mobile/23-what-needs-my-attention.md, packages/taleus-app/design/stories/mobile/43-notifications.md
+files: packages/taleus-core/src/index.ts, packages/taleus-core/schema/portfolio.qsql, packages/taleus-app/design/stories/mobile/23-what-needs-my-attention.md, packages/taleus-app/design/stories/mobile/43-notifications.md
 difficulty: medium
 ----
 ## Why this ticket exists

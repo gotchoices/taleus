@@ -1,6 +1,6 @@
 description: A lift that resolves inconsistently (one partition commits while another voids, or a Byzantine referee half-commits) leaves some edges settled and others not — design an after-the-fact compensating "fixup" transaction that rebalances so honest parties are made whole.
 prereq: feat-schema-lift-chits
-files: packages/taleus/schema/draft1.qsql, docs/architecture.md
+files: packages/taleus-core/schema/draft1.qsql, docs/architecture.md
 difficulty: hard
 ----
 > **Speculative — not ready to implement.** This needs substantial design thought before any

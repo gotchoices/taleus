@@ -1,11 +1,11 @@
 description: Once a tally's balance touches zero during close it becomes permanently closed with no way to reverse a mistaken final payment or reopen — decide whether that terminal state should be reversible by mutual consent.
 prereq: feat-schema-tally-close
-files: packages/taleus/schema/draft1.qsql
+files: packages/taleus-core/schema/draft1.qsql
 difficulty: medium
 ----
 ## Problem
 
-`CloseState` (`packages/taleus/schema/draft1.qsql`) flips a closing tally to `'closed'` the
+`CloseState` (`packages/taleus-core/schema/draft1.qsql`) flips a closing tally to `'closed'` the
 **instant** its settled `Ledger.Balance` reaches exactly zero and no pending lift is open.
 Two schema facts make that state a hard, irreversible terminal:
 

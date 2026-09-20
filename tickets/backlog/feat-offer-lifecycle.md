@@ -1,5 +1,5 @@
 description: Work out how a tally offer lives and dies — how long it stays good, what happens when several are outstanding, and whether refusing one should be recorded or simply left to lapse.
-files: packages/taleus/schema/draft1.qsql, docs/architecture.md, packages/taleus-app/design/stories/mobile/03-negotiate-terms.md
+files: packages/taleus-core/schema/draft1.qsql, docs/architecture.md, packages/taleus-app/design/stories/mobile/03-negotiate-terms.md
 difficulty: medium
 ----
 ## Why this ticket exists

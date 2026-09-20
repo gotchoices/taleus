@@ -7,7 +7,7 @@ Where app-observable behavior comes from.
 | Concern | Lives in |
 |---------|----------|
 | System design, formation, negotiation, lifts, recovery | `docs/architecture.md` |
-| Data model + constraints | `packages/taleus/schema/draft1.qsql` |
+| Data model + constraints | `packages/taleus-core/schema/draft1.qsql` |
 | Trading variables | MyCHIPs `schema/tallies.wmt` |
 
 ## Engine boundary
@@ -41,7 +41,7 @@ Derived by the engine, not stored. The apps display them and build attention lis
 
 ## What the apps ask of the engine
 
-The engine does not exist yet (`packages/taleus/src` is crypto, lift, and transport). Mock mode is
+The engine does not exist yet (`packages/taleus-core/src` is crypto, lift, and transport). Mock mode is
 therefore where the app-facing surface gets defined, and this is that surface stated in concepts
 rather than types — enough for `feat-engine-tally-api` to build against, and for the app to be
 rewired when it differs.

@@ -83,7 +83,7 @@ Filed as tickets from the app design pass:
   recorded at all (`TallyContractProposal` is a single mutable row today, with no expiry).
 - `feat-formation-lifecycle` — what an invitation nobody accepts leaves behind.
 - `feat-standing-invitation` — a vendor's reusable invitation; Sereus records one use per invite today.
-- `feat-engine-tally-api` — the app-facing surface for the whole tally lifecycle (`packages/taleus/src`
+- `feat-engine-tally-api` — the app-facing surface for the whole tally lifecycle (`packages/taleus-core/src`
   currently exports crypto, transport, and the lift agent only).
 - `feat-engine-run-modes`, `feat-attention-signals`, `feat-position-and-estimates`,
   `feat-disclosure-selection`, `feat-device-and-recovery-surface` — the rest of what the drafted

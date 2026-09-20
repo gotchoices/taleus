@@ -1,0 +1,114 @@
+import { verify } from '../crypto/index.js'
+import { digest as canonicalDigest, type DigestField } from '../lift/digest.js'
+
+/**
+ * The host-registered scalars the schema calls.
+ *
+ * Quereus rejects non-deterministic expressions inside CHECK constraints and column
+ * defaults, and it is right to: every replica re-validates every write, so a gate that
+ * read a clock or a random source would have replicas disagree about the same row and
+ * the strand would diverge. Every function here is therefore a pure function of its
+ * arguments -- `DayNumber` cannot read a clock the way `julianday('now')` can, and there
+ * is deliberately no `RandomUUID`: a row's `Id` is inside the digest its signer signs,
+ * so the caller must choose it before the insert.
+ *
+ * See `docs/timestamps.md`.
+ */
+
+/** `YYYY-MM-DD`, the calendar-date form the schema stores. */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * A calendar date's day number -- days since the Unix epoch, UTC.
+ *
+ * Read in UTC deliberately: `2026-03-02` is the second of March to both parties wherever
+ * they are, and putting a civil date through a local zone renders it as the first for
+ * half the world.
+ */
+export function dayNumber(date: unknown): number | null {
+	if (typeof date !== 'string' || !ISO_DATE.test(date)) {
+		return null
+	}
+	const ms = Date.parse(`${date}T00:00:00Z`)
+	return Number.isNaN(ms) ? null : Math.floor(ms / 86_400_000)
+}
+
+/** Whether a value is a calendar date the schema will accept. */
+export function validDate(date: unknown): number {
+	return dayNumber(date) === null ? 0 : 1
+}
+
+/**
+ * The digest a signature covers -- the schema's `Digest(...)` scalar.
+ *
+ * This does NOT have its own encoding. `src/lift/digest.ts` already implements the
+ * schema's `Digest()` (its own comment says so: "Field order is load-bearing -- it is the
+ * schema's `Digest(...)` argument order"), with a type-tagged, length-prefixed encoding
+ * that no two distinct field lists can collide in. A second implementation here would be
+ * exactly the divergence that file warns about, and the symptom would be every signature
+ * failing to verify while looking like a permissions problem.
+ *
+ * So this adapts SQL values to `DigestField` and delegates. The only work it does is
+ * rejecting what the encoding cannot represent -- a non-integer number would otherwise be
+ * silently truncated into a different digest.
+ */
+export function digest(...args: unknown[]): string {
+	const fields: DigestField[] = args.map(arg => {
+		if (arg === null || arg === undefined) return null
+		if (typeof arg === 'string' || typeof arg === 'bigint') return arg
+		if (typeof arg === 'number') {
+			if (!Number.isInteger(arg)) {
+				throw new Error(`Digest received a non-integer number: ${arg}`)
+			}
+			return arg
+		}
+		// A Uint8Array or similar would encode differently on each host; refuse it rather
+		// than pick an encoding here.
+		throw new Error(`Digest received an unsupported value: ${typeof arg}`)
+	})
+	return Buffer.from(canonicalDigest(fields)).toString('base64url')
+}
+
+/**
+ * Two-argument min and max. SQL has no scalar `min`/`max` -- SQLite's are an extension, and
+ * Quereus treats both as aggregates -- so the schema's economics (`LiftLading`) would
+ * otherwise be spelled as nested `case when` and become unreadable. The names are
+ * PostgreSQL's for the same operation.
+ */
+export function greatest(a: unknown, b: unknown): unknown {
+	if (typeof a !== 'number') return b
+	if (typeof b !== 'number') return a
+	return a > b ? a : b
+}
+
+export function least(a: unknown, b: unknown): unknown {
+	if (typeof a !== 'number') return b
+	if (typeof b !== 'number') return a
+	return a < b ? a : b
+}
+
+/** Verify a signature over a digest with a public key. Returns 1/0, as SQL wants. */
+export function signatureValid(
+	digestText: unknown,
+	signature: unknown,
+	publicKey: unknown,
+): number {
+	if (
+		typeof digestText !== 'string' ||
+		typeof signature !== 'string' ||
+		typeof publicKey !== 'string'
+	) {
+		return 0
+	}
+	try {
+		return verify(
+			Buffer.from(publicKey, 'base64url'),
+			Buffer.from(digestText, 'utf8'),
+			Buffer.from(signature, 'base64url'),
+		)
+			? 1
+			: 0
+	} catch {
+		return 0
+	}
+}

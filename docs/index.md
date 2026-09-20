@@ -22,6 +22,9 @@ system) and flags its own open questions.
 - **[tally-lifecycle.md](tally-lifecycle.md)** — the negotiation state machine (draft → offer → open →
   closing → closed) and the **rights invariant** that governs every state transition, plus the
   taxonomy of ways a tally can (and cannot) get wedged.
+- **[timestamps.md](timestamps.md)** — why every dated record carries a time its creator asserted and
+  signed, what backdating and postdating can buy a byzantine party on a direct chit, and what bounds
+  the damage.
 - **[concurrency-model.md](concurrency-model.md)** — why a signature-gated, insert-only schema stays safe
   on the Sereus/Optimystic substrate: the CRDT lens and the two load-bearing platform assumptions.
 
@@ -29,8 +32,6 @@ system) and flags its own open questions.
 
 Design intentions still under analysis; not yet timeless. See [`drafts/`](drafts/).
 
-- **[drafts/engine-api.md](drafts/engine-api.md)** — the app-facing library surface, drafted from the
-  mobile app's side while mock mode stands in for the engine. For reaction; nothing settled.
 - **[drafts/credit-terms.md](drafts/credit-terms.md)** — roadmap from demand credit to rich instruments
   (interest, amortization, vesting). A gap carried over from MyCHIPs, not yet designed.
 

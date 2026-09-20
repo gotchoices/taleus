@@ -1,6 +1,6 @@
 description: Give a party an honest picture of what they are worth across tallies held in different units, without pretending a single exact number exists.
 prereq: feat-engine-tally-api
-files: packages/taleus/schema/portfolio.qsql, packages/taleus-app/design/stories/mobile/40-my-position.md, packages/taleus-app/design/specs/domain/rules.md
+files: packages/taleus-core/schema/portfolio.qsql, packages/taleus-app/design/stories/mobile/40-my-position.md, packages/taleus-app/design/specs/domain/rules.md
 difficulty: medium
 ----
 ## Why this ticket exists

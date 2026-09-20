@@ -1,6 +1,6 @@
 description: Let people see and manage the devices that act for them, and get back to a working identity after losing a phone — including the case where nothing at all survives.
 prereq: feat-engine-tally-api
-files: docs/architecture.md, packages/taleus/schema/draft1.qsql, packages/taleus-app/design/stories/mobile/13-my-devices.md, packages/taleus-app/design/stories/mobile/50-recover-after-losing-a-device.md
+files: docs/architecture.md, packages/taleus-core/schema/draft1.qsql, packages/taleus-app/design/stories/mobile/13-my-devices.md, packages/taleus-app/design/stories/mobile/50-recover-after-losing-a-device.md
 difficulty: hard
 ----
 ## Why this ticket exists

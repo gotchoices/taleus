@@ -54,7 +54,7 @@ counterparty wholly absent there is nowhere for the entry to land. It does not g
 is told plainly, and **nothing is left half-done** — "did that go through" gets a straight answer.
 
 `recordEntry` takes an `actId` the screen generates once per attempt, so retrying cannot record twice.
-The engine will need to honour something equivalent — `docs/drafts/engine-api.md` question 4. The
+The engine will need to honour something equivalent — `packages/taleus-app/design/notes/core-asks.md` question 4. The
 story's own *Open* section says the reachability boundary is undecided; the user-visible rule holds
 either way, and this screen only depends on the rule.
 

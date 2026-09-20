@@ -9,8 +9,8 @@ files: packages/taleus-node/src/index.ts, packages/taleus-node/src/cli.ts, packa
 What the service must do:
 
 - **Attach to the cadre.** Take a cadre endpoint in `TaleusNodeConfig`, connect as a client, and obtain read/write access to the `sAppId:taleus` strands (tally strands + the single-party portfolio strand). Exact client API is a Sereus dependency (see Open questions).
-- **Run the lift agent.** Drive discovery/commit from the portfolio `LiftJournal`, reading `LiftLading`/`ExchangeRateQuote` and writing `PendingLift`/`Ledger`/`LiftVoid`, using the already-landed `packages/taleus/src/lift/` logic (`agent.ts`, `discovery.ts`, `commit.ts`, `referee.ts`, `convert.ts`).
-- **Serve `/taleus/chipnet/1.0.0`.** Host the transport (`packages/taleus/src/transport/`) so counterparties can dial this node for `QueryPeerFunc`/`updatePeer`. Bind ChipNet's injected ports (`DiscoveryEngine`, consensus, `EdgeStrand`) to live implementations.
+- **Run the lift agent.** Drive discovery/commit from the portfolio `LiftJournal`, reading `LiftLading`/`ExchangeRateQuote` and writing `PendingLift`/`Ledger`/`LiftVoid`, using the already-landed `packages/taleus-core/src/lift/` logic (`agent.ts`, `discovery.ts`, `commit.ts`, `referee.ts`, `convert.ts`).
+- **Serve `/taleus/chipnet/1.0.0`.** Host the transport (`packages/taleus-core/src/transport/`) so counterparties can dial this node for `QueryPeerFunc`/`updatePeer`. Bind ChipNet's injected ports (`DiscoveryEngine`, consensus, `EdgeStrand`) to live implementations.
 - **Act as referee when it is the originator's node.** Emit the dual signature (ChipNet whole-record + per-edge Taleus) per § Referee model.
 - **Lifecycle.** `start()`/`stop()` with clean resource teardown (libp2p handlers, strand wake subscriptions, agent timers — the jest "worker failed to exit" warning in the lib suite is a reminder to `.unref()` timers here).
 - **CLI.** `cli.ts`: parse args/config (cadre endpoint, referee policy, log level), start the service, handle signals.

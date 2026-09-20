@@ -5,7 +5,7 @@ counterparty's lift agent how much balance movement this party will accept, and 
 drive **lifts** (automated credit clearing); they do not gate **direct chits** (a party may pledge
 directly to its counterparty at any time for any reason — see [Contract governance](tally-lifecycle.md#contract-governance)).
 
-Schema: [`TradingVariable`](../packages/taleus/schema/draft1.qsql) — per-party, revisioned, insert-only,
+Schema: [`TradingVariable`](../packages/taleus-core/schema/draft1.qsql) — per-party, revisioned, insert-only,
 grantor-signed. The latest-revision resolver is `CurrentTradingVariable`; capacity is advertised by
 `LiftLading`.
 

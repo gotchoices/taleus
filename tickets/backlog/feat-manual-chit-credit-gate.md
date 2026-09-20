@@ -1,12 +1,12 @@
 description: Let someone promise to pay more than their partner agreed to be owed — warning both people rather than refusing the entry — since a promise costs the person receiving it nothing.
-files: packages/taleus/schema/draft1.qsql, packages/taleus-app/design/stories/mobile/20-pay-a-partner.md, packages/taleus-app/design/specs/domain/rules.md, docs/architecture.md
+files: packages/taleus-core/schema/draft1.qsql, packages/taleus-app/design/stories/mobile/20-pay-a-partner.md, packages/taleus-app/design/specs/domain/rules.md, docs/architecture.md
 difficulty: medium
 ----
 ## Why this ticket exists
 
 Today a manual chit is refused outright if it would take the balance past either party's credit
 limit — `Ledger.WithinCreditLimits` and `WithinReservedCredit` are hard CHECK constraints
-(`packages/taleus/schema/draft1.qsql:862`). The proposal is to stop refusing manual chits on that
+(`packages/taleus-core/schema/draft1.qsql:862`). The proposal is to stop refusing manual chits on that
 basis and warn instead.
 
 The reasoning is that a chit is a **promise by the person making it**. Whoever receives it has given

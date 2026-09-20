@@ -1,6 +1,6 @@
 description: Restore MyCHIPs' rich credit terms (interest, compounding period, grace, minimum payment, prepayment cap, maturity/vesting) that were collapsed to a bare limit+call in the Taleus reboot, so the platform can represent more than demand, short-term credit.
 prereq: feat-schema-credit-terms
-files: packages/taleus/schema/draft1.qsql, docs/drafts/credit-terms.md
+files: packages/taleus-core/schema/draft1.qsql, docs/drafts/credit-terms.md
 difficulty: hard
 ----
 ## Why this ticket exists

@@ -25,10 +25,10 @@ MyCHIPs' negotiation was well-designed and carries over. A tally signed by **onl
 contract-in-waiting** — a standing offer the other party can complete unilaterally by countersigning. The
 raw material is in the schema:
 
-- [`TallyContractProposal`](../packages/taleus/schema/draft1.qsql) — a one-sided, signed offer (the
+- [`TallyContractProposal`](../packages/taleus-core/schema/draft1.qsql) — a one-sided, signed offer (the
   negotiation cursor): a contract CID + arguments (denomination, each party's operative `CreditTerms`
   revision), signed by the proposer.
-- [`TallyContract`](../packages/taleus/schema/draft1.qsql) — bilaterally-signed acceptances, numbered; the
+- [`TallyContract`](../packages/taleus-core/schema/draft1.qsql) — bilaterally-signed acceptances, numbered; the
   highest fully-signed number governs.
 
 So MyCHIPs' `draft → offer → open` with `H.`/`P.`/`B.` (holder/partner/both-signed) prefixes maps directly:

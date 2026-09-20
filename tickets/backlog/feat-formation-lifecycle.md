@@ -1,5 +1,5 @@
 description: Decide what an invitation that nobody ever accepts should leave behind, so abandoned invitations don't accumulate as half-built tallies.
-files: packages/taleus/schema/draft1.qsql, docs/architecture.md, packages/taleus-app/design/stories/mobile/01-invite-a-partner.md
+files: packages/taleus-core/schema/draft1.qsql, docs/architecture.md, packages/taleus-app/design/stories/mobile/01-invite-a-partner.md
 difficulty: medium
 ----
 ## Why this ticket exists

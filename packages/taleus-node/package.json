@@ -19,7 +19,7 @@
 		"lint": "eslint ./src"
 	},
 	"dependencies": {
-		"taleus": "workspace:^"
+		"taleus-core": "workspace:^"
 	},
 	"devDependencies": {
 		"@eslint/js": "10.0.1",

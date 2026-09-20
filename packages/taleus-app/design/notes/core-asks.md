@@ -1,9 +1,19 @@
-# Engine API — draft for discussion
+# What the mobile app asks of the core — one app's wish-list
 
-**Status: draft, for reaction.** Nothing here is settled. It is written from the app side: the mobile
-stories are complete and reviewed, the first screens are being generated, and mock mode is currently
-standing in for an engine that does not exist. This is what the app finds itself asking for. Where the
-engine's real shape should differ, it should — the app is the easier side to move.
+**This is an app document, not a core specification.** It lives under `taleus-app` because it was
+written from the app's side, by the app's authors, from the mobile stories. It states what *this*
+app finds convenient. It is not the shape `taleus-core` should take, and several things in it are
+frankly screen-shaped — `waitingOn: me | them | nobody` comes straight from story 23's attention
+list, and the seven-state enum from story 04.
+
+`taleus-core` is platform-neutral by design ([`docs/architecture.md`](../../../../docs/architecture.md)):
+it runs in Node, React Native and the browser, serves an ERP integration as readily as a phone, and
+will one day carry a MyCHIPs-style UI with a completely different screen layout. A core shaped to
+this document would serve none of those well. The app-specific layer belongs **in the app**.
+
+Read this, then, as evidence of what one consumer wants — useful input to the core's design, and a
+checklist to reconcile against once the core exists. Where the core's real shape should differ, it
+should; the app is the easier side to move.
 
 Companion material:
 

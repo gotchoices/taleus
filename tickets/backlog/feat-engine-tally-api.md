@@ -1,6 +1,6 @@
 description: Give the apps a way to carry a tally through its whole life — invite, respond, offer, accept, close, and read what's in force — without reaching into the database layers themselves.
 prereq: feat-offer-lifecycle, feat-schema-tally-state
-files: packages/taleus/src/index.ts, packages/taleus/schema/draft1.qsql, packages/taleus/schema/portfolio.qsql, packages/taleus-app/design/specs/domain/interfaces.md, packages/taleus-app/design/stories/mobile/
+files: packages/taleus-core/src/index.ts, packages/taleus-core/schema/draft1.qsql, packages/taleus-core/schema/portfolio.qsql, packages/taleus-app/design/specs/domain/interfaces.md, packages/taleus-app/design/stories/mobile/
 difficulty: hard
 ----
 ## Why this ticket exists
@@ -41,7 +41,7 @@ Drawn from the drafted stories in `packages/taleus-app/design/stories/mobile/`:
 
 ## A draft to react to
 
-`docs/drafts/engine-api.md` states this surface from the app's side — the asks, the shapes the stories
+`packages/taleus-app/design/notes/core-asks.md` states this surface from the app's side — the asks, the shapes the stories
 depend on, and five questions for whoever builds it. `packages/taleus-app/mock/data/` is the
 executable form of the same thing. Both are the app's guess, offered as a starting point rather than a
 specification.

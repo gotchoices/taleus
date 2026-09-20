@@ -1,6 +1,6 @@
 description: Make the engine usable in three ways — with no engine at all for design work, on a single device with no network, and fully live with peers — so the app can be built and tested long before a real network exists.
 prereq: feat-engine-tally-api
-files: packages/taleus/src/index.ts, packages/taleus-app/design/specs/domain/interfaces.md
+files: packages/taleus-core/src/index.ts, packages/taleus-app/design/specs/domain/interfaces.md
 difficulty: medium
 ----
 ## Why this ticket exists

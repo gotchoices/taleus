@@ -18,7 +18,7 @@ says which of the two the engine is handing over, `types.ts` carries `CivilDate`
 only civil dates in the fixtures; they now look like dates (`2026-03-02`, no clock) so the mistake
 cannot be made silently again.
 
-This is also a question for Nate — see `docs/drafts/engine-api.md`. If the engine returns everything
+This is also a question for Nate — see `packages/taleus-app/design/notes/core-asks.md`. If the engine returns everything
 as a timestamp, the app has to be told which ones are days.
 
 **"`TallyView` offers no next action" — real gap, wrong remedy.**

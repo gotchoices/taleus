@@ -91,7 +91,7 @@ Sereus fabric — sereus (cadre, strands), quereus (schema), optimystic (storage
 **What will be shared across targets?**
 
 - [x] Domain contract — `design/specs/domain/`
-- [x] Engine — the `taleus` package (`packages/taleus/`); behavior that is not app-specific belongs
+- [x] Engine — the `taleus` package (`packages/taleus-core/`); behavior that is not app-specific belongs
       there, not in a target
 - [x] Mock data — `mock/data/`
 

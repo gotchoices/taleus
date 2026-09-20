@@ -1,6 +1,6 @@
 description: Decide how someone who has lost everything gets back to trading with the people they already deal with — and whether any part of that can safely happen inside the app at all.
 prereq: feat-master-key-custody
-files: docs/architecture.md, packages/taleus/schema/draft1.qsql, packages/taleus-app/design/stories/mobile/50-recover-after-losing-a-device.md
+files: docs/architecture.md, packages/taleus-core/schema/draft1.qsql, packages/taleus-app/design/stories/mobile/50-recover-after-losing-a-device.md
 difficulty: hard
 ----
 ## Why this ticket exists

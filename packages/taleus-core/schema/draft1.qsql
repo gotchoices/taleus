@@ -1,3 +1,11 @@
+-- Taleus tally strand -- the two-party sApp schema.
+--
+-- ORDER MATTERS. Every statement here is executed in file order, and Quereus plans a
+-- view's body when the view is created, so a view must follow the tables it selects from.
+-- Table CHECK constraints are planned lazily at write time instead, which is why a table
+-- may reference a view defined below it (Ledger.WithinReservedCredit reads ReservedBalance).
+-- Hence: all tables first, then all views.
+
 create table Stock (
     Sid text,
     InvitationKey text,    --public key of sk sent to invited party
@@ -215,99 +223,6 @@ create table PartyKeyAdoption (
     constraint InsertOnly check on delete, update (0)
 );
 
--- Every key ever introduced for a party, revocation-agnostic: normal adds (PartyKey) plus
--- counterparty-attested adoptions (PartyKeyAdoption, the key-counterparty-rekey ceremony).
--- AuthorizedKey subtracts revocations from this; PartyKeyRevocation.TargetAuthorized reads THIS
--- view (not the authorized one) so a key stays a recognizable revocation target even after the
--- in-flight revocation buffers -- and, crucially, so an ADOPTED key is revocable exactly like a
--- normal add. Factored into its own view so the PartyKey-union-PartyKeyAdoption set is defined
--- once, not duplicated across every consumer. (union, not union all: the two sources never share a
--- (Sid, PublicKey) -- PartyKeyAdoption.UniqueKey forbids adopting a key already registered in
--- PartyKey -- so dedup is a safety net, not load-bearing.)
-create view RegisteredKey as
-    select Sid, PublicKey from PartyKey
-    union
-    select Sid, PublicKey from PartyKeyAdoption;
-
--- The party's currently-authorized signing keys: every registered key (RegisteredKey = adds plus
--- adoptions) minus revoked ones. Signature-gated tables resolve their SignerKey against this set.
--- Reads current (buffered+committed) state; constraints that must exclude the row being inserted
--- (PartyKey.RevisionMonotonicInt, PartyKey.AuthKeyAuthorized) use committed.* directly instead of
--- this view.
--- NOTE: every SignerAuthorized / RevokerAuthorized / NotLastKey / CounterpartyIsOther check
--- references THIS view (or RegisteredKey) from inside a CHECK sub-query. Confirmed against Quereus
--- source (planner/building/select.ts buildFrom inlines a view wherever a base table is accepted,
--- including constraint sub-queries, with no base-table-only guard) -- but Quereus has NO test
--- exercising a view inside a CHECK. If a future runner rejects a view here, the fallback is to
--- inline the body -- RegisteredKey (PartyKey union PartyKeyAdoption) minus PartyKeyRevocation --
--- directly into each referencing constraint.
--- NOTE: NEW here vs the sibling key-multi-and-revoke ticket -- PartyKeyAdoption.CounterpartyIsOther
--- references AuthorizedKey, while AuthorizedKey (via RegisteredKey) references PartyKeyAdoption: a
--- table<->view definitional CYCLE. It is unbreakable by reordering (each side names the other), so
--- the table is created before these views and relies on Quereus resolving view names at
--- statement-build time, not DDL-creation order. The committed.* forward table references already in
--- this schema resolve the same way; a view forward-reference is the same class, unexercised by any
--- runner.
-create view AuthorizedKey as
-    select RK.Sid, RK.PublicKey
-    from RegisteredKey RK
-    where not exists (select 1 from PartyKeyRevocation R where R.Sid = RK.Sid and R.PublicKey = RK.PublicKey);
-
--- Tally identity record (feat-schema-tally-core). The founding facts of the tally, whose digest IS the
--- tally CID -- the per-strand anchor every Cid-bound signature (contracts, chits, pledges) binds to, so a
--- row signed for this tally can never be replayed into another. Single row, insert-only, created once at
--- formation. Created AFTER seating (both Stock and Foil rows exist) and BEFORE negotiation: no Cid-bound
--- table is written until negotiation, and the seating tables (Stock/Foil/PartyKey/PartyCertificate)
--- deliberately do NOT bind to Cid, so the invitee's Sid is already known when this row is needed. Folding
--- FoilSid into the Cid makes the identity commit to BOTH parties -- see the replay NOTE.
---
--- Cid = Digest(StockSid, FoilSid, ProtocolVersion, CreatedAt). The stored Cid must equal that digest
--- (CidCorrect); StockSid/FoilSid must be the actually-seated parties (StockSeated/FoilSeated pin them to
--- the single-row Stock/Foil tables), so even a malicious initiator cannot name a counterparty who never
--- seated. Signed by an authorized key of the STOCK (initiator) party -- "created by the initiator".
---
--- NOTE (replay): both party Sids are folded into the Cid, so the tally identity cryptographically commits
--- to WHICH two parties it binds. A chit/contract/pledge digest binding this Cid cannot validate in any
--- tally with a different party pair. Excluding FoilSid (the provision-time alternative) would commit only
--- to the initiator + timestamp, weakening cross-tally replay protection -- rejected.
--- NOTE (CreatedAt trust): CreatedAt is chosen by the inserting (stock) party. A dishonest value only
--- changes the Cid, which both parties observe before binding any negotiation signature to it -- disputable,
--- not silently exploitable. Not gated against now() (that would make the insert volatile/non-deterministic,
--- same reasoning as CreditTerms.Date at schema/draft1.qsql:486-495).
--- NOTE: StockSeated/FoilSeated pin each Sid independently; a self-tally (StockSid = FoilSid) is not
--- rejected here. Fine now -- honest two-party seating cannot produce it (Foil requires the invitee to
--- sign with Stock's out-of-band invitation secret). If a formation path ever lets one party hold both
--- roles, add a StockSid <> FoilSid check here (PerspectiveBalance et al. union the two Sids and would
--- collapse to one party).
-create table TallyCore (
-    Cid text,              -- tally id: digest of the founding fields below; the per-strand signature anchor
-    StockSid text,         -- initiator (stock) party identity
-    FoilSid text,          -- invitee (foil) party identity
-    ProtocolVersion text,  -- Taleus tally protocol version in force at formation
-    CreatedAt text,        -- formation timestamp
-    SignerKey text,        -- authorized PartyKey of StockSid that signed this row
-    Signature text,
-
-    primary key (/* 1 row */),
-    -- Cid is the content address of the founding fields: the stored value must equal their digest.
-    constraint CidCorrect check on insert (New.Cid = Digest(StockSid, FoilSid, ProtocolVersion, CreatedAt)),
-    -- StockSid/FoilSid must name the actually-seated parties (both tables are single-row), so the identity
-    -- cannot be minted against a counterparty who never seated. Requiring the Foil row also pins creation
-    -- to AFTER the invitee seats.
-    constraint StockSeated check on insert (New.StockSid in (select Sid from Stock)),
-    constraint FoilSeated check on insert (New.FoilSid in (select Sid from Foil)),
-    constraint ProtocolVersionPresent check on insert (New.ProtocolVersion is not null and New.ProtocolVersion <> ''),
-    constraint CreatedAtValid check on insert (ValidDate(New.CreatedAt)),
-    -- Initiator (stock) creates the identity: SignerKey resolves against the STOCK party's authorized set.
-    constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.StockSid)),
-    constraint SignatureValid check on insert (SignatureValid(
-        Digest(StockSid, FoilSid, ProtocolVersion, CreatedAt),
-        Signature,
-        New.SignerKey
-    )),
-    constraint InsertOnly check on delete, update (0)
-);
-
 create table PartyCertificate (
     PartySid text,
     Revision integer,
@@ -375,7 +290,6 @@ create table TallyContractProposal (
         New.SignerKey
     ))
 );
-
 
 create table TallyContract (
     Number integer,
@@ -526,13 +440,13 @@ create table CreditTerms (
     -- Shortening CallDays is itself restrictive: otherwise a grantor could instantly shorten notice,
     -- then yank the limit. A revision that raises CreditLimit but shortens CallDays is restrictive.
     constraint EffectiveDateValid check on insert (
-        (New.Revision = 1 and julianday(New.EffectiveDate) = julianday(New.Date))
+        (New.Revision = 1 and DayNumber(New.EffectiveDate) = DayNumber(New.Date))
         or (New.Revision > 1 and
             case
                 when New.CreditLimit >= (select CreditLimit from committed.CreditTerms CT where CT.Sid = New.Sid and CT.Revision = New.Revision - 1)
                  and New.CallDays   >= (select CallDays   from committed.CreditTerms CT where CT.Sid = New.Sid and CT.Revision = New.Revision - 1)
-                then julianday(New.EffectiveDate) = julianday(New.Date)
-                else julianday(New.EffectiveDate) >= julianday(New.Date)
+                then DayNumber(New.EffectiveDate) = DayNumber(New.Date)
+                else DayNumber(New.EffectiveDate) >= DayNumber(New.Date)
                      + (select CallDays from committed.CreditTerms CT where CT.Sid = New.Sid and CT.Revision = New.Revision - 1)
             end)
     ),
@@ -571,189 +485,6 @@ create table CloseRequest (
     constraint InsertOnly check on delete, update (0)
 );
 
--- Effective (latest-revision) trading variables per party.
--- A party that has published none trades at the MyCHIPs defaults (all zero):
--- lifts may pay its accumulated balance down to zero for free, and accumulate nothing beyond that.
-create view CurrentTradingVariable as
-    select P.Sid,
-        coalesce(TV.Target, 0) as Target,
-        coalesce(TV.Bound, 0) as Bound,
-        coalesce(TV.Reward, 0) as Reward,
-        coalesce(TV.Clutch, 0) as Clutch
-    from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P
-        left join TradingVariable TV on TV.Sid = P.Sid
-            and TV.Revision = (select max(Revision) from TradingVariable T2 where T2.Sid = P.Sid);
-
--- Effective (latest-effective-revision) credit limit each party grants, as of now.
--- Advisory only -- fuels LiftLading capacity advertisement; the hard safety gate is the
--- deterministic, chit-dated Ledger.WithinCreditLimits below. Effective limit = CreditLimit of
--- the highest-Revision CreditTerms row whose EffectiveDate <= now; absent any row -> 0.
--- NOTE: julianday('now')/date('now') are VOLATILE -- fine in a plain view; NOT allowed in a
--- MATERIALIZED view (Quereus hard-rejects volatile there). If a future runner rejects
--- volatile-in-view, fall back to computing the effective revision in the lift agent
--- (application) and keep the deterministic chit-dated Ledger gate as the safety boundary.
-create view CurrentCreditLimit as
-    select P.Sid,
-        coalesce((select CT.CreditLimit from CreditTerms CT
-                  where CT.Sid = P.Sid and julianday(CT.EffectiveDate) <= julianday('now')
-                  order by CT.Revision desc limit 1), 0) as CreditLimit
-    from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
-
--- Tally balance from each party's perspective (positive = value that party has accumulated), SETTLED
--- only: direct chits + FINALIZED lifts -- the Ledger.Balance chain. This is the authoritative signed
--- balance and stays the value reports/PerspectiveBalance consumers read.
--- Ledger convention: foil-issued chits increment Balance, so raw Balance is already
--- the stock holder's perspective; the foil holder sees its negation.
--- Pending (unresolved) lift chits are deliberately NOT folded in here: a pledge reserves capacity via
--- the separate ReservedBalance / ReservedPerspectiveBalance views (below) and only enters this settled
--- chain when it FINALIZES. LiftLading advertises free capacity from the RESERVED views, so open pending
--- lifts shrink advertised capacity without moving the signed balance -- this realizes the former "fold in
--- pending lift chits" plan item (the pending-aware view is ReservedPerspectiveBalance, not this one). Open
--- invoices are likewise advisory-only (OpenInvoice), not folded into this Balance or the hard credit gate.
-create view PerspectiveBalance as
-    select P.Sid,
-        coalesce((select Balance from Ledger order by Number desc limit 1), 0)
-            * (case when P.Sid = (select StockSid from TallyCore) then 1 else -1 end) as Balance
-    from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
-
--- Open (unresolved) pending lifts: a PendingLift row with NEITHER a Ledger finalize (Kind='lift') NOR a
--- LiftVoid for its LiftId. This is the reservation set -- ReservedBalance sums it. A finalize or a void
--- drops the row out immediately (its capacity moves to the settled chain, or is released), so the reserved
--- gate counts open pledges only.
-create view OpenPendingLift as
-    select PL.LiftId, PL.RefereeKey, PL.Issuer, PL.Units, PL.Date, PL.Expiry, PL.SignerKey, PL.Signature
-    from PendingLift PL
-    where not exists (select 1 from Ledger L where L.LiftId = PL.LiftId and L.Kind = 'lift')
-      and not exists (select 1 from LiftVoid V where V.LiftId = PL.LiftId);
-
--- Derived close lifecycle (feat-schema-tally-close): open / closing / closed, one row (TallyCore is one row).
---   'open'    -- no CloseRequest row filed. Does NOT distinguish Forming / Open / Void: those depend on
---                contract/formation state the schema does not materialize today (out of scope).
---   'closing' -- a CloseRequest row exists but the tally is not yet a stable zero.
---   'closed'  -- terminal, stable: the SETTLED balance (raw Ledger.Balance, latest row) is zero AND no
---                pending lift is still open. The open-pledge test is load-bearing -- without it a still-open
---                pledge could later finalize and bump a "closed" tally back off zero, so 'closed' would not
---                be stable. Reads settled Ledger.Balance (not reserved) so a finalize can never unsettle it.
-create view CloseState as
-    select case
-        when not exists (select 1 from CloseRequest) then 'open'
-        when coalesce((select Balance from Ledger order by Number desc limit 1), 0) = 0
-             and not exists (select 1 from OpenPendingLift) then 'closed'
-        else 'closing'
-    end as State
-    from TallyCore;   -- single row
-
--- Reserved balance = settled signed balance + every OPEN pending-lift delta, stock-perspective (same sign
--- convention as raw Ledger.Balance: foil-issued +Units, stock-issued -Units, matching BalanceCorrect).
--- Single row (TallyCore is one row). New PendingLift pledges and new direct chits gate against THIS via
--- WithinReservedCredit so concurrent lifts cannot collectively over-commit; LiftLading advertises net of it.
--- Because the gate reads this with a plain (buffered+committed) ref, the row being inserted is already
--- reflected -- see WithinReservedCredit on PendingLift and Ledger.
-create view ReservedBalance as
-    select
-        coalesce((select Balance from Ledger order by Number desc limit 1), 0)
-        + coalesce((select sum(Units * case when Issuer = 'F' then 1 else -1 end) from OpenPendingLift), 0)
-            as Balance
-    from TallyCore;
-
--- Per-party reserved balance -- mirrors PerspectiveBalance but off ReservedBalance (settled + open
--- pending), negated for the foil side. LiftLading advertises from this; PerspectiveBalance stays SETTLED.
-create view ReservedPerspectiveBalance as
-    select P.Sid,
-        (select Balance from ReservedBalance)
-            * (case when P.Sid = (select StockSid from TallyCore) then 1 else -1 end) as Balance
-    from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
-
--- Lift lading: what a lift may move through this tally, per direction.
--- A direction is named by its receiver -- the party whose perspective balance rises;
--- the counterparty releases the same value (perspective balances are negatives of each
--- other). One row per party; a drop is the same movement read from the other row.
---   FreeUnits:     receiver accumulation up to its Target -- no reward fee
---   RewardedUnits: further accumulation up to its Bound, charged at the receiver's Reward
---   Reward/Clutch: per-unit fee ratios (ppm); Clutch is the releasing counterparty's
---                  charge and applies to the whole moved amount
--- Fee ratios compose along a lift route as NewRate = PriorRate + MyRate * (1 - PriorRate).
--- Receiver accumulation is additionally capped by the credit the RECEIVER granted the
--- counterparty: a lift raises the receiver's perspective balance (the counterparty's debt to
--- the receiver), bounded by CurrentCreditLimit. Cap = min(Bound, receiver's effective
--- CreditLimit); Balance + moved <= Cap. Advisory only -- the hard safety gate is the
--- deterministic, chit-dated Ledger.WithinCreditLimits / WithinReservedCredit.
--- Balance here is the RESERVED perspective balance (settled + open pending lifts), so an open pledge
--- already subtracts from advertised free capacity -- concurrent lifts do not double-advertise the same room.
--- NOTE (pre-existing, unrelated to lift chits): the FreeUnits/RewardedUnits math below uses SCALAR 2-arg
--- max()/min(), which Quereus does not provide (it has aggregate min/max only, so this view fails to bind:
--- "Function not found: max/2"). Predates this ticket; tracked in backlog/debt-schema-liftlading-scalar-minmax
--- (rewrite as CASE expressions, or add scalar min/max upstream). Everything else in the lift-chit machinery
--- binds cleanly on Quereus -- this is the sole exception.
-create view LiftLading as
-    select
-        RV.Sid as ReceiverSid,
-        max(0, min(RV.Target, min(RV.Bound, CCL.CreditLimit)) - PB.Balance) as FreeUnits,
-        max(0, min(RV.Bound, CCL.CreditLimit) - max(PB.Balance, RV.Target)) as RewardedUnits,
-        RV.Reward,
-        CV.Clutch
-    from CurrentTradingVariable RV
-        join ReservedPerspectiveBalance PB on PB.Sid = RV.Sid
-        join CurrentCreditLimit CCL on CCL.Sid = RV.Sid
-        join CurrentTradingVariable CV on CV.Sid <> RV.Sid;
-
--- Invoice state, derived from the tables (never stored). Precedence paid > declined > expired > open.
--- 'paid' is checked first, so the derived state stays deterministic even if a decline and a chit both
--- somehow commit (self-inflicted -- both are the payer's own actions; see InvoiceLink / InvoiceDecline).
--- 'expired' is time-derived (julianday('now') is VOLATILE -- fine in a plain view, NOT allowed in a
--- MATERIALIZED view; same caveat as CurrentCreditLimit at schema/draft1.qsql:504). It is deliberately
--- NOT gated at chit insert -- a late payment still succeeds and 'paid' wins by precedence.
-create view InvoiceState as
-    select I.Id, I.Requester, I.Units, I.Date, I.ExpiryDate,
-        case
-            when exists (select 1 from Ledger L where L.InvoiceId = I.Id) then 'paid'
-            when exists (select 1 from InvoiceDecline D where D.InvoiceId = I.Id) then 'declined'
-            when I.ExpiryDate is not null and julianday(I.ExpiryDate) < julianday('now') then 'expired'
-            else 'open'
-        end as State
-    from Invoice I;
-
--- Open (unanswered, undeclined, unexpired) invoices -- advisory signal of upcoming balance movement
--- for the lift agent / credit-check application layer. NOT folded into LiftLading or WithinCreditLimits.
-create view OpenInvoice as
-    select Id, Requester, Units, Date, ExpiryDate from InvoiceState where State = 'open';
-
--- Payment request. One party formally asks the counterparty to pay it: the Requester is the party that
--- wants to RECEIVE value (the future chit recipient), so the answering chit's Issuer is always the
--- OPPOSITE side (see Ledger.InvoiceLink and the BalanceCorrect convention). Signed by the requester;
--- insert-only, Cid-bound digest, no mutable state. An invoice is a REQUEST, not a commitment: it is
--- NOT gated against credit limits at insert (requesting more than current capacity is legitimate -- the
--- payer may raise credit first), and its expiry is time-derived and advisory (see InvoiceState), so the
--- insert stays deterministic/non-volatile. State (open/declined/expired/paid) is DERIVED, never stored.
-create table Invoice (
-    Id text default RandomUUID(),
-    Requester text check (Requester in ('S', 'F')),  -- party requesting payment (future recipient)
-    Units integer check (Units > 0),                 -- smallest denomination unit, exact-match by the answering chit
-    Date text check (ValidDate(Date)),
-    ExpiryDate text null,                           -- null = never expires
-    Reference text,                                 -- machine-readable JSON (stored as text, no parser -- house rule)
-    Memo text,
-    SignerKey text,                                 -- authorized PartyKey of the requesting party
-    Signature text,
-
-    primary key (Id),
-    -- SignerKey resolves against the REQUESTING side's own authorized set.
-    constraint SignerAuthorized check on insert (New.SignerKey in (
-        select PublicKey from AuthorizedKey AK
-        where AK.Sid = (select case when New.Requester = 'S' then StockSid else FoilSid end from TallyCore)
-    )),
-    constraint SignatureValid check on insert (SignatureValid(
-        Digest((select Cid from TallyCore), Id, Requester, Units, Date, ExpiryDate, Reference, Memo),
-        Signature, New.SignerKey
-    )),
-    -- ExpiryDate, when present, must be a valid date at or after Date.
-    constraint ExpiryValid check on insert (
-        New.ExpiryDate is null
-        or (ValidDate(New.ExpiryDate) and julianday(New.ExpiryDate) >= julianday(New.Date))
-    ),
-    constraint InsertOnly check on delete, update (0)
-);
-
 -- A signed decline of an invoice by the PAYER (the counterparty of the requester). Expiry needs no row
 -- (it is time-derived); a decline is an explicit act and so needs a signed record. At most one per
 -- invoice, and only before the invoice is answered by a chit.
@@ -786,7 +517,7 @@ create table InvoiceDecline (
 create table Ledger (
     Number integer, -- Sequential, monotonically increasing
     ContractNumber integer,
-    Id text default RandomUUID(),
+    Id text,               -- caller-supplied: it is inside the signed digest, so the signer must know it first
     Issuer text check (Issuer in ('S', 'F')), -- S = Stock, F = Foil
     Units integer check (Units > 0),
     Date text check (ValidDate(Date)),
@@ -836,6 +567,17 @@ create table Ledger (
         Coalesce((select Balance from Ledger where Number = Number - 1), 0)
             + (Units * case when Issuer = 'F' then 1 else -1 end) = Balance
     ),
+    -- Time bound (docs/timestamps.md). A chit may not be dated before the chit preceding it in the
+    -- chain. Deterministic -- it compares two signed values already in the strand, never a clock --
+    -- and it is what stops an issuer reaching back past a restrictive credit reduction to select an
+    -- older, larger limit. Any activity on the tally re-anchors the floor, so the reachable window
+    -- is the gap since the last chit; a long-dormant tally is the case this does not cover, and the
+    -- receiving agent's own clock is the check there.
+    constraint DateMonotonic check on insert (
+        DayNumber(New.Date) >= Coalesce(
+            (select DayNumber(Date) from committed.Ledger L where L.Number = New.Number - 1),
+            DayNumber(New.Date))
+    ),
     -- Credit gate. The prospective (stock-perspective) Balance must sit within the credit each
     -- party extended, effective as of THIS chit's own signed Date -- deterministic, no now().
     -- Stock-granted limit caps how far Balance may RISE (foil's debt to stock); foil-granted limit
@@ -853,24 +595,24 @@ create table Ledger (
     -- credit check could reject a finalize the other strands accept -- breaking cross-strand atomicity.
     -- The pledge was already reserved-gated at insert; the referee commit is authoritative. This can push
     -- the settled Balance past the nominal limit (soft-limit NOTE) -- accepted: a committed lift is binding.
-    -- NOTE: gate keys off the issuer-signed New.Date, which is unconstrained (no Date/Number
-    -- monotonicity on Ledger) and chits are unilateral (issuer-signed only -- this CHECK is the SOLE
-    -- enforcement, no counterparty countersignature). An issuer can therefore backdate a chit to a
-    -- pre-reduction date to select an older, higher effective limit and exceed the limit now in force,
-    -- defeating restrictive-change notice. Design decision tracked in
-    -- backlog/debt-credit-gate-chit-date-backdating (bound Date, gate on now(), or accept as disputable).
+    -- NOTE: the gate keys off the issuer-signed New.Date, and chits are unilateral (issuer-signed
+    -- only -- this CHECK is the SOLE schema enforcement, no counterparty countersignature). So the
+    -- gate inherits whatever honesty the date has. Backdating past a restrictive reduction would
+    -- select an older, larger limit; DateMonotonic (below) bounds how far back a chit may reach, and
+    -- the receiving agent's clock check bounds the rest. A dormant tally is the residual exposure.
+    -- Reasoned through in docs/timestamps.md; see also backlog/debt-credit-gate-chit-date-backdating.
     constraint WithinCreditLimits check on insert (
         New.Kind = 'lift'
         or (
             Balance <= coalesce((
                 select CT.CreditLimit from CreditTerms CT
                 where CT.Sid = (select StockSid from TallyCore)
-                  and julianday(CT.EffectiveDate) <= julianday(New.Date)
+                  and DayNumber(CT.EffectiveDate) <= DayNumber(New.Date)
                 order by CT.Revision desc limit 1), 0)
             and Balance >= -coalesce((
                 select CT.CreditLimit from CreditTerms CT
                 where CT.Sid = (select FoilSid from TallyCore)
-                  and julianday(CT.EffectiveDate) <= julianday(New.Date)
+                  and DayNumber(CT.EffectiveDate) <= DayNumber(New.Date)
                 order by CT.Revision desc limit 1), 0)
         )
     ),
@@ -885,12 +627,12 @@ create table Ledger (
             (select Balance from ReservedBalance) <= coalesce((
                 select CT.CreditLimit from CreditTerms CT
                 where CT.Sid = (select StockSid from TallyCore)
-                  and julianday(CT.EffectiveDate) <= julianday(New.Date)
+                  and DayNumber(CT.EffectiveDate) <= DayNumber(New.Date)
                 order by CT.Revision desc limit 1), 0)
             and (select Balance from ReservedBalance) >= -coalesce((
                 select CT.CreditLimit from CreditTerms CT
                 where CT.Sid = (select FoilSid from TallyCore)
-                  and julianday(CT.EffectiveDate) <= julianday(New.Date)
+                  and DayNumber(CT.EffectiveDate) <= DayNumber(New.Date)
                 order by CT.Revision desc limit 1), 0)
         )
     ),
@@ -1049,7 +791,7 @@ create table PendingLift (
         Signature,
         New.SignerKey
     )),
-    constraint ExpiryValid check on insert (julianday(Expiry) >= julianday(Date)),
+    constraint ExpiryValid check on insert (DayNumber(Expiry) >= DayNumber(Date)),
     -- Reserved-credit gate: the prospective RESERVED balance (settled + all open pending, INCLUDING this new
     -- pledge -- a plain ref to ReservedBalance already buffers it in) must sit within both parties' limits as
     -- of New.Date. Same limit lookup as Ledger.WithinCreditLimits (highest-Revision CreditTerms row whose
@@ -1060,12 +802,12 @@ create table PendingLift (
         (select Balance from ReservedBalance) <= coalesce((
             select CT.CreditLimit from CreditTerms CT
             where CT.Sid = (select StockSid from TallyCore)
-              and julianday(CT.EffectiveDate) <= julianday(New.Date)
+              and DayNumber(CT.EffectiveDate) <= DayNumber(New.Date)
             order by CT.Revision desc limit 1), 0)
         and (select Balance from ReservedBalance) >= -coalesce((
             select CT.CreditLimit from CreditTerms CT
             where CT.Sid = (select FoilSid from TallyCore)
-              and julianday(CT.EffectiveDate) <= julianday(New.Date)
+              and DayNumber(CT.EffectiveDate) <= DayNumber(New.Date)
             order by CT.Revision desc limit 1), 0)
     ),
     -- Closing gate (feat-schema-tally-close): while any CloseRequest is filed, a new pledge may only move the
@@ -1117,4 +859,283 @@ create table LiftVoid (
     )),
     constraint InsertOnly check on delete, update (0)
 );
+
+-- Every key ever introduced for a party, revocation-agnostic: normal adds (PartyKey) plus
+-- counterparty-attested adoptions (PartyKeyAdoption, the key-counterparty-rekey ceremony).
+-- AuthorizedKey subtracts revocations from this; PartyKeyRevocation.TargetAuthorized reads THIS
+-- view (not the authorized one) so a key stays a recognizable revocation target even after the
+-- in-flight revocation buffers -- and, crucially, so an ADOPTED key is revocable exactly like a
+-- normal add. Factored into its own view so the PartyKey-union-PartyKeyAdoption set is defined
+-- once, not duplicated across every consumer. (union, not union all: the two sources never share a
+-- (Sid, PublicKey) -- PartyKeyAdoption.UniqueKey forbids adopting a key already registered in
+-- PartyKey -- so dedup is a safety net, not load-bearing.)
+-- Tally identity record (feat-schema-tally-core). The founding facts of the tally, whose digest IS the
+-- tally CID -- the per-strand anchor every Cid-bound signature (contracts, chits, pledges) binds to, so a
+-- row signed for this tally can never be replayed into another. Single row, insert-only, created once at
+-- formation. Created AFTER seating (both Stock and Foil rows exist) and BEFORE negotiation: no Cid-bound
+-- table is written until negotiation, and the seating tables (Stock/Foil/PartyKey/PartyCertificate)
+-- deliberately do NOT bind to Cid, so the invitee's Sid is already known when this row is needed. Folding
+-- FoilSid into the Cid makes the identity commit to BOTH parties -- see the replay NOTE.
+--
+-- Cid = Digest(StockSid, FoilSid, ProtocolVersion, CreatedAt). The stored Cid must equal that digest
+-- (CidCorrect); StockSid/FoilSid must be the actually-seated parties (StockSeated/FoilSeated pin them to
+-- the single-row Stock/Foil tables), so even a malicious initiator cannot name a counterparty who never
+-- seated. Signed by an authorized key of the STOCK (initiator) party -- "created by the initiator".
+--
+-- NOTE (replay): both party Sids are folded into the Cid, so the tally identity cryptographically commits
+-- to WHICH two parties it binds. A chit/contract/pledge digest binding this Cid cannot validate in any
+-- tally with a different party pair. Excluding FoilSid (the provision-time alternative) would commit only
+-- to the initiator + timestamp, weakening cross-tally replay protection -- rejected.
+-- NOTE (CreatedAt trust): CreatedAt is chosen by the inserting (stock) party. A dishonest value only
+-- changes the Cid, which both parties observe before binding any negotiation signature to it -- disputable,
+-- not silently exploitable. Not gated against now() (that would make the insert volatile/non-deterministic,
+-- same reasoning as CreditTerms.Date at schema/draft1.qsql:486-495).
+-- NOTE: StockSeated/FoilSeated pin each Sid independently; a self-tally (StockSid = FoilSid) is not
+-- rejected here. Fine now -- honest two-party seating cannot produce it (Foil requires the invitee to
+-- sign with Stock's out-of-band invitation secret). If a formation path ever lets one party hold both
+-- roles, add a StockSid <> FoilSid check here (PerspectiveBalance et al. union the two Sids and would
+-- collapse to one party).
+create table TallyCore (
+    Cid text,              -- tally id: digest of the founding fields below; the per-strand signature anchor
+    StockSid text,         -- initiator (stock) party identity
+    FoilSid text,          -- invitee (foil) party identity
+    ProtocolVersion text,  -- Taleus tally protocol version in force at formation
+    CreatedAt text,        -- formation timestamp
+    SignerKey text,        -- authorized PartyKey of StockSid that signed this row
+    Signature text,
+
+    primary key (/* 1 row */),
+    -- Cid is the content address of the founding fields: the stored value must equal their digest.
+    constraint CidCorrect check on insert (New.Cid = Digest(StockSid, FoilSid, ProtocolVersion, CreatedAt)),
+    -- StockSid/FoilSid must name the actually-seated parties (both tables are single-row), so the identity
+    -- cannot be minted against a counterparty who never seated. Requiring the Foil row also pins creation
+    -- to AFTER the invitee seats.
+    constraint StockSeated check on insert (New.StockSid in (select Sid from Stock)),
+    constraint FoilSeated check on insert (New.FoilSid in (select Sid from Foil)),
+    constraint ProtocolVersionPresent check on insert (New.ProtocolVersion is not null and New.ProtocolVersion <> ''),
+    constraint CreatedAtValid check on insert (ValidDate(New.CreatedAt)),
+    -- Initiator (stock) creates the identity: SignerKey resolves against the STOCK party's authorized set.
+    constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.StockSid)),
+    constraint SignatureValid check on insert (SignatureValid(
+        Digest(StockSid, FoilSid, ProtocolVersion, CreatedAt),
+        Signature,
+        New.SignerKey
+    )),
+    constraint InsertOnly check on delete, update (0)
+);
+
+-- Payment request. One party formally asks the counterparty to pay it: the Requester is the party that
+-- wants to RECEIVE value (the future chit recipient), so the answering chit's Issuer is always the
+-- OPPOSITE side (see Ledger.InvoiceLink and the BalanceCorrect convention). Signed by the requester;
+-- insert-only, Cid-bound digest, no mutable state. An invoice is a REQUEST, not a commitment: it is
+-- NOT gated against credit limits at insert (requesting more than current capacity is legitimate -- the
+-- payer may raise credit first), and its expiry is time-derived and advisory (see InvoiceState), so the
+-- insert stays deterministic/non-volatile. State (open/declined/expired/paid) is DERIVED, never stored.
+create table Invoice (
+    Id text,               -- caller-supplied: it is inside the signed digest, so the signer must know it first
+    Requester text check (Requester in ('S', 'F')),  -- party requesting payment (future recipient)
+    Units integer check (Units > 0),                 -- smallest denomination unit, exact-match by the answering chit
+    Date text check (ValidDate(Date)),
+    ExpiryDate text null,                           -- null = never expires
+    Reference text,                                 -- machine-readable JSON (stored as text, no parser -- house rule)
+    Memo text,
+    SignerKey text,                                 -- authorized PartyKey of the requesting party
+    Signature text,
+
+    primary key (Id),
+    -- SignerKey resolves against the REQUESTING side's own authorized set.
+    constraint SignerAuthorized check on insert (New.SignerKey in (
+        select PublicKey from AuthorizedKey AK
+        where AK.Sid = (select case when New.Requester = 'S' then StockSid else FoilSid end from TallyCore)
+    )),
+    constraint SignatureValid check on insert (SignatureValid(
+        Digest((select Cid from TallyCore), Id, Requester, Units, Date, ExpiryDate, Reference, Memo),
+        Signature, New.SignerKey
+    )),
+    -- ExpiryDate, when present, must be a valid date at or after Date.
+    constraint ExpiryValid check on insert (
+        New.ExpiryDate is null
+        or (ValidDate(New.ExpiryDate) and DayNumber(New.ExpiryDate) >= DayNumber(New.Date))
+    ),
+    constraint InsertOnly check on delete, update (0)
+);
+
+create view RegisteredKey as
+    select Sid, PublicKey from PartyKey
+    union
+    select Sid, PublicKey from PartyKeyAdoption;
+
+-- The party's currently-authorized signing keys: every registered key (RegisteredKey = adds plus
+-- adoptions) minus revoked ones. Signature-gated tables resolve their SignerKey against this set.
+-- Reads current (buffered+committed) state; constraints that must exclude the row being inserted
+-- (PartyKey.RevisionMonotonicInt, PartyKey.AuthKeyAuthorized) use committed.* directly instead of
+-- this view.
+-- NOTE: every SignerAuthorized / RevokerAuthorized / NotLastKey / CounterpartyIsOther check
+-- references THIS view (or RegisteredKey) from inside a CHECK sub-query. Confirmed against Quereus
+-- source (planner/building/select.ts buildFrom inlines a view wherever a base table is accepted,
+-- including constraint sub-queries, with no base-table-only guard) -- but Quereus has NO test
+-- exercising a view inside a CHECK. If a future runner rejects a view here, the fallback is to
+-- inline the body -- RegisteredKey (PartyKey union PartyKeyAdoption) minus PartyKeyRevocation --
+-- directly into each referencing constraint.
+-- NOTE: NEW here vs the sibling key-multi-and-revoke ticket -- PartyKeyAdoption.CounterpartyIsOther
+-- references AuthorizedKey, while AuthorizedKey (via RegisteredKey) references PartyKeyAdoption: a
+-- table<->view definitional CYCLE. It is unbreakable by reordering (each side names the other), so
+-- the table is created before these views and relies on Quereus resolving view names at
+-- statement-build time, not DDL-creation order. The committed.* forward table references already in
+-- this schema resolve the same way; a view forward-reference is the same class, unexercised by any
+-- runner.
+create view AuthorizedKey as
+    select RK.Sid, RK.PublicKey
+    from RegisteredKey RK
+    where not exists (select 1 from PartyKeyRevocation R where R.Sid = RK.Sid and R.PublicKey = RK.PublicKey);
+
+
+-- Effective (latest-revision) trading variables per party.
+-- A party that has published none trades at the MyCHIPs defaults (all zero):
+-- lifts may pay its accumulated balance down to zero for free, and accumulate nothing beyond that.
+create view CurrentTradingVariable as
+    select P.Sid,
+        coalesce(TV.Target, 0) as Target,
+        coalesce(TV.Bound, 0) as Bound,
+        coalesce(TV.Reward, 0) as Reward,
+        coalesce(TV.Clutch, 0) as Clutch
+    from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P
+        left join TradingVariable TV on TV.Sid = P.Sid
+            and TV.Revision = (select max(Revision) from TradingVariable T2 where T2.Sid = P.Sid);
+
+-- Effective (latest-effective-revision) credit limit each party grants, as of now.
+-- Advisory only -- fuels LiftLading capacity advertisement; the hard safety gate is the
+-- deterministic, chit-dated Ledger.WithinCreditLimits below. Effective limit = CreditLimit of
+-- the highest-Revision CreditTerms row whose EffectiveDate <= now; absent any row -> 0.
+-- NOTE: DayNumber('now')/date('now') are VOLATILE -- fine in a plain view; NOT allowed in a
+-- MATERIALIZED view (Quereus hard-rejects volatile there). If a future runner rejects
+-- volatile-in-view, fall back to computing the effective revision in the lift agent
+-- (application) and keep the deterministic chit-dated Ledger gate as the safety boundary.
+create view CurrentCreditLimit as
+    select P.Sid,
+        coalesce((select CT.CreditLimit from CreditTerms CT
+                  where CT.Sid = P.Sid and DayNumber(CT.EffectiveDate) <= DayNumber('now')
+                  order by CT.Revision desc limit 1), 0) as CreditLimit
+    from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
+
+-- Tally balance from each party's perspective (positive = value that party has accumulated), SETTLED
+-- only: direct chits + FINALIZED lifts -- the Ledger.Balance chain. This is the authoritative signed
+-- balance and stays the value reports/PerspectiveBalance consumers read.
+-- Ledger convention: foil-issued chits increment Balance, so raw Balance is already
+-- the stock holder's perspective; the foil holder sees its negation.
+-- Pending (unresolved) lift chits are deliberately NOT folded in here: a pledge reserves capacity via
+-- the separate ReservedBalance / ReservedPerspectiveBalance views (below) and only enters this settled
+-- chain when it FINALIZES. LiftLading advertises free capacity from the RESERVED views, so open pending
+-- lifts shrink advertised capacity without moving the signed balance -- this realizes the former "fold in
+-- pending lift chits" plan item (the pending-aware view is ReservedPerspectiveBalance, not this one). Open
+-- invoices are likewise advisory-only (OpenInvoice), not folded into this Balance or the hard credit gate.
+create view PerspectiveBalance as
+    select P.Sid,
+        coalesce((select Balance from Ledger order by Number desc limit 1), 0)
+            * (case when P.Sid = (select StockSid from TallyCore) then 1 else -1 end) as Balance
+    from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
+
+-- Open (unresolved) pending lifts: a PendingLift row with NEITHER a Ledger finalize (Kind='lift') NOR a
+-- LiftVoid for its LiftId. This is the reservation set -- ReservedBalance sums it. A finalize or a void
+-- drops the row out immediately (its capacity moves to the settled chain, or is released), so the reserved
+-- gate counts open pledges only.
+create view OpenPendingLift as
+    select PL.LiftId, PL.RefereeKey, PL.Issuer, PL.Units, PL.Date, PL.Expiry, PL.SignerKey, PL.Signature
+    from PendingLift PL
+    where not exists (select 1 from Ledger L where L.LiftId = PL.LiftId and L.Kind = 'lift')
+      and not exists (select 1 from LiftVoid V where V.LiftId = PL.LiftId);
+
+-- Derived close lifecycle (feat-schema-tally-close): open / closing / closed, one row (TallyCore is one row).
+--   'open'    -- no CloseRequest row filed. Does NOT distinguish Forming / Open / Void: those depend on
+--                contract/formation state the schema does not materialize today (out of scope).
+--   'closing' -- a CloseRequest row exists but the tally is not yet a stable zero.
+--   'closed'  -- terminal, stable: the SETTLED balance (raw Ledger.Balance, latest row) is zero AND no
+--                pending lift is still open. The open-pledge test is load-bearing -- without it a still-open
+--                pledge could later finalize and bump a "closed" tally back off zero, so 'closed' would not
+--                be stable. Reads settled Ledger.Balance (not reserved) so a finalize can never unsettle it.
+create view CloseState as
+    select case
+        when not exists (select 1 from CloseRequest) then 'open'
+        when coalesce((select Balance from Ledger order by Number desc limit 1), 0) = 0
+             and not exists (select 1 from OpenPendingLift) then 'closed'
+        else 'closing'
+    end as State
+    from TallyCore;   -- single row
+
+-- Reserved balance = settled signed balance + every OPEN pending-lift delta, stock-perspective (same sign
+-- convention as raw Ledger.Balance: foil-issued +Units, stock-issued -Units, matching BalanceCorrect).
+-- Single row (TallyCore is one row). New PendingLift pledges and new direct chits gate against THIS via
+-- WithinReservedCredit so concurrent lifts cannot collectively over-commit; LiftLading advertises net of it.
+-- Because the gate reads this with a plain (buffered+committed) ref, the row being inserted is already
+-- reflected -- see WithinReservedCredit on PendingLift and Ledger.
+create view ReservedBalance as
+    select
+        coalesce((select Balance from Ledger order by Number desc limit 1), 0)
+        + coalesce((select sum(Units * case when Issuer = 'F' then 1 else -1 end) from OpenPendingLift), 0)
+            as Balance
+    from TallyCore;
+
+-- Per-party reserved balance -- mirrors PerspectiveBalance but off ReservedBalance (settled + open
+-- pending), negated for the foil side. LiftLading advertises from this; PerspectiveBalance stays SETTLED.
+create view ReservedPerspectiveBalance as
+    select P.Sid,
+        (select Balance from ReservedBalance)
+            * (case when P.Sid = (select StockSid from TallyCore) then 1 else -1 end) as Balance
+    from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
+
+-- Lift lading: what a lift may move through this tally, per direction.
+-- A direction is named by its receiver -- the party whose perspective balance rises;
+-- the counterparty releases the same value (perspective balances are negatives of each
+-- other). One row per party; a drop is the same movement read from the other row.
+--   FreeUnits:     receiver accumulation up to its Target -- no reward fee
+--   RewardedUnits: further accumulation up to its Bound, charged at the receiver's Reward
+--   Reward/Clutch: per-unit fee ratios (ppm); Clutch is the releasing counterparty's
+--                  charge and applies to the whole moved amount
+-- Fee ratios compose along a lift route as NewRate = PriorRate + MyRate * (1 - PriorRate).
+-- Receiver accumulation is additionally capped by the credit the RECEIVER granted the
+-- counterparty: a lift raises the receiver's perspective balance (the counterparty's debt to
+-- the receiver), bounded by CurrentCreditLimit. Cap = min(Bound, receiver's effective
+-- CreditLimit); Balance + moved <= Cap. Advisory only -- the hard safety gate is the
+-- deterministic, chit-dated Ledger.WithinCreditLimits / WithinReservedCredit.
+-- Balance here is the RESERVED perspective balance (settled + open pending lifts), so an open pledge
+-- already subtracts from advertised free capacity -- concurrent lifts do not double-advertise the same room.
+-- NOTE (pre-existing, unrelated to lift chits): the FreeUnits/RewardedUnits math below uses SCALAR 2-arg
+-- max()/min(), which Quereus does not provide (it has aggregate min/max only, so this view fails to bind:
+-- "Function not found: max/2"). Predates this ticket; tracked in backlog/debt-schema-liftlading-scalar-minmax
+-- (rewrite as CASE expressions, or add scalar min/max upstream). Everything else in the lift-chit machinery
+-- binds cleanly on Quereus -- this is the sole exception.
+create view LiftLading as
+    select
+        RV.Sid as ReceiverSid,
+        -- Greatest/Least are host scalars: SQL has no two-argument min/max (SQLite's are an
+        -- extension, and Quereus treats min/max as aggregates only). See src/store/functions.ts.
+        Greatest(0, Least(RV.Target, Least(RV.Bound, CCL.CreditLimit)) - PB.Balance) as FreeUnits,
+        Greatest(0, Least(RV.Bound, CCL.CreditLimit) - Greatest(PB.Balance, RV.Target)) as RewardedUnits,
+        RV.Reward,
+        CV.Clutch
+    from CurrentTradingVariable RV
+        join ReservedPerspectiveBalance PB on PB.Sid = RV.Sid
+        join CurrentCreditLimit CCL on CCL.Sid = RV.Sid
+        join CurrentTradingVariable CV on CV.Sid <> RV.Sid;
+
+-- Invoice state, derived from the tables (never stored). Precedence paid > declined > expired > open.
+-- 'paid' is checked first, so the derived state stays deterministic even if a decline and a chit both
+-- somehow commit (self-inflicted -- both are the payer's own actions; see InvoiceLink / InvoiceDecline).
+-- 'expired' is time-derived (DayNumber('now') is VOLATILE -- fine in a plain view, NOT allowed in a
+-- MATERIALIZED view; same caveat as CurrentCreditLimit at schema/draft1.qsql:504). It is deliberately
+-- NOT gated at chit insert -- a late payment still succeeds and 'paid' wins by precedence.
+create view InvoiceState as
+    select I.Id, I.Requester, I.Units, I.Date, I.ExpiryDate,
+        case
+            when exists (select 1 from Ledger L where L.InvoiceId = I.Id) then 'paid'
+            when exists (select 1 from InvoiceDecline D where D.InvoiceId = I.Id) then 'declined'
+            when I.ExpiryDate is not null and DayNumber(I.ExpiryDate) < DayNumber('now') then 'expired'
+            else 'open'
+        end as State
+    from Invoice I;
+
+-- Open (unanswered, undeclined, unexpired) invoices -- advisory signal of upcoming balance movement
+-- for the lift agent / credit-check application layer. NOT folded into LiftLading or WithinCreditLimits.
+create view OpenInvoice as
+    select Id, Requester, Units, Date, ExpiryDate from InvoiceState where State = 'open';
 

@@ -22,7 +22,7 @@ richer than today's Taleus schema:
 | `pay` | Minimum payment (amount or formula, e.g. `min(10, balance/4)`, `interest`, `balance`) |
 | `defint` | Default interest applied after the call period lapses |
 
-Taleus's [`CreditTerms`](../../packages/taleus/schema/draft1.qsql) currently collapses this to
+Taleus's [`CreditTerms`](../../packages/taleus-core/schema/draft1.qsql) currently collapses this to
 **`CreditLimit` + `CallDays` + opaque `Args`**. That reduces the model to **demand credit lines** —
 interest-bearing loans, amortizing debt, and term instruments (the bulk of real private credit) have no
 first-class representation. MyCHIPs also had a `vesting` date on chits, designed to represent

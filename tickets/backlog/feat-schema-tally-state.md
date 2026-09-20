@@ -1,6 +1,6 @@
 description: Materialize the tally's negotiation/lifecycle state (forming / offer / open / void) as a derived view, preserving MyCHIPs' draft→offer→open signing dance that the reboot left only implicit.
 prereq: feat-schema-tally-core
-files: packages/taleus/schema/draft1.qsql, docs/tally-lifecycle.md
+files: packages/taleus-core/schema/draft1.qsql, docs/tally-lifecycle.md
 difficulty: medium
 ----
 ## Why this ticket exists

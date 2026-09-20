@@ -1,7 +1,7 @@
 {
-	"name": "taleus",
+	"name": "taleus-core",
 	"version": "0.1.0",
-	"description": "Taleus core library: tally logic, negotiation, schema, and the lift agent.",
+	"description": "Taleus core: platform-neutral tally logic, schema, crypto, transport and lift. Runs in Node, React Native and the browser.",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -31,7 +31,8 @@
 	},
 	"dependencies": {
 		"@noble/curves": "2.2.0",
-		"@noble/hashes": "2.2.0"
+		"@noble/hashes": "2.2.0",
+		"@quereus/quereus": "^4.19.4"
 	},
 	"devDependencies": {
 		"@eslint/js": "10.0.1",

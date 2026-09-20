@@ -31,7 +31,7 @@ Taleus is a peer-to-peer private credit system — a reboot of [MyCHIPs](https:/
 
 A yarn-workspaces monorepo:
 
-- `packages/taleus/` — the platform-neutral core library: tally logic, negotiation, lift agent, and the Quereus sApp schema (`packages/taleus/schema/`).
+- `packages/taleus-core/` — the platform-neutral core library: tally logic, negotiation, lift agent, and the Quereus sApp schema (`packages/taleus-core/schema/`).
 - `packages/taleus-node/` — the always-on trading service (headless lift agent + `/taleus/chipnet/1.0.0`), run as a client of the party's Sereus cadre.
 - `packages/taleus-app/` — the client application(s), managed as an [appeus](https://github.com/gotchoices/appeus) design-first project: stories/specs under `design/`, generated app code under `apps/<target>/`. Framework decision pending.
 - `web/` — the public site at [sereus.org/taleus](https://sereus.org/taleus/): landing page, invite fallback, deep-link association entries, publish script (see [`web/README.md`](web/README.md)).

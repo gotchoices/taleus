@@ -1,5 +1,5 @@
 description: Make a payment request behave like a real bill — it can be paid in part, withdrawn by whoever sent it, and it ages rather than silently expiring.
-files: packages/taleus/schema/draft1.qsql, packages/taleus-app/design/stories/mobile/21-ask-to-be-paid.md, packages/taleus-app/design/stories/mobile/22-respond-to-a-request.md, packages/taleus-app/design/specs/domain/rules.md
+files: packages/taleus-core/schema/draft1.qsql, packages/taleus-app/design/stories/mobile/21-ask-to-be-paid.md, packages/taleus-app/design/stories/mobile/22-respond-to-a-request.md, packages/taleus-app/design/specs/domain/rules.md
 difficulty: medium
 ----
 ## Why this ticket exists
