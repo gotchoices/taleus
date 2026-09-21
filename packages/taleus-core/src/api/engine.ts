@@ -17,6 +17,7 @@ import type {
 	Amount,
 	Balances,
 	Change,
+	ChangeKind,
 	ContractOffer,
 	CreditOffer,
 	CreditTerms,
@@ -658,8 +659,11 @@ class TallyEngine implements Tally {
 	}
 
 	watch(listener: (change: Change) => void): Unsubscribe {
-		return this.store.subscribe(() => {
-			listener({ tally: this.ref, kind: 'balance', at: this.now() })
+		return this.store.subscribe(tables => {
+			const at = this.now()
+			for (const kind of kindsOf(tables)) {
+				listener({ tally: this.ref, kind, at })
+			}
 		})
 	}
 
@@ -693,6 +697,44 @@ class TallyEngine implements Tally {
 			throw error
 		}
 	}
+}
+
+/**
+ * Which tables a consumer would care about, and what to call it when they change.
+ *
+ * A table with no entry produces no event, which is the right default: `Ledger` moving is
+ * news, and a table nobody reads through the API is not. One commit can touch several -- a
+ * payment answering a request is `balance` and nothing else, but formation's seating rows are
+ * `contract`.
+ */
+const CHANGE_KINDS: Record<string, ChangeKind> = {
+	Ledger: 'balance',
+	Invoice: 'request',
+	InvoiceDecline: 'request',
+	CreditTerms: 'terms',
+	TradingVariable: 'terms',
+	Stock: 'contract',
+	Foil: 'contract',
+	TallyCore: 'contract',
+	TallyContractProposal: 'contract',
+	TallyContract: 'contract',
+	PartyKey: 'keys',
+	PartyKeyRevocation: 'keys',
+	PartyKeyAdoption: 'keys',
+	PartyCertificate: 'keys',
+	CloseRequest: 'close',
+	PendingLift: 'lift',
+	LiftVoid: 'lift',
+}
+
+/** Distinct kinds, in a stable order, for the tables one commit touched. */
+function kindsOf(tables: readonly string[]): ChangeKind[] {
+	const kinds = new Set<ChangeKind>()
+	for (const table of tables) {
+		const kind = CHANGE_KINDS[table]
+		if (kind) kinds.add(kind)
+	}
+	return [...kinds]
 }
 
 class NotEstablished extends Error {}

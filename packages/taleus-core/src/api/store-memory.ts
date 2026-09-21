@@ -1,6 +1,14 @@
 import type { Database } from '@quereus/quereus'
 
-import { insertStatement, openStrandFrom, row, rows, type RowWrite } from '../store/strand.js'
+import {
+	insertStatement,
+	openStrandFrom,
+	row,
+	rows,
+	statementsOf,
+	stripComments,
+	type RowWrite,
+} from '../store/strand.js'
 import type { InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe } from './types.js'
 
 /**
@@ -25,7 +33,6 @@ interface Replica {
 
 class Strand {
 	readonly replicas: Replica[] = []
-	readonly listeners = new Set<() => void>()
 	/**
 	 * Every act that stood, in order. A replica that joins late replays it -- which is not an
 	 * optimisation but a requirement: the invitee's own seating validates against the inviter's
@@ -53,7 +60,16 @@ export class MemoryFabric {
 	private readonly strands = new Map<string, Strand>()
 	private nextId = 1
 
-	constructor(private readonly schema: string) {}
+	/** Every base table in the schema -- the scope a replica's watcher registers over. */
+	private readonly tables: string[]
+
+	constructor(private readonly schema: string) {
+		this.tables = tablesIn(schema)
+	}
+
+	tableNames(): readonly string[] {
+		return this.tables
+	}
 
 	/** A store provider acting as one member. Each gets its own replica of any strand it joins. */
 	provider(member: string): StoreProvider {
@@ -110,19 +126,25 @@ class MemoryStoreProvider implements StoreProvider {
 		const strand = this.fabric.strandOf(ref)
 		const replica = strand.replicas.find(r => r.member === this.member)
 		if (!replica) throw new Error(`${this.member} holds no replica of ${ref.id}`)
-		return new MemoryTallyStore(strand, replica)
+		return new MemoryTallyStore(strand, replica, this.fabric.tableNames())
 	}
 
 	async create(): Promise<{ ref: TallyRef; store: TallyStore }> {
 		const { strand, replica } = await this.fabric.createStrand(this.member)
-		return { ref: { id: strand.id }, store: new MemoryTallyStore(strand, replica) }
+		return {
+			ref: { id: strand.id },
+			store: new MemoryTallyStore(strand, replica, this.fabric.tableNames()),
+		}
 	}
 
 	async join(ticket: InvitationTicket): Promise<{ ref: TallyRef; store: TallyStore }> {
 		// The ticket names its strand; what else it carries is the engine's business.
 		const strand = this.fabric.strandOf(ticket.ref)
 		const replica = await this.fabric.addReplica(strand, this.member)
-		return { ref: { id: strand.id }, store: new MemoryTallyStore(strand, replica) }
+		return {
+			ref: { id: strand.id },
+			store: new MemoryTallyStore(strand, replica, this.fabric.tableNames()),
+		}
 	}
 }
 
@@ -130,6 +152,7 @@ class MemoryTallyStore implements TallyStore {
 	constructor(
 		private readonly strand: Strand,
 		private readonly replica: Replica,
+		private readonly tables: readonly string[],
 	) {}
 
 	async query<T>(sql: string, params?: unknown[]): Promise<T[]> {
@@ -160,12 +183,32 @@ class MemoryTallyStore implements TallyStore {
 			throw new Error(rejected[0].message)
 		}
 		this.strand.log.push(writes)
-		for (const listener of this.strand.listeners) listener()
 	}
 
-	subscribe(listener: () => void): Unsubscribe {
-		this.strand.listeners.add(listener)
-		return () => this.strand.listeners.delete(listener)
+	/**
+	 * Quereus's own post-commit watchers, on this member's replica.
+	 *
+	 * Deliberately not a callback the fabric fans out itself: firing through `Database.watch`
+	 * is the path a Sereus-backed store will take too, so what is exercised here is what will
+	 * ship. The only piece that differs is where the commit comes from -- locally today,
+	 * locally *or* from a peer once the replication path calls `notifyExternalTableChange`.
+	 */
+	subscribe(listener: (tables: readonly string[]) => void): Unsubscribe {
+		const subscription = this.replica.db.watch(
+			{
+				watches: this.tables.map(table => ({
+					table: { schema: 'main', table },
+					columns: 'all' as const,
+					scope: { kind: 'full' as const },
+				})),
+				nonDeterministicSources: [],
+				unboundParameters: [],
+			},
+			event => {
+				listener(event.matched.map(m => m.watch.table.table))
+			},
+		)
+		return () => subscription.unsubscribe()
 	}
 
 	async close(): Promise<void> {
@@ -189,6 +232,19 @@ async function applyTo(db: Database, writes: RowWrite[]): Promise<void> {
 
 function messageOf(error: unknown): string {
 	return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * The schema's base tables, read from the DDL rather than listed by hand -- a table added to
+ * the schema and forgotten here would be a watch that silently never fires.
+ */
+function tablesIn(schema: string): string[] {
+	const names: string[] = []
+	for (const statement of statementsOf(stripComments(schema))) {
+		const match = /^\s*create\s+table\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(statement)
+		if (match) names.push(match[1])
+	}
+	return names
 }
 
 /** Read one row, or undefined. Re-exported so the engine need not reach into `src/store/`. */

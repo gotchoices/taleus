@@ -303,7 +303,10 @@ describe('lifts', () => {
 })
 
 describe('watching', () => {
-	it('tells a party that something moved', async () => {
+	it('tells a party what the counterparty did, and stops when asked', async () => {
+		// Jan watches; Sam acts. The event reaches Jan through his *own* replica's post-commit
+		// watchers -- Quereus's `Database.watch`, the same path a replicated write will arrive
+		// on once the distributed backend calls `notifyExternalTableChange`. Nothing here polls.
 		const world = await twoParties()
 		const { janTally, samTally } = await opened(world)
 		const seen: string[] = []
@@ -314,5 +317,30 @@ describe('watching', () => {
 		must(await samTally.pay({ amount: usd(1000) }))
 
 		expect(seen).toEqual(['balance'])
+	})
+
+	it('says which part of the tally moved', async () => {
+		const world = await twoParties()
+		const { janTally, samTally } = await opened(world)
+		const seen: string[] = []
+		const stop = samTally.watch(change => seen.push(change.kind))
+
+		must(await janTally.offerCredit({ limit: usd(60000), callDays: 21 }))
+		must(await janTally.requestPayment({ amount: usd(500) }))
+		must(await janTally.requestClose())
+		stop()
+
+		expect(seen).toEqual(['terms', 'request', 'close'])
+	})
+
+	it('names the tally the change belongs to', async () => {
+		const world = await twoParties()
+		const { janTally, samTally } = await opened(world)
+		const seen: string[] = []
+		const stop = janTally.watch(change => seen.push(change.tally.id))
+		must(await samTally.pay({ amount: usd(1000) }))
+		stop()
+
+		expect(seen).toEqual([janTally.ref.id])
 	})
 })

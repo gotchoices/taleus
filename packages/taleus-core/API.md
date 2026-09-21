@@ -207,11 +207,14 @@ must(await janTally.pay({ amount: usd(30000) }))
   `TallyStore` / `StoreProvider` are an adapter away, not a research project
   (`feat-formation-over-sereus-strand`). One question from `SPEC.md` § Where Sereus plugs in remains
   behind the interface: whether invite redemption and Taleus seating commit as one act.
-- **`watch` reports this host's acts, not the counterparty's.** Quereus fires watchers post-commit
-  for local commits and exposes `notifyExternalTableChange` as the hook for changes arriving from a
-  peer, but nothing in the replication path calls it yet. The surface is right and the semantics
-  will widen under it; until then a phone or an ERP listener sees only what it did itself. A test
-  host drives both sides and never notices.
+- **`watch` is built on the real path, and the distributed half of it is upstream work.**
+  `TallyStore.subscribe` registers a Quereus `Database.watch` over the schema's base tables on the
+  member's own replica, and the engine maps the tables a commit touched to a `ChangeKind`. That is
+  the whole mechanism — there is no polling anywhere and no fabric-level shortcut. In memory it
+  already delivers the counterparty's acts, because every replica commits in process. On the
+  distributed backend a peer's write will arrive through `notifyExternalTableChange(table)`, which
+  Quereus already exposes and the replication path does not yet call. When it does, this code does
+  not change.
 - **`TallyState` is computed here**, because the schema does not materialize a negotiation state
   (`feat-schema-tally-state`). `forming` and `offered` are inferences from what has been signed.
   First thing to revisit when that ticket lands.

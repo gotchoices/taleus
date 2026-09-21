@@ -524,7 +524,15 @@ export interface Taleus {
 export interface TallyStore {
 	query<T>(sql: string, params?: unknown[]): Promise<T[]>
 	apply(writes: RowWrite[]): Promise<void>
-	subscribe(listener: () => void): Unsubscribe
+	/**
+	 * Fire after a transaction commits on **this replica**, naming the tables it touched.
+	 *
+	 * Naming the tables rather than just saying "something happened" is what lets the engine
+	 * report a useful `ChangeKind` without re-reading everything. It is also the shape the
+	 * distributed path will have: Quereus fires watchers post-commit for local writes, and
+	 * `notifyExternalTableChange(table)` is the hook a replicated write will come in through.
+	 */
+	subscribe(listener: (tables: readonly string[]) => void): Unsubscribe
 	close(): Promise<void>
 }
 
