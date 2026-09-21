@@ -277,6 +277,34 @@ Things the tests turned up that are design questions rather than test failures.
   row-level suite that plays both sides cannot see it — and it would have been found by the first
   real two-party client instead.
 
+- **`TradingVariable` and `PartyCertificate` were uninsertable, and the schema had already
+  flagged it as a tripwire.** Both used a *plain* ref in `RevisionMonotonicInt`
+  (`Revision = max(Revision) + 1`) where `PartyKey` and `CreditTerms` use `committed.*`. A plain
+  ref buffers the row being inserted, so `max(Revision)` already sees it and the check can never
+  hold. `CreditTerms`' comment asked a future runner to adjudicate and said explicitly not to
+  "fix" the siblings without evidence. There is a runner now and the answer is definite. **Fixed**
+  (both read `committed.*`); the tripwire note is replaced with the resolution. Third table in
+  this family, after `TallyContract` and `Ledger`'s finalize columns — *a table nobody had ever
+  executed* is the recurring shape of defect in this schema.
+- **`PartyKeyAdoption` had the same two-party problem as `TallyContract`.** `adoptKey` took the
+  recovering party's *key pair* to make the self-signature, which only works in a test playing
+  both sides: the counterparty attesting does not hold that key. **Fixed** the same way — the
+  recovering party makes the claim (`adoptionClaim(sid, publicKey)` signed by the new key) and
+  relays it; the builder takes the signature, not the pair. The API surfaces this honestly as two
+  calls: `claimKey` on the recovering side, `adoptCounterpartyKey` on the attesting side. Twice
+  now the same defect, found the same way — **a builder that takes two key pairs is the smell**.
+- **`PartyCertificate` is not bound to any strand.** Every other signature in the schema binds
+  either the tally `Cid` or the per-strand invitation key. A certificate's digest is
+  `Digest(PartySid, Revision, Certificate)` — nothing strand-specific — so a certificate row
+  signed on one tally can be copied into another where the party holds the same Sid. The schema
+  reasons explicitly that seating tables do not bind `Cid` (they are written before `TallyCore`
+  exists), and that is right; but `Stock`, `Foil` and `PartyKey` are all strand-bound *via the
+  invitation key*, and this one is not. Since `docs/identity.md` makes "a party may deliberately
+  present a different identity on a different tally" a design goal, replay defeats a choice the
+  design intends. **Not fixed** — `Stock.InvitationKey` is available at seating and forever after,
+  so `Digest((select InvitationKey from Stock), PartySid, …)` would close it, but changing a
+  digest the schema deliberately reasoned about is Nate's call, not a unilateral one.
+
 ## 1. Substrate
 
 - [x] Every statement in `draft1.qsql` executes in Quereus

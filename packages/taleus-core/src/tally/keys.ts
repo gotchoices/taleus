@@ -62,11 +62,23 @@ export function revokeKey({ sid, publicKey, by }: KeyRevoke): RowWrite {
 	}
 }
 
+/** The digest both halves of an adoption sign: the party, and the key they now claim. */
+export function adoptionClaim(sid: string, publicKey: string): string {
+	return digest(sid, publicKey)
+}
+
 export interface KeyAdoption {
 	/** The party regaining authority. Its identity does not change. */
 	sid: string
-	/** The fresh key, which proves possession by signing for itself. */
-	key: KeyPairText
+	/** The fresh key. */
+	publicKey: string
+	/**
+	 * That key signing `adoptionClaim(sid, publicKey)` -- proof the recovering party holds it.
+	 * Made by them and relayed out of band, because the counterparty attesting here does not
+	 * hold it. An earlier version took the key *pair*, which only worked in a test playing both
+	 * sides -- the same mistake, and the same fix, as `signContract`.
+	 */
+	selfSignature: string
 	/** The **counterparty's** authorized key, attesting. Not the party's own -- a party who
 	 *  has lost everything has nothing left to attest with, which is the whole point. */
 	counterparty: KeyPairText
@@ -80,16 +92,15 @@ export interface KeyAdoption {
  * enough, and the counterparty's attestation is what makes this a negotiation rather than
  * a claim -- there is no other authority in a two-party strand to appeal to.
  */
-export function adoptKey({ sid, key, counterparty }: KeyAdoption): RowWrite {
-	const claim = digest(sid, key.publicKey)
+export function adoptKey({ sid, publicKey, selfSignature, counterparty }: KeyAdoption): RowWrite {
 	return {
 		table: 'PartyKeyAdoption',
 		row: {
 			Sid: sid,
-			PublicKey: key.publicKey,
-			SelfSignature: signText(key, claim),
+			PublicKey: publicKey,
+			SelfSignature: selfSignature,
 			CounterpartyKey: counterparty.publicKey,
-			CounterpartySignature: signText(counterparty, claim),
+			CounterpartySignature: signText(counterparty, adoptionClaim(sid, publicKey)),
 		},
 	}
 }

@@ -231,7 +231,7 @@ create table PartyCertificate (
     Signature text,
 
     primary key (PartySid, Revision),
-    constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from PartyCertificate PC where PC.PartySid = New.PartySid), 0) + 1),
+    constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.PartyCertificate PC where PC.PartySid = New.PartySid), 0) + 1),
     constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.PartySid)),
     constraint SignatureValid check on insert (SignatureValid(
         Digest(PartySid, Revision, Certificate),
@@ -394,7 +394,7 @@ create table TradingVariable (
 
     primary key (Sid, Revision),
     constraint PartyOfTally check on insert (Sid in (select StockSid from TallyCore union select FoilSid from TallyCore)),
-    constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from TradingVariable TV where TV.Sid = New.Sid), 0) + 1),
+    constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.TradingVariable TV where TV.Sid = New.Sid), 0) + 1),
     constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)),
     constraint SignatureValid check on insert (SignatureValid(
         Digest((select Cid from TallyCore), Sid, Revision, Target, Bound, Reward, Clutch),
@@ -435,11 +435,12 @@ create table CreditTerms (
     constraint PartyOfTally check on insert (Sid in (select StockSid from TallyCore union select FoilSid from TallyCore)),
     -- NOTE: committed.* vs plain ref. This table reads committed.CreditTerms for the monotonic and
     -- prior-revision lookups, following PartyKey's carefully-reasoned rule (schema/draft1.qsql:54-59):
-    -- committed.* excludes the row being inserted so `Revision = max + 1` is satisfiable. The sibling
-    -- unilateral-revisioned tables TradingVariable (RevisionMonotonicInt) and PartyCertificate use a
-    -- PLAIN ref for the same monotonic check -- an apparent inconsistency in the existing schema.
-    -- Confirm the correct choice against the Quereus deferral model when a runner exists; do NOT
-    -- "fix" the siblings inside this ticket (tripwire, not a task).
+    -- committed.* excludes the row being inserted so `Revision = max + 1` is satisfiable.
+    -- RESOLVED: TradingVariable and PartyCertificate carried a PLAIN ref for the same check, which
+    -- the earlier tripwire note asked a future runner to adjudicate. A runner exists now and the
+    -- answer is definite: a plain ref buffers the row being inserted, so `max(Revision)` already
+    -- sees it and `Revision = max + 1` can never hold -- both tables were uninsertable. Both now
+    -- read committed.* like this one. See test/STATUS.md § 0.
     constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.CreditTerms CT where CT.Sid = New.Sid), 0) + 1),
     constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)),
     constraint SignatureValid check on insert (SignatureValid(

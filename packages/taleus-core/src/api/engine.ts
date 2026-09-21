@@ -1,10 +1,18 @@
 import { bytesToHex, hexToBytes } from '../lift/digest.js'
 import { newInvitation, signText, type KeyPairText } from '../store/index.js'
+import type { RowWrite } from '../store/strand.js'
+import { publishCertificate } from '../tally/certificates.js'
 import { issueChit } from '../tally/chits.js'
 import { requestClose as closeRow } from '../tally/close.js'
 import { createTally, seatFoil, seatStock } from '../tally/formation.js'
 import { declineInvoice, requestPayment } from '../tally/invoices.js'
-import { addKey as addKeyRow, adoptKey, revokeKey as revokeKeyRow } from '../tally/keys.js'
+import {
+	addKey as addKeyRow,
+	adoptKey,
+	adoptionClaim,
+	revokeKey as revokeKeyRow,
+} from '../tally/keys.js'
+import { publishTradingVariables } from '../tally/trading.js'
 import {
 	proposeContract,
 	publishCreditTerms,
@@ -13,6 +21,7 @@ import {
 } from '../tally/negotiation.js'
 import { attempt, locally, no, ok } from './refusal.js'
 import type {
+	AcceptRequest,
 	ActOptions,
 	Amount,
 	Balances,
@@ -23,13 +32,16 @@ import type {
 	CreditTerms,
 	Entry,
 	Environment,
-	Hex,
 	HistoryQuery,
 	InvitationTicket,
 	InviteRequest,
 	KeyAddition,
+	KeyClaim,
 	KeyRecord,
 	KeyRevocation,
+	LiftCapacity,
+	PartyIdentity,
+	LiftDirection,
 	LiftSurface,
 	LocalSigner,
 	PaymentRequest,
@@ -46,6 +58,8 @@ import type {
 	TallyStore,
 	TallySummary,
 	TallyView,
+	TradingPolicy,
+	TradingPolicyChange,
 	Unsubscribe,
 } from './types.js'
 
@@ -172,12 +186,16 @@ class TallyEngine implements Tally {
 			state: await this.state(),
 			denomination: code,
 			denominationScale: scale,
-			me: { sid: mySid },
-			counterparty: { sid: theirSid },
+			me: identity(mySid, await this.certificateOf(mySid)),
+			counterparty: identity(theirSid, theirSid ? await this.certificateOf(theirSid) : undefined),
 			balances: await this.balances(),
 			terms: {
 				mine: await this.termsOf(mySid, code),
 				theirs: theirSid ? await this.termsOf(theirSid, code) : undefined,
+			},
+			trading: {
+				mine: await this.tradingOf(mySid, code),
+				theirs: theirSid ? await this.tradingOf(theirSid, code) : undefined,
 			},
 			...(await this.contractView()),
 			createdAt: core?.CreatedAt ?? '',
@@ -225,6 +243,59 @@ class TallyEngine implements Tally {
 			...shape(effective),
 			...(latest.Revision !== effective.Revision ? { pending: shape(latest) } : {}),
 		}
+	}
+
+	private async tradingOf(sid: string, denomination: string): Promise<TradingPolicy | undefined> {
+		const row = await this.one<{
+			Revision: number
+			Target: number
+			Bound: number
+			Reward: number
+			Clutch: number
+		}>(
+			`select Revision, Target, Bound, Reward, Clutch from TradingVariable
+			 where Sid = ? order by Revision desc limit 1`,
+			[sid],
+		)
+		if (!row) return undefined
+		return {
+			revision: row.Revision,
+			target: amount(row.Target, denomination),
+			bound: amount(row.Bound, denomination),
+			reward: row.Reward,
+			clutch: row.Clutch,
+		}
+	}
+
+	async setTradingPolicy(change: TradingPolicyChange): Promise<Result<TradingPolicy>> {
+		return this.guarded(async core => {
+			const { signer } = this.act(change)
+			const { code } = await this.denomination()
+			// Each revision is a complete statement, so anything the caller left out keeps the
+			// value it already has -- a party raising its bound should not silently zero its
+			// reward. Nothing published yet means the all-zero defaults.
+			const standing = await this.tradingOf(this.env.sid, code)
+			const next: TradingPolicy = {
+				revision: (standing?.revision ?? 0) + 1,
+				target: change.target ?? standing?.target ?? amount(0, code),
+				bound: change.bound ?? standing?.bound ?? amount(0, code),
+				reward: change.reward ?? standing?.reward ?? 0,
+				clutch: change.clutch ?? standing?.clutch ?? 0,
+			}
+			await this.store.apply([
+				publishTradingVariables({
+					sid: this.env.sid,
+					tallyCid: core.Cid,
+					revision: next.revision,
+					target: next.target.units,
+					bound: next.bound.units,
+					reward: next.reward,
+					clutch: next.clutch,
+					signer,
+				}),
+			])
+			return next
+		})
 	}
 
 	async balances(): Promise<Balances> {
@@ -583,6 +654,33 @@ class TallyEngine implements Tally {
 		})
 	}
 
+	async publishCertificate(certificate: unknown, options?: ActOptions): Promise<Result<void>> {
+		return this.guarded(async () => {
+			const { signer } = this.act(options)
+			const prior = await this.one<{ Revision: number }>(
+				'select max(Revision) as Revision from PartyCertificate where PartySid = ?',
+				[this.env.sid],
+			)
+			await this.store.apply([
+				certificateRow(this.env.sid, (prior?.Revision ?? 0) + 1, certificate, signer),
+			])
+		})
+	}
+
+	private async certificateOf(sid: string): Promise<unknown> {
+		const row = await this.one<{ Certificate: string }>(
+			'select Certificate from PartyCertificate where PartySid = ? order by Revision desc limit 1',
+			[sid],
+		)
+		if (!row) return undefined
+		try {
+			return JSON.parse(row.Certificate) as unknown
+		} catch {
+			// A counterparty may publish anything; unparseable payload is still what they said.
+			return row.Certificate
+		}
+	}
+
 	async addKey(addition: KeyAddition): Promise<Result<KeyRecord>> {
 		return this.guarded(async () => {
 			const { signer } = this.act(addition)
@@ -612,14 +710,22 @@ class TallyEngine implements Tally {
 		})
 	}
 
-	async adoptCounterpartyKey(publicKey: Hex, options?: ActOptions): Promise<Result<void>> {
+	async claimKey(key: LocalSigner): Promise<KeyClaim> {
+		return {
+			publicKey: key.publicKey,
+			selfSignature: signText(asPair(key), adoptionClaim(this.env.sid, key.publicKey)),
+		}
+	}
+
+	async adoptCounterpartyKey(claim: KeyClaim, options?: ActOptions): Promise<Result<void>> {
 		return this.guarded(async core => {
 			const { signer } = this.act(options)
 			const theirSid = core.StockSid === this.env.sid ? core.FoilSid : core.StockSid
 			await this.store.apply([
 				adoptKey({
 					sid: theirSid,
-					key: { publicKey, secretKey: new Uint8Array() },
+					publicKey: claim.publicKey,
+					selfSignature: claim.selfSignature,
 					counterparty: signer,
 				}),
 			])
@@ -653,6 +759,36 @@ class TallyEngine implements Tally {
 				pledgedOn: r.Date,
 				expiresOn: r.Expiry,
 			}))
+		},
+		capacity: async (): Promise<LiftCapacity> => {
+			const { code } = await this.denomination()
+			const core = await this.core()
+			const empty = (): LiftDirection => ({
+				free: amount(0, code),
+				rewarded: amount(0, code),
+				reward: 0,
+				clutch: 0,
+			})
+			if (!core) return { toMe: empty(), fromMe: empty() }
+			const rows = await this.store.query<{
+				ReceiverSid: string
+				FreeUnits: number
+				RewardedUnits: number
+				Reward: number
+				Clutch: number
+			}>('select ReceiverSid, FreeUnits, RewardedUnits, Reward, Clutch from LiftLading')
+			const of = (receiver: string): LiftDirection => {
+				const row = rows.find(r => r.ReceiverSid === receiver)
+				if (!row) return empty()
+				return {
+					free: amount(row.FreeUnits, code),
+					rewarded: amount(row.RewardedUnits, code),
+					reward: row.Reward,
+					clutch: row.Clutch,
+				}
+			}
+			const theirSid = core.StockSid === this.env.sid ? core.FoilSid : core.StockSid
+			return { toMe: of(this.env.sid), fromMe: of(theirSid) }
 		},
 		propose: async (): Promise<Result<never>> =>
 			no(locally('unsupported', 'proposing a lift needs feat-lift-referee-commit')),
@@ -737,6 +873,21 @@ function kindsOf(tables: readonly string[]): ChangeKind[] {
 	return [...kinds]
 }
 
+/** A certificate row, with the payload serialized the one way the engine writes it. */
+function certificateRow(
+	sid: string,
+	revision: number,
+	certificate: unknown,
+	signer: KeyPairText,
+): RowWrite {
+	return publishCertificate({ sid, revision, certificate: JSON.stringify(certificate), signer })
+}
+
+const identity = (sid: string, certificate: unknown): PartyIdentity => ({
+	sid,
+	...(certificate === undefined ? {} : { certificate }),
+})
+
 class NotEstablished extends Error {}
 class MissingTerms extends Error {}
 class NoProposal extends Error {}
@@ -794,33 +945,36 @@ class TaleusEngine implements Taleus {
 		const invitation = newKeyPair()
 		const on = request.on ?? this.now()
 		const seat = request.as === 'stock' ? seatStock : seatFoil
+		const signer = asPair(request.signer ?? this.env.signer)
 		const result = await attempt(async () => {
-			await store.apply(
-				seat({
-					sid: this.env.sid,
-					genesis: asPair(request.signer ?? this.env.signer),
-					invitation,
-				}),
-			)
+			await store.apply([
+				...seat({ sid: this.env.sid, genesis: signer, invitation }),
+				// Seating and certifying are one act: the certificate's signature resolves against
+				// a key registered in the same transaction, which only works because Quereus
+				// defers a subquery CHECK to COMMIT.
+				...(request.certificate === undefined
+					? []
+					: [certificateRow(this.env.sid, 1, request.certificate, signer)]),
+			])
 		})
 		if (!result.ok) return no(result.refusal)
 		const ticket = encodeTicket(ref, other(request.as), invitation, request.denomination)
 		return ok({ ticket, ref, invitedAs: other(request.as), createdAt: on })
 	}
 
-	async accept(ticket: InvitationTicket, request?: ActOptions): Promise<Result<Tally>> {
+	async accept(ticket: InvitationTicket, request?: AcceptRequest): Promise<Result<Tally>> {
 		const decoded = decodeTicket(ticket)
 		if (!decoded) return no(locally('not-found', 'that invitation cannot be read'))
 		const { ref, store } = await this.env.store.join(ticket)
 		const seat = decoded.role === 'stock' ? seatStock : seatFoil
+		const signer = asPair(request?.signer ?? this.env.signer)
 		const result = await attempt(async () => {
-			await store.apply(
-				seat({
-					sid: this.env.sid,
-					genesis: asPair(request?.signer ?? this.env.signer),
-					invitation: decoded.invitation,
-				}),
-			)
+			await store.apply([
+				...seat({ sid: this.env.sid, genesis: signer, invitation: decoded.invitation }),
+				...(request?.certificate === undefined
+					? []
+					: [certificateRow(this.env.sid, 1, request.certificate, signer)]),
+			])
 		})
 		if (!result.ok) return no(result.refusal)
 		return ok(

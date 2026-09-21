@@ -98,6 +98,21 @@ export class MemoryFabric {
 		return replica
 	}
 
+	/**
+	 * Write to ONE member's replica, bypassing the others.
+	 *
+	 * A test affordance, and an honest one: it manufactures the state a party's own node has
+	 * admitted while the counterparty's has not. Nothing an engine does can reach it -- `apply`
+	 * always proposes to everyone -- which is exactly why a `disagreement` needs it to be
+	 * reachable at all.
+	 */
+	async divergeOn(member: string, ref: TallyRef, writes: RowWrite[]): Promise<void> {
+		const strand = this.strandOf(ref)
+		const replica = strand.replicas.find(r => r.member === member)
+		if (!replica) throw new Error(`${member} holds no replica of ${ref.id}`)
+		await applyTo(replica.db, writes)
+	}
+
 	strandOf(ref: TallyRef): Strand {
 		const strand = this.strands.get(ref.id)
 		if (!strand) throw new Error(`no strand ${ref.id}`)

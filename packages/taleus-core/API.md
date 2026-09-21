@@ -29,7 +29,7 @@ MyCHIPs is the other input. Its lesson is mostly about what to leave out — the
 draft chits, does not expose the `S`/`F` side codes, and does not make the caller reason in the
 stock party's sign convention.
 
-## The six decisions
+## The seven decisions
 
 ### 1. Everything is from the acting party's perspective
 
@@ -86,7 +86,22 @@ signs** — a master key kept cold, a device key used daily (`docs/identity.md`,
 `feat-master-key-custody`). An API that bound one key per engine would make key rotation
 impossible to express.
 
-### 5. What is bilateral belongs on the contract
+### 5. Two signatures means two calls
+
+Three records need a signature from each party: the contract, a key adoption, and (later) a lift
+commit. In each, one half is made by someone who does not hold the other's key. So the surface
+splits them: the first party produces something signed, it travels out of band, the second party
+relays it alongside their own.
+
+`claimKey` / `adoptCounterpartyKey` is the visible case — a party who has lost every device makes
+the claim, and the counterparty attests it. Neither alone is enough, which is what makes recovery a
+negotiation rather than an assertion. There is no other authority in a two-party strand.
+
+Relaying a signature is safe wherever the digest covers every field, which it does in both cases: a
+relayed contract signature cannot be attached to different terms, and a relayed key claim cannot be
+attached to a different party.
+
+### 6. What is bilateral belongs on the contract
 
 Credit limits are unilateral — a party says alone how much it will be owed — so `offerCredit` is a
 single-signature act and the counterparty's agreement is not sought. The **denomination** is not:
@@ -94,7 +109,7 @@ it is one shared value both parties sign, fixed for the tally's life. So it is a
 `offerContract`, not of `invite`. An invitation may *advertise* a unit so an invitee knows what is
 being proposed; nothing is agreed until the contract is.
 
-### 6. Three balances, because one number answers the question badly
+### 7. Three balances, because one number answers the question badly
 
 ```
 settled    signed, done, authoritative
@@ -134,11 +149,13 @@ interface Taleus {
 
 interface Tally {
   read() / balances() / history() / requests() / keys()
-  offerCredit() / offerContract() / acceptContract()
+  establish()
+  offerCredit() / setTradingPolicy() / offerContract() / acceptContract()
   pay() / requestPayment() / declinePayment()
-  addKey() / revokeKey() / adoptCounterpartyKey()
+  publishCertificate()
+  addKey() / revokeKey() / claimKey() / adoptCounterpartyKey()
   requestClose()
-  lifts: LiftSurface
+  lifts: { pending(), capacity(), propose() }
   watch(listener): Unsubscribe
 }
 ```
@@ -148,7 +165,19 @@ need to know something moved without polling: a phone wakes a screen, a server p
 test awaits the counterparty's acceptance. The event is deliberately thin — *that* a tally changed
 and roughly where — and the consumer re-reads what it cares about.
 
-Lifts are **declared and not built**. `lifts.pending()` works, because an open pledge already
+**Trading variables** are here as `setTradingPolicy` and `lifts.capacity()`, even though no lift can
+be proposed yet. They are a party's published, unilateral policy for what automated clearing may do
+to its balance — eight values per tally, four per party, because balance is one signed number but
+each party governs its own side of zero. The one departure from MyCHIPs is that a variable means the
+same thing whichever seat publishes it; MyCHIPs made the same field a "lift margin" on a foil and a
+"drop margin" on a stock, and dropping that flip costs no expressive power.
+
+**Certificates** are how a party says who they are in the real world. A `Sid` is deliberately
+anonymous and strand-local — one person is not one identity — so a certificate is opaque payload the
+parties judge for themselves, and no protocol rule reads it. Exchanged during seating or published
+later.
+
+Lifts are **declared and mostly not built**. `lifts.pending()` works, because an open pledge already
 moves `projected` and already constrains what else a party may do; a consumer that could not see
 one would be unable to explain its own balance. `lifts.propose()` returns
 `{ code: 'unsupported' }`. Declaring the seam beats omitting it: a consumer can render "not yet"

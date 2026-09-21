@@ -59,7 +59,12 @@ export function refusalFrom(error: unknown, refusedBy: Refusal['refusedBy'] = 'b
 		return { code: 'disagreement', message, refusedBy: 'self' }
 	}
 	const constraint = constraintIn(message)
-	const mapped = constraint ? BY_CONSTRAINT[constraint] : undefined
+	// Quereus names a column-level CHECK `_check_<Column>`. Every one in this schema is a
+	// value-validity rule -- a bound below a target, a non-positive amount, a malformed date --
+	// so they all land on `terms` rather than each needing an entry.
+	const mapped = constraint
+		? (BY_CONSTRAINT[constraint] ?? (constraint.startsWith('_check_') ? 'terms' : undefined))
+		: undefined
 	const code: RefusalCode =
 		mapped ?? (/UNIQUE constraint failed/.test(message) ? 'already-exists' : 'refused')
 	return { code, message, refusedBy, ...(constraint ? { constraint } : {}) }

@@ -1,5 +1,4 @@
 import {
-	digest,
 	newKey,
 	sidFor,
 	signText,
@@ -12,7 +11,7 @@ import {
 	type Party,
 } from '../store/test-harness.js'
 import { seatFoil, seatStock } from './formation.js'
-import { addKey, adoptKey, revokeKey } from './keys.js'
+import { addKey, adoptKey, adoptionClaim, revokeKey } from './keys.js'
 
 /**
  * Keys, on a strand two parties share.
@@ -189,13 +188,23 @@ describe('revoking a key', () => {
 })
 
 describe('adoption: getting back in after losing everything', () => {
+	/**
+	 * What the recovering party produces and hands over out of band. They make it themselves --
+	 * the counterparty attesting cannot, because they do not hold the key.
+	 */
+	const claimOf = (sid: string, key: Party['keys'][0]) => ({
+		sid,
+		publicKey: key.publicKey,
+		selfSignature: signText(key, adoptionClaim(sid, key.publicKey)),
+	})
+
 	it('the counterparty attests a fresh key, and the party can act again', async () => {
 		const { jan, sam, tally } = await seated()
 		// Jan has lost every device. He has no key to sign with, which is exactly why this
 		// ceremony exists: only Sam can vouch for him.
 		const recovered = newKey()
 		await tally.propose([
-			adoptKey({ sid: jan.sid, key: recovered, counterparty: sam.keys[0] }),
+			adoptKey({ ...claimOf(jan.sid, recovered), counterparty: sam.keys[0] }),
 		])
 
 		for (const party of [jan, sam]) {
@@ -207,7 +216,7 @@ describe('adoption: getting back in after losing everything', () => {
 	it('an adopted key can authorize fresh device keys', async () => {
 		const { jan, sam, tally } = await seated()
 		const recovered = newKey()
-		await tally.propose([adoptKey({ sid: jan.sid, key: recovered, counterparty: sam.keys[0] })])
+		await tally.propose([adoptKey({ ...claimOf(jan.sid, recovered), counterparty: sam.keys[0] })])
 
 		// Without this, an adopted key could sign rows but never rebuild the set, and
 		// recovery would stop one step short of being recovery.
@@ -224,7 +233,7 @@ describe('adoption: getting back in after losing everything', () => {
 		// Self-attestation would make the ceremony worthless: anyone holding a fresh key
 		// could claim any identity on the strand.
 		await expect(
-			tally.refuses([adoptKey({ sid: jan.sid, key: recovered, counterparty: jan.keys[0] })]),
+			tally.refuses([adoptKey({ ...claimOf(jan.sid, recovered), counterparty: jan.keys[0] })]),
 		).resolves.toMatch(/CounterpartyIsOther/)
 	})
 
@@ -232,18 +241,16 @@ describe('adoption: getting back in after losing everything', () => {
 		const { jan, sam, tally } = await seated()
 		const recovered = newKey()
 		const somebodyElse = newKey()
-		const write = adoptKey({ sid: jan.sid, key: recovered, counterparty: sam.keys[0] })
 		// Sam attests a key nobody has demonstrated possession of. The self-signature is the
-		// half of the ceremony Sam cannot supply.
+		// half of the ceremony Sam cannot supply -- so here it is forged by a third key.
 		await expect(
 			tally.refuses([
-				{
-					...write,
-					row: {
-						...write.row,
-						SelfSignature: signText(somebodyElse, digest(jan.sid, recovered.publicKey)),
-					},
-				},
+				adoptKey({
+					sid: jan.sid,
+					publicKey: recovered.publicKey,
+					selfSignature: signText(somebodyElse, adoptionClaim(jan.sid, recovered.publicKey)),
+					counterparty: sam.keys[0],
+				}),
 			]),
 		).resolves.toMatch(/SelfSigValid/)
 	})
@@ -251,7 +258,7 @@ describe('adoption: getting back in after losing everything', () => {
 	it('an adopted key is revocable like any other', async () => {
 		const { jan, sam, tally } = await seated()
 		const recovered = newKey()
-		await tally.propose([adoptKey({ sid: jan.sid, key: recovered, counterparty: sam.keys[0] })])
+		await tally.propose([adoptKey({ ...claimOf(jan.sid, recovered), counterparty: sam.keys[0] })])
 		await tally.propose([
 			revokeKey({ sid: jan.sid, publicKey: recovered.publicKey, by: jan.keys[0] }),
 		])

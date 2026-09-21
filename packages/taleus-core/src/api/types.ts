@@ -47,6 +47,12 @@ export interface Amount {
 }
 
 /**
+ * A fee ratio in parts per million: `10000` is 1%. Positive is a charge, negative a subsidy.
+ * `1000000` on a clutch effectively blocks the movement it applies to.
+ */
+export type Ppm = number
+
+/**
  * Which side of the tally a party sits on. `stock` is the party that accumulates value by
  * default -- a vendor, a lender, an employer; `foil` is the one that draws on the credit.
  */
@@ -101,7 +107,10 @@ export type RefusalCode =
 	| 'already-exists'
 	/** Nothing here by that identity. */
 	| 'not-found'
-	/** Terms are internally inconsistent: a notice period, an expiry, a denomination change. */
+	/**
+	 * The values do not hold together: a notice period too short, an expiry before its date, a
+	 * bound below its target, a denomination that cannot change, an amount out of range.
+	 */
 	| 'terms'
 	/** The two replicas did not agree. Neither copy should be trusted until it is understood. */
 	| 'disagreement'
@@ -144,7 +153,21 @@ export interface LocalSigner extends Signer {
  */
 export interface PartyIdentity {
 	sid: string
+	/**
+	 * What this party has chosen to say about themselves: a company number, a licence, an
+	 * address. Opaque -- no protocol rule reads it, and the parties judge for themselves whether
+	 * what they have been given is adequate. Absent until someone publishes one.
+	 */
 	certificate?: unknown
+}
+
+/**
+ * A party's assertion that they hold a fresh key, signed by that key. Travels out of band to
+ * the counterparty, who attests it with `adoptCounterpartyKey`.
+ */
+export interface KeyClaim {
+	publicKey: Hex
+	selfSignature: Hex
 }
 
 /** A key that may sign for a party on this tally, and whether it still may. */
@@ -187,6 +210,70 @@ export interface Balances {
 	capacity: { canReceive: Amount; canSend: Amount }
 }
 
+/**
+ * A party's published lift policy -- what it will let automated credit clearing do to its
+ * balance, and what that costs. Unilateral: each party signs its own, so a tally carries two.
+ *
+ * Every value is from the **publishing party's own perspective**, whichever seat they hold.
+ * MyCHIPs made the same field mean "lift margin" or "drop margin" depending on the side; that
+ * flip is gone (`docs/trading-variables.md`).
+ *
+ * Publishing nothing means trading at zero: lifts may pay this party's accumulated balance down
+ * to nothing, free, and accumulate nothing beyond that.
+ */
+export interface TradingPolicy {
+	revision: number
+	/** Ideal balance to accumulate through lifts. Movement up to here carries no reward fee. */
+	target: Amount
+	/** The most this party will accrue through lifts. Never below `target`. */
+	bound: Amount
+	/** Charged on accumulation above `target`, up to `bound`. */
+	reward: Ppm
+	/** Charged on drops -- lifts that reduce what this party has accumulated. */
+	clutch: Ppm
+}
+
+/**
+ * A change to that policy. Each revision is a complete statement, so anything left out keeps
+ * its current value rather than resetting -- the engine reads the standing revision and fills
+ * the gaps.
+ */
+export interface TradingPolicyChange extends ActOptions {
+	target?: Amount
+	bound?: Amount
+	reward?: Ppm
+	clutch?: Ppm
+}
+
+/**
+ * What a lift may move through this tally, per direction, and what it costs.
+ *
+ * A direction is named by its **receiver** -- the party whose balance rises. The counterparty
+ * releases the same value, so `toMe` and `fromMe` are the same movement read from the two ends.
+ * Both parties' variables price a single lift: the receiver's `reward` on what it accumulates,
+ * and the releaser's `clutch` on the whole amount.
+ *
+ * Advisory. The hard gate on a lift pledge is the credit limit, not these numbers -- conformance
+ * to a party's own published policy is enforced by its agent, since the pledge is self-signed.
+ */
+export interface LiftDirection {
+	/** Units that may move with no reward fee. */
+	free: Amount
+	/** Further units beyond `free`, charged at `reward`. */
+	rewarded: Amount
+	/** The receiving party's charge on `rewarded` units. */
+	reward: Ppm
+	/** The releasing party's charge, applied to the whole amount moved. */
+	clutch: Ppm
+}
+
+export interface LiftCapacity {
+	/** Value that may come to me. */
+	toMe: LiftDirection
+	/** Value that may leave me. */
+	fromMe: LiftDirection
+}
+
 /** The credit one party extends to the other, and the notice owed before withdrawing it. */
 export interface CreditTerms {
 	revision: number
@@ -211,6 +298,8 @@ export interface TallyView {
 	balances: Balances
 	/** `mine` is the credit I extend to them; `theirs` is what they extend to me. */
 	terms: { mine?: CreditTerms; theirs?: CreditTerms }
+	/** Each party's published lift policy. Absent means they have published none. */
+	trading: { mine?: TradingPolicy; theirs?: TradingPolicy }
 	contract?: { cid: string; revision: number; agreedOn: IsoDate }
 	createdAt: IsoDate
 }
@@ -417,6 +506,8 @@ export interface PendingLiftView {
  */
 export interface LiftSurface {
 	pending(): Promise<PendingLiftView[]>
+	/** What a lift could move through this tally right now, and what it would cost. */
+	capacity(): Promise<LiftCapacity>
 	/** Not built: `feat-lift-referee-commit`, `feat-chipnet-integration`. */
 	propose(request: { amount: Amount; direction: 'in' | 'out' }): Promise<Result<never>>
 }
@@ -451,6 +542,11 @@ export interface Tally {
 
 	/** Publish what I am willing to let them owe me. */
 	offerCredit(offer: CreditOffer): Promise<Result<CreditTerms>>
+	/**
+	 * Publish what lifts may do to my balance, and what that costs. Unilateral, like credit --
+	 * it obliges the counterparty to nothing and needs no agreement.
+	 */
+	setTradingPolicy(change: TradingPolicyChange): Promise<Result<TradingPolicy>>
 	/** Propose the contract both sides sign to open the tally. */
 	offerContract(offer: ContractOffer): Promise<Result<void>>
 	/** Counter-sign a contract the counterparty proposed. */
@@ -463,14 +559,30 @@ export interface Tally {
 	/** Refuse a request addressed to me, on the record. */
 	declinePayment(requestId: string, options?: ActOptions): Promise<Result<void>>
 
+	/**
+	 * Say more about who I am. Revisioned and signed, so what was claimed and when is on the
+	 * record; the counterparty decides whether it satisfies them.
+	 */
+	publishCertificate(certificate: unknown, options?: ActOptions): Promise<Result<void>>
+
 	addKey(addition: KeyAddition): Promise<Result<KeyRecord>>
 	revokeKey(revocation: KeyRevocation): Promise<Result<void>>
 	/**
-	 * Accept a key the counterparty asserts is theirs. The recovery path after a compromise:
-	 * a sealed strand cannot re-admit a member, so a counterparty's adoption is the only way a
-	 * party's signing key can change for the life of the tally (`docs/identity.md`).
+	 * Produce a signed claim that I hold a fresh key, to hand to the counterparty out of band.
+	 *
+	 * Writes nothing. This is my half of the recovery ceremony -- the counterparty cannot make
+	 * it, because they do not hold the key.
 	 */
-	adoptCounterpartyKey(publicKey: Hex, options?: ActOptions): Promise<Result<void>>
+	claimKey(key: LocalSigner): Promise<KeyClaim>
+	/**
+	 * Attest a claim the counterparty made. The recovery path after a compromise: a sealed
+	 * strand cannot re-admit a member, so a counterparty's adoption is the only way a party's
+	 * signing key can change for the life of the tally (`docs/identity.md`).
+	 *
+	 * Two signatures, two parties, neither alone enough -- which is what makes this a
+	 * negotiation rather than a claim. There is no other authority in a two-party strand.
+	 */
+	adoptCounterpartyKey(claim: KeyClaim, options?: ActOptions): Promise<Result<void>>
 
 	/**
 	 * Begin winding down. Unilateral and safe: it freezes balance growth in both directions
