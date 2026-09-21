@@ -39,9 +39,10 @@ what Quereus is, or that Optimystic exists. Names mean the same thing everywhere
 same shapes. A thing that can fail returns why rather than throwing an exception the caller must
 catalogue.
 
-**Drafted, not implemented**: `src/api/types.ts` is the surface and `API.md` is the argument for
-it. `src/index.ts` exports those types and nothing from `src/store/` or `src/tally/` — the row
-builders are below the seam and stay there.
+**Implemented over an in-memory store**: `src/api/` — `types.ts` the surface, `engine.ts` the
+implementation, `store-memory.ts` a multi-party `StoreProvider`, `API.md` the argument.
+`src/index.ts` exports `src/api/` and nothing from `src/store/` or `src/tally/` — the row builders
+speak the schema's language and stay below the seam.
 
 ### 2. Asynchronous where anything can happen
 
@@ -107,10 +108,12 @@ capability.
 The point of the seam is version independence: when Sereus changes its plugin, its formation
 contract or its transactor, the change lands in one adapter here rather than in every app.
 
-**Status: the interface exists; the adapter does not.** `TallyStore` / `StoreProvider` in
-`src/api/types.ts` are what a Sereus-backed store must implement, written that way deliberately —
-the API draft is what determined their shape. Today nothing implements them: `openStrandFrom` opens
-a bare in-memory Quereus database and binds no strand. See § Where Sereus plugs in.
+**Status: both halves exist; nothing joins them.** `TallyStore` / `StoreProvider` in
+`src/api/types.ts` are what a Sereus-backed store must implement — the API draft determined their
+shape. Upstream, `@serfab/quereus-plugin-sereus` already binds a Quereus database to a strand,
+composes the Optimystic and crypto plugins, and applies a sApp schema. What is missing is only the
+adapter *here* that implements the former in terms of the latter. `openStrandFrom` still opens a
+bare in-memory database and binds no strand. See § Where Sereus plugs in.
 
 ### 7. Tests drive the shape
 
@@ -133,7 +136,7 @@ while claiming to prove an authorization rule.
 | `src/store/` | the Quereus strand: host scalars, statement loading, row writes | no |
 | `src/store/schema-node.ts` | reading `.qsql` off a filesystem | **yes — only here** |
 | `src/tally/` | formation, keys, negotiation, chits — **schema-facing row builders** | no |
-| `src/api/` | the declared consumer surface (`API.md`) — names no table, column or constraint | no |
+| `src/api/` | the consumer surface and its engine (`API.md`) — names no table, column or constraint | no |
 | `schema/*.qsql` | the sApp schema — the deployable artifact, and the source of truth | — |
 
 ## Where Sereus plugs in
@@ -152,18 +155,30 @@ sits *inside* Sereus's formation and shares its invitation key: `Stock.Invitatio
 on the strand being sealed — verified: a sApp CHECK can read the `Strand` namespace. The work is
 `feat-formation-over-sereus-strand`.
 
+Three things were checked upstream rather than assumed, and all three came back better than this
+section used to claim:
+
+- **The transactor is not a trap.** `StrandConnectionOptions.transactor` is a closed union
+  (`'local' | 'network' | 'test'`), every member of which commits through Optimystic's transactor
+  stack and so through Quereus DML, firing constraints. It defaults to `'network'`; an unrecognised
+  value throws. `quereus-sync` is a different package and is not a dependency of the plugin.
+- **Multi-row acts can be atomic.** `OptimysticVirtualTable` implements `begin` / `commit` /
+  `rollback`, which is what `TallyStore.apply` needs — a seating is several rows and one act.
+- **Deferred CHECKs with `committed.*` refs work over the backend.** The Optimystic module has an
+  explicit read-committed path for exactly that, citing Sereus's own `FormationUsage.Monotonic` as
+  the case it serves. This schema uses the same pattern in `PartyKey` and `CreditTerms`.
+
 What remains to settle before writing the adapter:
 
 1. **Can redemption and Taleus seating be one act?** If not, a strand can hold a member who is not
-   yet a party, and the seam must reconcile it.
-2. **Which transactor backs a tally strand?** `docs/STATUS.md` records that tally strands *must*
-   bind to the synchronous Optimystic network transactor — the `quereus-sync` CRDT path writes
-   column deltas straight to storage and **fires no SQL constraints at all**, which would silently
-   void every signature gate in the schema. That choice belongs in this adapter, and it is easy to
-   get wrong by default.
-
-Until then, the store interface should be written as though a Sereus-backed implementation is
-coming, because one is.
+   yet a party, and the seam must reconcile it. `begin`/`commit` above makes this look answerable
+   in the affirmative, but it has not been tried.
+2. **Remote change notification.** `Database.watch(scope, handler)` fires post-commit for *local*
+   commits, and `notifyExternalTableChange(table)` exists as the injection point for changes that
+   arrive from a peer — but nothing in the replication path calls it yet. Until it does,
+   `Tally.watch` / `Taleus.watch` report this host's own acts and not the counterparty's. That is a
+   real limitation for a phone and an ERP listener; it is invisible to the test host, which drives
+   both sides itself.
 
 ## Compliance checks
 

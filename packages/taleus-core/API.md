@@ -1,8 +1,14 @@
 # taleus-core — the API surface
 
-**Status: drafted, not implemented.** `src/api/types.ts` is the declared surface and compiles;
-nothing behind it exists yet. This document is the argument for that shape — why these calls and
-not others, and what each one is hiding.
+**Status: implemented over the in-memory strand fabric.** `src/api/types.ts` is the surface,
+`src/api/engine.ts` the implementation, and `src/api/store-memory.ts` a `StoreProvider` that runs
+several parties' replicas in one process. `src/api/engine.test.ts` carries two parties from an
+invitation through payment, requests, credit revision, key rotation and close — 18 tests, all
+through the API, none of them naming a table. The Sereus-backed `StoreProvider` is the piece still
+missing.
+
+This document is the argument for the shape — why these calls and not others, and what each one is
+hiding.
 
 `SPEC.md` says what this package is and must never become. This says what a consumer touches.
 
@@ -23,7 +29,7 @@ MyCHIPs is the other input. Its lesson is mostly about what to leave out — the
 draft chits, does not expose the `S`/`F` side codes, and does not make the caller reason in the
 stock party's sign convention.
 
-## The five decisions
+## The six decisions
 
 ### 1. Everything is from the acting party's perspective
 
@@ -71,12 +77,24 @@ an idempotent retry or a reproducible test supplies its own.
 a hardware token and a remote signing service can all implement it, and none of them will hand
 over a secret. `sign` is async because those are.
 
+Today the engine takes the narrower `LocalSigner`, which also carries the secret — because the row
+builders in `src/tally/` sign synchronously, and widening them is a real refactor. That narrowing
+is **in the types**, so nobody discovers it by passing an enclave and getting a runtime error.
+
 Every act takes an optional `signer` because **a party holds several keys and chooses which one
 signs** — a master key kept cold, a device key used daily (`docs/identity.md`,
 `feat-master-key-custody`). An API that bound one key per engine would make key rotation
 impossible to express.
 
-### 5. Three balances, because one number answers the question badly
+### 5. What is bilateral belongs on the contract
+
+Credit limits are unilateral — a party says alone how much it will be owed — so `offerCredit` is a
+single-signature act and the counterparty's agreement is not sought. The **denomination** is not:
+it is one shared value both parties sign, fixed for the tally's life. So it is a field of
+`offerContract`, not of `invite`. An invitation may *advertise* a unit so an invitee knows what is
+being proposed; nothing is agreed until the contract is.
+
+### 6. Three balances, because one number answers the question badly
 
 ```
 settled    signed, done, authoritative
@@ -138,52 +156,72 @@ rather than discover the capability is missing.
 
 ## A tally's whole life
 
+Taken from `src/api/engine.test.ts`, which runs it.
+
 ```ts
-const taleus = await openTaleus({ store, signer, sid })
+const jan = await openTaleus({ store: fabric.provider('jan'), signer, sid })
 
 // Jan forms a tally and holds a seat for Sam.
-const invited = await taleus.invite({
-  as: 'stock',
-  denomination: 'iso:USD',
-  offering: { limit: { units: 50000, denomination: 'iso:USD' }, callDays: 21 },
-})
-if (!invited.ok) return invited.refusal
-show(invited.value.ticket.encoded)          // a QR, a link, an email
+const invited = must(await jan.invite({ as: 'stock', denomination: 'iso4217:USD' }))
+show(invited.ticket.encoded)                 // a QR, a link, an email
 
-// Sam redeems it. One act: the strand seats him and the tally knows him.
-const joined = await sam.accept(ticket, { certificate: samsCert })
+// Sam redeems it: the strand admits him and he takes the open seat.
+const samTally = must(await sam.accept(invited.ticket))
+const janTally = await jan.open(invited.ref)
 
-// Both sides publish terms, then agree a contract.
-await tally.offerCredit({ limit: zero, callDays: 21 })
-await tally.offerContract({ contractCid: 'cid:standard-tally-v1' })
-await peer.acceptContract()                  // state: 'open'
+// Only now can the tally be named — its id is a digest over both parties — and only stock
+// signs it. Until this lands, nothing else can be signed, because every other signature
+// binds that id.
+must(await janTally.establish())
+
+// Credit is unilateral; the contract is bilateral and carries the unit of account.
+must(await janTally.offerCredit({ limit: usd(50000), callDays: 21 }))
+must(await samTally.offerCredit({ limit: usd(0), callDays: 21 }))
+must(await janTally.offerContract({ contractCid: 'cid:standard-tally-v1',
+                                    denomination: 'iso4217:USD', denominationScale: 2 }))
+must(await samTally.acceptContract())        // state: 'open'
 
 // Value moves. A party may always give, so this clears the counterparty's gate by construction.
-await tally.pay({ amount: { units: 12000, denomination: 'iso:USD' }, memo: 'March hours' })
+must(await samTally.pay({ amount: usd(12000), memo: 'March hours' }))
+;(await janTally.balances()).settled         // +12000 — Jan is owed
+;(await samTally.balances()).settled         // -12000 — the same fact, his side of it
 
 // Asking is not the same as being paid.
-const req = await tally.requestPayment({ amount: { units: 8000, denomination: 'iso:USD' } })
-const paid = await peer.pay({ amount: req.value.amount, answers: req.value.id })
+const asked = must(await janTally.requestPayment({ amount: usd(8000) }))
+const paid = await samTally.pay({ amount: usd(8000), answers: asked.id })
 if (!paid.ok && paid.refusal.code === 'credit-limit') {
-  // The request was legitimate; the payer is out of room. Raise the limit or renegotiate.
+  // The request was legitimate; the payer is out of room. `refusal.constraint` says which
+  // gate — 'WithinCreditLimits' — for anyone who needs to know exactly.
 }
 
 // Winding down: unilateral, and it cannot trap the counterparty.
-await tally.requestClose()
-// growth frozen both ways; reduction still permitted; 'closed' only at an actual settled zero
+must(await janTally.requestClose())          // growth frozen both ways, reduction permitted
+must(await janTally.pay({ amount: usd(30000) }))
+;(await samTally.read()).state               // 'closed', at an actual settled zero
 ```
 
 ## What is still open
 
-- **The store seam is the one interface the API cannot finish.** `TallyStore` / `StoreProvider` are
-  written as though a Sereus-backed implementation is coming, because one is
-  (`feat-formation-over-sereus-strand`). Two questions from `SPEC.md` § Where Sereus plugs in remain,
-  and both live behind this interface rather than in it: whether invite redemption and Taleus seating
-  are one act, and **which transactor backs a tally strand** — the `quereus-sync` path fires no SQL
-  constraints at all, which would silently void every gate in the schema.
+- **The store seam has an implementation waiting for it.** `@serfab/quereus-plugin-sereus` already
+  binds a Quereus database to a strand, applies a sApp schema, and exposes `begin`/`commit` — so
+  `TallyStore` / `StoreProvider` are an adapter away, not a research project
+  (`feat-formation-over-sereus-strand`). One question from `SPEC.md` § Where Sereus plugs in remains
+  behind the interface: whether invite redemption and Taleus seating commit as one act.
+- **`watch` reports this host's acts, not the counterparty's.** Quereus fires watchers post-commit
+  for local commits and exposes `notifyExternalTableChange` as the hook for changes arriving from a
+  peer, but nothing in the replication path calls it yet. The surface is right and the semantics
+  will widen under it; until then a phone or an ERP listener sees only what it did itself. A test
+  host drives both sides and never notices.
 - **`TallyState` is computed here**, because the schema does not materialize a negotiation state
   (`feat-schema-tally-state`). `forming` and `offered` are inferences from what has been signed.
   First thing to revisit when that ticket lands.
+- **`invite` does not carry opening terms.** A vendor's QR ought to propose a credit limit, and
+  `InviteRequest.offering` was in the first draft. It cannot work: credit terms are signed against
+  the tally's id, which does not exist until both parties are seated. Carrying them as unsigned
+  ticket payload is possible and is what a real vendor flow wants; not built.
+- **`Taleus.watch` subscribes to the tallies that exist when it is called.** A tally formed
+  afterwards is not covered. The store layer should offer one stream per member rather than the
+  engine gathering per-tally subscriptions; nothing needs it yet.
 - **`PaymentRequest` cannot be withdrawn**, only declined by the payer, and it expires rather than
   ages (`feat-invoice-lifecycle`). The surface reflects today's schema; `requestPayment` gains a
   `withdraw` sibling when that lands.

@@ -28,6 +28,16 @@ export default defineConfig(
 		},
 	},
 	{
+		// The API surface is async by rule, not by present need: `SPEC.md` § 2 requires every
+		// operation that *could* ever wait to be async today, because widening a sync function
+		// later breaks every caller. Several of them do not await anything yet, and that is the
+		// design rather than an oversight.
+		files: ['packages/taleus-core/src/api/**/*.ts'],
+		rules: {
+			'@typescript-eslint/require-await': 'off',
+		},
+	},
+	{
 		files: ['**/*.test.ts'],
 		languageOptions: {
 			globals: {

@@ -40,23 +40,33 @@ job, and `PartyKeyAdoption` is the only recovery path.
 **Atomic seating is settled**: Sereus's writers take `joinOpenTransaction` (default true), so
 `consumeInvite` + `Foil` + genesis key commit as one act.
 
-One question left, and it shapes the API:
+**The transactor question is answered**, and it was never as sharp as it read. The Sereus plugin's
+`transactor` option is a closed union whose every member commits through Optimystic and therefore
+fires SQL constraints; it defaults to the right one and throws on a typo. `quereus-sync` is a
+different package the plugin does not depend on.
 
-1. **Which transactor backs a tally strand?** `docs/STATUS.md` records that it *must* be the
-   synchronous Optimystic network transactor: the `quereus-sync` CRDT path writes column deltas
-   straight to storage and **fires no SQL constraints at all**, which silently voids every
-   signature gate in the schema. That choice lives in the Sereus adapter and is easy to get wrong
-   by default.
+What is left in step 2 is adapter work, not research: implement `TallyStore` / `StoreProvider`
+(`src/api/types.ts`) over `@serfab/quereus-plugin-sereus`. The plugin already wraps DDL as
+`declare schema App { … } apply schema App;`, which is a chunk of
+`feat-formation-over-sereus-strand` done upstream. One thing to try rather than assume: whether
+invite redemption and Taleus seating commit as a single transaction (`begin`/`commit` exist on the
+Optimystic vtable, so it looks answerable).
 
 Parked upstream: `feat-multi-use-tally-invitation` — Sereus offers closed **XOR** multi-use, and a
 vendor's printed QR needs both.
 
-### Step 3 — design the API surface *(drafted)*
+### Step 3 — the API surface *(done, over an in-memory store)*
 
-`packages/taleus-core/API.md` is the argument; `src/api/types.ts` is the surface, compiling and
-exported from `src/index.ts`. Nothing behind it is implemented. It was drafted ahead of step 2 on
-purpose: the store seam (`TallyStore` / `StoreProvider`) is the interface the Sereus adapter has to
-satisfy, and designing the API is what determines its shape.
+`packages/taleus-core/API.md` is the argument; `src/api/` is the surface, the engine, and a
+multi-party in-memory `StoreProvider`; `src/index.ts` exports it and nothing from `src/store/` or
+`src/tally/`. `src/api/engine.test.ts` carries two parties from invitation to close — 18 tests,
+none of them naming a table.
+
+It was built ahead of step 2 on purpose, and that paid twice. The store seam
+(`TallyStore` / `StoreProvider`) is the interface the Sereus adapter has to satisfy, and designing
+the API is what determined its shape. And driving the schema from two *separate* parties, neither
+holding the other's key, is what exposed the un-completable `TallyContract` in § 0 — which no
+row-level test could have found.
 
 Criterion 1 of `SPEC.md`. Not by extrapolating from the row-builders in `src/tally/` — that is how
 table names leak through the seam. Two requirements that were already known, both honoured:
@@ -252,6 +262,20 @@ Things the tests turned up that are design questions rather than test failures.
   gates read it; a credit limit needs the one-sided worst case per direction instead. Filed as
   `feat-schema-directional-reserve`. Not the deferred-CHECK isolation question — this fails in
   order, with nothing racing.
+
+- **A `TallyContract` could not be completed by two separate parties.** The row carries both
+  signatures over one digest and needs both at insert, but nothing in the schema carried the
+  *proposer's* contract signature to the accepter — `TallyContractProposal.Signature` covers a
+  different message (it folds in `Proposer`), and the accepter does not hold the proposer's key.
+  Every row-level test passed because the harness held both key pairs and `signContract` took
+  both. **Fixed**: `TallyContractProposal` gained a `ContractSignature` column — the proposer's
+  signature over the contract digest at `Number = SequenceNumber` — validated by its own
+  constraint, and `signContract` now takes one live signer plus the relayed one. Safe to hand
+  over: the signature covers every field, so an accepter that alters the contract cid, either
+  terms revision, the denomination or the scale invalidates it (tested).
+  **This is the finding that justifies the whole API step.** It is invisible from below — a
+  row-level suite that plays both sides cannot see it — and it would have been found by the first
+  real two-party client instead.
 
 ## 1. Substrate
 

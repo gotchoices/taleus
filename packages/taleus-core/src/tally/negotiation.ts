@@ -66,6 +66,30 @@ export function publishCreditTerms(terms: CreditTermsRevision): RowWrite {
 
 export type Side = 'S' | 'F'
 
+/** What both parties sign to make a contract. Notably *not* the proposer -- see `signContract`. */
+export interface ContractTerms {
+	tallyCid: string
+	number: number
+	contractCid: string
+	stockCreditTermsRevision: number
+	foilCreditTermsRevision: number
+	denomination?: string
+	denominationScale?: number
+}
+
+/** The one message a contract's two signatures both cover. */
+export function contractDigest(terms: ContractTerms): string {
+	return digest(
+		terms.tallyCid,
+		terms.number,
+		terms.contractCid,
+		terms.stockCreditTermsRevision,
+		terms.foilCreditTermsRevision,
+		terms.denomination ?? 'CHIP',
+		terms.denominationScale ?? 0,
+	)
+}
+
 export interface ContractOffer {
 	tallyCid: string
 	sequenceNumber: number
@@ -82,6 +106,12 @@ export interface ContractOffer {
 /**
  * Put terms on the table. The proposal carries both sides' terms revisions, so an offer is
  * a complete statement of what the tally would be -- not half of one.
+ *
+ * It also carries `ContractSignature`: the proposer's signature over the **contract** digest,
+ * which is a different message from this proposal's own (that one folds in `Proposer`). Without
+ * it the offer would be un-acceptable -- `TallyContract` needs both signatures at insert, and
+ * nothing else would carry the proposer's to the other party. Handing it over costs nothing: it
+ * verifies against exactly these fields and no others.
  */
 export function proposeContract(offer: ContractOffer): RowWrite {
 	return {
@@ -108,39 +138,41 @@ export function proposeContract(offer: ContractOffer): RowWrite {
 					offer.denominationScale ?? 0,
 				),
 			),
+			ContractSignature: signText(
+				offer.signer,
+				contractDigest({ ...offer, number: offer.sequenceNumber }),
+			),
 		},
 	}
 }
 
-export interface SignedContract {
-	tallyCid: string
-	number: number
-	contractCid: string
-	stockCreditTermsRevision: number
-	foilCreditTermsRevision: number
-	denomination?: string
-	denominationScale?: number
-	stockSigner: KeyPairText
-	foilSigner: KeyPairText
+export interface SignedContract extends ContractTerms {
+	/** Which side proposed, and therefore which signature is the relayed one. */
+	proposer: Side
+	/** The proposer's key and their `ContractSignature`, taken from the standing proposal. */
+	proposerSignerKey: string
+	proposerSignature: string
+	/** The accepting party, signing now. */
+	accepter: KeyPairText
 }
 
 /**
  * The contract itself: one row carrying **both** signatures over the same digest.
  *
- * Note what the digest does not include -- the proposer. An offer records who put it on
- * the table; the agreement does not care, because by then both have signed it. That is
- * also why the same fields, signed by both, are what makes a tally rather than an offer.
+ * Only one of them is made here. The other was made when the offer was put on the table and
+ * travelled in `TallyContractProposal.ContractSignature` -- because the two parties are two
+ * parties, and the accepter does not hold the proposer's key. An earlier version of this
+ * function took both key pairs, which only worked in a test that played both sides; building
+ * the API is what surfaced it (see test/STATUS.md § 0).
+ *
+ * Note what the digest does not include -- the proposer. An offer records who put it on the
+ * table; the agreement does not care, because by then both have signed it. That is also why
+ * relaying the proposer's signature is safe: it commits them to these terms and to nothing the
+ * accepter could substitute.
  */
 export function signContract(contract: SignedContract): RowWrite {
-	const covered = digest(
-		contract.tallyCid,
-		contract.number,
-		contract.contractCid,
-		contract.stockCreditTermsRevision,
-		contract.foilCreditTermsRevision,
-		contract.denomination ?? 'CHIP',
-		contract.denominationScale ?? 0,
-	)
+	const mine = signText(contract.accepter, contractDigest(contract))
+	const stockIsProposer = contract.proposer === 'S'
 	return {
 		table: 'TallyContract',
 		row: {
@@ -150,10 +182,10 @@ export function signContract(contract: SignedContract): RowWrite {
 			FoilCreditTermsRevision: contract.foilCreditTermsRevision,
 			Denomination: contract.denomination ?? 'CHIP',
 			DenominationScale: contract.denominationScale ?? 0,
-			StockSignerKey: contract.stockSigner.publicKey,
-			StockSignature: signText(contract.stockSigner, covered),
-			FoilSignerKey: contract.foilSigner.publicKey,
-			FoilSignature: signText(contract.foilSigner, covered),
+			StockSignerKey: stockIsProposer ? contract.proposerSignerKey : contract.accepter.publicKey,
+			StockSignature: stockIsProposer ? contract.proposerSignature : mine,
+			FoilSignerKey: stockIsProposer ? contract.accepter.publicKey : contract.proposerSignerKey,
+			FoilSignature: stockIsProposer ? mine : contract.proposerSignature,
 		},
 	}
 }

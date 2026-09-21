@@ -1,6 +1,7 @@
 import {
 	newKey,
 } from '../store/index.js'
+import type { RowWrite } from '../store/strand.js'
 import {
 	Tally,
 	newInvitation,
@@ -194,15 +195,41 @@ describe('credit terms are one party’s own statement', () => {
 })
 
 describe('offering and countersigning', () => {
-	const offerFrom = (cid: string, proposer: 'S' | 'F', signer: Party['keys'][0], sequenceNumber = 1) =>
+	const offerFrom = (
+		cid: string,
+		proposer: 'S' | 'F',
+		signer: Party['keys'][0],
+		over: { sequenceNumber?: number; stockCreditTermsRevision?: number } = {},
+	) =>
 		proposeContract({
 			tallyCid: cid,
-			sequenceNumber,
+			sequenceNumber: 1,
 			contractCid: CONTRACT,
 			proposer,
 			stockCreditTermsRevision: 1,
 			foilCreditTermsRevision: 1,
 			signer,
+			...over,
+		})
+
+	/**
+	 * Countersign a standing offer -- reading the terms off the proposal row itself, which is
+	 * what a real accepter does. It holds only its own key; the proposer's signature over the
+	 * contract digest travelled in the offer.
+	 */
+	const acceptOf = (cid: string, offer: RowWrite, accepter: Party['keys'][0]) =>
+		signContract({
+			tallyCid: cid,
+			number: offer.row.SequenceNumber as number,
+			contractCid: offer.row.ContractCid as string,
+			stockCreditTermsRevision: offer.row.StockCreditTermsRevision as number,
+			foilCreditTermsRevision: offer.row.FoilCreditTermsRevision as number,
+			denomination: offer.row.Denomination as string,
+			denominationScale: offer.row.DenominationScale as number,
+			proposer: offer.row.Proposer as 'S' | 'F',
+			proposerSignerKey: offer.row.SignerKey as string,
+			proposerSignature: offer.row.ContractSignature as string,
+			accepter,
 		})
 
 	it('FINDING: there is no counter-offer — one proposal row exists, ever', async () => {
@@ -217,7 +244,9 @@ describe('offering and countersigning', () => {
 		//
 		// This is `feat-offer-lifecycle`, and it is the MyCHIPs signing dance the reboot left
 		// implicit. Demonstrated here rather than described.
-		await expect(tally.refuses([offerFrom(cid, 'F', sam.keys[0], 2)])).resolves.toMatch(
+		await expect(
+			tally.refuses([offerFrom(cid, 'F', sam.keys[0], { sequenceNumber: 2 })]),
+		).resolves.toMatch(
 			/UNIQUE constraint failed: TallyContractProposal/,
 		)
 	})
@@ -242,18 +271,9 @@ describe('offering and countersigning', () => {
 
 	it('countersigning makes a tally: one row, both signatures', async () => {
 		const { jan, sam, tally, cid } = await withTerms(await opened())
-		await tally.propose([offerFrom(cid, 'S', jan.keys[0])])
-		await tally.propose([
-			signContract({
-				tallyCid: cid,
-				number: 1,
-				contractCid: CONTRACT,
-				stockCreditTermsRevision: 1,
-				foilCreditTermsRevision: 1,
-				stockSigner: jan.keys[0],
-				foilSigner: sam.keys[0],
-			}),
-		])
+		const offer = offerFrom(cid, 'S', jan.keys[0])
+		await tally.propose([offer])
+		await tally.propose([acceptOf(cid, offer, sam.keys[0])])
 
 		for (const party of [jan, sam]) {
 			await expect(
@@ -264,38 +284,40 @@ describe('offering and countersigning', () => {
 
 	it('one signature is not a tally', async () => {
 		const { jan, tally, cid } = await withTerms(await opened())
-		// Jan signs both halves. The foil signature is his, over the right digest, with a key
-		// that is simply not Sam's -- which is the whole check.
+		const offer = offerFrom(cid, 'S', jan.keys[0])
+		await tally.propose([offer])
+		// Jan accepts his own offer. The foil signature is his, over the right digest, with a
+		// key that is simply not Sam's -- which is the whole check.
+		await expect(tally.refuses([acceptOf(cid, offer, jan.keys[0])])).resolves.toMatch(
+			/FoilSignerAuthorized/,
+		)
+	})
+
+	it('the accepter cannot alter what the proposer signed up to', async () => {
+		// The proposer's signature travels in the offer, which is the only way a two-party
+		// contract can be assembled at all -- the accepter does not hold their key. Handing it
+		// over is safe because it covers every field: swap the contract document and the
+		// relayed signature stops verifying.
+		const { jan, sam, tally, cid } = await withTerms(await opened())
+		const offer = offerFrom(cid, 'S', jan.keys[0])
+		await tally.propose([offer])
+		const tampered = acceptOf(cid, offer, sam.keys[0])
 		await expect(
 			tally.refuses([
-				signContract({
-					tallyCid: cid,
-					number: 1,
-					contractCid: CONTRACT,
-					stockCreditTermsRevision: 1,
-					foilCreditTermsRevision: 1,
-					stockSigner: jan.keys[0],
-					foilSigner: jan.keys[0],
-				}),
+				{ ...tampered, row: { ...tampered.row, ContractCid: 'cid:something-else' } },
 			]),
-		).resolves.toMatch(/FoilSignerAuthorized/)
+		).resolves.toMatch(/StockSignatureValid/)
 	})
 
 	it('a contract cannot lock terms revisions that were never published', async () => {
 		const { jan, sam, tally, cid } = await withTerms(await opened())
-		await expect(
-			tally.refuses([
-				signContract({
-					tallyCid: cid,
-					number: 1,
-					contractCid: CONTRACT,
-					stockCreditTermsRevision: 7,
-					foilCreditTermsRevision: 1,
-					stockSigner: jan.keys[0],
-					foilSigner: sam.keys[0],
-				}),
-			]),
-		).resolves.toMatch(/StockTermsExist/)
+		// Nothing stops the *offer* naming a revision that does not exist -- the proposal has no
+		// existence check. It is the contract that refuses to lock it.
+		const offer = offerFrom(cid, 'S', jan.keys[0], { stockCreditTermsRevision: 7 })
+		await tally.propose([offer])
+		await expect(tally.refuses([acceptOf(cid, offer, sam.keys[0])])).resolves.toMatch(
+			/StockTermsExist/,
+		)
 	})
 
 	it('a key revoked before countersigning cannot complete the contract', async () => {
@@ -324,22 +346,13 @@ describe('offering and countersigning', () => {
 		const { revokeKey } = await import('./keys.js')
 		await tally.propose([revokeKey({ sid: sam.sid, publicKey: tablet.publicKey, by: sam.keys[0] })])
 
-		await tally.propose([offerFrom(cid, 'S', jan.keys[0])])
+		const offer = offerFrom(cid, 'S', jan.keys[0])
+		await tally.propose([offer])
 		// The stolen tablet countersigns. Both engines refuse: authority is checked when the
 		// row is written, not when the key was issued.
-		await expect(
-			tally.refuses([
-				signContract({
-					tallyCid: cid,
-					number: 1,
-					contractCid: CONTRACT,
-					stockCreditTermsRevision: 1,
-					foilCreditTermsRevision: 1,
-					stockSigner: jan.keys[0],
-					foilSigner: tablet,
-				}),
-			]),
-		).resolves.toMatch(/FoilSignerAuthorized/)
+		await expect(tally.refuses([acceptOf(cid, offer, tablet)])).resolves.toMatch(
+			/FoilSignerAuthorized/,
+		)
 	})
 })
 

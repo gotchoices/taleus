@@ -72,17 +72,18 @@ export async function trading({ janGrants = 50000, samGrants = 0 } = {}): Promis
 			}),
 		])
 	}
-	await tally.propose([
-		proposeContract({
-			tallyCid: cid,
-			sequenceNumber: 1,
-			contractCid: CONTRACT,
-			proposer: 'S',
-			stockCreditTermsRevision: 1,
-			foilCreditTermsRevision: 1,
-			signer: jan.keys[0],
-		}),
-	])
+	// Jan proposes; Sam accepts by relaying Jan's contract signature and adding his own. Neither
+	// party ever holds the other's key -- see `signContract`.
+	const offer = proposeContract({
+		tallyCid: cid,
+		sequenceNumber: 1,
+		contractCid: CONTRACT,
+		proposer: 'S',
+		stockCreditTermsRevision: 1,
+		foilCreditTermsRevision: 1,
+		signer: jan.keys[0],
+	})
+	await tally.propose([offer])
 	await tally.propose([
 		signContract({
 			tallyCid: cid,
@@ -90,8 +91,10 @@ export async function trading({ janGrants = 50000, samGrants = 0 } = {}): Promis
 			contractCid: CONTRACT,
 			stockCreditTermsRevision: 1,
 			foilCreditTermsRevision: 1,
-			stockSigner: jan.keys[0],
-			foilSigner: sam.keys[0],
+			proposer: 'S',
+			proposerSignerKey: jan.keys[0].publicKey,
+			proposerSignature: offer.row.ContractSignature as string,
+			accepter: sam.keys[0],
 		}),
 	])
 

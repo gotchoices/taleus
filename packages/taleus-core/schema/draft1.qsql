@@ -276,7 +276,15 @@ create table TallyContractProposal (
     DenominationScale integer default 0 check (DenominationScale >= 0),
     SignerKey text,        -- authorized PartyKey of the proposing party that signed
     Signature text,
-
+    -- The proposer's signature over the CONTRACT digest (TallyContract's, at Number = SequenceNumber),
+    -- not over this proposal. Without it a proposal is un-acceptable in a real two-party setting:
+    -- TallyContract requires BOTH signatures at insert, over a digest this proposal's own Signature
+    -- does not cover (that one folds in Proposer and is therefore a different message), and no other
+    -- row carries one party's contract signature to the other. The accepting party copies this into
+    -- the matching Stock/Foil slot and adds its own. Safe to hand over: the signature binds every
+    -- covered field, so an accepter that alters the contract cid, either terms revision, the
+    -- denomination or the scale invalidates it and TallyContract rejects the row.
+    ContractSignature text,
     primary key (/* 1 row */),
     -- SignerKey resolves against the proposing side's own authorized set. This also fixes the
     -- draft placeholder that passed ProposerSid (a party id) as the public-key argument.
@@ -287,6 +295,13 @@ create table TallyContractProposal (
     constraint SignatureValid check on insert, update (SignatureValid(
         Digest((select Cid from TallyCore), SequenceNumber, ContractCid, Proposer, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         Signature,
+        New.SignerKey
+    )),
+    -- Same key, the other message. Verified here so a proposal carrying an unusable contract
+    -- signature is rejected when it is made, rather than when the counterparty tries to accept.
+    constraint ContractSignatureValid check on insert, update (SignatureValid(
+        Digest((select Cid from TallyCore), SequenceNumber, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
+        ContractSignature,
         New.SignerKey
     ))
 );

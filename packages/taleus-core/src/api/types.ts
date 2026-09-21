@@ -123,6 +123,18 @@ export interface Signer {
 }
 
 /**
+ * A signer whose secret half is in this process.
+ *
+ * Today's engine requires one, and says so in the types rather than accepting a `Signer` it
+ * cannot actually use. The row builders in `src/tally/` sign synchronously, so widening to the
+ * full `Signer` above means making them async -- worth doing, and a visible change rather than
+ * a runtime surprise when someone passes an enclave.
+ */
+export interface LocalSigner extends Signer {
+	readonly secretKey: Uint8Array
+}
+
+/**
  * A party, as this tally knows them.
  *
  * A `sid` is **strand-local** by design: one person is not one identity, and nothing here tries
@@ -192,6 +204,8 @@ export interface TallyView {
 	role: Role
 	state: TallyState
 	denomination: string
+	/** Decimal exponent: one `Amount.units` is 10^-scale of the denomination's display unit. */
+	denominationScale: number
 	me: PartyIdentity
 	counterparty: PartyIdentity
 	balances: Balances
@@ -261,7 +275,7 @@ export interface HistoryQuery {
  * or a reproducible test, supplies its own.
  */
 export interface ActOptions {
-	signer?: Signer
+	signer?: LocalSigner
 	on?: IsoDate
 	id?: string
 }
@@ -295,11 +309,20 @@ export interface CreditOffer extends ActOptions {
 export interface ContractOffer extends ActOptions {
 	/** Content address of the contract text both parties are agreeing to. */
 	contractCid: string
+	/**
+	 * The tally's unit of account, fixed for its life. It belongs here rather than on the
+	 * invitation because it is a **bilateral** term: one shared value both parties sign, unlike
+	 * credit limits, which each party sets alone. An invitation may advertise a denomination,
+	 * but nothing is agreed until the contract is. Defaults to `CHIP` at scale 0.
+	 */
+	denomination?: string
+	/** Decimal exponent: one unit is 10^-scale of the denomination's display unit. */
+	denominationScale?: number
 }
 
 export interface KeyAddition extends ActOptions {
 	/** The new key. It must sign for itself, proving the caller holds it. */
-	key: Signer
+	key: LocalSigner
 }
 
 export interface KeyRevocation extends ActOptions {
@@ -314,6 +337,15 @@ export interface KeyRevocation extends ActOptions {
  * is the party entitled to take the open seat.
  */
 export interface InvitationTicket {
+	/**
+	 * Which strand it admits the holder to. The store layer resolves this and nothing else --
+	 * in a real host it is the strand's address, the thing a joiner dials.
+	 */
+	readonly ref: TallyRef
+	/**
+	 * The credential: the seat offered and the secret half of the invitation key. Opaque to the
+	 * store, read only by the engine. Holding this is what entitles someone to the open seat.
+	 */
 	readonly encoded: string
 }
 
@@ -329,6 +361,7 @@ export interface PendingInvitation {
 export interface InviteRequest extends ActOptions {
 	/** The seat I take; the invitee takes the other. */
 	as: Role
+	/** Advertised on the ticket so an invitee knows what is being proposed. Agreed in the contract. */
 	denomination: string
 	/** Optional opening position, so an invitee sees real terms rather than an empty tally. */
 	offering?: { limit: Amount; callDays: number }
@@ -405,6 +438,16 @@ export interface Tally {
 	history(query?: HistoryQuery): Promise<Entry[]>
 	requests(): Promise<PaymentRequest[]>
 	keys(): Promise<KeyRecord[]>
+
+	/**
+	 * Stock only: name the tally, once the counterparty has taken their seat.
+	 *
+	 * The tally's identity is a digest over *both* parties' sids, so it cannot exist until both
+	 * are seated -- and only the stock party signs it. That makes this a real step rather than
+	 * an implementation detail: between the invitee accepting and the inviter naming, nothing
+	 * can be signed against the tally, because every other signature binds its id.
+	 */
+	establish(options?: ActOptions): Promise<Result<void>>
 
 	/** Publish what I am willing to let them owe me. */
 	offerCredit(offer: CreditOffer): Promise<Result<CreditTerms>>
@@ -503,7 +546,7 @@ export interface StoreProvider {
  */
 export interface Environment {
 	store: StoreProvider
-	signer: Signer
+	signer: LocalSigner
 	sid: string
 	now?: () => IsoDate
 	newId?: () => string

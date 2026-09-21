@@ -19,12 +19,13 @@ citations) is prepared separately for transmission to Nathan; this is the digest
   implemented, but wiring it fully into cluster consensus is flagged as partly future work.
   **Acceptance:** a two-node integration test that fires the concurrent double-revocation and
   asserts exactly one transaction commits.
-- [ ] **Transactor-backing rule (load-bearing safety invariant).** Tally strands **must** bind to
-  the synchronous Optimystic **network transactor**. The stack also has a `quereus-sync`
-  last-write-wins CRDT/KV replication path that writes column deltas straight to storage and
-  **does not fire SQL constraints at all**. Routing a tally strand through that path would silently
-  void every signature gate, credit gate, and balance-chain check. This choice belongs in the
-  runner/wiring layer that does not exist yet, so it is easy to get wrong by default — pin it.
+- [x] **Transactor-backing rule — checked upstream, and far less exposed than this entry claimed.**
+  `@serfab/quereus-plugin-sereus` takes `transactor: 'local' | 'network' | 'test'` as a **closed
+  union**, all three of which commit through Optimystic's transactor stack and therefore through
+  Quereus DML, so SQL constraints fire. It defaults to `'network'`, and `parseConfig` *throws* on an
+  unrecognised value rather than falling back. `quereus-sync` is a separate package and is not a
+  dependency of the plugin anywhere in Sereus — it is not reachable by misconfiguration, only by
+  someone deliberately wiring a different stack. Residual rule, stated once: **do not.**
 - [ ] **Partition behavior for time-sensitive actions.** Optimystic is CP: a cadre in the minority
   partition cannot commit, so a party **cannot revoke a stolen key while partitioned**, widening
   the key-compromise race window by the partition duration. Understand and document the bound.
@@ -62,8 +63,14 @@ module keeps its in-process suite against doubles until direct chits work on a r
   identity and keys, formation, negotiation, credit terms, direct chits, invoices, close, reading.
   240 tests over 20 suites, every act proposed to two replicas that each re-validate it. Five schema
   defects were found and fixed along the way (see that file's § 0).
-- [ ] Next: `feat-formation-over-sereus-strand` (the Sereus seam), then the API surface — sequencing
-  in that file's § Roadmap.
+- [x] **The API surface is built and exercised.** `packages/taleus-core/API.md` + `src/api/`: one
+  consumer surface that names no table, an engine over it, and an in-memory multi-party store so it
+  runs today. Two parties go from invitation to close through the API alone. It surfaced a defect
+  no row-level test could: a `TallyContract` could not be completed by two parties who do not share
+  a key (fixed — see that package's `test/STATUS.md` § 0).
+- [ ] Next: `feat-formation-over-sereus-strand` — a `StoreProvider` over
+  `@serfab/quereus-plugin-sereus`, which already binds Quereus to a strand and applies the sApp
+  schema. Then migrate the row-level suite up per `test/STATUS.md` § Roadmap step 4.
 - [ ] Mine `mc/mychips/test/auto` for scenarios (5,543 lines; the code does not transfer, the
   scenarios do).
 
