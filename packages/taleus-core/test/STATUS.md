@@ -305,6 +305,35 @@ Things the tests turned up that are design questions rather than test failures.
   so `Digest((select InvitationKey from Stock), PartySid, …)` would close it, but changing a
   digest the schema deliberately reasoned about is Nate's call, not a unilateral one.
 
+- **`CurrentTradingVariable` was quadratic in the journal's depth, and it sits on the lift path.**
+  It resolved the latest revision with a correlated `TV.Revision = (select max(Revision) from
+  TradingVariable T2 where T2.Sid = P.Sid)` in a left-join ON clause -- the **only** use of that
+  idiom in the schema; every other resolver uses `order by Revision desc limit 1`. The correlated
+  max is re-evaluated per candidate row, and `LiftLading` joins this view twice. Measured on the
+  in-memory runner, one `LiftLading` read:
+
+  | revisions | correlated max | `order by … limit 1` |
+  |---|---|---|
+  | 1 | 24 ms | 40 ms |
+  | 60 | 308 ms | 53 ms |
+  | 120 | 1 210 ms | 76 ms |
+  | 240 | 5 505 ms | 142 ms |
+
+  **Fixed** -- the view now matches the schema's own idiom. `TradingVariable` is insert-only and
+  revisioned, so depth only grows, and these reads happen while pricing lifts.
+
+- **Nothing in the schema declares an index, and every journal read is therefore linear.** Even
+  after the fix above, cost still roughly doubles as a journal doubles (53 → 76 → 142 ms), so the
+  `order by … desc limit 1` is scanning rather than seeking. The same shows on the write path: a
+  chit insert measured 101 ms at ledger depth 0, 123 ms at 120, 170 ms at 240 and 241 ms at 360 --
+  growing with the history it has to validate against. Two lookups inside `Ledger`'s own
+  constraints are the worst exposure, because they hit **non-key columns on the table that grows
+  without bound**: `InvoiceLink`'s `select count(*) from Ledger where InvoiceId = ?` and
+  `LiftFinalize`'s `where L.LiftId = ? and L.Kind = 'lift'`, plus `OpenPendingLift`'s anti-join
+  against the whole ledger, which `ReservedBalance` reads on every chit and every pledge. Quereus
+  supports `create index` and materialized views; neither is used. Not a correctness problem and
+  not urgent, but it is a real ceiling on a tally that trades for years.
+
 ## 1. Substrate
 
 - [x] Every statement in `draft1.qsql` executes in Quereus
