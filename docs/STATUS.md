@@ -53,7 +53,7 @@ module keeps its in-process suite against doubles until direct chits work on a r
   now the generic notion; an app-specific layer belongs *in the app*, not in a core library.
 - [x] `docs/drafts/engine-api.md` moved to `packages/taleus-app/design/notes/core-asks.md` — it was
   written from the app's side and is one app's wish-list, not a core specification.
-- [x] **The schema executes.** All 28 statements of `draft1.qsql` load into Quereus in memory, with
+- [x] **The schema executes.** All 33 statements of `draft1.qsql` load into Quereus in memory, with
   host scalars registered (`src/store/`). Nothing had ever run it before — the lift suite uses an
   in-memory double its own harness calls "schema-EMULATING".
 - [x] `docs/timestamps.md` — the creator asserts and signs the time; what backdating buys a byzantine

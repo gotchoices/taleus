@@ -4,7 +4,7 @@
 -- view's body when the view is created, so a view must follow the tables it selects from.
 -- Table CHECK constraints are planned lazily at write time instead, which is why a table
 -- may reference a view defined below it (Ledger.WithinReservedCredit reads ReservedBalance).
--- Hence: all tables first, then all views.
+-- Hence: all tables first, then indexes, then all views.
 
 create table Stock (
     Sid text,
@@ -984,6 +984,85 @@ create table Invoice (
     constraint InsertOnly check on delete, update (0)
 );
 
+-- ── Indexes ──────────────────────────────────────────────────────────────────────────────
+--
+-- Declared up front rather than added reactively, and measured rather than assumed.
+--
+-- Two rules came out of measuring this schema on a real runner:
+--
+--   1. A lookup on a primary key or a PK *prefix* needs nothing more. `InvoiceDecline`,
+--      `PendingLift`, `LiftVoid` and `Invoice` are probed by their whole key; `Stock`, `Foil`,
+--      `TallyCore`, `TallyContractProposal` and `CloseRequest` hold one or two rows and can never
+--      repay an index.
+--
+--   2. **A descending read does NOT ride the primary key.** `order by X desc limit 1` -- the
+--      idiom this schema uses everywhere to resolve "the latest" -- scans and sorts unless an
+--      index declares that order explicitly. Measured: reading the current balance cost 27ms at
+--      an empty ledger and 67ms at 360 chits; with `Ledger (Number desc)` it is 25ms and 17ms,
+--      i.e. flat. A chit insert, which consults that read twice through the credit gates, went
+--      from 241ms to 106ms at the same depth. Every `order by ... desc limit 1` below therefore
+--      has a matching descending index, and a new one must come with its own.
+--
+-- What is left after those two rules is lookups on **non-key columns of tables that grow without
+-- bound** -- which, in a tally that trades for years, means the ledger.
+
+-- The latest settled balance: `PerspectiveBalance`, `ReservedBalance` and `CloseState` all read
+-- `order by Number desc limit 1`, and the reserved-credit gate consults it on every chit and
+-- every pledge. The single highest-value index in the schema.
+create index LedgerLatest on Ledger (Number desc);
+
+-- Answering an invoice. `Ledger.InvoiceLink` counts the chits naming an invoice on every direct
+-- chit insert, and `InvoiceState` joins the same way per invoice, which `OpenInvoice` and every
+-- balance read then consume. `InvoiceId` is null on most ledger rows -- the overwhelming majority
+-- of chits answer nothing -- so this could be a partial index; kept total until a runner confirms
+-- the planner picks partial indexes up.
+create index LedgerByInvoice on Ledger (InvoiceId);
+
+-- Lift resolution. `Ledger.LiftFinalize`'s single-finalize guard and `OpenPendingLift`'s
+-- anti-join both filter `LiftId` together with `Kind`, and `OpenPendingLift` feeds
+-- `ReservedBalance`, which the reserved-credit gate reads on every chit AND every pledge.
+-- `LiftId` first: it is the selective half, and the pair covers the trailing `and Kind = 'lift'`.
+create index LedgerByLift on Ledger (LiftId, Kind);
+
+-- Reporting. The application layer asks for a date range -- a statement, a reconciliation, a
+-- period close -- and `Date` is `YYYY-MM-DD` by `ValidDate`, so lexicographic order IS
+-- chronological order and a plain range predicate can use this. (A predicate written as
+-- `DayNumber(Date) >= ...` cannot: it is a function of the column, not the column.)
+create index LedgerByDate on Ledger (Date);
+
+-- NOTE (upstream, not a workaround). These indexes are declared in the right shape, but a
+-- Quereus planner limit stops several of them being used: a **table alias** between the table
+-- access and a Sort defeats sort-absorption via index ordering. `select x from t order by r desc
+-- limit 1` plans as an ordered index walk (planner cost 501); `select x from t TV order by TV.r
+-- desc limit 1` plans as a full Sort over a primary-key scan (cost 20933) -- one `Alias` node,
+-- nothing else. Every latest-revision resolver here is aliased, including the six CreditTerms
+-- lookups inside Ledger's credit gates that run on every chit insert.
+--
+-- Dropping the aliases does recover it (measured: a LiftLading read over a 240-revision journal,
+-- 100ms -> 61ms), and we are DELIBERATELY NOT DOING THAT. Un-aliased SQL is harder to read, and
+-- the schema should not be contorted around a planner bug that is being fixed. Filed upstream
+-- with a minimal repro as quereus#32; this note exists so the cost is known and the temptation
+-- is answered. When it lands, nothing here needs to change -- these resolvers simply get faster.
+
+-- The unilateral revisioned journals. Each resolves "latest for this party" by `order by
+-- Revision desc limit 1` within a Sid, so the PK prefix gives the Sid and the descending half
+-- has to be declared. These are insert-only and grow for the life of the tally -- `CreditTerms`
+-- is read by BOTH credit gates on every chit, and `TradingVariable` twice per `LiftLading`.
+create index CreditTermsLatest on CreditTerms (Sid, Revision desc);
+create index TradingVariableLatest on TradingVariable (Sid, Revision desc);
+create index PartyCertificateLatest on PartyCertificate (PartySid, Revision desc);
+
+-- The contract in force: `order by Number desc limit 1` on every chit insert (to stamp
+-- `ContractNumber`) and on every read of the tally's denomination.
+create index TallyContractLatest on TallyContract (Number desc);
+
+-- Authorization. `PartyKey.UniqueKey` and `PartyKeyAdoption.UniqueKey` both probe
+-- `(Sid, PublicKey)`, and `RegisteredKey` -- hence `AuthorizedKey`, hence the `SignerAuthorized`
+-- check on every signature-gated insert in the schema -- projects exactly those two columns, so
+-- this also covers that read. The primary key is `(Sid, Revision)`, so `PublicKey` is not
+-- reachable through it.
+create index PartyKeyByKey on PartyKey (Sid, PublicKey);
+
 create view RegisteredKey as
     select Sid, PublicKey from PartyKey
     union
@@ -1017,20 +1096,22 @@ create view AuthorizedKey as
 -- Effective (latest-revision) trading variables per party.
 -- A party that has published none trades at the MyCHIPs defaults (all zero):
 -- lifts may pay its accumulated balance down to zero for free, and accumulate nothing beyond that.
--- NOTE (cost): the latest-revision lookup is `order by Revision desc limit 1` per column, matching
--- CurrentCreditLimit and every other resolver in this schema. It was written as a left join whose
--- ON clause carried a correlated `= (select max(Revision) ...)`, which was the ONLY use of that
--- idiom here -- and it is QUADRATIC in the journal's depth: the correlated max is re-evaluated per
--- candidate row, and LiftLading joins this view TWICE. Measured on the in-memory runner, a single
--- LiftLading read cost 24ms at 1 revision, 308ms at 60, 1.2s at 120 and 5.5s at 240, while the
--- `order by ... limit 1` form over the same journal stayed flat. TradingVariable is insert-only and
--- revisioned, so depth grows for the life of the tally, and these are read on the lift path.
+-- NOTE (cost). One scalar subquery per column, matching CurrentCreditLimit and every other
+-- resolver here. This was a left join whose ON clause carried a correlated
+-- `TV.Revision = (select max(Revision) ...)` -- the only use of that idiom in the schema -- and it
+-- is QUADRATIC in the journal's depth, because a correlated subquery in an ON clause is
+-- re-evaluated per candidate row and LiftLading joins this view TWICE. Measured, one LiftLading
+-- read over a 240-revision journal: 5.5s in that form, 0.10s in this one.
+-- The quadratic part is the ON-clause correlation, NOT `max()`: rewriting it as
+-- `TV.Revision = (select T2.Revision ... order by T2.Revision desc limit 1)` in the same ON clause
+-- measured 2.3s at the same depth. Keep latest-revision lookups as scalar subqueries in the
+-- SELECT list; never as a correlated predicate in a join.
 create view CurrentTradingVariable as
     select P.Sid,
-        coalesce((select Target from TradingVariable TV where TV.Sid = P.Sid order by TV.Revision desc limit 1), 0) as Target,
-        coalesce((select Bound  from TradingVariable TV where TV.Sid = P.Sid order by TV.Revision desc limit 1), 0) as Bound,
-        coalesce((select Reward from TradingVariable TV where TV.Sid = P.Sid order by TV.Revision desc limit 1), 0) as Reward,
-        coalesce((select Clutch from TradingVariable TV where TV.Sid = P.Sid order by TV.Revision desc limit 1), 0) as Clutch
+        coalesce((select TV.Target from TradingVariable TV where TV.Sid = P.Sid order by TV.Revision desc limit 1), 0) as Target,
+        coalesce((select TV.Bound  from TradingVariable TV where TV.Sid = P.Sid order by TV.Revision desc limit 1), 0) as Bound,
+        coalesce((select TV.Reward from TradingVariable TV where TV.Sid = P.Sid order by TV.Revision desc limit 1), 0) as Reward,
+        coalesce((select TV.Clutch from TradingVariable TV where TV.Sid = P.Sid order by TV.Revision desc limit 1), 0) as Clutch
     from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
 
 -- Effective (latest-effective-revision) credit limit each party grants, as of now.

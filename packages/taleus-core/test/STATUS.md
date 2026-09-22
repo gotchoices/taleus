@@ -322,17 +322,60 @@ Things the tests turned up that are design questions rather than test failures.
   **Fixed** -- the view now matches the schema's own idiom. `TradingVariable` is insert-only and
   revisioned, so depth only grows, and these reads happen while pricing lifts.
 
-- **Nothing in the schema declares an index, and every journal read is therefore linear.** Even
-  after the fix above, cost still roughly doubles as a journal doubles (53 → 76 → 142 ms), so the
-  `order by … desc limit 1` is scanning rather than seeking. The same shows on the write path: a
-  chit insert measured 101 ms at ledger depth 0, 123 ms at 120, 170 ms at 240 and 241 ms at 360 --
-  growing with the history it has to validate against. Two lookups inside `Ledger`'s own
-  constraints are the worst exposure, because they hit **non-key columns on the table that grows
-  without bound**: `InvoiceLink`'s `select count(*) from Ledger where InvoiceId = ?` and
-  `LiftFinalize`'s `where L.LiftId = ? and L.Kind = 'lift'`, plus `OpenPendingLift`'s anti-join
-  against the whole ledger, which `ReservedBalance` reads on every chit and every pledge. Quereus
-  supports `create index` and materialized views; neither is used. Not a correctness problem and
-  not urgent, but it is a real ceiling on a tally that trades for years.
+- **The schema declared no indexes; it now declares nine, chosen by measurement.** Three rules
+  came out of it, and the second was a surprise:
+
+  1. A lookup on a primary key or PK *prefix* needs nothing. Single- and double-row tables can
+     never repay an index.
+  2. **A descending read does not ride the primary key.** `order by X desc limit 1` -- the idiom
+     this schema uses everywhere for "the latest" -- scans and sorts unless an index declares that
+     order. `Ledger (Number desc)` took the current-balance read from 27 ms (empty) / 67 ms (360
+     chits) to 25 / 17 -- i.e. flat -- and a chit insert, which consults it twice through the
+     credit gates, from 241 ms to 105 ms at that depth.
+  3. Non-key columns on the unbounded table: `Ledger.InvoiceId` (`InvoiceLink` counts on every
+     direct chit; `InvoiceState` joins per invoice), `Ledger (LiftId, Kind)` (`LiftFinalize` and
+     `OpenPendingLift`, the latter feeding `ReservedBalance`), `Ledger.Date` (reporting ranges --
+     usable only because `ValidDate` pins `YYYY-MM-DD`, so lexicographic order is chronological),
+     and `PartyKey (Sid, PublicKey)`, which also covers the `RegisteredKey`/`AuthorizedKey`
+     projection every signature-gated insert reads.
+
+  Two upstream limits came out of reading the actual query plans (`db.getDebugPlan`), and both
+  are now reflected in how the schema is written:
+
+  - **A table alias defeats sort-absorption via index ordering.** `select x from t order by r
+    desc limit 1` plans as an ordered index walk (planner cost 501); `select x from t TV order by
+    TV.r desc limit 1` plans as a full `Sort` over a primary-key scan (cost 20933). One `Alias`
+    node, nothing else -- no `WHERE`, no subquery, no correlation needed. Every latest-revision
+    resolver in this schema is aliased, including the six `CreditTerms` lookups inside `Ledger`'s
+    credit gates that run on every chit insert.
+    **Decision: keep the aliases and wait for the upstream fix.** De-aliasing does recover it
+    (a `LiftLading` read over a 240-revision journal, 100 ms -> 61 ms) and was tried and reverted:
+    contorting the schema around a planner bug costs more in readability than it buys, and the
+    repro is clean enough to expect a prompt fix. Filed upstream as **quereus#32**
+    (https://github.com/gotchoices/quereus/issues/32); draft kept at
+    `tmp/quereus-issue-alias-blocks-sort-absorption.md` (companion notes for two existing
+    Quereus tickets in `tmp/quereus-notes-for-existing-tickets.md`). A NOTE beside the index block records the
+    cost so the temptation stays answered.
+  - **A compound index is seekable only on its full key, never on a prefix.** `where k = ? and
+    r = ?` against `primary key (k, r)` seeks; `where k = ?` alone falls back to a full table
+    scan with a filter -- and a single-column index on the same column *does* seek, which isolates
+    compound-ness as the trigger. That includes the primary key's own prefix, so
+    `primary key (a, b)` with `where a = ?` scans. Minor for us (a `Sid` has two distinct values
+    per strand, so the filter discards almost nothing) but general: it is every per-parent lookup
+    in a normalized schema. Filed upstream as **quereus#33**
+    (https://github.com/gotchoices/quereus/issues/33); draft at
+    `tmp/quereus-issue-compound-index-prefix-seek.md`. Independent of and additive to #32 --
+    fixing either alone leaves the other's cost.
+
+- **A correlated subquery in a join ON clause is quadratic; in a SELECT list it is linear.**
+  *(Already filed upstream as `quereus feat-decorrelate-remaining-subquery-sites` Arm A, which
+  names this exact shape.)*
+  Established by measurement while fixing `CurrentTradingVariable`, and the distinction is not
+  about `max()`. Over a 240-revision journal, one `LiftLading` read cost **5.5 s** with
+  `TV.Revision = (select max(Revision) …)` in the ON clause, **2.3 s** with the same correlation
+  written as `(select … order by … desc limit 1)` in the ON clause, and **0.10 s** as one scalar
+  subquery per column in the SELECT list. Rule for this schema: resolve "the latest" in the SELECT
+  list, never as a correlated predicate in a join.
 
 ## 1. Substrate
 
