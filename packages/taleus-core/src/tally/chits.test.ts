@@ -107,7 +107,7 @@ describe('who may issue a chit', () => {
 		await tally.propose([chit({ number: 1, issuer: 'F', units: 18000, balance: 18000 })])
 		// One signature, Sam's, and the tally moved. Jan agreed to nothing here.
 		await expect(
-			tally.seesOne(sam, 'select SignerKey from Ledger where Number = 1'),
+			tally.seesOne(sam, 'select SignerKey from App.Ledger where Number = 1'),
 		).resolves.toEqual({ SignerKey: sam.keys[0].publicKey })
 	})
 
@@ -226,7 +226,7 @@ describe('what a chit is signed over', () => {
 		await tally.propose([chit({ number: 1, issuer: 'F', units: 18000, balance: 18000 })])
 		const row = await tally.seesOne<{ Signature: string }>(
 			sam,
-			'select Signature from Ledger where Number = 1',
+			'select Signature from App.Ledger where Number = 1',
 		)
 		// Signed over Sam's own Sid -- the issuer -- not Jan's.
 		expect(row?.Signature).toBe(

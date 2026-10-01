@@ -1,9 +1,14 @@
+import { Database } from '@quereus/quereus'
+
+import { fromText } from '../lift/digest.js'
+import { digest } from '../store/functions.js'
 import { readSchema } from '../store/schema-node.js'
 import { newKey } from '../store/index.js'
 import { publishCertificate } from '../tally/certificates.js'
 import { MemoryFabric } from './store-memory.js'
 import { localSigner, openTaleus } from './engine.js'
-import type { Amount, Result, Taleus, Tally } from './types.js'
+import { registerCrypto, row, type RowWrite } from '../store/strand.js'
+import type { Amount, Result, StoreProvider, Taleus, Tally, TallyStore } from './types.js'
 
 /**
  * The API, driven the way a consumer drives it: two parties, two engines, no shared secrets.
@@ -37,10 +42,39 @@ interface World {
 	fabric: MemoryFabric
 }
 
-async function twoParties(): Promise<World> {
+/** Stand between a party's engine and its store -- to lose a reply, or stage a race. */
+type StoreWrap = (store: TallyStore) => TallyStore
+
+/** A store whose `apply` runs `around` in place of the real one. */
+function aroundApply(store: TallyStore, around: (writes: RowWrite[], apply: () => Promise<void>) => Promise<void>): TallyStore {
+	return {
+		query: (sql, params) => store.query(sql, params),
+		apply: writes => around(writes, () => store.apply(writes)),
+		subscribe: listener => store.subscribe(listener),
+		close: () => store.close(),
+	}
+}
+
+function wrapProvider(provider: StoreProvider, wrap?: StoreWrap): StoreProvider {
+	if (!wrap) return provider
+	return {
+		list: () => provider.list(),
+		open: async ref => wrap(await provider.open(ref)),
+		create: async request => {
+			const made = await provider.create(request)
+			return { ref: made.ref, store: wrap(made.store) }
+		},
+		join: async ticket => {
+			const joined = await provider.join(ticket)
+			return { ref: joined.ref, store: wrap(joined.store) }
+		},
+	}
+}
+
+async function twoParties(wraps: { sam?: StoreWrap } = {}): Promise<World> {
 	const fabric = new MemoryFabric(readSchema('draft1'))
 	let counter = 0
-	const party = async (name: string) => {
+	const party = async (name: string, wrap?: StoreWrap) => {
 		const key = newKey()
 		const sid = `sid:${name}`
 		const signer = localSigner(key)
@@ -48,7 +82,7 @@ async function twoParties(): Promise<World> {
 			sid,
 			signer,
 			engine: await openTaleus({
-				store: fabric.provider(name),
+				store: wrapProvider(fabric.provider(name), wrap),
 				signer,
 				sid,
 				now: () => TODAY,
@@ -57,7 +91,7 @@ async function twoParties(): Promise<World> {
 		}
 	}
 	const jan = await party('jan')
-	const sam = await party('sam')
+	const sam = await party('sam', wraps.sam)
 	return {
 		jan: jan.engine,
 		sam: sam.engine,
@@ -473,6 +507,110 @@ describe('keys', () => {
 	})
 })
 
+describe('a signer', () => {
+	it('produces what the schema’s verify accepts', async () => {
+		// The `Signer` contract is all a secure enclave or hardware token has to meet: sign the
+		// bytes handed to you, answer in the schema's text form. This one had a hex round-trip
+		// left in it that no passing path happened to reach.
+		const key = newKey()
+		const signer = localSigner(key)
+		const digestText = digest('tally:1', 'F', 18000)
+		const signature = await signer.sign(fromText(digestText))
+
+		const db = new Database()
+		await registerCrypto(db)
+		const result = await row<{ ok: unknown }>(db, "select verify(?, ?, ?, 'ed25519') as ok", [
+			digestText,
+			signature,
+			signer.publicKey,
+		])
+		expect(Boolean(result?.ok)).toBe(true)
+	})
+})
+
+describe('paying once, however many attempts it takes', () => {
+	// Sereus's schema guide: a write can fail without settling whether it landed, so an event's
+	// key is minted once and held across every attempt, and a retry reads before it re-writes.
+
+	it('returns the stored chit when a payment is retried with its id', async () => {
+		const world = await twoParties()
+		const { janTally, samTally } = await opened(world)
+		const first = must(await samTally.pay({ amount: usd(1000), id: 'chit:rent-march' }))
+		const again = must(await samTally.pay({ amount: usd(1000), id: 'chit:rent-march' }))
+
+		expect(again).toEqual(first)
+		expect(await janTally.history()).toHaveLength(1)
+		expect((await janTally.balances()).settled).toEqual(usd(1000))
+	})
+
+	it('is not paid twice when the first attempt landed but its reply was lost', async () => {
+		// The case the guide names: the commit was accepted, the answer never came back. Before
+		// the unique index on `Ledger.Id`, the retry renumbered the same signed chit and stored
+		// it again -- a double payment, reproduced before this was fixed.
+		let dropped = false
+		const world = await twoParties({
+			sam: store =>
+				aroundApply(store, async (writes, apply) => {
+					await apply()
+					if (!dropped && writes.some(w => w.table === 'Ledger')) {
+						dropped = true
+						throw new Error('connection reset: reply lost')
+					}
+				}),
+		})
+		const { janTally, samTally } = await opened(world)
+
+		await expect(samTally.pay({ amount: usd(1000), id: 'chit:rent-march' })).rejects.toThrow(/reply lost/)
+		const retried = must(await samTally.pay({ amount: usd(1000), id: 'chit:rent-march' }))
+
+		expect(retried.id).toBe('chit:rent-march')
+		expect(await janTally.history()).toHaveLength(1)
+		expect((await janTally.balances()).settled).toEqual(usd(1000))
+	})
+
+	it('refuses an id that already names a different payment', async () => {
+		// An edited payment is a new event. Reusing the key would report the edit as stored
+		// while the ledger still held the original.
+		const world = await twoParties()
+		const { samTally } = await opened(world)
+		must(await samTally.pay({ amount: usd(1000), id: 'chit:rent-march' }))
+
+		const edited = await samTally.pay({ amount: usd(1200), id: 'chit:rent-march' })
+		expect(edited.ok ? '' : edited.refusal.code).toBe('already-exists')
+	})
+
+	it('renumbers a chit that lost the race for the next Number, and loses nothing', async () => {
+		// A real race, staged in process: at the instant Sam's chit is written, Jan's lands first
+		// and takes the Number Sam had read. Sam's write is refused on the ledger's primary key;
+		// the engine re-reads the chain's head and writes the next link.
+		const race: { jan?: Tally; ran: boolean } = { ran: false }
+		const world = await twoParties({
+			sam: store =>
+				aroundApply(store, async (writes, apply) => {
+					if (!race.ran && race.jan && writes.some(w => w.table === 'Ledger')) {
+						race.ran = true
+						must(await race.jan.pay({ amount: usd(300) }))
+					}
+					await apply()
+				}),
+		})
+		const tallies = await opened(world)
+		const janTally = (race.jan = tallies.janTally)
+		must(await tallies.samTally.offerCredit({ limit: usd(50000), callDays: 21 })) // let Jan issue too
+
+		must(await tallies.samTally.pay({ amount: usd(1000) }))
+
+		expect(race.ran).toBe(true)
+		const history = await janTally.history()
+		expect(history.map(e => e.amount.units).sort((a, b) => a - b)).toEqual([300, 1000])
+		// Jan gave 300, Sam gave 1000: Jan is owed 700, and the chain agrees on both replicas.
+		expect((await janTally.balances()).settled).toEqual(usd(700))
+		expect((await tallies.samTally.balances()).settled).toEqual(usd(-700))
+		// Three payments, a backoff and four reads across two replicas -- more round trips than any
+		// other test here, so it gets more than Jest's default five seconds.
+	}, 30_000)
+})
+
 describe('how a refusal reads', () => {
 	it('says a request was answered with the wrong amount', async () => {
 		const world = await twoParties()
@@ -484,13 +622,18 @@ describe('how a refusal reads', () => {
 		expect(short.ok ? '' : short.refusal.constraint).toBe('InvoiceLink')
 	})
 
-	it('says a record with that identity already exists', async () => {
+	it('says an id already names something different', async () => {
+		// The same request retried is not a refusal -- it is the request, reported once
+		// (see "paying once"). A different request under that id is, because an edited
+		// request is a new event.
 		const world = await twoParties()
 		const { janTally } = await opened(world)
-		must(await janTally.requestPayment({ amount: usd(1000), id: 'inv:march' }))
+		const first = must(await janTally.requestPayment({ amount: usd(1000), id: 'inv:march' }))
 
-		const again = await janTally.requestPayment({ amount: usd(1000), id: 'inv:march' })
-		expect(again.ok ? '' : again.refusal.code).toBe('already-exists')
+		expect(must(await janTally.requestPayment({ amount: usd(1000), id: 'inv:march' }))).toEqual(first)
+		const edited = await janTally.requestPayment({ amount: usd(1500), id: 'inv:march' })
+		expect(edited.ok ? '' : edited.refusal.code).toBe('already-exists')
+		expect(await janTally.requests()).toHaveLength(1)
 	})
 
 	it('says a signature did not verify', async () => {

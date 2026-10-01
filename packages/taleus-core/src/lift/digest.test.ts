@@ -1,6 +1,9 @@
+import { digest as stackDigest } from '@optimystic/quereus-plugin-crypto'
 import { generateKeyPair, sign, verify } from '../crypto/index.js'
 import {
 	bytesToHex,
+	fromText,
+	toText,
 	digest,
 	hexToBytes,
 	liftTermsDigest,
@@ -106,7 +109,7 @@ describe('lift-terms digest byte-parity with the schema constraint form', () => 
 		const t = { ...terms, refereeKey: refKey }
 		// Sign a wrong-order digest (Issuer/Units swapped) and confirm the schema form rejects it.
 		const wrong = digest([t.cid, t.liftId, t.refereeKey, t.units, t.issuer, t.date, t.expiry])
-		const badSig = bytesToHex(sign(secretKey, wrong))
+		const badSig = toText(sign(secretKey, wrong))
 		expect(verifyLiftTerms(refKey, t, badSig)).toBe(false)
 	})
 })
@@ -124,7 +127,38 @@ describe('void digest is distinct from the commit digest (no cross-replay)', () 
 		// …and the void signature cannot satisfy the finalize check.
 		expect(verifyLiftTerms(refKey, t, voidSig)).toBe(false)
 		// Each verifies against its own form.
-		expect(verify(publicKey, liftTermsDigest(t), hexToBytes(commitSig))).toBe(true)
-		expect(verify(publicKey, liftVoidDigest(t.cid, t.liftId), hexToBytes(voidSig))).toBe(true)
+		expect(verify(publicKey, liftTermsDigest(t), fromText(commitSig))).toBe(true)
+		expect(verify(publicKey, liftVoidDigest(t.cid, t.liftId), fromText(voidSig))).toBe(true)
+	})
+})
+
+describe('the schema\u2019s text form', () => {
+	it('round-trips raw bytes through base64url', () => {
+		const bytes = new Uint8Array([0, 1, 62, 63, 250, 251, 254, 255])
+		expect(fromText(toText(bytes))).toEqual(bytes)
+		expect(toText(bytes)).toMatch(/^[A-Za-z0-9_-]+$/)
+	})
+
+	it('is the form the stack\u2019s digest emits, byte for byte', () => {
+		// The schema compares these as text; a padding or alphabet difference would be a
+		// mismatch that looks like a bad signature.
+		const fields = ['tally:1', 'F', 18000n, null]
+		expect(toText(digest(fields))).toBe(stackDigest(fields, 'sha256', 'base64url'))
+	})
+
+	it('refuses text that is not base64url', () => {
+		expect(() => fromText('not base64url!')).toThrow()
+	})
+
+	it('refuses a non-canonical twin, as the schema’s verify does', () => {
+		// 'f' and 'e' differ only in bits a 64-byte signature's final character does not use,
+		// so both decode to the same bytes. The stack's verify refuses the twin; if this
+		// accepted it, Taleus would trust a signature every replica rejects.
+		const bytes = new Uint8Array(64).fill(7)
+		const text = toText(bytes)
+		const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+		const twin = text.slice(0, -1) + alphabet[alphabet.indexOf(text.at(-1)!) ^ 1]
+		expect(twin).not.toBe(text)
+		expect(() => fromText(twin)).toThrow(/non-canonical/)
 	})
 })

@@ -1,27 +1,11 @@
-import { verify } from '../crypto/index.js'
-import {
-	bytesToHex,
-	digest as canonicalDigest,
-	hexToBytes,
-	type DigestField,
-} from '../lift/digest.js'
+import { digest as stackDigest } from '@optimystic/quereus-plugin-crypto'
+
+import type { DigestField } from '../lift/digest.js'
 
 /**
- * Text encoding, once.
- *
- * Keys, signatures and digests reach the schema as **hex** -- `src/lift/digest.ts` already
- * fixes that (`publicKeyText` is "a public key in the schema's text form (hex of the raw
- * ed25519 key)"). A second encoding here would mean the same key is two different strings
- * depending on which path wrote it, which is the same failure as a second digest: rows that
- * should match silently do not.
- *
- * `TextEncoder` rather than `Buffer`: this package runs in React Native and the browser as
- * well as Node, and `Buffer` exists in neither without a polyfill.
- */
-const utf8 = new TextEncoder()
-
-/**
- * The host-registered scalars the schema calls.
+ * The host-registered scalars the schema calls -- Taleus's own, that is. The crypto scalars
+ * (`digest`, `verify`) are `@optimystic/quereus-plugin-crypto`'s, which Sereus composes into
+ * every strand database; see `registerFunctions` for why none of ours may share their names.
  *
  * Quereus rejects non-deterministic expressions inside CHECK constraints and column
  * defaults, and it is right to: every replica re-validates every write, so a gate that
@@ -72,18 +56,13 @@ export function validDate(date: unknown): number {
 }
 
 /**
- * The digest a signature covers -- the schema's `Digest(...)` scalar.
+ * The digest a signature covers, in the schema's text form -- byte-for-byte what the schema's
+ * `digest(...)` computes, because it is the same function: the plugin's, asked for base64url,
+ * its default and so what a strand database registers.
  *
- * This does NOT have its own encoding. `src/lift/digest.ts` already implements the
- * schema's `Digest()` (its own comment says so: "Field order is load-bearing -- it is the
- * schema's `Digest(...)` argument order"), with a type-tagged, length-prefixed encoding
- * that no two distinct field lists can collide in. A second implementation here would be
- * exactly the divergence that file warns about, and the symptom would be every signature
- * failing to verify while looking like a permissions problem.
- *
- * So this adapts SQL values to `DigestField` and delegates. The only work it does is
- * rejecting what the encoding cannot represent -- a non-integer number would otherwise be
- * silently truncated into a different digest.
+ * The only work done here is refusing what the schema never digests. A non-integer number
+ * would encode as a REAL, which the plugin documents as colliding with an integer of equal
+ * value; nothing Taleus signs is fractional, so a fraction here is a caller's mistake.
  */
 export function digest(...args: unknown[]): string {
 	const fields: DigestField[] = args.map(arg => {
@@ -91,15 +70,13 @@ export function digest(...args: unknown[]): string {
 		if (typeof arg === 'string' || typeof arg === 'bigint') return arg
 		if (typeof arg === 'number') {
 			if (!Number.isInteger(arg)) {
-				throw new Error(`Digest received a non-integer number: ${arg}`)
+				throw new Error(`digest received a non-integer number: ${arg}`)
 			}
 			return arg
 		}
-		// A Uint8Array or similar would encode differently on each host; refuse it rather
-		// than pick an encoding here.
-		throw new Error(`Digest received an unsupported value: ${typeof arg}`)
+		throw new Error(`digest received an unsupported value: ${typeof arg}`)
 	})
-	return bytesToHex(canonicalDigest(fields))
+	return stackDigest(fields, 'sha256', 'base64url') as string
 }
 
 /**
@@ -148,25 +125,4 @@ export function least(a: unknown, b: unknown): unknown {
 	if (typeof a !== 'number') return b
 	if (typeof b !== 'number') return a
 	return a < b ? a : b
-}
-
-/** Verify a signature over a digest with a public key. Returns 1/0, as SQL wants. */
-export function signatureValid(
-	digestText: unknown,
-	signature: unknown,
-	publicKey: unknown,
-): number {
-	if (
-		typeof digestText !== 'string' ||
-		typeof signature !== 'string' ||
-		typeof publicKey !== 'string'
-	) {
-		return 0
-	}
-	try {
-		return verify(hexToBytes(publicKey), utf8.encode(digestText), hexToBytes(signature)) ? 1 : 0
-	} catch {
-		// Malformed hex throws rather than returning false; a bad signature is a 0, not a crash.
-		return 0
-	}
 }

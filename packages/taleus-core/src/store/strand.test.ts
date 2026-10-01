@@ -1,5 +1,8 @@
+import cryptoPlugin from '@optimystic/quereus-plugin-crypto/plugin'
+import { Database } from '@quereus/quereus'
+
 import { openStrand, readSchema } from './schema-node.js'
-import { functionsCalledBy, rows, statementsOf, stripComments } from './strand.js'
+import { appTable, functionsCalledBy, rows, statementsOf, stripComments } from './strand.js'
 
 /**
  * The schema is the thing everything else stands on, and until this suite existed nothing
@@ -20,7 +23,7 @@ describe('the schema loads into Quereus', () => {
 	it('declares the tables the tally lifecycle needs', async () => {
 		const db = await openStrand('draft1')
 		for (const table of ['TallyCore', 'TallyContractProposal', 'TallyContract', 'CreditTerms', 'Ledger']) {
-			await expect(rows(db, `select count(*) as n from ${table}`)).resolves.toEqual([{ n: 0 }])
+			await expect(rows(db, `select count(*) as n from ${appTable(table)}`)).resolves.toEqual([{ n: 0 }])
 		}
 	})
 })
@@ -29,19 +32,15 @@ describe('every scalar the schema calls is registered', () => {
 	// A function used only inside a column CHECK is planned lazily, so a missing one is
 	// invisible until the first insert into that table -- `ValidDenomination` was missing
 	// and the load test above passed regardless. Read the schema, not memory.
-	const HOST_SCALARS = [
-		'DayNumber',
-		'Digest',
-		'Greatest',
-		'Least',
-		'SignatureValid',
-		'Today',
-		'ValidDate',
-		'ValidDenomination',
-	]
+
+	/** Taleus's own, registered by `registerFunctions`. */
+	const TALEUS_SCALARS = ['DayNumber', 'Greatest', 'Least', 'Today', 'ValidDate', 'ValidDenomination']
+	/** The stack's, from `@optimystic/quereus-plugin-crypto`, which Sereus registers itself. */
+	const STACK_SCALARS = ['digest', 'verify']
+
 	it.each(['draft1', 'portfolio'] as const)('%s.qsql calls nothing the host does not provide', name => {
 		for (const fn of functionsCalledBy(readSchema(name))) {
-			expect(HOST_SCALARS).toContain(fn)
+			expect([...TALEUS_SCALARS, ...STACK_SCALARS]).toContain(fn)
 		}
 	})
 
@@ -49,7 +48,7 @@ describe('every scalar the schema calls is registered', () => {
 		// Without this, a scanner that matched nothing would pass the check above forever.
 		// (`portfolio.qsql` calls none, which is why the check above cannot assert a count.)
 		const called = functionsCalledBy(readSchema('draft1'))
-		expect(called).toEqual(expect.arrayContaining(['Digest', 'SignatureValid', 'DayNumber']))
+		expect(called).toEqual(expect.arrayContaining(['digest', 'verify', 'DayNumber']))
 	})
 
 	it('and every one of them is actually registered', async () => {
@@ -57,10 +56,10 @@ describe('every scalar the schema calls is registered', () => {
 		// Arity differs, so call each with what it takes; the point is that it resolves.
 		const calls = [
 			"DayNumber('2026-03-02')",
-			"Digest('a','b')",
+			"digest('a','b')",
 			'Greatest(1, 2)',
 			'Least(1, 2)',
-			"SignatureValid('d','s','k')",
+			"verify('d','s','k','ed25519')",
 			'Today()',
 			"ValidDate('2026-03-02')",
 			"ValidDenomination('CHIP')",
@@ -69,7 +68,45 @@ describe('every scalar the schema calls is registered', () => {
 			await expect(rows(db, `select ${call} as v`)).resolves.toHaveLength(1)
 		}
 	})
+
+	it('no Taleus scalar shares a name with the stack’s, in any letter case', () => {
+		// Quereus resolves function names case-insensitively. A Taleus `Digest` beside the
+		// plugin's `digest` replaced it in every schema on the database -- Sereus's own
+		// membership constraints included -- and that is exactly what this schema used to do.
+		const stack = cryptoPlugin(new Database(), {}).functions.map(f => f.schema.name.toLowerCase())
+		for (const ours of TALEUS_SCALARS) {
+			expect(stack).not.toContain(ours.toLowerCase())
+		}
+	})
+
+	it('every verify in the schema names its curve', () => {
+		// The plugin's `verify` defaults to secp256k1. Taleus keys are ed25519, so a call that
+		// leaves the curve out refuses every genuine signature -- and reads as a permissions
+		// failure, not a typo.
+		const calls = verifyCalls(stripComments(readSchema('draft1')))
+		expect(calls.length).toBeGreaterThan(0)
+		for (const call of calls) {
+			expect(call).toMatch(/,\s*'ed25519'\s*\)$/)
+		}
+	})
 })
+
+/** Every `verify( … )` call in some SQL, whole, with nested parentheses balanced. */
+function verifyCalls(sql: string): string[] {
+	const calls: string[] = []
+	const pattern = /\bverify\(/g
+	for (let match = pattern.exec(sql); match; match = pattern.exec(sql)) {
+		let depth = 0
+		for (let i = match.index + 'verify'.length; i < sql.length; i++) {
+			if (sql[i] === '(') depth++
+			if (sql[i] === ')' && --depth === 0) {
+				calls.push(sql.slice(match.index, i + 1))
+				break
+			}
+		}
+	}
+	return calls
+}
 
 /**
  * Determinism is not a style preference here. Every replica of a strand re-validates every

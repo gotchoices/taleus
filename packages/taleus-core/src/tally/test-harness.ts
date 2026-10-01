@@ -138,4 +138,4 @@ export async function trading({ janGrants = 50000, samGrants = 0 } = {}): Promis
 
 /** The running stock-perspective balance both parties should agree on. */
 export const balanceOf = (tally: Tally, party: Party) =>
-	tally.seesOne<{ Balance: number }>(party, 'select Balance from Ledger order by Number desc limit 1')
+	tally.seesOne<{ Balance: number }>(party, 'select Balance from App.Ledger order by Number desc limit 1')

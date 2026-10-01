@@ -1,4 +1,5 @@
-import { bytesToHex, hexToBytes } from '../lift/digest.js'
+import { sign as signBytes } from '../crypto/index.js'
+import { bytesToHex, hexToBytes, toText } from '../lift/digest.js'
 import { newInvitation, signText, type KeyPairText } from '../store/index.js'
 import type { RowWrite } from '../store/strand.js'
 import { publishCertificate } from '../tally/certificates.js'
@@ -19,7 +20,7 @@ import {
 	signContract,
 	type Side,
 } from '../tally/negotiation.js'
-import { attempt, locally, no, ok } from './refusal.js'
+import { attempt, locally, no, ok, uniqueViolation } from './refusal.js'
 import type {
 	AcceptRequest,
 	ActOptions,
@@ -33,6 +34,7 @@ import type {
 	Entry,
 	Environment,
 	HistoryQuery,
+	IsoDate,
 	InvitationTicket,
 	InviteRequest,
 	KeyAddition,
@@ -74,12 +76,18 @@ import type {
 
 const PROTOCOL = 'taleus/1'
 
-/** Adapt a key pair to a signer. The bridge until the row builders sign asynchronously. */
+/**
+ * Adapt a key pair to a signer. The bridge until the row builders sign asynchronously.
+ *
+ * `sign` signs exactly the bytes it is handed -- for a Taleus record, a digest's raw bytes,
+ * which is what the schema's `verify` checks -- and answers in the schema's text form. That is
+ * the whole contract a secure enclave or hardware token has to meet.
+ */
 export function localSigner(pair: KeyPairText): LocalSigner {
 	return {
 		publicKey: pair.publicKey,
 		secretKey: pair.secretKey,
-		sign: async message => bytesToHex(hexToBytes(signText(pair, new TextDecoder().decode(message)))),
+		sign: async message => toText(signBytes(pair.secretKey, message)),
 	}
 }
 
@@ -137,7 +145,7 @@ class TallyEngine implements Tally {
 	}
 
 	private async core(): Promise<Core | undefined> {
-		return this.one<Core>('select Cid, StockSid, FoilSid, CreatedAt from TallyCore')
+		return this.one<Core>('select Cid, StockSid, FoilSid, CreatedAt from App.TallyCore')
 	}
 
 	/** Every act after formation binds the tally's id, so most of them need this first. */
@@ -151,12 +159,12 @@ class TallyEngine implements Tally {
 
 	private async denomination(): Promise<{ code: string; scale: number }> {
 		const row = await this.one<{ Denomination: string; DenominationScale: number }>(
-			'select Denomination, DenominationScale from TallyContract order by Number desc limit 1',
+			'select Denomination, DenominationScale from App.TallyContract order by Number desc limit 1',
 		)
 		const proposal = row
 			? undefined
 			: await this.one<{ Denomination: string; DenominationScale: number }>(
-					'select Denomination, DenominationScale from TallyContractProposal',
+					'select Denomination, DenominationScale from App.TallyContractProposal',
 				)
 		const chosen = row ?? proposal
 		return { code: chosen?.Denomination ?? 'CHIP', scale: chosen?.DenominationScale ?? 0 }
@@ -164,12 +172,12 @@ class TallyEngine implements Tally {
 
 	private async state(): Promise<TallyState> {
 		if (!(await this.core())) return 'forming'
-		const contract = await this.one<{ Number: number }>('select Number from TallyContract limit 1')
+		const contract = await this.one<{ Number: number }>('select Number from App.TallyContract limit 1')
 		if (!contract) {
-			const proposal = await this.one('select SequenceNumber from TallyContractProposal')
+			const proposal = await this.one('select SequenceNumber from App.TallyContractProposal')
 			return proposal ? 'offered' : 'forming'
 		}
-		const close = await this.one<{ State: TallyState }>('select State from CloseState')
+		const close = await this.one<{ State: TallyState }>('select State from App.CloseState')
 		return close?.State ?? 'open'
 	}
 
@@ -204,7 +212,7 @@ class TallyEngine implements Tally {
 
 	private async contractView(): Promise<Pick<TallyView, 'contract'>> {
 		const row = await this.one<{ Number: number; ContractCid: string }>(
-			'select Number, ContractCid from TallyContract order by Number desc limit 1',
+			'select Number, ContractCid from App.TallyContract order by Number desc limit 1',
 		)
 		if (!row) return {}
 		return {
@@ -219,13 +227,13 @@ class TallyEngine implements Tally {
 			CallDays: number
 			EffectiveDate: string
 		}>(
-			`select Revision, CreditLimit, CallDays, EffectiveDate from CreditTerms
+			`select Revision, CreditLimit, CallDays, EffectiveDate from App.CreditTerms
 			 where Sid = ? order by Revision desc`,
 			[sid],
 		)
 		if (filed.length === 0) return undefined
 		const inForce = await this.one<{ CreditLimit: number }>(
-			'select CreditLimit from CurrentCreditLimit where Sid = ?',
+			'select CreditLimit from App.CurrentCreditLimit where Sid = ?',
 			[sid],
 		)
 		// The newest revision is not necessarily the one governing: a restrictive change owes
@@ -253,7 +261,7 @@ class TallyEngine implements Tally {
 			Reward: number
 			Clutch: number
 		}>(
-			`select Revision, Target, Bound, Reward, Clutch from TradingVariable
+			`select Revision, Target, Bound, Reward, Clutch from App.TradingVariable
 			 where Sid = ? order by Revision desc limit 1`,
 			[sid],
 		)
@@ -302,15 +310,15 @@ class TallyEngine implements Tally {
 		const { code } = await this.denomination()
 		const mySid = this.env.sid
 		const settled = await this.one<{ Balance: number }>(
-			'select Balance from PerspectiveBalance where Sid = ?',
+			'select Balance from App.PerspectiveBalance where Sid = ?',
 			[mySid],
 		)
 		const projected = await this.one<{ Balance: number }>(
-			'select Balance from ReservedPerspectiveBalance where Sid = ?',
+			'select Balance from App.ReservedPerspectiveBalance where Sid = ?',
 			[mySid],
 		)
 		const asked = await this.store.query<{ Requester: Side; Units: number }>(
-			'select Requester, Units from OpenInvoice',
+			'select Requester, Units from App.OpenInvoice',
 		)
 		const sum = (which: Side) =>
 			asked.filter(r => r.Requester === which).reduce((n, r) => n + r.Units, 0)
@@ -341,7 +349,7 @@ class TallyEngine implements Tally {
 		const theirSid = core.StockSid === this.env.sid ? core.FoilSid : core.StockSid
 		const limit = async (sid: string) =>
 			(await this.one<{ CreditLimit: number }>(
-				'select CreditLimit from CurrentCreditLimit where Sid = ?',
+				'select CreditLimit from App.CurrentCreditLimit where Sid = ?',
 				[sid],
 			))?.CreditLimit ?? 0
 		const mine = await limit(this.env.sid)
@@ -356,25 +364,23 @@ class TallyEngine implements Tally {
 
 	async history(query?: HistoryQuery): Promise<Entry[]> {
 		const { code } = await this.denomination()
-		const mine = this.side === 'S' ? 'F' : 'S' // the issuer whose chit raises MY balance
-		const sign = this.role === 'stock' ? 1 : -1
-		const rows = await this.store.query<{
-			Id: string
-			Issuer: Side
-			Units: number
-			Date: string
-			Balance: number
-			Kind: string
-			InvoiceId: string | null
-			Reference: string
-			Memo: string
-		}>(
-			`select Id, Issuer, Units, Date, Balance, Kind, InvoiceId, Reference, Memo from Ledger
-			 ${query?.since ? 'where DayNumber(Date) >= DayNumber(?)' : ''}
+		// `Date >= ?`, not `DayNumber(Date) >= DayNumber(?)`: dates are `YYYY-MM-DD` by `ValidDate`,
+		// so text order is date order, and only a predicate on the bare column can use the
+		// `LedgerByDate` index. A function of the column cannot.
+		const rows = await this.store.query<LedgerRow>(
+			`select ${LEDGER_COLUMNS} from App.Ledger
+			 ${query?.since ? 'where Date >= ?' : ''}
 			 order by Number desc ${query?.limit ? 'limit ?' : ''}`,
 			[...(query?.since ? [query.since] : []), ...(query?.limit ? [query.limit] : [])],
 		)
-		return rows.map(r => ({
+		return rows.map(r => this.entryFrom(r, code))
+	}
+
+	/** One ledger row, from this party's side. */
+	private entryFrom(r: LedgerRow, code: string): Entry {
+		const mine = this.side === 'S' ? 'F' : 'S' // the issuer whose chit raises MY balance
+		const sign = this.role === 'stock' ? 1 : -1
+		return {
 			id: r.Id,
 			at: r.Date,
 			amount: amount(r.Units, code),
@@ -384,7 +390,7 @@ class TallyEngine implements Tally {
 			...(r.InvoiceId ? { requestId: r.InvoiceId } : {}),
 			...(r.Reference ? { reference: r.Reference } : {}),
 			...(r.Memo ? { memo: r.Memo } : {}),
-		}))
+		}
 	}
 
 	async requests(): Promise<PaymentRequest[]> {
@@ -396,7 +402,7 @@ class TallyEngine implements Tally {
 			Date: string
 			ExpiryDate: string | null
 			State: PaymentRequest['state']
-		}>('select Id, Requester, Units, Date, ExpiryDate, State from InvoiceState')
+		}>('select Id, Requester, Units, Date, ExpiryDate, State from App.InvoiceState')
 		return rows.map(r => ({
 			id: r.Id,
 			from: r.Requester === this.side ? 'me' : 'counterparty',
@@ -409,17 +415,17 @@ class TallyEngine implements Tally {
 
 	async keys(): Promise<KeyRecord[]> {
 		const added = await this.store.query<{ PublicKey: string; Revision: number }>(
-			'select PublicKey, Revision from PartyKey where Sid = ? order by Revision',
+			'select PublicKey, Revision from App.PartyKey where Sid = ? order by Revision',
 			[this.env.sid],
 		)
 		const adopted = await this.store.query<{ PublicKey: string }>(
-			'select PublicKey from PartyKeyAdoption where Sid = ?',
+			'select PublicKey from App.PartyKeyAdoption where Sid = ?',
 			[this.env.sid],
 		)
 		const revoked = new Set(
 			(
 				await this.store.query<{ PublicKey: string }>(
-					'select PublicKey from PartyKeyRevocation where Sid = ?',
+					'select PublicKey from App.PartyKeyRevocation where Sid = ?',
 					[this.env.sid],
 				)
 			).map(r => r.PublicKey),
@@ -449,8 +455,8 @@ class TallyEngine implements Tally {
 		if (await this.core()) {
 			return no(locally('already-exists', 'this tally is already established'))
 		}
-		const stock = await this.one<{ Sid: string }>('select Sid from Stock')
-		const foil = await this.one<{ Sid: string }>('select Sid from Foil')
+		const stock = await this.one<{ Sid: string }>('select Sid from App.Stock')
+		const foil = await this.one<{ Sid: string }>('select Sid from App.Foil')
 		if (!stock || !foil) {
 			return no(locally('not-found', 'the counterparty has not taken their seat yet'))
 		}
@@ -472,7 +478,7 @@ class TallyEngine implements Tally {
 		return this.guarded(async core => {
 			const { signer, on } = this.act(offer)
 			const prior = await this.one<{ Revision: number }>(
-				'select max(Revision) as Revision from CreditTerms where Sid = ?',
+				'select max(Revision) as Revision from App.CreditTerms where Sid = ?',
 				[this.env.sid],
 			)
 			const revision = (prior?.Revision ?? 0) + 1
@@ -531,7 +537,7 @@ class TallyEngine implements Tally {
 				DenominationScale: number
 				SignerKey: string
 				ContractSignature: string
-			}>('select * from TallyContractProposal')
+			}>('select * from App.TallyContractProposal')
 			if (!proposal) throw new NoProposal()
 			const { signer } = this.act(options)
 			await this.store.apply([
@@ -558,7 +564,7 @@ class TallyEngine implements Tally {
 		const latest = async (sid: string) =>
 			(
 				await this.one<{ Revision: number }>(
-					'select max(Revision) as Revision from CreditTerms where Sid = ?',
+					'select max(Revision) as Revision from App.CreditTerms where Sid = ?',
 					[sid],
 				)
 			)?.Revision
@@ -568,74 +574,139 @@ class TallyEngine implements Tally {
 		return { stockCreditTermsRevision: stock, foilCreditTermsRevision: foil }
 	}
 
+	/**
+	 * Give value -- once, however many times it is attempted.
+	 *
+	 * A payment is one event with one `id`, minted when the caller first asks and held across
+	 * every attempt ("Client-Generated Keys and Retrying a Write", Sereus's schema guide). That
+	 * matters because a write can fail without settling whether it landed: a commit can be
+	 * accepted while its reply is lost. So:
+	 *
+	 * - **Read before writing.** If a chit with this id is already stored, the earlier attempt
+	 *   landed; report it, write nothing. The unique index `LedgerById` makes this a guarantee
+	 *   rather than a courtesy -- a lookup that wrongly came back empty leads to an insert the
+	 *   index refuses, never to a second payment.
+	 * - **Retry a lost race for the next Number, with randomized backoff.** The ledger is a
+	 *   gapless sequence because the balance chain is one, which is the case the guide allows a
+	 *   `max + 1` key for. When both parties issue at once, one commits and the other is refused
+	 *   on the primary key; the loser re-reads and tries the next Number. The delay is random
+	 *   because both would otherwise recompute the same next Number and collide again.
+	 *
+	 * The chit's signature covers its id, issuer, units, date, reference, memo and invoice --
+	 * not its Number or running Balance -- so a retry re-numbers without re-signing anything a
+	 * counterparty relies on.
+	 */
 	async pay(payment: Payment): Promise<Result<Entry>> {
 		return this.guarded(async core => {
 			const { signer, on, id } = this.act(payment)
-			const contract = await this.one<{ Number: number }>(
-				'select Number from TallyContract order by Number desc limit 1',
-			)
-			if (!contract) throw new NotOpen()
-			const last = await this.one<{ Number: number; Balance: number }>(
-				'select Number, Balance from Ledger order by Number desc limit 1',
-			)
-			// `Balance` is the stock party's perspective throughout the ledger; a chit from the
-			// foil raises it. Giving therefore lowers the giver's own perspective balance.
-			const delta = this.side === 'F' ? payment.amount.units : -payment.amount.units
-			await this.store.apply([
-				issueChit({
-					tallyCid: core.Cid,
-					contractNumber: contract.Number,
-					number: (last?.Number ?? 0) + 1,
-					id,
-					issuer: this.side,
-					issuerSid: this.env.sid,
-					units: payment.amount.units,
-					date: on,
-					balance: (last?.Balance ?? 0) + delta,
-					...(payment.answers ? { invoiceId: payment.answers } : {}),
-					...(payment.reference ? { reference: payment.reference } : {}),
-					...(payment.memo ? { memo: payment.memo } : {}),
-					signer,
-				}),
-			])
-			return {
-				id,
-				at: on,
-				amount: payment.amount,
-				direction: 'out' as const,
-				balanceAfter: amount(
-					((last?.Balance ?? 0) + delta) * (this.role === 'stock' ? 1 : -1),
-					payment.amount.denomination,
-				),
-				origin: 'payment' as const,
-				...(payment.answers ? { requestId: payment.answers } : {}),
+			const { code } = await this.denomination()
+			for (let attempt = 1; ; attempt++) {
+				const stored = await this.one<LedgerRow>(`select ${LEDGER_COLUMNS} from App.Ledger where Id = ?`, [id])
+				if (stored) {
+					if (!sameChit(stored, this.side, payment)) throw new EventIdReused(id)
+					return this.entryFrom(stored, code)
+				}
+				try {
+					return await this.writeChit(core, payment, id, on, signer, code)
+				} catch (error) {
+					const collided = uniqueViolation(error)
+					// It landed after all -- ours, from an attempt whose reply went missing. Loop, and
+					// the read above returns it.
+					if (collided?.table === 'Ledger' && collided.key === 'Id') continue
+					if (collided?.table === 'Ledger' && collided.key === 'PK' && attempt < NUMBER_RACE_ATTEMPTS) {
+						await raceBackoff(attempt)
+						continue
+					}
+					throw error
+				}
 			}
 		})
 	}
 
+	/** One attempt at a chit: read the chain's head, number the next link, write it. */
+	private async writeChit(
+		core: Core,
+		payment: Payment,
+		id: string,
+		on: IsoDate,
+		signer: KeyPairText,
+		code: string,
+	): Promise<Entry> {
+		const contract = await this.one<{ Number: number }>(
+			'select Number from App.TallyContract order by Number desc limit 1',
+		)
+		if (!contract) throw new NotOpen()
+		const last = await this.one<{ Number: number; Balance: number }>(
+			'select Number, Balance from App.Ledger order by Number desc limit 1',
+		)
+		// `Balance` is the stock party's perspective throughout the ledger; a chit from the
+		// foil raises it. Giving therefore lowers the giver's own perspective balance.
+		const delta = this.side === 'F' ? payment.amount.units : -payment.amount.units
+		const row = issueChit({
+			tallyCid: core.Cid,
+			contractNumber: contract.Number,
+			number: (last?.Number ?? 0) + 1,
+			id,
+			issuer: this.side,
+			issuerSid: this.env.sid,
+			units: payment.amount.units,
+			date: on,
+			balance: (last?.Balance ?? 0) + delta,
+			...(payment.answers ? { invoiceId: payment.answers } : {}),
+			...(payment.reference ? { reference: payment.reference } : {}),
+			...(payment.memo ? { memo: payment.memo } : {}),
+			signer,
+		})
+		await this.store.apply([row])
+		return this.entryFrom(row.row as unknown as LedgerRow, code)
+	}
+
+	/**
+	 * Ask to be paid -- once, however many times it is attempted. The same discipline as `pay`:
+	 * the request's id is its idempotency key (it is the `Invoice` primary key), so a retry
+	 * reads before it writes and reports a request that already landed instead of refusing it.
+	 */
 	async requestPayment(draft: PaymentRequestDraft): Promise<Result<PaymentRequest>> {
 		return this.guarded(async core => {
 			const { signer, on, id } = this.act(draft)
-			await this.store.apply([
-				requestPayment({
-					tallyCid: core.Cid,
+			for (;;) {
+				const stored = await this.one<InvoiceRow>(
+					'select Requester, Units, ExpiryDate, Reference, Memo from App.Invoice where Id = ?',
+					[id],
+				)
+				if (stored) {
+					if (!sameRequest(stored, this.side, draft)) throw new EventIdReused(id)
+					const request = (await this.requests()).find(r => r.id === id)
+					if (request) return request
+				}
+				try {
+					await this.store.apply([
+						requestPayment({
+							tallyCid: core.Cid,
+							id,
+							requester: this.side,
+							units: draft.amount.units,
+							date: on,
+							...(draft.expiresOn ? { expiryDate: draft.expiresOn } : {}),
+							...(draft.reference ? { reference: draft.reference } : {}),
+							...(draft.memo ? { memo: draft.memo } : {}),
+							signer,
+						}),
+					])
+				} catch (error) {
+					// Stored after all, by an attempt whose reply went missing: loop and read it back.
+					const collided = uniqueViolation(error)
+					if (collided?.table === 'Invoice' && collided.key === 'PK') continue
+					throw error
+				}
+				return {
 					id,
-					requester: this.side,
-					units: draft.amount.units,
-					date: on,
-					...(draft.expiresOn ? { expiryDate: draft.expiresOn } : {}),
-					...(draft.reference ? { reference: draft.reference } : {}),
-					...(draft.memo ? { memo: draft.memo } : {}),
-					signer,
-				}),
-			])
-			return {
-				id,
-				from: 'me' as const,
-				amount: draft.amount,
-				requestedOn: on,
-				...(draft.expiresOn ? { expiresOn: draft.expiresOn } : {}),
-				state: 'open' as const,
+					from: 'me' as const,
+					amount: draft.amount,
+					requestedOn: on,
+					...(draft.expiresOn ? { expiresOn: draft.expiresOn } : {}),
+					state: 'open' as const,
+				}
 			}
 		})
 	}
@@ -658,7 +729,7 @@ class TallyEngine implements Tally {
 		return this.guarded(async () => {
 			const { signer } = this.act(options)
 			const prior = await this.one<{ Revision: number }>(
-				'select max(Revision) as Revision from PartyCertificate where PartySid = ?',
+				'select max(Revision) as Revision from App.PartyCertificate where PartySid = ?',
 				[this.env.sid],
 			)
 			await this.store.apply([
@@ -669,7 +740,7 @@ class TallyEngine implements Tally {
 
 	private async certificateOf(sid: string): Promise<unknown> {
 		const row = await this.one<{ Certificate: string }>(
-			'select Certificate from PartyCertificate where PartySid = ? order by Revision desc limit 1',
+			'select Certificate from App.PartyCertificate where PartySid = ? order by Revision desc limit 1',
 			[sid],
 		)
 		if (!row) return undefined
@@ -685,7 +756,7 @@ class TallyEngine implements Tally {
 		return this.guarded(async () => {
 			const { signer } = this.act(addition)
 			const prior = await this.one<{ Revision: number }>(
-				'select max(Revision) as Revision from PartyKey where Sid = ?',
+				'select max(Revision) as Revision from App.PartyKey where Sid = ?',
 				[this.env.sid],
 			)
 			const revision = (prior?.Revision ?? 0) + 1
@@ -750,7 +821,7 @@ class TallyEngine implements Tally {
 				Units: number
 				Date: string
 				Expiry: string
-			}>('select LiftId, Issuer, Units, Date, Expiry from OpenPendingLift')
+			}>('select LiftId, Issuer, Units, Date, Expiry from App.OpenPendingLift')
 			const raises = this.side === 'S' ? 'F' : 'S'
 			return rows.map(r => ({
 				liftId: r.LiftId,
@@ -776,7 +847,7 @@ class TallyEngine implements Tally {
 				RewardedUnits: number
 				Reward: number
 				Clutch: number
-			}>('select ReceiverSid, FreeUnits, RewardedUnits, Reward, Clutch from LiftLading')
+			}>('select ReceiverSid, FreeUnits, RewardedUnits, Reward, Clutch from App.LiftLading')
 			const of = (receiver: string): LiftDirection => {
 				const row = rows.find(r => r.ReceiverSid === receiver)
 				if (!row) return empty()
@@ -829,6 +900,14 @@ class TallyEngine implements Tally {
 			}
 			if (error instanceof NotOpen) {
 				return no(locally('not-found', 'the tally has no agreed contract yet'))
+			}
+			if (error instanceof EventIdReused) {
+				return no(
+					locally(
+						'already-exists',
+						`${error.id} already names something different -- an edited payment or request is a new event and needs a new id`,
+					),
+				)
 			}
 			throw error
 		}
@@ -888,6 +967,71 @@ const identity = (sid: string, certificate: unknown): PartyIdentity => ({
 	...(certificate === undefined ? {} : { certificate }),
 })
 
+/** The ledger columns an `Entry` is built from, in the one order both readers use. */
+const LEDGER_COLUMNS = 'Id, Issuer, Units, Date, Balance, Kind, InvoiceId, Reference, Memo'
+
+interface LedgerRow {
+	Id: string
+	Issuer: Side
+	Units: number
+	Date: string
+	Balance: number
+	Kind: string
+	InvoiceId: string | null
+	Reference: string
+	Memo: string
+}
+
+/**
+ * Whether a stored chit is the payment being attempted. The fields compared are the ones the
+ * issuer signs; the date is deliberately not among them, because a retry the next morning is
+ * still the same payment.
+ */
+function sameChit(stored: LedgerRow, side: Side, payment: Payment): boolean {
+	return (
+		stored.Kind === 'direct' &&
+		stored.Issuer === side &&
+		stored.Units === payment.amount.units &&
+		(stored.InvoiceId ?? undefined) === payment.answers &&
+		(stored.Reference || undefined) === payment.reference &&
+		(stored.Memo || undefined) === payment.memo
+	)
+}
+
+interface InvoiceRow {
+	Requester: Side
+	Units: number
+	ExpiryDate: string | null
+	Reference: string
+	Memo: string
+}
+
+/** Whether a stored request is the one being attempted -- the requester's signed fields. */
+function sameRequest(stored: InvoiceRow, side: Side, draft: PaymentRequestDraft): boolean {
+	return (
+		stored.Requester === side &&
+		stored.Units === draft.amount.units &&
+		(stored.ExpiryDate ?? undefined) === draft.expiresOn &&
+		(stored.Reference || undefined) === draft.reference &&
+		(stored.Memo || undefined) === draft.memo
+	)
+}
+
+/** How many times a chit may lose the race for the next Number before the refusal stands. */
+const NUMBER_RACE_ATTEMPTS = 6
+
+/** Randomized exponential backoff: both racers must not re-collide on the next Number. */
+function raceBackoff(attempt: number): Promise<void> {
+	const ms = 15 * 2 ** attempt * (0.5 + Math.random())
+	return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+class EventIdReused extends Error {
+	constructor(readonly id: string) {
+		super(`event id reused: ${id}`)
+	}
+}
+
 class NotEstablished extends Error {}
 class MissingTerms extends Error {}
 class NoProposal extends Error {}
@@ -908,9 +1052,9 @@ class TaleusEngine implements Taleus {
 	}
 
 	private async roleOn(store: TallyStore): Promise<Role> {
-		const core = (await store.query<Core>('select StockSid, FoilSid from TallyCore'))[0]
+		const core = (await store.query<Core>('select StockSid, FoilSid from App.TallyCore'))[0]
 		if (core) return core.StockSid === this.env.sid ? 'stock' : 'foil'
-		const stock = (await store.query<{ Sid: string }>('select Sid from Stock'))[0]
+		const stock = (await store.query<{ Sid: string }>('select Sid from App.Stock'))[0]
 		return stock?.Sid === this.env.sid ? 'stock' : 'foil'
 	}
 

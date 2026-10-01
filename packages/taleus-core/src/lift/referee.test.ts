@@ -15,7 +15,7 @@ describe('SingleReferee.commit', () => {
 		const commit = ref.commit(recordDigest, edges)
 
 		expect(commit.decision).toBe('commit')
-		expect(commit.recordSignature).toMatch(/^[0-9a-f]+$/)
+		expect(commit.recordSignature).toMatch(/^[A-Za-z0-9_-]+$/) // the schema's text form: base64url
 		expect(Object.keys(commit.edgeSignatures)).toEqual(['L1', 'L2'])
 		for (const e of edges) {
 			expect(verifyLiftTerms(key, e, commit.edgeSignatures[e.liftId])).toBe(true)

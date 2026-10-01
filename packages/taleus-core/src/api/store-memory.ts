@@ -1,6 +1,7 @@
 import type { Database } from '@quereus/quereus'
 
 import {
+	APP_SCHEMA,
 	insertStatement,
 	openStrandFrom,
 	row,
@@ -212,7 +213,7 @@ class MemoryTallyStore implements TallyStore {
 		const subscription = this.replica.db.watch(
 			{
 				watches: this.tables.map(table => ({
-					table: { schema: 'main', table },
+					table: { schema: APP_SCHEMA, table },
 					columns: 'all' as const,
 					scope: { kind: 'full' as const },
 				})),
@@ -256,7 +257,7 @@ function messageOf(error: unknown): string {
 function tablesIn(schema: string): string[] {
 	const names: string[] = []
 	for (const statement of statementsOf(stripComments(schema))) {
-		const match = /^\s*create\s+table\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(statement)
+		const match = /^\s*table\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(statement)
 		if (match) names.push(match[1])
 	}
 	return names

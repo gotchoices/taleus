@@ -88,7 +88,7 @@ describe('credit terms are one party’s own statement', () => {
 		// Sam never signed it and could not have refused it. What Jan will be owed is Jan's
 		// to say; what Sam does about it is to trade or not.
 		await expect(
-			tally.sees(sam, 'select CreditLimit from CreditTerms where Sid = ?', [jan.sid]),
+			tally.sees(sam, 'select CreditLimit from App.CreditTerms where Sid = ?', [jan.sid]),
 		).resolves.toEqual([{ CreditLimit: 50000 }])
 	})
 
@@ -146,7 +146,7 @@ describe('credit terms are one party’s own statement', () => {
 			}),
 		])
 		await expect(
-			tally.sees(world.sam, 'select CreditLimit from CreditTerms where Sid = ? and Revision = 2', [
+			tally.sees(world.sam, 'select CreditLimit from App.CreditTerms where Sid = ? and Revision = 2', [
 				jan.sid,
 			]),
 		).resolves.toEqual([{ CreditLimit: 80000 }])
@@ -257,7 +257,7 @@ describe('offering and countersigning', () => {
 
 		// Sam sees exactly what he would be agreeing to, both halves of it.
 		await expect(
-			tally.seesOne(sam, 'select Proposer, StockCreditTermsRevision, FoilCreditTermsRevision from TallyContractProposal'),
+			tally.seesOne(sam, 'select Proposer, StockCreditTermsRevision, FoilCreditTermsRevision from App.TallyContractProposal'),
 		).resolves.toEqual({ Proposer: 'S', StockCreditTermsRevision: 1, FoilCreditTermsRevision: 1 })
 	})
 
@@ -277,7 +277,7 @@ describe('offering and countersigning', () => {
 
 		for (const party of [jan, sam]) {
 			await expect(
-				tally.seesOne(party, 'select Number, ContractCid from TallyContract'),
+				tally.seesOne(party, 'select Number, ContractCid from App.TallyContract'),
 			).resolves.toEqual({ Number: 1, ContractCid: CONTRACT })
 		}
 	})

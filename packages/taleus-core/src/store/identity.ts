@@ -1,16 +1,15 @@
 import { generateKeyPair, sign } from '../crypto/index.js'
-import { bytesToHex, publicKeyText } from '../lift/digest.js'
+import { fromText, publicKeyText, toText } from '../lift/digest.js'
 import { digest } from './functions.js'
 
 /**
  * Keys, signatures and party identity, in the text forms the schema stores.
  *
- * Hex throughout, because `src/lift/digest.ts` already fixes that as "the schema's text
- * form". A second encoding would mean the same key is two different strings depending on
- * which path wrote it -- the same failure as a second digest, and just as quiet.
+ * base64url throughout -- `toText` in `src/lift/digest.ts` -- because it is what the stack's
+ * `digest` emits and its `verify` decodes. A second encoding would mean the same key is two
+ * different strings depending on which path wrote it, and just as quiet a failure as a second
+ * digest.
  */
-
-const utf8 = new TextEncoder()
 
 /** A key pair with its public half in the schema's text form. */
 export interface KeyPairText {
@@ -18,9 +17,16 @@ export interface KeyPairText {
 	secretKey: Uint8Array
 }
 
-/** Sign a digest with a party's key, in the hex form the schema stores. */
+/**
+ * Sign a digest with a party's key, in the text form the schema stores.
+ *
+ * What is signed is the digest's **raw bytes**, not its text: the schema checks with
+ * `verify(digest(...), Signature, Key, 'ed25519')`, and the plugin's `verify` decodes the
+ * digest text back to bytes before checking. Signing the text instead would produce a
+ * signature every replica refuses.
+ */
 export function signText(key: KeyPairText, digestText: string): string {
-	return bytesToHex(sign(key.secretKey, utf8.encode(digestText)))
+	return toText(sign(key.secretKey, fromText(digestText)))
 }
 
 export function newKey(): KeyPairText {

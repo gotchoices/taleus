@@ -71,9 +71,19 @@ signature.
 digest its signer signs, so the store cannot generate it. The core supplies one; a caller wanting
 an idempotent retry or a reproducible test supplies its own.
 
+That retry is a real guarantee, not a convention, and it matters on a network: a write can fail
+without settling whether it landed — the commit accepted, the reply lost. Mint the id once per
+payment, when the person first asks, and present the same id on every attempt. `pay` and
+`requestPayment` read before they write, so an attempt that already landed is reported rather than
+repeated, and `Ledger.Id` is unique, so even a lookup that wrongly came back empty ends in a refused
+insert, never a second payment. Release the id only when the event is settled or abandoned: an
+edited payment is a new event and needs a new id, and reusing one for different content is refused
+as `already-exists`. This is the rule Sereus's schema guide gives under "Client-Generated Keys and
+Retrying a Write", and the reference apps' composers implement it.
+
 ### 4. Signing is an interface, not a key pair
 
-`Signer` is `{ publicKey, sign(bytes): Promise<Hex> }` and nothing more. A phone's secure enclave,
+`Signer` is `{ publicKey, sign(bytes): Promise<CryptoText> }` and nothing more. A phone's secure enclave,
 a hardware token and a remote signing service can all implement it, and none of them will hand
 over a secret. `sign` is async because those are.
 

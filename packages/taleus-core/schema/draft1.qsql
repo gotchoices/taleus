@@ -1,12 +1,21 @@
 -- Taleus tally strand -- the two-party sApp schema.
 --
--- ORDER MATTERS. Every statement here is executed in file order, and Quereus plans a
--- view's body when the view is created, so a view must follow the tables it selects from.
--- Table CHECK constraints are planned lazily at write time instead, which is why a table
--- may reference a view defined below it (Ledger.WithinReservedCredit reads ReservedBalance).
--- Hence: all tables first, then indexes, then all views.
+-- An sApp schema BODY, in Sereus's declarative form: bare `table`, `index`, `unique index` and
+-- `view` items, never `create table …`. Sereus wraps the body as `declare schema App { … }` and
+-- applies it, so the tables are `App.Ledger` and so on to everything outside this file. Since
+-- Sereus 1.8 an item Quereus does not recognize -- a `create` prefix, a misspelled keyword -- is
+-- an error, where before it was silently skipped; `src/store/strand.ts` applies the schema the
+-- same way, so these tests refuse what Sereus would.
+--
+-- Declarative means order-independent: Quereus works out the dependency order itself. The file
+-- still reads tables, then indexes, then views, because that is the order a person wants.
+--
+-- The crypto is the stack's. `digest(…)` and `verify(…, 'ed25519')` are
+-- `@optimystic/quereus-plugin-crypto`'s, which Sereus registers on every strand database. Every
+-- `verify` names the curve: its default is secp256k1, and a call that leaves it out refuses
+-- every genuine Taleus signature. Keys, signatures and digests are base64url text.
 
-create table Stock (
+table Stock (
     Sid text,
     InvitationKey text,    --public key of sk sent to invited party
     SignerKey text,        -- authorized PartyKey of Sid that signed this row
@@ -14,26 +23,28 @@ create table Stock (
 
     primary key (/* 1 row */),
     constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)),
-    constraint SignatureValid check on insert (SignatureValid(
-        Digest(
+    constraint SignatureValid check on insert (verify(
+        digest(
             Sid,
             InvitationKey
         ),
         Signature,
-        New.SignerKey
+        New.SignerKey,
+        'ed25519'
     )),
     constraint InsertOnly check on delete, update (0)
 );
 
-create table Foil (
+table Foil (
     Sid text,
     Signature text,  -- signed using the out of band exchanged private key
     
     primary key (Sid),
-    constraint InvitationSignatureValid check on insert (SignatureValid(
-        Digest(Sid), 
+    constraint InvitationSignatureValid check on insert (verify(
+        digest(Sid), 
         Signature, 
-        (select InvitationKey from Stock)
+        (select InvitationKey from Stock),
+        'ed25519'
     )),
     constraint PartyExists check on insert ((select count(*) from PartyKey PK where PK.Sid = New.Sid)),
     constraint InsertOnly check on delete, update (0)
@@ -51,7 +62,7 @@ create table Foil (
 -- buffered+committed view, so it INCLUDES the row being inserted; `from committed.PartyKey`
 -- reads the pre-transaction snapshot, so it EXCLUDES it. Each constraint below picks the
 -- snapshot its logic requires.
-create table PartyKey (
+table PartyKey (
     Sid text,               -- party identity: Cid hash of the genesis (Revision 1) public key; never changes
     Revision integer,       -- per-Sid monotonic sequence of key-add events (ordering, not a sole-authority chain)
     PublicKey text,         -- the key being authorized
@@ -68,7 +79,6 @@ create table PartyKey (
     -- The new row IS visible here (plain ref), so a genuinely-unique PublicKey yields exactly
     -- one match. A revoked key can never be re-added: its PartyKey row is insert-only and
     -- stays, so a re-add of the same PublicKey makes the count 2 and fails.
-    constraint UniqueKey check on insert ((select count(*) from PartyKey PK where PK.Sid = New.Sid and PK.PublicKey = New.PublicKey) = 1),
     -- The authorizing key must have been in the party's authorized set as of the
     -- pre-transaction snapshot -- registered either as a normal add (committed.PartyKey) OR as a
     -- counterparty adoption (committed.PartyKeyAdoption), and not revoked by a committed
@@ -89,11 +99,12 @@ create table PartyKey (
         )
     ),
     -- Genesis validates against the invitation key (via Stock); every later add against the
-    -- key that authorized it. Reuses the single-key SignatureValid primitive -- no new crypto.
-    constraint SignatureValid check on insert (SignatureValid(
-        Digest(Sid, Revision, PublicKey, AuthKey),
+    -- key that authorized it. The same single-key `verify` every signed row uses -- no new crypto.
+    constraint SignatureValid check on insert (verify(
+        digest(Sid, Revision, PublicKey, AuthKey),
         Signature,
-        case when Revision = 1 then (select InvitationKey from Stock) else AuthKey end
+        case when Revision = 1 then (select InvitationKey from Stock) else AuthKey end,
+        'ed25519'
     )),
     constraint InsertOnly check on delete, update (0),
     -- Never introduce a third party. The new row's Sid is counted (plain ref).
@@ -113,7 +124,7 @@ create table PartyKey (
 -- inherent to a two-party, unilateral-chit ledger under distributed (Optimystic) ordering
 -- and is NOT closed here -- backstops are fast revocation, tally close, and the counterparty
 -- re-key ceremony (ticket key-counterparty-rekey).
-create table PartyKeyRevocation (
+table PartyKeyRevocation (
     Sid text,
     PublicKey text,         -- key being revoked (must be a registered key of the party)
     RevokedBy text,         -- currently-authorized key performing the revoke
@@ -133,7 +144,7 @@ create table PartyKeyRevocation (
     -- by the same in-flight row, so self-revocation is not a supported path -- retire a device
     -- from another surviving device.
     constraint RevokerAuthorized check on insert (New.RevokedBy in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)),
-    constraint SignatureValid check on insert (SignatureValid(Digest(Sid, PublicKey, RevokedBy), Signature, RevokedBy)),
+    constraint SignatureValid check on insert (verify(digest(Sid, PublicKey, RevokedBy), Signature, RevokedBy, 'ed25519')),
     -- Self-lockout guard. The AuthorizedKey view already reflects this in-flight revocation
     -- (plain ref = buffered+committed), so this count is the POST-revoke authorized set; we
     -- require >= 1 key to remain. This is the correct realization of the ticket's "prevent
@@ -183,20 +194,20 @@ create table PartyKeyRevocation (
 -- authenticating the recovering party here. SelfSigValid proves the adopted key is a real keypair
 -- whose private-key holder consented -- it does NOT prove WHICH party generated it. A malicious
 -- counterparty can therefore unilaterally re-key the other party: it generates (or reuses) a key it
--- controls, self-signs Digest(Sid, PublicKey) with it, and attests with its own authorized key,
+-- controls, self-signs digest(Sid, PublicKey) with it, and attests with its own authorized key,
 -- satisfying every guard alone. This is INHERENT and unpreventable at this layer -- in total loss
 -- the recovering party retains NO secret inside the tally, so there is no cryptographic material it
 -- could present that the counterparty could not fabricate. OUT OF SCOPE by design; the app must
 -- surface counterparty attestation as the trust decision it is.
--- NOTE: Digest(Sid, PublicKey) is not tally-bound (follows PartyKey precedent, not the chit
+-- NOTE: digest(Sid, PublicKey) is not tally-bound (follows PartyKey precedent, not the chit
 -- tables' Cid-bound digests). A self-signature is valid for this Sid in any tally the party holds,
 -- but confers nothing without THAT tally's counterparty attesting with a locally-authorized key,
 -- so cross-tally replay of the self-signature alone grants no authority. If adoption ever needs to
 -- bind to one specific tally, add (select Cid from TallyCore) to both digests.
-create table PartyKeyAdoption (
+table PartyKeyAdoption (
     Sid text,                    -- party regaining authority (unchanged identity)
     PublicKey text,              -- new key being adopted
-    SelfSignature text,          -- new key signs Digest(Sid, PublicKey): possession proof by the recovering party
+    SelfSignature text,          -- new key signs digest(Sid, PublicKey): possession proof by the recovering party
     CounterpartyKey text,        -- counterparty's currently-authorized key that attests
     CounterpartySignature text,  -- counterparty signs the same digest
 
@@ -211,9 +222,9 @@ create table PartyKeyAdoption (
     constraint CounterpartyIsOther check on insert (New.CounterpartyKey in (select PublicKey from AuthorizedKey AK where AK.Sid <> New.Sid)),
     -- Possession proof: the adopted key signs its own adoption. This is what stops the counterparty
     -- from adopting a key it alone controls.
-    constraint SelfSigValid check on insert (SignatureValid(Digest(Sid, PublicKey), SelfSignature, PublicKey)),
+    constraint SelfSigValid check on insert (verify(digest(Sid, PublicKey), SelfSignature, PublicKey, 'ed25519')),
     -- Attestation: the counterparty's authorized key signs the same digest.
-    constraint CounterpartySigValid check on insert (SignatureValid(Digest(Sid, PublicKey), CounterpartySignature, CounterpartyKey)),
+    constraint CounterpartySigValid check on insert (verify(digest(Sid, PublicKey), CounterpartySignature, CounterpartyKey, 'ed25519')),
     -- Replay/dup guard: the key must not already be a registered add (PartyKey) for this party, and
     -- this must be the sole adoption row for it (plain ref includes the buffered new row -> 1).
     constraint UniqueKey check on insert (
@@ -223,7 +234,7 @@ create table PartyKeyAdoption (
     constraint InsertOnly check on delete, update (0)
 );
 
-create table PartyCertificate (
+table PartyCertificate (
     PartySid text,
     Revision integer,
     Certificate text,
@@ -233,17 +244,18 @@ create table PartyCertificate (
     primary key (PartySid, Revision),
     constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.PartyCertificate PC where PC.PartySid = New.PartySid), 0) + 1),
     constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.PartySid)),
-    constraint SignatureValid check on insert (SignatureValid(
-        Digest(PartySid, Revision, Certificate),
+    constraint SignatureValid check on insert (verify(
+        digest(PartySid, Revision, Certificate),
         Signature,
-        New.SignerKey
+        New.SignerKey,
+        'ed25519'
     )),
     constraint InsertOnly check on delete, update (0)
 );
 
 -- ValidDenomination(id): prefix-dispatch validity check for a tally's denomination identifier
--- (feat-denomination-argument). A host-registered scalar like ValidDate/SignatureValid/Digest --
--- referenced here, defined by the runner. NO general parser and NO currency-table lookup: three
+-- (feat-denomination-argument). A Taleus host scalar, like ValidDate and DayNumber --
+-- referenced here, registered by `src/store/strand.ts` `registerFunctions`. NO general parser and NO currency-table lookup: three
 -- namespaces, each dispatched by prefix, and that is the whole contract:
 --   `CHIP`             -- the network reference unit; the reserved bare token, no prefix.
 --   `iso4217:<AAA>`    -- national currency; <AAA> is exactly three UPPERCASE ASCII letters
@@ -259,7 +271,7 @@ create table PartyCertificate (
 -- agree it names the same unit), NOT here -- do not add a runtime CHECK that fetches a CID. The
 -- descriptor is minimal: { name, symbol, description, canonicalUnit }; its human-readable label is
 -- display-only, so label collisions are harmless. See docs/architecture.md "Denomination registry".
-create table TallyContractProposal (
+table TallyContractProposal (
     SequenceNumber integer,
     ContractCid text,
     Proposer text check (Proposer in ('S', 'F')),
@@ -292,21 +304,23 @@ create table TallyContractProposal (
         select PublicKey from AuthorizedKey AK
         where AK.Sid = (select case when New.Proposer = 'S' then StockSid else FoilSid end from TallyCore)
     )),
-    constraint SignatureValid check on insert, update (SignatureValid(
-        Digest((select Cid from TallyCore), SequenceNumber, ContractCid, Proposer, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
+    constraint SignatureValid check on insert, update (verify(
+        digest((select Cid from TallyCore), SequenceNumber, ContractCid, Proposer, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         Signature,
-        New.SignerKey
+        New.SignerKey,
+        'ed25519'
     )),
     -- Same key, the other message. Verified here so a proposal carrying an unusable contract
     -- signature is rejected when it is made, rather than when the counterparty tries to accept.
-    constraint ContractSignatureValid check on insert, update (SignatureValid(
-        Digest((select Cid from TallyCore), SequenceNumber, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
+    constraint ContractSignatureValid check on insert, update (verify(
+        digest((select Cid from TallyCore), SequenceNumber, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         ContractSignature,
-        New.SignerKey
+        New.SignerKey,
+        'ed25519'
     ))
 );
 
-create table TallyContract (
+table TallyContract (
     Number integer,
     ContractCid text,
     -- Credit terms (limit, call) are UNILATERAL per-party policy in CreditTerms; the bilaterally
@@ -341,16 +355,18 @@ create table TallyContract (
     constraint FoilTermsExist  check on insert, update (New.FoilCreditTermsRevision  in (select Revision from CreditTerms CT where CT.Sid = (select FoilSid from TallyCore))),
     -- Each side's SignerKey resolves against ITS OWN party's authorized set, independently.
     constraint StockSignerAuthorized check on insert, update (New.StockSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = (select StockSid from TallyCore))),
-    constraint StockSignatureValid check on insert, update (SignatureValid(
-        Digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
+    constraint StockSignatureValid check on insert, update (verify(
+        digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         StockSignature,
-        New.StockSignerKey
+        New.StockSignerKey,
+        'ed25519'
     )),
     constraint FoilSignerAuthorized check on insert, update (New.FoilSignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = (select FoilSid from TallyCore))),
-    constraint FoilSignatureValid check on insert, update (SignatureValid(
-        Digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
+    constraint FoilSignatureValid check on insert, update (verify(
+        digest((select Cid from TallyCore), Number, ContractCid, StockCreditTermsRevision, FoilCreditTermsRevision, Denomination, DenominationScale),
         FoilSignature,
-        New.FoilSignerKey
+        New.FoilSignerKey,
+        'ed25519'
     )),
     -- Denomination + scale are FIXED for the tally's life: every revision after the first must match
     -- revision 1's, so a revision-2 contract naming a different denomination or scale is rejected.
@@ -382,7 +398,7 @@ create table TallyContract (
 --   Clutch: cost ratio charged for drops (lifts that reduce the balance this party has accumulated)
 -- Ratios are parts per million (10000 = 1%); positive is a fee, negative a subsidy.
 -- Clutch = 1000000 effectively blocks drops.
-create table TradingVariable (
+table TradingVariable (
     Sid text,
     Revision integer,
     Target integer default 0 check (Target >= 0),
@@ -396,10 +412,11 @@ create table TradingVariable (
     constraint PartyOfTally check on insert (Sid in (select StockSid from TallyCore union select FoilSid from TallyCore)),
     constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.TradingVariable TV where TV.Sid = New.Sid), 0) + 1),
     constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)),
-    constraint SignatureValid check on insert (SignatureValid(
-        Digest((select Cid from TallyCore), Sid, Revision, Target, Bound, Reward, Clutch),
+    constraint SignatureValid check on insert (verify(
+        digest((select Cid from TallyCore), Sid, Revision, Target, Bound, Reward, Clutch),
         Signature,
-        New.SignerKey
+        New.SignerKey,
+        'ed25519'
     )),
     constraint InsertOnly check on delete, update (0)
 );
@@ -420,7 +437,7 @@ create table TradingVariable (
 -- signed Date, so a backdate is disputable, not silently exploitable. Not solved
 -- cryptographically here; if a bound is later wanted, gate Date against Today() -- but that
 -- makes the insert volatile (non-deterministic), so it is deliberately left off.
-create table CreditTerms (
+table CreditTerms (
     Sid text,               -- grantor (party extending credit)
     Revision integer,
     CreditLimit integer default 0 check (CreditLimit >= 0),  -- CreditLimit not Limit (reserved word)
@@ -443,10 +460,11 @@ create table CreditTerms (
     -- read committed.* like this one. See test/STATUS.md § 0.
     constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.CreditTerms CT where CT.Sid = New.Sid), 0) + 1),
     constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.Sid)),
-    constraint SignatureValid check on insert (SignatureValid(
-        Digest((select Cid from TallyCore), Sid, Revision, CreditLimit, CallDays, Args, Date, EffectiveDate),
+    constraint SignatureValid check on insert (verify(
+        digest((select Cid from TallyCore), Sid, Revision, CreditLimit, CallDays, Args, Date, EffectiveDate),
         Signature,
-        New.SignerKey
+        New.SignerKey,
+        'ed25519'
     )),
     -- Notice rule. Prior = immediately preceding revision for this grantor (committed).
     --   Revision 1 (no prior): effective immediately.
@@ -483,20 +501,21 @@ create table CreditTerms (
 -- "Tally close".
 -- NOTE: no reopen/withdraw path; if wind-down needs to be reversible, add a signed CloseWithdrawal that
 -- supersedes -- see backlog if it comes up.
-create table CloseRequest (
+table CloseRequest (
     Requester text check (Requester in ('S','F')),  -- party requesting closure
     Date text check (ValidDate(Date)),
     SignerKey text,        -- authorized PartyKey of the requesting party
-    Signature text,        -- requester signs Digest(Cid, Requester, Date)
+    Signature text,        -- requester signs digest(Cid, Requester, Date)
 
     primary key (Requester),   -- at most one close request per party; either or both may file
     constraint SignerAuthorized check on insert (New.SignerKey in (
         select PublicKey from AuthorizedKey AK
         where AK.Sid = (select case when New.Requester = 'S' then StockSid else FoilSid end from TallyCore)
     )),
-    constraint SignatureValid check on insert (SignatureValid(
-        Digest((select Cid from TallyCore), Requester, Date),
-        Signature, New.SignerKey
+    constraint SignatureValid check on insert (verify(
+        digest((select Cid from TallyCore), Requester, Date),
+        Signature, New.SignerKey,
+        'ed25519'
     )),
     constraint InsertOnly check on delete, update (0)
 );
@@ -504,7 +523,7 @@ create table CloseRequest (
 -- A signed decline of an invoice by the PAYER (the counterparty of the requester). Expiry needs no row
 -- (it is time-derived); a decline is an explicit act and so needs a signed record. At most one per
 -- invoice, and only before the invoice is answered by a chit.
-create table InvoiceDecline (
+table InvoiceDecline (
     InvoiceId text,
     DeclinedBy text check (DeclinedBy in ('S', 'F')),  -- must be the payer (counterparty of requester)
     SignerKey text,
@@ -520,9 +539,10 @@ create table InvoiceDecline (
         select PublicKey from AuthorizedKey AK
         where AK.Sid = (select case when New.DeclinedBy = 'S' then StockSid else FoilSid end from TallyCore)
     )),
-    constraint SignatureValid check on insert (SignatureValid(
-        Digest((select Cid from TallyCore), InvoiceId, DeclinedBy),
-        Signature, New.SignerKey
+    constraint SignatureValid check on insert (verify(
+        digest((select Cid from TallyCore), InvoiceId, DeclinedBy),
+        Signature, New.SignerKey,
+        'ed25519'
     )),
     -- Cannot decline an invoice already answered by a chit. Mirror of Ledger.InvoiceLink's
     -- not-declined guard; both are commit-time subqueries with the SAME isolation caveat noted there.
@@ -530,7 +550,7 @@ create table InvoiceDecline (
     constraint InsertOnly check on delete, update (0)
 );
 
-create table Ledger (
+table Ledger (
     Number integer, -- Sequential, monotonically increasing
     ContractNumber integer,
     Id text,               -- caller-supplied: it is inside the signed digest, so the signer must know it first
@@ -565,8 +585,8 @@ create table Ledger (
     -- signature in LiftFinalize instead.)
     constraint SignatureValid check on insert (
         New.Kind = 'lift'
-        or SignatureValid(
-            Digest(
+        or verify(
+            digest(
                 Id,
                 Issuer,
                 (select case when Issuer = 'F' then FoilSid else StockSid end RecipientSid from TallyCore),
@@ -575,7 +595,7 @@ create table Ledger (
                 Reference,
                 Memo,
                 InvoiceId
-            ), Signature, New.SignerKey)
+            ), Signature, New.SignerKey, 'ed25519')
     ),
     -- Applies to EVERY Ledger row (direct + finalized lift both carry a real signed delta): the running
     -- Balance chains contiguously off the prior row.
@@ -691,22 +711,20 @@ create table Ledger (
     -- If this chit answers an invoice: the invoice must exist, the chit must be issued by the PAYER
     -- (opposite side from the requester -- a foil-issued chit raises Balance toward stock, so if Stock
     -- requested payment Foil must issue), pledge EXACTLY the invoiced Units (partial payment is
-    -- DISALLOWED -- one invoice, one chit, exact amount; see feat-schema-invoices), be the ONLY chit
-    -- answering it, and the invoice must not already be declined. A plain (buffered+committed) ref on
-    -- the count includes this new row -> exactly one match for a valid first payment.
-    -- NOTE: concurrency. Two chits referencing the same invoice get different Ledger.Number, so they do
-    -- NOT collide on the primary key; the `count(*) = 1` guard rejects the second only if this deferred
-    -- CHECK is re-evaluated against the latest committed snapshot at commit. Pay-then-decline vs
-    -- decline-then-pay races (this guard vs InvoiceDecline.NotPaid) have the same shape. This is the SAME
-    -- open isolation question already flagged for PartyKeyRevocation.NotLastKey (schema/draft1.qsql:137-146):
-    -- if Optimystic validates only against each transaction's original read snapshot, both could commit.
-    -- Both racing actions are the payer's own, so it only ever produces self-inflicted ambiguity, and
-    -- InvoiceState resolves it deterministically (paid > declined). Not solved here; confirm the isolation
-    -- model when a runner exists, same as the NotLastKey note.
-    -- Lift resolution joins this SAME open isolation list: LiftFinalize's NotVoided / single-finalize
-    -- clauses and LiftVoid.NotFinalized are commit-time deferred CHECKs with the identical shape (two
-    -- agents finalizing one lift, or a finalize racing a void, only reject if the CHECK re-evaluates
-    -- against the latest committed snapshot). Same question, not re-solved here.
+    -- DISALLOWED -- one invoice, one chit, exact amount; see feat-schema-invoices), and the invoice must
+    -- not already be declined.
+    -- "The ONLY chit answering it" is not in this CHECK: it is the unique index `LedgerByInvoice`. A
+    -- `count(*) = 1` clause here guarded it before, but two chits answering one invoice have different
+    -- Numbers, so only a CHECK re-evaluated against the latest committed state would catch the second --
+    -- an open isolation question. A declared unique index is not: Sereus guarantees that of two rows
+    -- racing one unique value under different primary keys, exactly one commits
+    -- (../sereus/docs/schema-guide.md, "A secondary unique column is the same safe guard as the primary
+    -- key, including at the same instant").
+    -- NOTE: concurrency, still open. Pay-then-decline vs decline-then-pay (this CHECK's not-declined
+    -- clause vs InvoiceDecline.NotPaid) is cross-table, so no index can close it; it keeps the deferred-
+    -- CHECK question flagged for PartyKeyRevocation.NotLastKey. Both racing acts are the payer's own, so
+    -- it only ever produces self-inflicted ambiguity, and InvoiceState resolves it (paid > declined).
+    -- LiftFinalize's NotVoided clause and LiftVoid.NotFinalized are the same cross-table shape.
     -- Kind='direct' only (a finalize carries InvoiceId null and never answers an invoice).
     constraint InvoiceLink check on insert (
         New.Kind = 'lift'
@@ -715,7 +733,6 @@ create table Ledger (
             exists (select 1 from Invoice where Id = New.InvoiceId)
             and New.Issuer <> (select Requester from Invoice where Id = New.InvoiceId)
             and New.Units = (select Units from Invoice where Id = New.InvoiceId)
-            and (select count(*) from Ledger where InvoiceId = New.InvoiceId) = 1
             and not exists (select 1 from InvoiceDecline where InvoiceId = New.InvoiceId)
         )
     ),
@@ -729,11 +746,12 @@ create table Ledger (
     --   (c) the referee commit signature verifies against the pledge's RefereeKey over the lift-terms digest
     --       (field order per the PendingLift.SignatureValid protocol-contract NOTE) -- binding Cid + LiftId
     --       makes a commit signed for another tally or another lift impossible to replay here;
-    --   (d) NotVoided: no LiftVoid for this LiftId (finalize-after-void rejected), AND no prior finalize:
-    --       Ledger's PK is Number, so a second 'lift' row for the same LiftId does NOT collide on the PK --
-    --       this self-count (plain ref = buffered+committed -> 1 for a valid first finalize) rejects the second.
+    --   (d) NotVoided: no LiftVoid for this LiftId (finalize-after-void rejected).
+    -- One finalize per lift is the unique index `LedgerByLift`, not this CHECK: a direct chit's LiftId is
+    -- null, so the index admits any number of those and exactly one row per lift -- race-safe, where the
+    -- self-count it replaces was not. See the InvoiceLink note.
     -- Kind='lift' is EXEMPT from both credit gates above (decision 3): a referee-committed finalize must
-    -- always settle. Isolation caveat on the NotVoided / single-finalize clauses: see the InvoiceLink note.
+    -- always settle. Isolation caveat on the cross-table NotVoided clause: see the InvoiceLink note.
     constraint LiftFinalize check on insert (
         New.Kind = 'direct'
         or (
@@ -741,8 +759,8 @@ create table Ledger (
             and New.Issuer = (select Issuer from PendingLift where LiftId = New.LiftId)
             and New.Units  = (select Units  from PendingLift where LiftId = New.LiftId)
             and New.Date   = (select Date   from PendingLift where LiftId = New.LiftId)
-            and SignatureValid(
-                Digest(
+            and verify(
+                digest(
                     (select Cid from TallyCore),
                     New.LiftId,
                     (select RefereeKey from PendingLift where LiftId = New.LiftId),
@@ -752,10 +770,10 @@ create table Ledger (
                     (select Expiry from PendingLift where LiftId = New.LiftId)
                 ),
                 New.RefereeSignature,
-                (select RefereeKey from PendingLift where LiftId = New.LiftId)
+                (select RefereeKey from PendingLift where LiftId = New.LiftId),
+                'ed25519'
             )
             and not exists (select 1 from LiftVoid V where V.LiftId = New.LiftId)
-            and (select count(*) from Ledger L where L.LiftId = New.LiftId and L.Kind = 'lift') = 1
         )
     ),
     -- Null-hygiene across Kind. A direct chit carries a fresh issuer signature and no lift fields; a
@@ -788,7 +806,7 @@ create table Ledger (
 -- referee-committed others finalize). Inherent to a referee-arbitrated, no-cross-strand-transaction model;
 -- referee reliability is the mitigation. A bounded party-driven release is parked in
 -- backlog/feat-lift-timeout-release -- do NOT add a unilateral party void here.
-create table PendingLift (
+table PendingLift (
     LiftId text,           -- globally-unique lift id (from the ChipNet route); one pending chit per lift per strand
     RefereeKey text,       -- agreed referee's public key; every resolution signature verifies against THIS key
     Issuer text check (Issuer in ('S','F')),  -- side pledging value on this edge (foil +Units, stock -Units, per BalanceCorrect)
@@ -796,7 +814,7 @@ create table PendingLift (
     Date text check (ValidDate(Date)),         -- pledge timestamp; the date the reserved-credit gate keys off
     Expiry text check (ValidDate(Expiry)),     -- advisory staleness bound + signed term; NOT a per-strand finalize gate (decision 2)
     SignerKey text,        -- authorized PartyKey of the issuing party
-    Signature text,        -- issuer signs Digest(Cid, LiftId, RefereeKey, Issuer, Units, Date, Expiry)
+    Signature text,        -- issuer signs digest(Cid, LiftId, RefereeKey, Issuer, Units, Date, Expiry)
 
     primary key (LiftId),
     -- SignerKey resolves against the issuing side's own authorized set (mirror Ledger.SignerAuthorized).
@@ -808,12 +826,13 @@ create table PendingLift (
     -- NOTE (protocol contract): this digest field order -- Cid, LiftId, RefereeKey, Issuer, Units, Date,
     -- Expiry -- is the SAME lift-terms digest the ChipNet referee signs at commit (see Ledger.LiftFinalize).
     -- It is a cross-component contract: feat-chipnet-integration MUST NOT drift from this order, or a valid
-    -- referee commit will fail to verify against the pledge. The void digest is DISTINCT -- Digest(Cid,
+    -- referee commit will fail to verify against the pledge. The void digest is DISTINCT -- digest(Cid,
     -- LiftId, 'void') (LiftVoid) -- so a commit signature can never be replayed as a void or vice versa.
-    constraint SignatureValid check on insert (SignatureValid(
-        Digest((select Cid from TallyCore), LiftId, RefereeKey, Issuer, Units, Date, Expiry),
+    constraint SignatureValid check on insert (verify(
+        digest((select Cid from TallyCore), LiftId, RefereeKey, Issuer, Units, Date, Expiry),
         Signature,
-        New.SignerKey
+        New.SignerKey,
+        'ed25519'
     )),
     constraint ExpiryValid check on insert (DayNumber(Expiry) >= DayNumber(Date)),
     -- Reserved-credit gate: the prospective RESERVED balance (settled + all open pending, INCLUDING this new
@@ -862,9 +881,9 @@ create table PendingLift (
 -- cross-strand transaction. Voiding writes NO settled Ledger row -- the pledge simply drops out of
 -- OpenPendingLift, releasing its reserved capacity. Mutual exclusion with finalize is enforced both ways
 -- (NotFinalized here; LiftFinalize.NotVoided there); double-void collides on the primary key.
-create table LiftVoid (
+table LiftVoid (
     LiftId text,             -- one void per lift; PK also blocks double-void
-    RefereeSignature text,   -- referee signs Digest(Cid, LiftId, 'void') -- DISTINCT from the commit digest
+    RefereeSignature text,   -- referee signs digest(Cid, LiftId, 'void') -- DISTINCT from the commit digest
 
     primary key (LiftId),
     -- The pledge being voided must exist. `in (subquery)` over a non-null PK column yields a definite FALSE
@@ -876,10 +895,11 @@ create table LiftVoid (
     -- Referee void signature over the DISTINCT void digest, verified against the pledge's RefereeKey. The
     -- distinct digest is what makes a commit signature un-replayable as a void (and vice versa). PendingExists
     -- guarantees the RefereeKey sub-select is a definite value here.
-    constraint RefereeVoidValid check on insert (SignatureValid(
-        Digest((select Cid from TallyCore), New.LiftId, 'void'),
+    constraint RefereeVoidValid check on insert (verify(
+        digest((select Cid from TallyCore), New.LiftId, 'void'),
         New.RefereeSignature,
-        (select RefereeKey from PendingLift where LiftId = New.LiftId)
+        (select RefereeKey from PendingLift where LiftId = New.LiftId),
+        'ed25519'
     )),
     constraint InsertOnly check on delete, update (0)
 );
@@ -901,7 +921,7 @@ create table LiftVoid (
 -- deliberately do NOT bind to Cid, so the invitee's Sid is already known when this row is needed. Folding
 -- FoilSid into the Cid makes the identity commit to BOTH parties -- see the replay NOTE.
 --
--- Cid = Digest(StockSid, FoilSid, ProtocolVersion, CreatedAt). The stored Cid must equal that digest
+-- Cid = digest(StockSid, FoilSid, ProtocolVersion, CreatedAt). The stored Cid must equal that digest
 -- (CidCorrect); StockSid/FoilSid must be the actually-seated parties (StockSeated/FoilSeated pin them to
 -- the single-row Stock/Foil tables), so even a malicious initiator cannot name a counterparty who never
 -- seated. Signed by an authorized key of the STOCK (initiator) party -- "created by the initiator".
@@ -919,7 +939,7 @@ create table LiftVoid (
 -- sign with Stock's out-of-band invitation secret). If a formation path ever lets one party hold both
 -- roles, add a StockSid <> FoilSid check here (PerspectiveBalance et al. union the two Sids and would
 -- collapse to one party).
-create table TallyCore (
+table TallyCore (
     Cid text,              -- tally id: digest of the founding fields below; the per-strand signature anchor
     StockSid text,         -- initiator (stock) party identity
     FoilSid text,          -- invitee (foil) party identity
@@ -930,7 +950,7 @@ create table TallyCore (
 
     primary key (/* 1 row */),
     -- Cid is the content address of the founding fields: the stored value must equal their digest.
-    constraint CidCorrect check on insert (New.Cid = Digest(StockSid, FoilSid, ProtocolVersion, CreatedAt)),
+    constraint CidCorrect check on insert (New.Cid = digest(StockSid, FoilSid, ProtocolVersion, CreatedAt)),
     -- StockSid/FoilSid must name the actually-seated parties (both tables are single-row), so the identity
     -- cannot be minted against a counterparty who never seated. Requiring the Foil row also pins creation
     -- to AFTER the invitee seats.
@@ -940,10 +960,11 @@ create table TallyCore (
     constraint CreatedAtValid check on insert (ValidDate(New.CreatedAt)),
     -- Initiator (stock) creates the identity: SignerKey resolves against the STOCK party's authorized set.
     constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.StockSid)),
-    constraint SignatureValid check on insert (SignatureValid(
-        Digest(StockSid, FoilSid, ProtocolVersion, CreatedAt),
+    constraint SignatureValid check on insert (verify(
+        digest(StockSid, FoilSid, ProtocolVersion, CreatedAt),
         Signature,
-        New.SignerKey
+        New.SignerKey,
+        'ed25519'
     )),
     constraint InsertOnly check on delete, update (0)
 );
@@ -955,7 +976,7 @@ create table TallyCore (
 -- NOT gated against credit limits at insert (requesting more than current capacity is legitimate -- the
 -- payer may raise credit first), and its expiry is time-derived and advisory (see InvoiceState), so the
 -- insert stays deterministic/non-volatile. State (open/declined/expired/paid) is DERIVED, never stored.
-create table Invoice (
+table Invoice (
     Id text,               -- caller-supplied: it is inside the signed digest, so the signer must know it first
     Requester text check (Requester in ('S', 'F')),  -- party requesting payment (future recipient)
     Units integer check (Units > 0),                 -- smallest denomination unit, exact-match by the answering chit
@@ -972,9 +993,10 @@ create table Invoice (
         select PublicKey from AuthorizedKey AK
         where AK.Sid = (select case when New.Requester = 'S' then StockSid else FoilSid end from TallyCore)
     )),
-    constraint SignatureValid check on insert (SignatureValid(
-        Digest((select Cid from TallyCore), Id, Requester, Units, Date, ExpiryDate, Reference, Memo),
-        Signature, New.SignerKey
+    constraint SignatureValid check on insert (verify(
+        digest((select Cid from TallyCore), Id, Requester, Units, Date, ExpiryDate, Reference, Memo),
+        Signature, New.SignerKey,
+        'ed25519'
     )),
     -- ExpiryDate, when present, must be a valid date at or after Date.
     constraint ExpiryValid check on insert (
@@ -1005,30 +1027,41 @@ create table Invoice (
 --
 -- What is left after those two rules is lookups on **non-key columns of tables that grow without
 -- bound** -- which, in a tally that trades for years, means the ledger.
+--
+-- Three of these are `unique`, and that is a correctness decision rather than a speed one. Sereus
+-- guarantees that of two rows racing one declared unique value -- primary key or secondary index,
+-- at the same instant, on different machines -- exactly one commits and the other is refused
+-- (../sereus/docs/schema-guide.md). A CHECK that counts rows gets no such guarantee: it is a
+-- deferred constraint, and whether it sees a concurrent commit is the open isolation question. So
+-- "at most one" is stated here as an index wherever it can be, and never as a count.
 
 -- The latest settled balance: `PerspectiveBalance`, `ReservedBalance` and `CloseState` all read
 -- `order by Number desc limit 1`, and the reserved-credit gate consults it on every chit and
 -- every pledge. The single highest-value index in the schema.
-create index LedgerLatest on Ledger (Number desc);
+index LedgerLatest on Ledger (Number desc);
 
--- Answering an invoice. `Ledger.InvoiceLink` counts the chits naming an invoice on every direct
--- chit insert, and `InvoiceState` joins the same way per invoice, which `OpenInvoice` and every
--- balance read then consume. `InvoiceId` is null on most ledger rows -- the overwhelming majority
--- of chits answer nothing -- so this could be a partial index; kept total until a runner confirms
--- the planner picks partial indexes up.
-create index LedgerByInvoice on Ledger (InvoiceId);
+-- A chit's own identity, and the reason a retried payment is not a second payment. `Id` is minted
+-- once per payment and is inside the digest its issuer signs, but the primary key is `Number`,
+-- recomputed on every attempt -- so without this index an attempt whose commit landed but whose
+-- reply was lost, retried, is stored twice. With it the retry is refused, and the engine reads the
+-- row back instead ("Client-Generated Keys and Retrying a Write", ../sereus/docs/schema-guide.md).
+unique index LedgerById on Ledger (Id);
 
--- Lift resolution. `Ledger.LiftFinalize`'s single-finalize guard and `OpenPendingLift`'s
--- anti-join both filter `LiftId` together with `Kind`, and `OpenPendingLift` feeds
--- `ReservedBalance`, which the reserved-credit gate reads on every chit AND every pledge.
--- `LiftId` first: it is the selective half, and the pair covers the trailing `and Kind = 'lift'`.
-create index LedgerByLift on Ledger (LiftId, Kind);
+-- One chit per invoice. Unique rather than counted (see above); `InvoiceId` is null on most rows,
+-- and a unique index admits any number of nulls. Also serves `InvoiceState`'s per-invoice probe,
+-- which `OpenInvoice` and every balance read consume.
+unique index LedgerByInvoice on Ledger (InvoiceId);
+
+-- One finalize per lift. `LiftId` is null on every direct chit, so this admits those freely and one
+-- row per lift. Also serves `OpenPendingLift`'s anti-join, which feeds `ReservedBalance`, which the
+-- reserved-credit gate reads on every chit and every pledge.
+unique index LedgerByLift on Ledger (LiftId);
 
 -- Reporting. The application layer asks for a date range -- a statement, a reconciliation, a
 -- period close -- and `Date` is `YYYY-MM-DD` by `ValidDate`, so lexicographic order IS
 -- chronological order and a plain range predicate can use this. (A predicate written as
 -- `DayNumber(Date) >= ...` cannot: it is a function of the column, not the column.)
-create index LedgerByDate on Ledger (Date);
+index LedgerByDate on Ledger (Date);
 
 -- NOTE (upstream, not a workaround). These indexes are declared in the right shape, but a
 -- Quereus planner limit stops several of them being used: a **table alias** between the table
@@ -1048,22 +1081,22 @@ create index LedgerByDate on Ledger (Date);
 -- Revision desc limit 1` within a Sid, so the PK prefix gives the Sid and the descending half
 -- has to be declared. These are insert-only and grow for the life of the tally -- `CreditTerms`
 -- is read by BOTH credit gates on every chit, and `TradingVariable` twice per `LiftLading`.
-create index CreditTermsLatest on CreditTerms (Sid, Revision desc);
-create index TradingVariableLatest on TradingVariable (Sid, Revision desc);
-create index PartyCertificateLatest on PartyCertificate (PartySid, Revision desc);
+index CreditTermsLatest on CreditTerms (Sid, Revision desc);
+index TradingVariableLatest on TradingVariable (Sid, Revision desc);
+index PartyCertificateLatest on PartyCertificate (PartySid, Revision desc);
 
 -- The contract in force: `order by Number desc limit 1` on every chit insert (to stamp
 -- `ContractNumber`) and on every read of the tally's denomination.
-create index TallyContractLatest on TallyContract (Number desc);
+index TallyContractLatest on TallyContract (Number desc);
 
--- Authorization. `PartyKey.UniqueKey` and `PartyKeyAdoption.UniqueKey` both probe
--- `(Sid, PublicKey)`, and `RegisteredKey` -- hence `AuthorizedKey`, hence the `SignerAuthorized`
--- check on every signature-gated insert in the schema -- projects exactly those two columns, so
--- this also covers that read. The primary key is `(Sid, Revision)`, so `PublicKey` is not
+-- A key is registered to a party once. This replaced a `count(*)` CHECK (`PartyKey.UniqueKey`) for
+-- the reason above. It also serves `PartyKeyAdoption.UniqueKey`'s cross-table probe, and
+-- `RegisteredKey` -- hence `AuthorizedKey`, hence `SignerAuthorized` on every signed insert --
+-- projects exactly these two columns. The primary key is `(Sid, Revision)`, so `PublicKey` is not
 -- reachable through it.
-create index PartyKeyByKey on PartyKey (Sid, PublicKey);
+unique index PartyKeyByKey on PartyKey (Sid, PublicKey);
 
-create view RegisteredKey as
+view RegisteredKey as
     select Sid, PublicKey from PartyKey
     union
     select Sid, PublicKey from PartyKeyAdoption;
@@ -1073,21 +1106,15 @@ create view RegisteredKey as
 -- Reads current (buffered+committed) state; constraints that must exclude the row being inserted
 -- (PartyKey.RevisionMonotonicInt, PartyKey.AuthKeyAuthorized) use committed.* directly instead of
 -- this view.
--- NOTE: every SignerAuthorized / RevokerAuthorized / NotLastKey / CounterpartyIsOther check
--- references THIS view (or RegisteredKey) from inside a CHECK sub-query. Confirmed against Quereus
--- source (planner/building/select.ts buildFrom inlines a view wherever a base table is accepted,
--- including constraint sub-queries, with no base-table-only guard) -- but Quereus has NO test
--- exercising a view inside a CHECK. If a future runner rejects a view here, the fallback is to
--- inline the body -- RegisteredKey (PartyKey union PartyKeyAdoption) minus PartyKeyRevocation --
--- directly into each referencing constraint.
--- NOTE: NEW here vs the sibling key-multi-and-revoke ticket -- PartyKeyAdoption.CounterpartyIsOther
--- references AuthorizedKey, while AuthorizedKey (via RegisteredKey) references PartyKeyAdoption: a
--- table<->view definitional CYCLE. It is unbreakable by reordering (each side names the other), so
--- the table is created before these views and relies on Quereus resolving view names at
--- statement-build time, not DDL-creation order. The committed.* forward table references already in
--- this schema resolve the same way; a view forward-reference is the same class, unexercised by any
--- runner.
-create view AuthorizedKey as
+-- NOTE: every SignerAuthorized / RevokerAuthorized / NotLastKey / CounterpartyIsOther check reads
+-- THIS view (or RegisteredKey) from inside a CHECK sub-query, and PartyKeyAdoption.CounterpartyIsOther
+-- makes that a table<->view cycle (the table reads this view; this view, via RegisteredKey, reads the
+-- table). Both were once open questions -- Quereus had no test of a view inside a CHECK, and the cycle
+-- relied on names resolving at statement-build time. Both are now exercised on every signed insert in
+-- `packages/taleus-core`'s suite, under the declarative apply Sereus uses. If a future runner ever
+-- rejects a view here, the fallback is to inline the body -- RegisteredKey (PartyKey union
+-- PartyKeyAdoption) minus PartyKeyRevocation -- into each referencing constraint.
+view AuthorizedKey as
     select RK.Sid, RK.PublicKey
     from RegisteredKey RK
     where not exists (select 1 from PartyKeyRevocation R where R.Sid = RK.Sid and R.PublicKey = RK.PublicKey);
@@ -1106,7 +1133,7 @@ create view AuthorizedKey as
 -- `TV.Revision = (select T2.Revision ... order by T2.Revision desc limit 1)` in the same ON clause
 -- measured 2.3s at the same depth. Keep latest-revision lookups as scalar subqueries in the
 -- SELECT list; never as a correlated predicate in a join.
-create view CurrentTradingVariable as
+view CurrentTradingVariable as
     select P.Sid,
         coalesce((select TV.Target from TradingVariable TV where TV.Sid = P.Sid order by TV.Revision desc limit 1), 0) as Target,
         coalesce((select TV.Bound  from TradingVariable TV where TV.Sid = P.Sid order by TV.Revision desc limit 1), 0) as Bound,
@@ -1122,7 +1149,7 @@ create view CurrentTradingVariable as
 -- MATERIALIZED view (Quereus hard-rejects volatile there). If a future runner rejects
 -- volatile-in-view, fall back to computing the effective revision in the lift agent
 -- (application) and keep the deterministic chit-dated Ledger gate as the safety boundary.
-create view CurrentCreditLimit as
+view CurrentCreditLimit as
     select P.Sid,
         coalesce((select CT.CreditLimit from CreditTerms CT
                   where CT.Sid = P.Sid and DayNumber(CT.EffectiveDate) <= Today()
@@ -1140,7 +1167,7 @@ create view CurrentCreditLimit as
 -- lifts shrink advertised capacity without moving the signed balance -- this realizes the former "fold in
 -- pending lift chits" plan item (the pending-aware view is ReservedPerspectiveBalance, not this one). Open
 -- invoices are likewise advisory-only (OpenInvoice), not folded into this Balance or the hard credit gate.
-create view PerspectiveBalance as
+view PerspectiveBalance as
     select P.Sid,
         coalesce((select Balance from Ledger order by Number desc limit 1), 0)
             * (case when P.Sid = (select StockSid from TallyCore) then 1 else -1 end) as Balance
@@ -1150,7 +1177,7 @@ create view PerspectiveBalance as
 -- LiftVoid for its LiftId. This is the reservation set -- ReservedBalance sums it. A finalize or a void
 -- drops the row out immediately (its capacity moves to the settled chain, or is released), so the reserved
 -- gate counts open pledges only.
-create view OpenPendingLift as
+view OpenPendingLift as
     select PL.LiftId, PL.RefereeKey, PL.Issuer, PL.Units, PL.Date, PL.Expiry, PL.SignerKey, PL.Signature
     from PendingLift PL
     where not exists (select 1 from Ledger L where L.LiftId = PL.LiftId and L.Kind = 'lift')
@@ -1164,7 +1191,7 @@ create view OpenPendingLift as
 --                pending lift is still open. The open-pledge test is load-bearing -- without it a still-open
 --                pledge could later finalize and bump a "closed" tally back off zero, so 'closed' would not
 --                be stable. Reads settled Ledger.Balance (not reserved) so a finalize can never unsettle it.
-create view CloseState as
+view CloseState as
     select case
         when not exists (select 1 from CloseRequest) then 'open'
         when coalesce((select Balance from Ledger order by Number desc limit 1), 0) = 0
@@ -1179,7 +1206,7 @@ create view CloseState as
 -- WithinReservedCredit so concurrent lifts cannot collectively over-commit; LiftLading advertises net of it.
 -- Because the gate reads this with a plain (buffered+committed) ref, the row being inserted is already
 -- reflected -- see WithinReservedCredit on PendingLift and Ledger.
-create view ReservedBalance as
+view ReservedBalance as
     select
         coalesce((select Balance from Ledger order by Number desc limit 1), 0)
         + coalesce((select sum(Units * case when Issuer = 'F' then 1 else -1 end) from OpenPendingLift), 0)
@@ -1188,7 +1215,7 @@ create view ReservedBalance as
 
 -- Per-party reserved balance -- mirrors PerspectiveBalance but off ReservedBalance (settled + open
 -- pending), negated for the foil side. LiftLading advertises from this; PerspectiveBalance stays SETTLED.
-create view ReservedPerspectiveBalance as
+view ReservedPerspectiveBalance as
     select P.Sid,
         (select Balance from ReservedBalance)
             * (case when P.Sid = (select StockSid from TallyCore) then 1 else -1 end) as Balance
@@ -1215,7 +1242,7 @@ create view ReservedPerspectiveBalance as
 -- "Function not found: max/2"). Predates this ticket; tracked in backlog/debt-schema-liftlading-scalar-minmax
 -- (rewrite as CASE expressions, or add scalar min/max upstream). Everything else in the lift-chit machinery
 -- binds cleanly on Quereus -- this is the sole exception.
-create view LiftLading as
+view LiftLading as
     select
         RV.Sid as ReceiverSid,
         -- Greatest/Least are host scalars: SQL has no two-argument min/max (SQLite's are an
@@ -1235,7 +1262,7 @@ create view LiftLading as
 -- 'expired' is time-derived (Today() is VOLATILE -- fine in a plain view, NOT allowed in a
 -- MATERIALIZED view; same caveat as CurrentCreditLimit at schema/draft1.qsql:504). It is deliberately
 -- NOT gated at chit insert -- a late payment still succeeds and 'paid' wins by precedence.
-create view InvoiceState as
+view InvoiceState as
     select I.Id, I.Requester, I.Units, I.Date, I.ExpiryDate,
         case
             when exists (select 1 from Ledger L where L.InvoiceId = I.Id) then 'paid'
@@ -1247,6 +1274,6 @@ create view InvoiceState as
 
 -- Open (unanswered, undeclined, unexpired) invoices -- advisory signal of upcoming balance movement
 -- for the lift agent / credit-check application layer. NOT folded into LiftLading or WithinCreditLimits.
-create view OpenInvoice as
+view OpenInvoice as
     select Id, Requester, Units, Date, ExpiryDate from InvoiceState where State = 'open';
 

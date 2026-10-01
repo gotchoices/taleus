@@ -377,6 +377,41 @@ Things the tests turned up that are design questions rather than test failures.
   subquery per column in the SELECT list. Rule for this schema: resolve "the latest" in the SELECT
   list, never as a correlated predicate in a join.
 
+- **Stack upgrade to Sereus 1.8 / Optimystic 1.8 / Quereus 4.20 — six things it turned up, all
+  fixed.** Found by reading the release notes and `../sereus/docs/schema-guide.md` against this code,
+  then confirming each before changing it:
+  1. **A retried payment was a second payment.** `Ledger`'s primary key is `Number`, recomputed per
+     attempt, and the chit's own `Id` was not unique — so `pay({ id })` twice stored two chits with
+     one id, balance doubled. Reproduced before fixing. The guide's rule is that an event's key is
+     minted once and a retry reads before it re-writes; `ActOptions.id` promised exactly that and did
+     not deliver it. Now `unique index LedgerById`, and `pay` / `requestPayment` read before writing.
+  2. **Taleus's `Digest` replaced the stack's `digest`.** Quereus resolves function names
+     case-insensitively; registering ours after `@optimystic/quereus-plugin-crypto` made every
+     `digest(…)` on the database Taleus's — Sereus's own `Strand` membership constraints included.
+     Either registration order breaks one side's signatures. Fixed by adopting the plugin's
+     `digest` / `verify(…, 'ed25519')`, which now does what ours was written to do (injective,
+     typed, framed). A test pins that no Taleus scalar shares a name with the plugin's.
+  3. **The lift referee signed something the schema could not verify.** `src/lift/` signed a
+     digest's raw bytes; the tally path signed the UTF-8 of its hex *text*, and the schema's old
+     `SignatureValid` checked the latter. A real referee commit would never have finalized — hidden
+     because lifts are stubbed. The plugin's `verify` decodes digest text to bytes, so raw bytes is
+     now the one form, everywhere.
+  4. **base64url signatures are malleable, and the two checks disagreed.** The final character can
+     carry unused bits, so several strings decode to one signature. The plugin's `verify` refuses
+     the non-canonical ones; the first `fromText` accepted them — so the lift agent would have trusted
+     a referee record the strand then refuses. Surfaced as a test that failed one run in four.
+     `fromText` now requires canonical text.
+  5. **"At most one" was a count, which Sereus does not guarantee under concurrency.** One chit per
+     invoice, one finalize per lift and one registration per key were `count(*)` CHECKs — deferred,
+     so whether they see a concurrent commit was the open isolation question. Sereus guarantees a
+     declared unique value (primary key or secondary index) refuses the second of two racing rows.
+     All three are now `unique` indexes and the counts are gone; the cross-table races
+     (pay-vs-decline, finalize-vs-void, `NotLastKey`) cannot be indexes and stay open.
+  6. **The schema was in a form Sereus 1.8 refuses.** Each `create table` inside `declare schema App`
+     was read as an ignored placeholder *plus* the table — which is why the earlier wrap check saw
+     `App.TallyCore` resolve — and 1.8 made ignored items an error. Both schemas are now declarative
+     items, and `applyAppSchema` loads them exactly as Sereus does, refusal included.
+
 ## 1. Substrate
 
 - [x] Every statement in `draft1.qsql` executes in Quereus

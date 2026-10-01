@@ -132,9 +132,12 @@ a fresh closed strand per redemption, and the sequence above then runs unchanged
 Named so they can be checked rather than inherited.
 
 1. **The Taleus schema is applied as `declare schema App { … }` alongside `Strand` in one strand
-   database.** Verified for the mechanism: the current `draft1.qsql` body wraps with no qualification
-   changes and `App.TallyCore` resolves. `compose-strand.ts` applies the sApp schema into the same
-   database that holds `Strand`.
+   database.** *Verified, and now the only form Sereus accepts.* `compose-strand.ts` applies the sApp
+   schema into the same database that holds `Strand`. Since Sereus 1.8 the body must be declarative
+   items (`table X (…)`, not `create table X (…)`); each `create` prefix used to be read as an ignored
+   placeholder beside the real table, and is now an error. `draft1.qsql` is written that way, and the
+   in-memory store applies it exactly as Sereus does, refusing ignored items. Inside the body, names
+   resolve unqualified; outside it, app code writes `App.TallyCore`.
 2. **`Stock.InvitationKey` is `Strand.Invite.Key`.** A design decision, not a discovery — it
    identifies two mechanisms that were independently described the same way.
 3. **Membership, not management, is what lets a party write sApp rows.** Consistent with the Taleus

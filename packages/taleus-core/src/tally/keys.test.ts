@@ -37,7 +37,7 @@ async function seated() {
 }
 
 const authorized = (tally: Tally, party: Party, of: Party) =>
-	tally.sees<{ PublicKey: string }>(party, 'select PublicKey from AuthorizedKey where Sid = ?', [
+	tally.sees<{ PublicKey: string }>(party, 'select PublicKey from App.AuthorizedKey where Sid = ?', [
 		of.sid,
 	])
 
@@ -88,7 +88,7 @@ describe('adding a key', () => {
 		const { jan, tally } = await seated()
 		await expect(
 			tally.refuses([addKey({ sid: jan.sid, key: jan.keys[0], by: jan.keys[0], revision: 2 })]),
-		).resolves.toMatch(/UniqueKey/)
+		).resolves.toMatch(/UNIQUE constraint failed: PartyKey \(Sid, PublicKey\)/)
 	})
 })
 
@@ -134,10 +134,10 @@ describe('revoking a key', () => {
 	it('a revoked key can never be re-added', async () => {
 		const { jan, tally, tablet } = await withTablet()
 		await tally.propose([revokeKey({ sid: jan.sid, publicKey: tablet.publicKey, by: jan.keys[0] })])
-		// The PartyKey row is insert-only and stays, so a re-add makes the count two.
+		// The PartyKey row is insert-only and stays, so a re-add collides with it.
 		await expect(
 			tally.refuses([addKey({ sid: jan.sid, key: tablet, by: jan.keys[0], revision: 3 })]),
-		).resolves.toMatch(/UniqueKey/)
+		).resolves.toMatch(/UNIQUE constraint failed: PartyKey \(Sid, PublicKey\)/)
 	})
 
 	it('a key cannot revoke itself, so the last key survives', async () => {

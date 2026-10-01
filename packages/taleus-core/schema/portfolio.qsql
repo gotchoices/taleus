@@ -25,7 +25,7 @@
 
 -- Singleton marker + owner identity. Presence of this row is how the app recognizes
 -- a strand as *the* portfolio (vs a tally strand, which has TallyCore instead).
-create table PortfolioCore (
+table PortfolioCore (
     OwnerSid text,        -- this party's Sid IN THIS PORTFOLIO's own strand. A Sid is strand-local
                           -- (docs/identity.md): the same human holds a different Sid in every tally,
                           -- deliberately, so nobody can correlate their tallies. Do NOT read this as
@@ -39,7 +39,7 @@ create table PortfolioCore (
 -- One logical entry per tally the party holds; revisioned. This is a *cache/index*
 -- over the party's tally strands, not the authoritative tally state (that lives in
 -- each tally strand). Reconstructible from CadreControl.Strand + reading each tally.
-create table TallyRegistry (
+table TallyRegistry (
     StrandId text,                       -- the tally strand's id
     Revision integer,
     Role text check (Role in ('S', 'F')),  -- this party's seat: Stock or Foil
@@ -60,7 +60,7 @@ create table TallyRegistry (
     constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.TallyRegistry T where T.StrandId = New.StrandId), 0) + 1),
     constraint InsertOnly check on delete, update (0)
 );
-create view CurrentTallyRegistry as
+view CurrentTallyRegistry as
     select R.* from TallyRegistry R
     where R.Revision = (select max(Revision) from TallyRegistry T2 where T2.StrandId = R.StrandId);
 
@@ -68,7 +68,7 @@ create view CurrentTallyRegistry as
 -- The authoritative per-edge state is the pending lift chit in each tally strand's Ledger;
 -- this journal is the private "which lift, which edges, what state" map the agent needs to
 -- drive discovery/commit across strands. Revisioned; advances by appending a new State.
-create table LiftJournal (
+table LiftJournal (
     LiftId text,
     Revision integer,
     Role text check (Role in ('O', 'I', 'P')),   -- Originator | Intermediary | Payee
@@ -80,12 +80,12 @@ create table LiftJournal (
     constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.LiftJournal J where J.LiftId = New.LiftId), 0) + 1),
     constraint InsertOnly check on delete, update (0)
 );
-create view CurrentLift as
+view CurrentLift as
     select J.* from LiftJournal J
     where J.Revision = (select max(Revision) from LiftJournal J2 where J2.LiftId = J.LiftId);
 
 -- App preferences: key/value, revisioned (e.g. display currency, notification prefs).
-create table AppPreference (
+table AppPreference (
     Key text,
     Revision integer,
     Value text,
@@ -94,7 +94,7 @@ create table AppPreference (
     constraint RevisionMonotonicInt check on insert (Revision = Coalesce((select max(Revision) from committed.AppPreference P where P.Key = New.Key), 0) + 1),
     constraint InsertOnly check on delete, update (0)
 );
-create view CurrentPreference as
+view CurrentPreference as
     select P.* from AppPreference P
     where P.Revision = (select max(Revision) from AppPreference P2 where P2.Key = P.Key);
 
@@ -113,7 +113,7 @@ create view CurrentPreference as
 -- Display-level, scale-independent: the rate is defined at each denomination's *display* unit
 -- (1 USD, 1 CHIP), not at smallest-unit granularity, so a quote is independent of any tally's
 -- per-contract scale. Scales enter only at conversion time, from each edge's contract.
-create table ExchangeRateQuote (
+table ExchangeRateQuote (
     FromDenom text,                           -- convert-FROM denom = D_in in the conversion NOTE below: the upstream (payer-side) edge; value the quoting party RECEIVES/accumulates
     ToDenom text,                             -- convert-TO   denom = D_out in the conversion NOTE below: the downstream (payee-side) edge; value the quoting party RELEASES/pays out
     Revision integer,
@@ -135,7 +135,7 @@ create table ExchangeRateQuote (
 -- usable quote, so that conversion boundary is pruned from the route (the agent must never
 -- fabricate a rate). Committed lift terms bind regardless of later expiry -- the quoting party
 -- bears any rate movement between quote and commit, bounded by the window it chose.
-create view CurrentExchangeRateQuote as
+view CurrentExchangeRateQuote as
     select Q.* from ExchangeRateQuote Q
     where Q.Revision = (select max(Revision) from ExchangeRateQuote Q2 where Q2.FromDenom = Q.FromDenom and Q2.ToDenom = Q.ToDenom);
 

@@ -1,11 +1,10 @@
-import { Database } from '@quereus/quereus'
+import cryptoPlugin from '@optimystic/quereus-plugin-crypto/plugin'
+import { Database, registerPlugin } from '@quereus/quereus'
 
 import {
 	dayNumber,
-	digest,
 	greatest,
 	least,
-	signatureValid,
 	today,
 	validDate,
 	validDenomination,
@@ -59,7 +58,16 @@ export function statementsOf(sql: string): string[] {
 		.filter(Boolean)
 }
 
-/** Register the scalars the schema calls. Every one is deterministic; see `functions.ts`. */
+/**
+ * Register Taleus's own scalars. Every one is deterministic but `Today`; see `functions.ts`.
+ *
+ * This is deliberately NOT the crypto: `digest` and `verify` come from
+ * `@optimystic/quereus-plugin-crypto`, which Sereus registers on every strand database before
+ * the app's schema is applied. Quereus resolves function names **case-insensitively**, so a
+ * Taleus scalar named `Digest` would silently replace the plugin's `digest` -- in Sereus's
+ * own `Strand` membership constraints as much as in ours. The names below are checked
+ * against the plugin's in `strand.test.ts`.
+ */
 export function registerFunctions(db: Database): void {
 	db.createScalarFunction('DayNumber', { numArgs: 1, deterministic: true }, date => dayNumber(date))
 	db.createScalarFunction('ValidDate', { numArgs: 1, deterministic: true }, date => validDate(date))
@@ -68,28 +76,68 @@ export function registerFunctions(db: Database): void {
 	)
 	// The one volatile scalar: plain views only, never a constraint. See functions.ts.
 	db.createScalarFunction('Today', { numArgs: 0, deterministic: false }, () => today())
-	db.createScalarFunction('SignatureValid', { numArgs: 3, deterministic: true }, (d, s, k) =>
-		signatureValid(d, s, k),
-	)
 	db.createScalarFunction('Greatest', { numArgs: 2, deterministic: true }, (a, b) => greatest(a, b) as never)
 	db.createScalarFunction('Least', { numArgs: 2, deterministic: true }, (a, b) => least(a, b) as never)
-	// Variadic: the schema calls Digest with as many columns as the row signs.
-	db.createScalarFunction('Digest', { numArgs: -1, deterministic: true }, (...args) => digest(...args))
 }
 
 /**
- * Open an in-memory database with a schema loaded and its scalars registered.
+ * Register the crypto scalars exactly as Sereus does when it composes a strand: the plugin,
+ * with no configuration, so `digest` is sha256 and emits base64url.
+ */
+export async function registerCrypto(db: Database): Promise<void> {
+	await registerPlugin(db, cryptoPlugin)
+}
+
+/**
+ * The schema Taleus's tables live in, on every strand database.
  *
- * In memory is the whole story for now. A real deployment binds the strand to Sereus's
- * Quereus plugin and the Optimystic transactor instead, and that seam does not exist yet
- * -- see `SPEC.md` § Where Sereus plugs in.
+ * Sereus wraps an sApp schema as `declare schema App { … }` and applies it, so the tables
+ * are `App.Ledger`, `App.TallyCore` and so on, and app code qualifies them -- as the Sereus
+ * reference apps do. The in-memory store does exactly the same, so SQL written against it is
+ * SQL that runs on a real strand.
+ */
+export const APP_SCHEMA = 'App'
+
+/** A table or view name, qualified into the app's schema. */
+export function appTable(name: string): string {
+	return `${APP_SCHEMA}.${name}`
+}
+
+/**
+ * Apply an sApp schema body the way Sereus applies it (`applyAppSchema` in
+ * `@serfab/quereus-plugin-sereus`): declare it as `App`, refuse it if Quereus skipped any
+ * item, then apply.
+ *
+ * The refusal matters more than it looks. Quereus keeps an item it does not model -- a
+ * `create table …` prefix, a misspelled `tabel` -- as an opaque placeholder that apply
+ * ignores, so without the check a schema can load *missing a table* and nothing says so.
+ * Sereus 1.8 made this an error; doing the same here means a schema that passes these tests
+ * is one Sereus will accept.
+ */
+export async function applyAppSchema(db: Database, schema: string): Promise<void> {
+	await db.exec(`declare schema ${APP_SCHEMA} {\n${schema}\n}`)
+	const items = db.declaredSchemaManager.getDeclaredSchema(APP_SCHEMA)?.items ?? []
+	const ignored = items.filter(item => item.type === 'declareIgnored').length
+	if (ignored > 0) {
+		throw new Error(
+			`sApp schema has ${ignored} item(s) Quereus does not recognize -- a \`create …\` prefix or a ` +
+				'misspelled keyword; items are `table`, `index`, `unique index`, `view`, ' +
+				'`materialized view`, `seed` and `assertion`',
+		)
+	}
+	await db.exec(`apply schema ${APP_SCHEMA}`)
+}
+
+/**
+ * Open an in-memory database with a schema applied and its scalars registered -- composed
+ * the way a Sereus strand database is, minus the storage: crypto plugin first, then Taleus's
+ * own scalars, then the sApp schema declared and applied as `App`.
  */
 export async function openStrandFrom(sql: string): Promise<Database> {
 	const db = new Database()
+	await registerCrypto(db)
 	registerFunctions(db)
-	for (const statement of statementsOf(sql)) {
-		await db.exec(statement)
-	}
+	await applyAppSchema(db, sql)
 	return db
 }
 
@@ -126,9 +174,10 @@ export async function row<T = Record<string, unknown>>(
 export function functionsCalledBy(sql: string): string[] {
 	const code = stripComments(sql)
 
-	// Relation names are not function calls even when a '(' follows them.
+	// Relation names are not function calls even when a '(' follows them. Matched in the
+	// declarative item form an sApp schema uses (`table X (…)`), not `create table`.
 	const relations = new Set(
-		[...code.matchAll(/create\s+(?:table|view)\s+(\w+)/gi)].map(m => m[1].toLowerCase()),
+		[...code.matchAll(/^\s*(?:materialized\s+)?(?:table|view)\s+(\w+)/gim)].map(m => m[1].toLowerCase()),
 	)
 	// SQL's own vocabulary, which the same pattern matches.
 	const keywords = new Set(
@@ -163,7 +212,7 @@ export interface RowWrite {
 export function insertStatement({ table, row }: RowWrite): { sql: string; params: unknown[] } {
 	const columns = Object.keys(row)
 	return {
-		sql: `insert into ${table} (${columns.join(', ')}) values (${columns.map(() => '?').join(', ')})`,
+		sql: `insert into ${appTable(table)} (${columns.join(', ')}) values (${columns.map(() => '?').join(', ')})`,
 		params: columns.map(c => row[c]),
 	}
 }

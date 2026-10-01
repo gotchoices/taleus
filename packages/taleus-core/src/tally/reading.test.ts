@@ -27,19 +27,19 @@ async function must<T>(read: Promise<T | undefined>): Promise<T> {
 const perspective = (tally: Tally, party: Party) =>
 	tally.seesOne<{ Balance: number }>(
 		party,
-		`select Balance from PerspectiveBalance where Sid = '${party.sid}'`,
+		`select Balance from App.PerspectiveBalance where Sid = '${party.sid}'`,
 	)
 
 const reservedPerspective = (tally: Tally, party: Party) =>
 	tally.seesOne<{ Balance: number }>(
 		party,
-		`select Balance from ReservedPerspectiveBalance where Sid = '${party.sid}'`,
+		`select Balance from App.ReservedPerspectiveBalance where Sid = '${party.sid}'`,
 	)
 
 const limitGrantedBy = (tally: Tally, reader: Party, grantor: Party) =>
 	tally.seesOne<{ CreditLimit: number }>(
 		reader,
-		`select CreditLimit from CurrentCreditLimit where Sid = '${grantor.sid}'`,
+		`select CreditLimit from App.CurrentCreditLimit where Sid = '${grantor.sid}'`,
 	)
 
 describe('perspective', () => {
@@ -60,7 +60,7 @@ describe('perspective', () => {
 
 		for (const reader of [jan, sam]) {
 			await expect(
-				tally.sees(reader, 'select Balance from PerspectiveBalance order by Balance'),
+				tally.sees(reader, 'select Balance from App.PerspectiveBalance order by Balance'),
 			).resolves.toEqual([{ Balance: -18000 }, { Balance: 18000 }])
 		}
 	})
@@ -180,10 +180,10 @@ describe('a tally with no activity', () => {
 			expect((await must(reservedPerspective(tally, party))).Balance + 0).toEqual(0)
 			await expect(limitGrantedBy(tally, party, party)).resolves.toEqual({ CreditLimit: 0 })
 			await expect(
-				tally.seesOne(party, 'select State from CloseState'),
+				tally.seesOne(party, 'select State from App.CloseState'),
 			).resolves.toEqual({ State: 'open' })
-			await expect(tally.sees(party, 'select Id from OpenInvoice')).resolves.toEqual([])
-			await expect(tally.sees(party, 'select LiftId from OpenPendingLift')).resolves.toEqual([])
+			await expect(tally.sees(party, 'select Id from App.OpenInvoice')).resolves.toEqual([])
+			await expect(tally.sees(party, 'select LiftId from App.OpenPendingLift')).resolves.toEqual([])
 		}
 	})
 })

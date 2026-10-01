@@ -890,19 +890,33 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@noble/curves@npm:2.2.0":
-  version: 2.2.0
-  resolution: "@noble/curves@npm:2.2.0"
+"@noble/curves@npm:^2.0.1, @noble/curves@npm:^2.4.0":
+  version: 2.4.0
+  resolution: "@noble/curves@npm:2.4.0"
   dependencies:
-    "@noble/hashes": "npm:2.2.0"
-  checksum: 10c0/e545d3bb03ebedd5c04c2cab81342d64f5ce8a4c1019cfe207f3dc69174bc0ad7cfb50effc31bfa8616b8340900f445dd053da7454190428857c4eedd3b51413
+    "@noble/hashes": "npm:2.4.0"
+  checksum: 10c0/b60b737f65cc4e128dd94fea467df1ed73c5c0c089ef1bdb61614a0897db1fa7151d7f95bb7205854a9030d3f80a879e00f3bb74990befde061184ae43dfaec6
   languageName: node
   linkType: hard
 
-"@noble/hashes@npm:2.2.0":
-  version: 2.2.0
-  resolution: "@noble/hashes@npm:2.2.0"
-  checksum: 10c0/cad8630c504d6b9271984f685cd0af9101b40988fc2dfbe17ccdf068a9941f95cc5c9957d89e9ca4b7ca94c15cb35f93510c5d53a09fbcc83ee503b93d0a1034
+"@noble/hashes@npm:2.4.0, @noble/hashes@npm:^2.0.1, @noble/hashes@npm:^2.2.0":
+  version: 2.4.0
+  resolution: "@noble/hashes@npm:2.4.0"
+  checksum: 10c0/f5820a38c52886073a69722a030688ad188bbacb822d01554545371259961c2b916266c57c013c2ce5a0d78aec977142fc68fd2a79be4c97b0644fcee9bb35f6
+  languageName: node
+  linkType: hard
+
+"@optimystic/quereus-plugin-crypto@npm:^1.8.0":
+  version: 1.8.0
+  resolution: "@optimystic/quereus-plugin-crypto@npm:1.8.0"
+  dependencies:
+    "@noble/curves": "npm:^2.0.1"
+    "@noble/hashes": "npm:^2.0.1"
+    multiformats: "npm:^13.4.2"
+    uint8arrays: "npm:^6.1.1"
+  peerDependencies:
+    "@quereus/quereus": ^4.20.0
+  checksum: 10c0/03f3650d3463ecef84019e5766fa0ea48c0ab0607e52eacbac3f569230ba3163094565723e1b93327e3c7089408290a2faed20f85396b92bbb62e3ae5ecfa80e
   languageName: node
   linkType: hard
 
@@ -920,9 +934,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@quereus/quereus@npm:^4.19.4":
-  version: 4.19.4
-  resolution: "@quereus/quereus@npm:4.19.4"
+"@quereus/quereus@npm:^4.20.0":
+  version: 4.20.0
+  resolution: "@quereus/quereus@npm:4.20.0"
   dependencies:
     debug: "npm:^4.4.3"
     fast-json-patch: "npm:^3.1.1"
@@ -930,7 +944,7 @@ __metadata:
     moat-maker: "npm:^2.2.0"
     temporal-polyfill: "npm:^0.3.0"
     uint8arrays: "npm:^6.1.1"
-  checksum: 10c0/c1d12fdd5d19ce35d8420c11fb771e85e79456c7cedd718eb507fb86d968cf3b6dc55009ff314d79163887b97fd5d37658560561197d8bff3eaa4ea0e7be538a
+  checksum: 10c0/a176397dddef8aab09d3ccb4c4a649e2249653782272a1cd93582865d12c89300e78d107e10b402d65607aa92ecb3049057ed9cce8f071e6dfccec3d9752bc06
   languageName: node
   linkType: hard
 
@@ -3207,6 +3221,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"multiformats@npm:^13.4.2":
+  version: 13.4.2
+  resolution: "multiformats@npm:13.4.2"
+  checksum: 10c0/b7be09b8bf8198d601c8f8c9a358b9a6aca5a14d61239a84f88d8266322e4e7c3015fe7bdf88b589b9993a4abb752defabb932719d1b457a53277e264c4cee11
+  languageName: node
+  linkType: hard
+
 "multiformats@npm:^14.0.0":
   version: 14.0.5
   resolution: "multiformats@npm:14.0.5"
@@ -3734,9 +3755,10 @@ __metadata:
   resolution: "taleus-core@workspace:packages/taleus-core"
   dependencies:
     "@eslint/js": "npm:10.0.1"
-    "@noble/curves": "npm:2.2.0"
-    "@noble/hashes": "npm:2.2.0"
-    "@quereus/quereus": "npm:^4.19.4"
+    "@noble/curves": "npm:^2.4.0"
+    "@noble/hashes": "npm:^2.2.0"
+    "@optimystic/quereus-plugin-crypto": "npm:^1.8.0"
+    "@quereus/quereus": "npm:^4.20.0"
     "@types/jest": "npm:30.0.0"
     "@types/node": "npm:26.1.1"
     cross-env: "npm:7.0.3"

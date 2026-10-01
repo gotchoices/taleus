@@ -34,7 +34,7 @@
  */
 
 import { sign } from '../crypto/index.js'
-import { bytesToHex, liftTermsDigest, liftVoidDigest, type LiftEdgeTerms } from './digest.js'
+import { toText, liftTermsDigest, liftVoidDigest, type LiftEdgeTerms } from './digest.js'
 
 /**
  * One edge the referee resolves. The referee — the route's arbiter — legitimately knows
@@ -96,7 +96,7 @@ export class SingleReferee {
 		const edgeSignatures = this.signEdges(edges, (e) => liftTermsDigest(e))
 		return {
 			decision: 'commit',
-			recordSignature: bytesToHex(sign(this.secretKey, recordDigest)),
+			recordSignature: toText(sign(this.secretKey, recordDigest)),
 			edgeSignatures,
 		}
 	}
@@ -110,7 +110,7 @@ export class SingleReferee {
 		const edgeSignatures = this.signEdges(edges, (e) => liftVoidDigest(e.cid, e.liftId))
 		return {
 			decision: 'void',
-			recordSignature: bytesToHex(sign(this.secretKey, recordDigest)),
+			recordSignature: toText(sign(this.secretKey, recordDigest)),
 			edgeSignatures,
 		}
 	}
@@ -129,7 +129,7 @@ export class SingleReferee {
 				// be told apart in the { LiftId → signature } map. Fail loudly rather than clobber.
 				throw new Error(`referee saw duplicate LiftId ${edge.liftId} in one resolution`)
 			}
-			out[edge.liftId] = bytesToHex(sign(this.secretKey, digestOf(edge)))
+			out[edge.liftId] = toText(sign(this.secretKey, digestOf(edge)))
 		}
 		return out
 	}

@@ -22,7 +22,7 @@ const NOTICE_GIVEN = '2026-03-23'
 const AFTER_NOTICE = '2026-03-24'
 
 const stateOf = (tally: Tally, party: Party) =>
-	tally.seesOne<{ State: string }>(party, 'select State from CloseState')
+	tally.seesOne<{ State: string }>(party, 'select State from App.CloseState')
 
 describe('filing a close', () => {
 	it('is unilateral — one party’s signature moves the tally to closing', async () => {
@@ -45,7 +45,7 @@ describe('filing a close', () => {
 		await tally.propose([close('F')])
 
 		await expect(
-			tally.sees(jan, 'select Requester from CloseRequest order by Requester'),
+			tally.sees(jan, 'select Requester from App.CloseRequest order by Requester'),
 		).resolves.toEqual([{ Requester: 'F' }, { Requester: 'S' }])
 		await expect(tally.refuses([close('S')])).resolves.toMatch(
 			/UNIQUE constraint failed: CloseRequest/,
@@ -206,7 +206,7 @@ describe('the closing gate on lift pledges', () => {
 		await tally.propose([close('S')])
 		await tally.propose([pledge(cid, { liftId: 'lift:1', issuer: 'S', units: 10000, signer: jan })])
 
-		await expect(tally.seesOne(sam, 'select Balance from ReservedBalance')).resolves.toEqual({
+		await expect(tally.seesOne(sam, 'select Balance from App.ReservedBalance')).resolves.toEqual({
 			Balance: 20000,
 		})
 	})

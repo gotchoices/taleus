@@ -75,17 +75,30 @@ The guarantee that matters is about the **entry point**: a bundler following `sr
 never arrive at `node:` anything. `src/store/spec.test.ts` walks the import graph from there and
 asserts it.
 
-### 4. One encoding, one digest, one spelling
+### 4. One encoding, one digest, one spelling — and they are the stack's
 
 Where two implementations of the same thing exist, they will diverge, and the failure looks like a
 permissions bug rather than an encoding one: signatures stop verifying and nothing says why.
 
-- The digest is `src/lift/digest.ts`. `Digest()` the host scalar **delegates** to it.
-- The schema's text form for keys, signatures and digests is **hex** (`publicKeyText`,
-  `bytesToHex`, `hexToBytes`).
+- **The digest and the signature check are `@optimystic/quereus-plugin-crypto`'s** — `digest(…)` and
+  `verify(…, 'ed25519')` — which Sereus registers on every strand database. Taleus once carried its
+  own `Digest`; the stack now has an injective, type-tagged, framed digest of its own, and keeping a
+  second one was not merely redundant (see the next point). `src/lift/digest.ts` and
+  `src/store/functions.ts` **delegate** to the plugin; they encode nothing themselves.
+- **No Taleus scalar may share a name with the stack's, in any letter case.** Quereus resolves
+  function names case-insensitively, so a Taleus `Digest` replaced the plugin's `digest` in every
+  schema on the database, Sereus's own membership constraints included. `strand.test.ts` checks.
+- **Every `verify` names its curve.** The plugin defaults to secp256k1; Taleus keys are ed25519. A
+  call that leaves the curve out refuses every genuine signature. `strand.test.ts` checks.
+- **What is signed is a digest's raw bytes**, because the plugin's `verify` decodes the digest text
+  back to bytes before checking.
+- **The text form for keys, signatures and digests is base64url, canonical** (`toText` / `fromText`).
+  base64url's last character can carry unused bits, so several strings decode to one signature; the
+  plugin's `verify` refuses all but the canonical one, and `fromText` must refuse them too, or Taleus
+  trusts a signature every replica rejects. Plain hex (`bytesToHex`) remains for identifiers only.
 
-Both of these have already been violated once each and caught by a test. Assume it will happen
-again.
+Each of these has been violated at least once and caught by a test — the hex/base64url choice twice,
+a second digest once, the name collision once, a lenient decoder once. Assume it will happen again.
 
 ### 5. Deterministic where a replica re-validates
 
@@ -168,6 +181,50 @@ section used to claim:
   explicit read-committed path for exactly that, citing Sereus's own `FormationUsage.Monotonic` as
   the case it serves. This schema uses the same pattern in `PartyKey` and `CreditTerms`.
 
+### Prescribed usage, as of Sereus 1.8 / Optimystic 1.8 / Quereus 4.20
+
+What the adapter has to do, taken from Sereus's release notes, `docs/schema-guide.md` and the
+reference apps rather than inferred. The in-memory store already does every item that applies to it,
+so the suite exercises the same rules.
+
+- **One copy of each stack package.** Sereus composes Optimystic with whatever copy it resolves; a
+  nested older `@optimystic/*` or `@quereus/quereus` silently gives old behaviour. Check with
+  `yarn why` after every upgrade.
+- **The schema is an sApp body**: bare `table` / `index` / `unique index` / `view` items, passed as
+  the plugin's `schema` option. Sereus wraps it as `App` and, since 1.8, refuses any item Quereus does
+  not recognize. `applyAppSchema` in `src/store/strand.ts` applies it the same way.
+- **App code qualifies its tables** (`App.Ledger`), as the reference apps do; `appTable()` and the
+  engine's SQL follow that.
+- **Register Taleus's own scalars on the host database before Sereus applies the schema** — views
+  call `DayNumber`, `Today`, `Greatest` and `Least`, and a view is planned when it is created. Sereus
+  registers the crypto plugin itself; registering it again, or anything named like it, is the bug in
+  § 4.
+- **An event's key is minted once and held across attempts; a retry reads before it re-writes.** A
+  strand write can fail without settling whether it landed (`TornActionError` not marked final,
+  `SyncRetryExhaustedError`, a lost reply), and strand writes get no retry funnel. `pay` and
+  `requestPayment` follow the rule; `Ledger.Id` is unique so a retry cannot become a second chit.
+  Never `insert or ignore`: it skips CHECK and NOT NULL failures silently too.
+- **"At most one" is a declared `unique`, never a `count(*)` CHECK.** Sereus guarantees exactly one of
+  two racing rows commits for a primary key or secondary unique index; a counting CHECK gets no such
+  guarantee. A concurrent refusal can arrive as a plain `Error` with the constraint text on its
+  `cause` chain, so `refusal.ts` reads the whole chain.
+- **A gapless integer key retries with randomized backoff.** The ledger's `Number` is the case the
+  guide allows, because the balance chain is gapless; both racers recompute the same next number, so
+  an immediate retry re-collides.
+- **Atomic acts**: `exec(sql, params, { transaction: true })` for a batch the caller owns. Explicit
+  `begin`/`commit` only where a Sereus writer joins the transaction (`joinOpenTransaction`), as
+  seating does with `consumeInvite`.
+- **First sync can take minutes over a relay.** `addStrand` waits up to 300 s and then throws a
+  retryable `StrandAwaitingFirstSyncError`; `whenStrandWritable(strandId)` / `strand:writable` wait
+  further.
+- **The host owns durable state the adapter must not hide**: a durable strand peer book
+  (`strandPeers: { store }`) and a durable `keyStore` (which records strands joined from another
+  party — every tally the invitee accepts). Left in memory, a restarted node loses its counterparty.
+- **`network.linkRoundTripMs` must be the same on every machine of a party.**
+- **Strand ids are lowercase** (`a–z 0–9 . _ -`, not starting `control-`); Sereus mints them.
+- **Upgrading a node across 1.8 recreates the party's control store** — a host concern, not the
+  core's, but every Taleus app inherits it.
+
 What remains to settle before writing the adapter:
 
 1. **Can redemption and Taleus seating be one act?** If not, a strand can hold a member who is not
@@ -188,6 +245,8 @@ Cheap, mechanical, and worth running before believing any of the above:
 grep -rn "from 'node:" src/ | grep -v schema-node     # § 3 — must be empty
 grep -rn "Buffer" src/ | grep -v '\*'                  # § 3 — must be empty
 grep -rnE "julianday|RandomUUID|now\(\)" schema/       # § 5 — must be empty
+grep -rnE "^create " schema/                           # sApp form — must be empty
+yarn why @quereus/quereus; yarn why @optimystic/quereus-plugin-crypto   # one copy each
 yarn workspace taleus-core test                        # § 7
 ```
 

@@ -12,11 +12,17 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [ ] **Read-dependency validation must be live on the consensus commit path.** The schema's
-  concurrency safety (concurrent double-revocation not locking a party out; single-finalize;
-  finalize-vs-void exclusion) relies on Optimystic rejecting a transaction whose read set went
-  stale, then forcing a retry that re-evaluates correctly. The core stale-read check appears
-  implemented, but wiring it fully into cluster consensus is flagged as partly future work.
+- [x] **Stack pinned at Sereus 1.8 / Optimystic 1.8 / Quereus 4.20**, one copy each.
+  `taleus-core` depends on `@quereus/quereus` and `@optimystic/quereus-plugin-crypto` directly; the
+  prescribed-usage checklist the Sereus adapter must follow is in
+  `packages/taleus-core/SPEC.md` § Where Sereus plugs in.
+- [ ] **Read-dependency validation must be live on the consensus commit path — now for cross-table
+  rules only.** Sereus guarantees that a declared unique value (primary key or secondary index)
+  refuses the second of two racing rows, so every "at most one" rule in the schema is now a
+  `unique` index rather than a counting CHECK: one chit per invoice, one finalize per lift, one
+  registration per key, and the new one-chit-per-id that makes a retried payment safe. What still
+  relies on Optimystic rejecting a stale read set is the cross-table rules no index can express:
+  concurrent double-revocation (`NotLastKey`), finalize-vs-void, and pay-vs-decline.
   **Acceptance:** a two-node integration test that fires the concurrent double-revocation and
   asserts exactly one transaction commits.
 - [x] **Transactor-backing rule — checked upstream, and far less exposed than this entry claimed.**
@@ -102,6 +108,16 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   map covering the rest of the MyCHIPs baseline).
 - [x] Each `apps/<target>/` is a standalone npm project, outside the root yarn workspaces.
 - [ ] Write the remaining stories (see `packages/taleus-app/design/stories/mobile/00-story-map.md`).
+- [ ] **Run a cadre node in the mobile app** (not started; the app still runs on mock data and does not
+  consume `taleus-core`). The prescribed kit as of Sereus 1.6+ is `@serfab/cadre-rn` —
+  `polyfills` as the app's first import, `withCadreMetro` for Metro, `buildNoiseCrypto` for native
+  connection crypto — which the Sereus reference app uses. `ser/chat` depends on the kit but still
+  carries copied `polyfills/` and its own Metro config, so it is not the model to copy for that part.
+  **Tripwire before adopting the kit:** its `Intl.PluralRules` is an English-only shim (`one` only
+  when n = 1), installed whenever `PluralRules` is missing. This app needs the full formatjs chain in
+  `src/i18n/intl.ts` (i18next resolves plurals through it — the "Waiting 1 days" bug). Imported in the
+  kit's prescribed order the shim lands first, and formatjs may then decline to polyfill. Order the
+  formatjs chain ahead of the kit, and verify a non-English plural on the device, not in Jest.
 
 (The `feat-taleus-app-shell` ticket has been retired — the app is scaffolded and now evolves through
 the appeus design/generation cycle. Toolchain decisions live in `design/specs/project.md`.)

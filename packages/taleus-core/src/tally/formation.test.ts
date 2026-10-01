@@ -42,10 +42,10 @@ describe('seating two parties', () => {
 
 		// Each party's own engine accepted both seats, independently.
 		for (const party of [jan, sam]) {
-			await expect(tally.sees(party, 'select Sid from Stock')).resolves.toEqual([{ Sid: jan.sid }])
-			await expect(tally.sees(party, 'select Sid from Foil')).resolves.toEqual([{ Sid: sam.sid }])
+			await expect(tally.sees(party, 'select Sid from App.Stock')).resolves.toEqual([{ Sid: jan.sid }])
+			await expect(tally.sees(party, 'select Sid from App.Foil')).resolves.toEqual([{ Sid: sam.sid }])
 			await expect(
-				tally.sees(party, 'select Sid from AuthorizedKey order by Sid'),
+				tally.sees(party, 'select Sid from App.AuthorizedKey order by Sid'),
 			).resolves.toHaveLength(2)
 		}
 	})
@@ -81,7 +81,7 @@ describe('seating two parties', () => {
 			seatFoil({ sid: mallory.sid, genesis: mallory.keys[0], invitation: forged }),
 		)
 		expect(reason).toMatch(/InvitationSignatureValid/)
-		await expect(tally.sees(jan, 'select Sid from Foil')).resolves.toEqual([])
+		await expect(tally.sees(jan, 'select Sid from App.Foil')).resolves.toEqual([])
 	})
 
 	it('refuses a genesis key that authorizes itself', async () => {
@@ -108,7 +108,7 @@ describe('seating two parties', () => {
 		await expect(
 			tally.refuses(seatFoil({ sid: second.sid, genesis: second.keys[0], invitation })),
 		).resolves.toMatch(/TwoParties/)
-		await expect(tally.sees(sam, 'select Sid from Foil')).resolves.toEqual([{ Sid: sam.sid }])
+		await expect(tally.sees(sam, 'select Sid from App.Foil')).resolves.toEqual([{ Sid: sam.sid }])
 	})
 
 	it('never admits a third party', async () => {
@@ -141,7 +141,7 @@ describe('naming the tally', () => {
 		})
 		// Both parties compute the same identity from the same founding fields.
 		for (const party of [jan, sam]) {
-			await expect(tally.sees(party, 'select Cid from TallyCore')).resolves.toEqual([
+			await expect(tally.sees(party, 'select Cid from App.TallyCore')).resolves.toEqual([
 				{ Cid: expected },
 			])
 		}
@@ -234,8 +234,8 @@ describe('a party whose node accepted what the counterparty refuses', () => {
 		])
 
 		// The replicas now differ, and the harness says so rather than papering over it.
-		await expect(tally.sees(jan, 'select PublicKey from AuthorizedKey')).resolves.toHaveLength(3)
-		await expect(tally.sees(sam, 'select PublicKey from AuthorizedKey')).resolves.toHaveLength(2)
+		await expect(tally.sees(jan, 'select PublicKey from App.AuthorizedKey')).resolves.toHaveLength(3)
+		await expect(tally.sees(sam, 'select PublicKey from App.AuthorizedKey')).resolves.toHaveLength(2)
 	})
 
 	it('surfaces as DisagreementError when only one replica accepts an act', async () => {

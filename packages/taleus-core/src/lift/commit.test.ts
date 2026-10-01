@@ -67,8 +67,13 @@ function makePlan(liftId: string, edges: Array<{ nonce: string; denom: string; u
 }
 
 /** Flip one hex character so a signature no longer verifies. */
-function tamper(hex: string): string {
-	return hex.slice(0, -1) + (hex.slice(-1) === 'f' ? 'e' : 'f')
+/**
+ * Alter a signature's final character. In base64url that character may touch only padding
+ * bits, leaving the decoded bytes identical -- which is the case worth testing: a canonical
+ * decoder refuses the altered text, and the schema's `verify` does the same.
+ */
+function tamper(signature: string): string {
+	return signature.slice(0, -1) + (signature.slice(-1) === 'f' ? 'e' : 'f')
 }
 
 const noop = (): void => {}

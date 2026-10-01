@@ -32,7 +32,7 @@
  * with the in-memory, schema-emulating doubles in src/lift/test-harness.ts.
  */
 
-import { bytesToHex, liftTermsDigest, verifyLiftTerms, verifyLiftVoid, type LiftEdgeTerms } from './digest.js'
+import { toText, liftTermsDigest, verifyLiftTerms, verifyLiftVoid, type LiftEdgeTerms } from './digest.js'
 import type { OriginatorState } from './agent.js'
 import type { JournalEdge } from './agent.js'
 import type { LiftPlan } from './terms.js'
@@ -155,7 +155,7 @@ function ownedTerms(edge: OwnedEdge, refereeKey: string): LiftEdgeTerms {
  */
 export async function pledgeEdge(edge: OwnedEdge, refereeKey: string, signer: EdgeSigner): Promise<void> {
 	const terms = ownedTerms(edge, refereeKey)
-	const signature = bytesToHex(signer.sign(liftTermsDigest(terms)))
+	const signature = toText(signer.sign(liftTermsDigest(terms)))
 	await edge.strand.pledge({
 		liftId: edge.liftId,
 		refereeKey,
