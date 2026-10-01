@@ -1,0 +1,167 @@
+import { fixture } from '../fixtures.js'
+import { getVariant } from '../variant.js'
+import { applyToRequest } from './requests.js'
+import { readTally } from './tally.js'
+import type { Amount, Result } from '../types.js'
+import type { Entry, Preview } from '../entries.js'
+
+/** A tally's signed entries, most recent first (story 24). */
+export async function listEntries(tallyId: string): Promise<Result<Entry[]>> {
+	return {
+		ok: true,
+		value: [...(recorded[tallyId] ?? []), ...(fixtureFor(getVariant()).entries[tallyId] ?? [])],
+	}
+}
+
+/** One entry, for the screen that shows nothing else (story 24 path C). */
+export async function readEntry(tallyId: string, entryId: string): Promise<Result<Entry>> {
+	const all = await listEntries(tallyId)
+	if (!all.ok) {
+		return all
+	}
+	const found = all.value.find(entry => entry.id === entryId)
+	if (!found) {
+		return {
+			ok: false,
+			error: { kind: 'not-found', message: `No entry ${entryId}.`, retryable: false },
+		}
+	}
+	return { ok: true, value: found }
+}
+
+function fixtureFor(variant: string): { entries: Record<string, Entry[]> } {
+	switch (variant) {
+		case 'empty':
+			return fixture('entries.empty') as { entries: Record<string, Entry[]> }
+		case 'error':
+			// Story 24 path A: movement that has not committed. The chip and the
+			// prospective balance were built five slices ago and never exercised,
+			// because no fixture produced one.
+			return fixture('entries.error') as { entries: Record<string, Entry[]> }
+		default:
+			return fixture('entries.happy') as { entries: Record<string, Entry[]> }
+	}
+}
+
+/**
+ * Story 20 step 2: the effect is shown before the entry is signed — the balance
+ * that would result, and the room left. Derived here rather than in a screen so
+ * the arithmetic happens once, and in the same place in engine mode.
+ */
+export async function previewEntry(tallyId: string, amount: Amount): Promise<Result<Preview>> {
+	const tally = await readTally(tallyId)
+	if (!tally.ok) {
+		return tally
+	}
+	// Value given moves the balance toward the counterparty: it reduces what they
+	// owe this party, or increases what this party owes them. Which side of zero
+	// it lands on is arithmetic, not a different kind of act (path F).
+	const signed = tally.value.balance.perspective === 'owed-by-me' ? -1 : 1
+	const before = signed * tally.value.balance.units
+	const after = before - amount.units
+	const room = tally.value.roomToSpend.units - amount.units
+	return {
+		ok: true,
+		value: {
+			balanceAfter: {
+				units: Math.abs(after),
+				perspective: after > 0 ? 'owed-to-me' : after < 0 ? 'owed-by-me' : 'level',
+			},
+			roomAfter: { units: Math.max(0, room) },
+			beyondLimit: room < 0 ? { units: -room } : undefined,
+		},
+	}
+}
+
+/** Mock writes, held in memory as elsewhere. */
+let recorded: Record<string, Entry[]> = {}
+const seen = new Set<string>()
+
+/**
+ * Story 20 step 4: recording value is the giver's own act, signed in the moment.
+ * The counterparty does not agree to receive value.
+ *
+ * `actId` is the caller's idempotency key — path D requires that a retry cannot
+ * record twice. The engine will have to honour something like it
+ * (`docs/drafts/engine-api.md` question 4).
+ */
+export async function recordEntry(
+	tallyId: string,
+	entry: { actId: string; amount: Amount; memo?: string; answers?: string[] },
+): Promise<Result<Entry>> {
+	const tally = await readTally(tallyId)
+	if (!tally.ok) {
+		return tally
+	}
+	// Path D: with the counterparty wholly absent there is nowhere for the entry
+	// to land. It does not go through, nothing is half-done, and the party is
+	// told plainly — "did that go through" gets a straight answer.
+	if (!tally.value.counterpartyReachable) {
+		return {
+			ok: false,
+			error: {
+				kind: 'counterparty-unreachable',
+				message: 'Nothing of theirs is reachable, so this did not go through.',
+				retryable: true,
+			},
+		}
+	}
+	const already = (recorded[tallyId] ?? []).find(e => e.id === `entry:${entry.actId}`)
+	// Story 05 step 4: while closing, what each party may do has narrowed to one
+	// direction. Anything moving the balance toward zero goes through; anything
+	// moving it further from zero does not. Closing does not forgive what is owed,
+	// so settling is exactly what stays allowed.
+	if (tally.value.closing) {
+		const owedToMe = tally.value.balance.perspective === 'owed-to-me'
+		const settled = tally.value.balance.units === 0
+		// Value given moves the balance away from zero when this party is already
+		// the one owing, or when nothing is owed either way.
+		if (!owedToMe || settled) {
+			return {
+				ok: false,
+				error: {
+					kind: 'closing',
+					message: 'This tally is closing, so only what settles it can go through.',
+					retryable: false,
+				},
+			}
+		}
+		if (entry.amount.units > tally.value.balance.units) {
+			return {
+				ok: false,
+				error: {
+					kind: 'closing-overshoot',
+					message: 'That is more than is outstanding, which would move the balance past zero.',
+					retryable: false,
+				},
+			}
+		}
+	}
+	if (seen.has(entry.actId) && already) {
+		return { ok: true, value: already }
+	}
+	seen.add(entry.actId)
+	const preview = await previewEntry(tallyId, entry.amount)
+	const made: Entry = {
+		id: `entry:${entry.actId}`,
+		kind: 'direct',
+		issuer: 'me',
+		amount: { units: -entry.amount.units },
+		date: new Date().toISOString(),
+		memo: entry.memo,
+		answers: entry.answers,
+		balanceAfter: preview.ok ? preview.value.balanceAfter : { units: 0, perspective: 'level' },
+	}
+	recorded = { ...recorded, [tallyId]: [made, ...(recorded[tallyId] ?? [])] }
+	// An entry that answers a request is recognisably tied to it, and the request
+	// records what was applied (story 22 path B).
+	for (const requestId of entry.answers ?? []) {
+		await applyToRequest(requestId, entry.amount)
+	}
+	return { ok: true, value: made }
+}
+
+export function resetEntries(): void {
+	recorded = {}
+	seen.clear()
+}

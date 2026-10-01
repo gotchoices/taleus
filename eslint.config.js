@@ -32,7 +32,9 @@ export default defineConfig(
 		// operation that *could* ever wait to be async today, because widening a sync function
 		// later breaks every caller. Several of them do not await anything yet, and that is the
 		// design rather than an oversight.
-		files: ['packages/taleus-core/src/api/**/*.ts'],
+		// The same holds for the app model's surface: every model operation is async because the
+		// engine implementation behind it will await, even where the mock answers at once.
+		files: ['packages/taleus-core/src/api/**/*.ts', 'packages/taleus-model/src/**/*.ts'],
 		rules: {
 			'@typescript-eslint/require-await': 'off',
 		},

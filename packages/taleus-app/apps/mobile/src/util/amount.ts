@@ -1,4 +1,5 @@
 import { bumpGeneration } from '../data/generation'
+import type { UnitStyle } from 'taleus-model'
 import { getLocale } from '../i18n'
 import type { Amount, Unit } from '../data/types'
 
@@ -19,7 +20,7 @@ import type { Amount, Unit } from '../data/types'
  * `USD 180` sets it once (story 42) and gets it everywhere. Either way the unit
  * is present, which is the rule that actually matters.
  */
-export type UnitStyle = 'mark' | 'code'
+export type { UnitStyle }
 
 let unitStyle: UnitStyle = 'mark'
 

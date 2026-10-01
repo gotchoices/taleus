@@ -1,0 +1,98 @@
+{
+	"name": "taleus-model",
+	"version": "0.1.0",
+	"description": "The Taleus app model: what the Taleus apps' screens read and do, behind one switch between mock fixtures and the taleus-core engine. Framework-free; shared by every Taleus app target.",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./attention": {
+			"types": "./dist/attention.d.ts",
+			"default": "./dist/attention.js"
+		},
+		"./devices": {
+			"types": "./dist/devices.d.ts",
+			"default": "./dist/devices.js"
+		},
+		"./entries": {
+			"types": "./dist/entries.d.ts",
+			"default": "./dist/entries.js"
+		},
+		"./invitations": {
+			"types": "./dist/invitations.d.ts",
+			"default": "./dist/invitations.js"
+		},
+		"./notifications": {
+			"types": "./dist/notifications.d.ts",
+			"default": "./dist/notifications.js"
+		},
+		"./offers": {
+			"types": "./dist/offers.d.ts",
+			"default": "./dist/offers.js"
+		},
+		"./party": {
+			"types": "./dist/party.d.ts",
+			"default": "./dist/party.js"
+		},
+		"./position": {
+			"types": "./dist/position.d.ts",
+			"default": "./dist/position.js"
+		},
+		"./profile": {
+			"types": "./dist/profile.d.ts",
+			"default": "./dist/profile.js"
+		},
+		"./rates": {
+			"types": "./dist/rates.d.ts",
+			"default": "./dist/rates.js"
+		},
+		"./requests": {
+			"types": "./dist/requests.d.ts",
+			"default": "./dist/requests.js"
+		},
+		"./settings": {
+			"types": "./dist/settings.d.ts",
+			"default": "./dist/settings.js"
+		},
+		"./standing": {
+			"types": "./dist/standing.d.ts",
+			"default": "./dist/standing.js"
+		},
+		"./tallies": {
+			"types": "./dist/tallies.d.ts",
+			"default": "./dist/tallies.js"
+		},
+		"./tally": {
+			"types": "./dist/tally.d.ts",
+			"default": "./dist/tally.js"
+		}
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+		"lint": "eslint ./src"
+	},
+	"devDependencies": {
+		"@eslint/js": "10.0.1",
+		"@types/jest": "30.0.0",
+		"@types/node": "26.1.1",
+		"cross-env": "7.0.3",
+		"eslint": "10.7.0",
+		"globals": "17.7.0",
+		"jest": "30.4.2",
+		"ts-jest": "29.4.11",
+		"typescript": "6.0.3",
+		"typescript-eslint": "8.63.0"
+	}
+}

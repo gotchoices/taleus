@@ -12,12 +12,19 @@ Where app-observable behavior comes from.
 
 ## Engine boundary
 
-Apps read and write tally state only through the `taleus` engine. Quereus, Optimystic, and the cadre
-are engine-internal; no target depends on them directly.
+Apps read and write tally state only through the app model, package `taleus-model`, which stands on
+the `taleus-core` engine. Quereus, Optimystic, and the cadre are engine-internal; no target depends on
+them directly.
+
+The model is the Taleus *product's* model: every Taleus target (mobile, a future web build) shares it,
+and each keeps only its own platform glue — UI bindings, startup, storage, formatting. A different
+product built on Taleus builds on `taleus-core` directly instead.
 
 ## Run modes
 
-One switch point in the data layer. Screens distinguish only mock from engine.
+One switch point, in each target's data layer (`src/data/config.ts` on mobile). **Screens distinguish
+nothing**: they call the data layer, which forwards to one `TaleusModel`, and only the switch knows
+which implementation that is.
 
 | Mode | Behavior |
 |------|----------|

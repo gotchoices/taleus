@@ -12,8 +12,11 @@
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint .",
     "preview": "sh -c '. ./env-defaults.sh && ../../appeus/scripts/preview-scenarios.sh --target mobile --device \"$DEVICE_SERIAL\" --port \"$PREVIEW_PORT\" \"$@\"' --",
     "publish:scenarios": "sh ./scripts/publish-scenarios.sh",
+    "prestart": "npm run model:build",
     "start": "sh -c '. ./env-defaults.sh && react-native start --port \"$METRO_PORT\"'",
-    "test": "jest"
+    "pretest": "npm run model:build",
+    "test": "jest",
+    "model:build": "npm --prefix ../../../taleus-model run build"
   },
   "dependencies": {
     "@formatjs/intl-displaynames": "^7.3.13",
@@ -33,7 +36,8 @@
     "react-native-localize": "^3.7.0",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.27.0",
-    "react-native-svg": "^15.15.5"
+    "react-native-svg": "^15.15.5",
+    "taleus-model": "file:../../../taleus-model"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

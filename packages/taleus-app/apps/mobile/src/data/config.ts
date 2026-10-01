@@ -12,11 +12,37 @@
  *   The engine over the embedded cadre node: real strands, peers, lifts.
  *
  * Screens and components check neither of these. They call the adapters in
- * `src/data/`, which is the only code that knows the difference. See
+ * `src/data/`, which forward to one `TaleusModel` (package `taleus-model`), and
+ * this file is the only code that chooses it. See
  * `design/specs/domain/interfaces.md` § Run modes.
  */
+import { createMockModel, onWorldChanged, type MockControls, type TaleusModel } from 'taleus-model'
+
+import { fixtureSource } from './fixtures'
+import { bumpGeneration } from './generation'
+
 export const USE_ENGINE = false
 export const USE_CADRE = false
 
 /** True when adapters should serve fixtures rather than engine state. */
 export const mockMode = !USE_ENGINE
+
+const mock = createMockModel(fixtureSource)
+
+// The model says when everything read so far is out of date (a new mock variant,
+// say); the app's answer is to have every screen read again.
+onWorldChanged(bumpGeneration)
+
+/**
+ * The model every adapter answers from. Mock for now; engine mode (taleus-core
+ * underneath) arrives as a second implementation of the same interface, chosen
+ * here and nowhere else.
+ */
+export function getModel(): TaleusModel {
+	return mock.model
+}
+
+/** The mock model's controls: the variant, and resets for tests. */
+export function mockControls(): MockControls {
+	return mock.controls
+}

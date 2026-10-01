@@ -1,6 +1,6 @@
 description: Make the engine usable in three ways — with no engine at all for design work, on a single device with no network, and fully live with peers — so the app can be built and tested long before a real network exists.
 prereq: feat-engine-tally-api
-files: packages/taleus-core/src/index.ts, packages/taleus-app/design/specs/domain/interfaces.md
+files: packages/taleus-model/src/model.ts, packages/taleus-model/src/mock/index.ts, packages/taleus-app/apps/mobile/src/data/config.ts, packages/taleus-core/src/api/store-memory.ts, packages/taleus-app/design/specs/domain/interfaces.md
 difficulty: medium
 ----
 ## Why this ticket exists
@@ -32,3 +32,24 @@ other two need the engine to cooperate.
   would make negotiation testable without a network at all. This may be the highest-value part of
   the ticket.
 - What a test fixture format looks like, if the engine should own one at all.
+
+## Progress
+
+- **The switch exists, and screens see nothing.** `packages/taleus-model` holds the app model: one
+  `TaleusModel` interface per namespace, generated from what the mock already answered. The mock
+  implementation moved there unchanged (fixtures injected by the app, because Metro bundles JSON only
+  through static `require`s). The mobile app's `src/data/*.ts` are now thin forwards, and
+  `src/data/config.ts` is the one place an implementation is chosen. Verified as a pure move: the
+  app's 190 tests pass, typecheck is clean, and a Metro bundle carries the model and its fixtures.
+- **Open question 1 is answered by taleus-core**: "engine on a local store" can be a real Quereus
+  database with the real schema and no networking. That is `MemoryFabric`, which the core's 300+
+  tests already run on.
+- **Open question 2 is answered too**: two parties in one process, each with its own replica, is how
+  `MemoryFabric` works today. What remains is a *simulated counterparty* — a scripted second party the
+  app can trade with on one device, which also makes UX passes realistic.
+- **Open question 3, proposed**: fixtures stay the app model's, but can be *generated* by running the
+  contract scenarios through the engine and snapshotting what the model returns, so mock and engine
+  cannot drift.
+
+Next: the engine implementation of `TaleusModel` over taleus-core, a contract suite run against both
+implementations, and the simulated counterparty.
