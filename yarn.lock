@@ -3782,9 +3782,15 @@ __metadata:
     eslint: "npm:10.7.0"
     globals: "npm:17.7.0"
     jest: "npm:30.4.2"
+    taleus-core: "workspace:^"
     ts-jest: "npm:29.4.11"
     typescript: "npm:6.0.3"
     typescript-eslint: "npm:8.63.0"
+  peerDependencies:
+    taleus-core: ^0.1.0
+  peerDependenciesMeta:
+    taleus-core:
+      optional: true
   languageName: unknown
   linkType: soft
 

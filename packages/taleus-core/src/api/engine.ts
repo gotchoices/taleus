@@ -1,6 +1,6 @@
 import { sign as signBytes } from '../crypto/index.js'
 import { bytesToHex, hexToBytes, toText } from '../lift/digest.js'
-import { newInvitation, signText, type KeyPairText } from '../store/index.js'
+import { newInvitation, newKey, sidFor, signText, type KeyPairText } from '../store/index.js'
 import type { RowWrite } from '../store/strand.js'
 import { publishCertificate } from '../tally/certificates.js'
 import { issueChit } from '../tally/chits.js'
@@ -75,6 +75,19 @@ import type {
  */
 
 const PROTOCOL = 'taleus/1'
+
+/**
+ * A new party identity: a fresh genesis key, and the Sid derived from it.
+ *
+ * A Sid is the content address of the party's genesis key (`docs/identity.md`), so a host
+ * cannot sensibly invent one -- it has to come from here. The core keeps neither half: the host
+ * persists the signer's secret wherever its platform keeps keys (a phone's secure store, a
+ * server's key file) and hands both back to `openTaleus` on the next start.
+ */
+export function createPartyIdentity(): { sid: string; signer: LocalSigner } {
+	const key = newKey()
+	return { sid: sidFor(key.publicKey), signer: localSigner(key) }
+}
 
 /**
  * Adapt a key pair to a signer. The bridge until the row builders sign asynchronously.
@@ -206,6 +219,8 @@ class TallyEngine implements Tally {
 				theirs: theirSid ? await this.tradingOf(theirSid, code) : undefined,
 			},
 			...(await this.contractView()),
+			...(await this.offerView()),
+			...(await this.closeView()),
 			createdAt: core?.CreatedAt ?? '',
 		}
 	}
@@ -218,6 +233,22 @@ class TallyEngine implements Tally {
 		return {
 			contract: { cid: row.ContractCid, revision: row.Number, agreedOn: (await this.core())?.CreatedAt ?? '' },
 		}
+	}
+
+	private async offerView(): Promise<Pick<TallyView, 'offer'>> {
+		if (await this.one('select Number from App.TallyContract limit 1')) return {}
+		const proposal = await this.one<{ Proposer: Side; ContractCid: string }>(
+			'select Proposer, ContractCid from App.TallyContractProposal',
+		)
+		if (!proposal) return {}
+		return { offer: { contractCid: proposal.ContractCid, by: proposal.Proposer === this.side ? 'me' : 'them' } }
+	}
+
+	private async closeView(): Promise<Pick<TallyView, 'closeRequestedBy'>> {
+		const rows = await this.store.query<{ Requester: Side }>('select Requester from App.CloseRequest')
+		if (rows.length === 0) return {}
+		if (rows.length > 1) return { closeRequestedBy: 'both' }
+		return { closeRequestedBy: rows[0].Requester === this.side ? 'me' : 'them' }
 	}
 
 	private async termsOf(sid: string, denomination: string): Promise<CreditTerms | undefined> {
@@ -1041,7 +1072,8 @@ class NotOpen extends Error {}
 
 class TaleusEngine implements Taleus {
 	readonly identity: { sid: string }
-	private readonly watchers = new Set<Unsubscribe>()
+	/** Each engine-level listener, with its per-tally subscriptions keyed by tally id. */
+	private readonly listeners = new Map<(change: Change) => void, Map<string, Unsubscribe>>()
 
 	constructor(private readonly env: Environment) {
 		this.identity = { sid: env.sid }
@@ -1086,6 +1118,7 @@ class TaleusEngine implements Taleus {
 
 	async invite(request: InviteRequest): Promise<Result<PendingInvitation>> {
 		const { ref, store } = await this.env.store.create({ denomination: request.denomination })
+		await this.attach(ref)
 		const invitation = newKeyPair()
 		const on = request.on ?? this.now()
 		const seat = request.as === 'stock' ? seatStock : seatFoil
@@ -1110,6 +1143,7 @@ class TaleusEngine implements Taleus {
 		const decoded = decodeTicket(ticket)
 		if (!decoded) return no(locally('not-found', 'that invitation cannot be read'))
 		const { ref, store } = await this.env.store.join(ticket)
+		await this.attach(ref)
 		const seat = decoded.role === 'stock' ? seatStock : seatFoil
 		const signer = asPair(request?.signer ?? this.env.signer)
 		const result = await attempt(async () => {
@@ -1130,27 +1164,58 @@ class TaleusEngine implements Taleus {
 		)
 	}
 
+	/**
+	 * Every tally at once -- including tallies this engine makes after the call. A listener
+	 * subscribed only to the tallies that existed when it asked would miss exactly the moment an
+	 * inviter most needs to hear about: the invitee taking their seat on a tally invited since.
+	 */
 	watch(listener: (change: Change) => void): Unsubscribe {
-		// Per-tally subscriptions, gathered. A host with many tallies will want the store layer
-		// to offer one stream; nothing needs that yet.
+		const subscriptions = new Map<string, Unsubscribe>()
+		this.listeners.set(listener, subscriptions)
 		let live = true
 		void (async () => {
 			for (const ref of await this.env.store.list()) {
 				if (!live) return
-				const tally = await this.open(ref)
-				this.watchers.add(tally.watch(listener))
+				await this.subscribe(listener, subscriptions, ref)
 			}
 		})()
 		return () => {
 			live = false
-			for (const stop of this.watchers) stop()
-			this.watchers.clear()
+			this.listeners.delete(listener)
+			for (const stop of subscriptions.values()) stop()
+			subscriptions.clear()
 		}
 	}
 
+	/** Attach every live listener to a tally this engine has just made, before its first write. */
+	private async attach(ref: TallyRef): Promise<void> {
+		for (const [listener, subscriptions] of this.listeners) {
+			await this.subscribe(listener, subscriptions, ref)
+		}
+	}
+
+	private async subscribe(
+		listener: (change: Change) => void,
+		subscriptions: Map<string, Unsubscribe>,
+		ref: TallyRef,
+	): Promise<void> {
+		if (subscriptions.has(ref.id)) return
+		const tally = await this.open(ref)
+		const stop = tally.watch(listener)
+		// The listener may have been stopped while the tally was opening; a subscription added
+		// after that would hear changes nobody is listening for any more.
+		if (this.listeners.get(listener) !== subscriptions || subscriptions.has(ref.id)) {
+			stop()
+			return
+		}
+		subscriptions.set(ref.id, stop)
+	}
+
 	async close(): Promise<void> {
-		for (const stop of this.watchers) stop()
-		this.watchers.clear()
+		for (const subscriptions of this.listeners.values()) {
+			for (const stop of subscriptions.values()) stop()
+		}
+		this.listeners.clear()
 	}
 }
 

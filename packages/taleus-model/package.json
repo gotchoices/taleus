@@ -73,6 +73,10 @@
 		"./tally": {
 			"types": "./dist/tally.d.ts",
 			"default": "./dist/tally.js"
+		},
+		"./engine": {
+			"types": "./dist/engine/index.d.ts",
+			"default": "./dist/engine/index.js"
 		}
 	},
 	"engines": {
@@ -91,8 +95,17 @@
 		"eslint": "10.7.0",
 		"globals": "17.7.0",
 		"jest": "30.4.2",
+		"taleus-core": "workspace:^",
 		"ts-jest": "29.4.11",
 		"typescript": "6.0.3",
 		"typescript-eslint": "8.63.0"
+	},
+	"peerDependencies": {
+		"taleus-core": "^0.1.0"
+	},
+	"peerDependenciesMeta": {
+		"taleus-core": {
+			"optional": true
+		}
 	}
 }

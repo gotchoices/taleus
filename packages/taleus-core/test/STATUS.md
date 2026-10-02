@@ -412,6 +412,17 @@ Things the tests turned up that are design questions rather than test failures.
      `App.TallyCore` resolve — and 1.8 made ignored items an error. Both schemas are now declarative
      items, and `applyAppSchema` loads them exactly as Sereus does, refusal included.
 
+- **Building the app model on the API found four gaps in it, all fixed.** (1) No public way to
+  create a party identity: a correct `sid` comes from a function below the seam -- now
+  `createPartyIdentity()`. (2) `TallyView` did not say who put a standing contract offer on the
+  table, which is what decides whose move it is -- now `offer: { contractCid, by }`. (3) Nor who
+  asked to close -- now `closeRequestedBy`. (4) `Taleus.watch` subscribed only to tallies that
+  existed when it was called, so an inviter listening from startup never heard its invitee take
+  the seat; and stopping any one listener stopped all of them. Both fixed, with a race closed in
+  the process (a listener stopped while a tally was still opening kept a late subscription). The
+  dead `InviteRequest.offering` field is gone. All four came from translating real screens'
+  questions, which is the argument for building the model before the Sereus store.
+
 ## 1. Substrate
 
 - [x] Every statement in `draft1.qsql` executes in Quereus

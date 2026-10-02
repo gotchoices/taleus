@@ -108,9 +108,11 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   map covering the rest of the MyCHIPs baseline).
 - [x] Each `apps/<target>/` is a standalone npm project, outside the root yarn workspaces.
 - [ ] Write the remaining stories (see `packages/taleus-app/design/stories/mobile/00-story-map.md`).
-- [x] **`packages/taleus-model`: the apps' shared model.** One `TaleusModel` interface; the mock
-  implementation moved out of the mobile app unchanged, and the app's data layer now forwards to it,
-  so screens see no backend at all. Engine implementation next — `feat-engine-run-modes` § Progress.
+- [x] **`packages/taleus-model`: the apps' shared model.** One `TaleusModel` interface with two
+  implementations -- the mock (moved out of the mobile app unchanged) and the engine over taleus-core,
+  with a simulated counterparty for one-device use -- and one contract suite run against both. The
+  app's data layer forwards to it, so screens see no backend at all. Wiring engine mode into the app
+  is next -- `feat-engine-run-modes` § Progress.
 - [ ] **Run a cadre node in the mobile app** (not started; the app still runs on mock data and does not
   consume `taleus-core`). The prescribed kit as of Sereus 1.6+ is `@serfab/cadre-rn` —
   `polyfills` as the app's first import, `withCadreMetro` for Metro, `buildNoiseCrypto` for native

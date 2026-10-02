@@ -64,13 +64,13 @@ export interface InvitationsModel {
 	 * takes it up becomes the other party.
 	 */
 	createInvitation(draft: {
-	note?: string
-	unit: Unit
-	creditLimit: Amount
-	noticeDays: number
-	agreementId: string
-	goodForDays: number
-}): Promise<Result<Invitation>>
+		note?: string
+		unit: Unit
+		creditLimit: Amount
+		noticeDays: number
+		agreementId: string
+		goodForDays: number
+	}): Promise<Result<Invitation>>
 	/** One invitation by its token — the universal-link landing (story 02). */
 	readInvitation(token: string): Promise<Result<OpenInvitation>>
 	/**

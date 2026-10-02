@@ -51,5 +51,18 @@ other two need the engine to cooperate.
   contract scenarios through the engine and snapshotting what the model returns, so mock and engine
   cannot drift.
 
-Next: the engine implementation of `TaleusModel` over taleus-core, a contract suite run against both
-implementations, and the simulated counterparty.
+- **Engine mode exists at the package level.** `taleus-model/engine` implements every namespace over
+  taleus-core; `createLocalWorld` runs it against a simulated counterparty on one in-memory fabric. A
+  whole tally lifecycle runs through the model's own interface with no protocol step done by hand: an
+  agent names the tally, publishes both sides' terms and proposes the contract, and the offer waits
+  for a person. What the core cannot do yet returns `unsupported`, naming its ticket.
+- **The contract suite runs on both.** The engine has no drift. The mock has four known items
+  (`KNOWN_FIXTURE_DRIFT` in `src/contract.test.ts`), which are design questions: two fixture entries
+  show "the seller records the sale" -- a party signing that the *other* owes it, which the protocol
+  forbids (that is a payment request) -- and one tally reads `Closing` at a zero balance, which a
+  real tally cannot (it would be `Closed`) and which its own detail fixture contradicts.
+
+Next: wire engine mode into the mobile app. Open there: Metro and Hermes running Quereus and the
+crypto plugin (health and chat do, behind `@serfab/cadre-rn`'s polyfills); bundling the schema text;
+and keeping the identity across restarts (the in-memory store forgets everything, which is fine for
+a demo mode and not otherwise).

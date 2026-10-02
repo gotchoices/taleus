@@ -42,8 +42,8 @@ export interface DevicesModel {
 	 * not the provisioning.
 	 */
 	addDevice(draft: {
-	name: string
-	kind: Device['kind']
-	hostedBy?: string | null
-}): Promise<Result<Device[]>>
+		name: string
+		kind: Device['kind']
+		hostedBy?: string | null
+	}): Promise<Result<Device[]>>
 }

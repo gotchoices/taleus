@@ -304,6 +304,13 @@ export interface TallyView {
 	/** Each party's published lift policy. Absent means they have published none. */
 	trading: { mine?: TradingPolicy; theirs?: TradingPolicy }
 	contract?: { cid: string; revision: number; agreedOn: IsoDate }
+	/**
+	 * A contract proposal standing unanswered, and which side put it on the table -- which is what
+	 * decides whose move it is. Absent once the contract is signed, or before anyone has offered.
+	 */
+	offer?: { contractCid: string; by: 'me' | 'them' }
+	/** Who has asked to wind the tally down. Absent while nobody has. */
+	closeRequestedBy?: 'me' | 'them' | 'both'
 	createdAt: IsoDate
 }
 
@@ -457,8 +464,6 @@ export interface InviteRequest extends ActOptions {
 	as: Role
 	/** Advertised on the ticket so an invitee knows what is being proposed. Agreed in the contract. */
 	denomination: string
-	/** Optional opening position, so an invitee sees real terms rather than an empty tally. */
-	offering?: { limit: Amount; callDays: number }
 	certificate?: unknown
 }
 

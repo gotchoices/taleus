@@ -6,7 +6,7 @@ import { readSchema } from '../store/schema-node.js'
 import { newKey } from '../store/index.js'
 import { publishCertificate } from '../tally/certificates.js'
 import { MemoryFabric } from './store-memory.js'
-import { localSigner, openTaleus } from './engine.js'
+import { createPartyIdentity, localSigner, openTaleus } from './engine.js'
 import { registerCrypto, row, type RowWrite } from '../store/strand.js'
 import type { Amount, Result, StoreProvider, Taleus, Tally, TallyStore } from './types.js'
 
@@ -507,6 +507,49 @@ describe('keys', () => {
 	})
 })
 
+describe('what the view says about whose move it is', () => {
+	it('names the side that put a standing offer on the table, and drops it once signed', async () => {
+		const world = await twoParties()
+		const invited = must(await world.jan.invite({ as: 'stock', denomination: USD }))
+		const samTally = must(await world.sam.accept(invited.ticket))
+		const janTally = await world.jan.open(invited.ref)
+		must(await janTally.establish())
+		must(await janTally.offerCredit({ limit: usd(50000), callDays: 21 }))
+		must(await samTally.offerCredit({ limit: usd(0), callDays: 21 }))
+		expect((await janTally.read()).offer).toBeUndefined()
+
+		must(await janTally.offerContract({ contractCid: 'cid:standard-tally-v1', denomination: USD, denominationScale: 2 }))
+		expect((await janTally.read()).offer).toEqual({ contractCid: 'cid:standard-tally-v1', by: 'me' })
+		expect((await samTally.read()).offer).toEqual({ contractCid: 'cid:standard-tally-v1', by: 'them' })
+
+		must(await samTally.acceptContract())
+		expect((await samTally.read()).offer).toBeUndefined()
+	})
+
+	it('names who asked to close', async () => {
+		const world = await twoParties()
+		const { janTally, samTally } = await opened(world)
+		expect((await janTally.read()).closeRequestedBy).toBeUndefined()
+		must(await janTally.requestClose())
+		expect((await janTally.read()).closeRequestedBy).toBe('me')
+		expect((await samTally.read()).closeRequestedBy).toBe('them')
+		must(await samTally.requestClose())
+		expect((await janTally.read()).closeRequestedBy).toBe('both')
+	})
+})
+
+describe('a new party', () => {
+	it('gets a Sid derived from its genesis key, and can trade under it', async () => {
+		const a = createPartyIdentity()
+		const b = createPartyIdentity()
+		expect(a.sid).toMatch(/^sid:/)
+		expect(a.sid).not.toBe(b.sid)
+		const fabric = new MemoryFabric(readSchema('draft1'))
+		const engine = await openTaleus({ store: fabric.provider('a'), signer: a.signer, sid: a.sid, now: () => TODAY })
+		expect(must(await engine.invite({ as: 'stock', denomination: USD })).invitedAs).toBe('foil')
+	})
+})
+
 describe('a signer', () => {
 	it('produces what the schema’s verify accepts', async () => {
 		// The `Signer` contract is all a secure enclave or hardware token has to meet: sign the
@@ -747,6 +790,35 @@ describe('watching', () => {
 		must(await samTally.pay({ amount: usd(1000) }))
 		stop()
 		expect(seen).toEqual(['balance'])
+	})
+
+	it('hears about a tally invited after it began listening -- the invitee taking their seat', async () => {
+		// The engine-level watch used to subscribe only to tallies that existed when it was
+		// called, so an inviter listening from startup never heard its invitee arrive.
+		const world = await twoParties()
+		const heard: string[] = []
+		const stop = world.jan.watch(change => heard.push(change.kind))
+		await Promise.resolve()
+		const invited = must(await world.jan.invite({ as: 'stock', denomination: USD }))
+		heard.length = 0
+		must(await world.sam.accept(invited.ticket))
+		stop()
+		expect(heard).toContain('contract')
+	})
+
+	it('stops one listener without silencing another', async () => {
+		const world = await twoParties()
+		const { samTally } = await opened(world)
+		const first: string[] = []
+		const second: string[] = []
+		const stopFirst = world.jan.watch(change => first.push(change.kind))
+		const stopSecond = world.jan.watch(change => second.push(change.kind))
+		await Promise.resolve()
+		stopFirst()
+		must(await samTally.pay({ amount: usd(1000) }))
+		stopSecond()
+		expect(first).toEqual([])
+		expect(second).toEqual(['balance'])
 	})
 
 	it('names the tally the change belongs to', async () => {

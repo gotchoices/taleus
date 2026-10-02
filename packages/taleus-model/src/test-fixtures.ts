@@ -15,3 +15,8 @@ export const FIXTURE_DIR = path.resolve(
 
 export const diskFixtures: FixtureSource = name =>
 	JSON.parse(readFileSync(path.join(FIXTURE_DIR, `${name}.json`), 'utf8')) as unknown
+
+/** The tally schema, as the host would bundle it. */
+export function tallySchema(): string {
+	return readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../taleus-core/schema/draft1.qsql'), 'utf8')
+}

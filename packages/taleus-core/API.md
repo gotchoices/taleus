@@ -198,6 +198,7 @@ rather than discover the capability is missing.
 Taken from `src/api/engine.test.ts`, which runs it.
 
 ```ts
+const { sid, signer } = createPartyIdentity()   // once; the host keeps the secret in its key store
 const jan = await openTaleus({ store: fabric.provider('jan'), signer, sid })
 
 // Jan forms a tally and holds a seat for Sam.
@@ -257,13 +258,16 @@ must(await janTally.pay({ amount: usd(30000) }))
 - **`TallyState` is computed here**, because the schema does not materialize a negotiation state
   (`feat-schema-tally-state`). `forming` and `offered` are inferences from what has been signed.
   First thing to revisit when that ticket lands.
-- **`invite` does not carry opening terms.** A vendor's QR ought to propose a credit limit, and
-  `InviteRequest.offering` was in the first draft. It cannot work: credit terms are signed against
-  the tally's id, which does not exist until both parties are seated. Carrying them as unsigned
-  ticket payload is possible and is what a real vendor flow wants; not built.
-- **`Taleus.watch` subscribes to the tallies that exist when it is called.** A tally formed
-  afterwards is not covered. The store layer should offer one stream per member rather than the
-  engine gathering per-tally subscriptions; nothing needs it yet.
+- **`invite` does not carry opening terms, by design.** Credit terms are signed against the tally's
+  id, which does not exist until both parties are seated, so `InviteRequest.offering` could never
+  have worked and is gone. An app that wants an invitee to see terms before joining carries them as
+  unsigned payload beside the ticket, and has them signed once the tally exists -- which is what
+  `taleus-model`'s invitation envelope does.
+- **`Taleus.watch` covers tallies this engine makes after the call, but not ones it learns of
+  otherwise.** `invite` and `accept` attach every live listener to the new tally before its first
+  write -- which is what an inviter needs to hear its invitee arrive, and was missing until the app
+  model needed it. A tally that appears another way (joined on another of the party's devices, say)
+  is not covered until the store layer offers one stream per member.
 - **`PaymentRequest` cannot be withdrawn**, only declined by the payer, and it expires rather than
   ages (`feat-invoice-lifecycle`). The surface reflects today's schema; `requestPayment` gains a
   `withdraw` sibling when that lands.

@@ -5,7 +5,7 @@ interface, `TaleusModel`. Screens never learn what answers them.
 
 ```
 screens ─▶ app data layer (src/data, thin) ─▶ TaleusModel ─┬─▶ mock: fixtures + in-memory writes
-                                                           └─▶ engine: taleus-core   (next)
+                                                           └─▶ engine: taleus-core
 ```
 
 ## What lives where
@@ -15,6 +15,8 @@ screens ─▶ app data layer (src/data, thin) ─▶ TaleusModel ─┬─▶ m
 | `src/<namespace>.ts` | Shapes, policy constants, pure derivations, and `<Namespace>Model` — the contract. Shared by every implementation. |
 | `src/model.ts` | `TaleusModel` (all namespaces) and `MockControls` (variant, resets). |
 | `src/mock/` | The mock implementation: fixtures and in-memory writes. |
+| `src/engine/` | The engine implementation over taleus-core (subpath `taleus-model/engine`). |
+| `src/contract.test.ts` | The contract: one suite run against both implementations. |
 | `src/types.ts` | Shapes used across namespaces (`Amount`, `Result`, `TallySummary`…). |
 
 Each namespace is also a subpath export (`taleus-model/attention`), because some shape names repeat
@@ -37,3 +39,39 @@ A Taleus app target depends on it as `"taleus-model": "file:../../../taleus-mode
 built `dist/` (`yarn build` here, or `tsc -p tsconfig.build.json --watch`). Metro needs the package in
 `watchFolders` and the app's `node_modules` in `resolver.nodeModulesPaths`; Jest needs the same in
 `modulePaths` — linked code otherwise looks for Babel's injected helpers beside its own real path.
+
+## Engine mode
+
+`createEngineModel({ store, identity?, now?, agreements? })` gives one party's `TaleusModel` over any
+taleus-core store. `createLocalWorld({ schema })` is the one-device arrangement: this party plus a
+**simulated counterparty**, both on one in-memory fabric — real schema, real signatures, real
+refusals, no network. The counterparty is just a second engine model whose agent accepts offers
+without asking; a script (or a developer) drives everything else it does through its own model.
+
+What engine mode adds beyond translation:
+
+- **An agent for the steps nobody has a screen for.** After an invitation is taken up, the inviter
+  names the tally, each side publishes the terms it already chose, and the inviter proposes the
+  contract. The agent does these whenever anything changes; accepting the offer is a decision, so it
+  stops there and the offer waits for a person.
+- **An invitation envelope.** The core's ticket says where to join and proves the seat is yours, but
+  not what is offered — terms are signed against a tally that does not exist yet. The model's token
+  carries the ticket plus the offered terms for display; the signed terms follow on the tally.
+- **Device-local state** — settings, notifications, rates, devices, "set aside" — that never touches
+  a tally. It starts empty: engine mode never borrows the mock's fixtures, which hold sample people.
+
+What the core does not support yet comes back as `{ kind: 'unsupported' }` naming its ticket:
+countering an offer, withdrawing a close, withdrawing or part-paying a request, one payment answering
+several requests, standing invitations, device management, and asking a counterparty for details.
+
+The engine also records the core's calendar dates as moments at the start of that day, UTC: signers
+assert days, not times (`docs/timestamps.md`).
+
+## The contract
+
+`src/contract.test.ts` runs the same checks against both implementations: well-formed tallies, the
+list agreeing with the detail, entries ending at the balance, requests and attention items pointing
+at things that exist, position summing the tallies, and no drift from the protocol. The mock has a
+short `KNOWN_FIXTURE_DRIFT` list — places the design fixtures show something the engine can never
+produce, each a question for the design. The suite fails on any drift not listed, so the list can
+only shrink.
