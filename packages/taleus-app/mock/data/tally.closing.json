@@ -171,11 +171,11 @@
         "scale": 2
       },
       "balance": {
-        "units": 0,
-        "perspective": "level"
+        "units": 4200,
+        "perspective": "owed-to-me"
       },
       "state": "Closing",
-      "waitingOn": "nobody",
+      "waitingOn": "them",
       "counterpartyReachable": true,
       "opened": "2024-05-20T08:00:00Z",
       "agreement": {
@@ -202,6 +202,10 @@
       },
       "roomToSpend": {
         "units": 0
+      },
+      "closing": {
+        "requestedBy": "me",
+        "requested": "2026-08-28T09:15:00Z"
       }
     },
     "tally:rae-offer": {

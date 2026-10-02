@@ -56,13 +56,29 @@ other two need the engine to cooperate.
   whole tally lifecycle runs through the model's own interface with no protocol step done by hand: an
   agent names the tally, publishes both sides' terms and proposes the contract, and the offer waits
   for a person. What the core cannot do yet returns `unsupported`, naming its ticket.
-- **The contract suite runs on both.** The engine has no drift. The mock has four known items
-  (`KNOWN_FIXTURE_DRIFT` in `src/contract.test.ts`), which are design questions: two fixture entries
-  show "the seller records the sale" -- a party signing that the *other* owes it, which the protocol
-  forbids (that is a payment request) -- and one tally reads `Closing` at a zero balance, which a
-  real tally cannot (it would be `Closed`) and which its own detail fixture contradicts.
+- **The contract suite runs on both.** Neither has drift. The design fixtures had two entries signed
+  by the wrong party (the giver signs) and a tally `Closing` at zero with no close request; both
+  corrected, so `KNOWN_FIXTURE_DRIFT` is empty.
 
-Next: wire engine mode into the mobile app. Open there: Metro and Hermes running Quereus and the
-crypto plugin (health and chat do, behind `@serfab/cadre-rn`'s polyfills); bundling the schema text;
-and keeping the identity across restarts (the in-memory store forgets everything, which is fine for
-a demo mode and not otherwise).
+- **Engine mode runs in the mobile app** (Mode B, `USE_ENGINE = true` in `src/data/config.ts`).
+  Verified on an Android emulator under Hermes: first run creates a real identity, an invitation is
+  taken up by the simulated counterparty (`createLocalWorld({ takeUpInvitations: true })`), the agent
+  forms and opens the tally, and a recorded entry moves the balance and position. How it is wired:
+  - `@serfab/cadre-rn/polyfills` + `boot-check` in `index.js`, *after* the app's formatjs `Intl` so
+    the kit's English-only `Intl.PluralRules` never installs; `withCadreMetro` in `metro.config.js`.
+  - The core emits each schema as a module (`taleus-core/schema-text/<name>`), so no host needs
+    bundler support for `.qsql`; `createLocalWorld` defaults to `draft1`.
+  - `src/data/engine.ts` is the only module importing the engine, loaded on demand: mock mode and
+    every test never evaluate Quereus. (A direct `import('taleus-model/engine')` fails under Metro's
+    lazy dev bundles: the URL lands outside the project root.)
+  - `App.tsx` gates on `startModel()`; in mock mode it is already started, so nothing waits.
+
+Open:
+- Persistence. The in-memory fabric forgets everything on restart, so each launch is a first run.
+  Needs a durable store (Optimystic local, or Quereus over the device's storage) plus the identity
+  secret in the platform key store, and the session's device-local state.
+- Mode C (`USE_CADRE`) throws "not built yet".
+- The simulated counterparty only takes up invitations and accepts offers; it never pays, asks or
+  closes, so those screens can only be exercised from this party's side.
+- Dates: the core keeps UTC calendar days, so near midnight a tally's "in force since" can read a day
+  off the local "last activity".

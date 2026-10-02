@@ -35,7 +35,7 @@
       {
         "id": "entry:0004",
         "kind": "direct",
-        "issuer": "me",
+        "issuer": "them",
         "amount": {
           "units": 12000
         },
@@ -68,7 +68,7 @@
       {
         "id": "entry:0100",
         "kind": "direct",
-        "issuer": "them",
+        "issuer": "me",
         "amount": {
           "units": -11250
         },
@@ -96,7 +96,22 @@
         }
       }
     ],
-    "tally:supplier-parts": [],
+    "tally:supplier-parts": [
+      {
+        "id": "entry:0300",
+        "kind": "direct",
+        "issuer": "them",
+        "amount": {
+          "units": 4200
+        },
+        "date": "2026-08-20T10:00:00Z",
+        "memo": "Parts order",
+        "balanceAfter": {
+          "units": 4200,
+          "perspective": "owed-to-me"
+        }
+      }
+    ],
     "tally:rae-offer": [],
     "tally:priya-new": []
   }

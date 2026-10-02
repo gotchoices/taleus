@@ -53,23 +53,11 @@ async function engineWorld(): Promise<TaleusModel> {
 }
 
 /**
- * Places where the design fixtures describe something the engine cannot produce. Each is a
- * question for the design, not a typo, so it is listed rather than silently "fixed". The suite
- * fails on any drift *not* listed here, so the list can only shrink.
+ * Places where the design fixtures describe something the engine cannot produce. The suite
+ * fails on any drift *not* listed here, so the list can only shrink; it is empty, and a fixture
+ * that adds to it is a design question, not a typo.
  */
-const KNOWN_FIXTURE_DRIFT = [
-	// "The seller records the sale." In Taleus a chit is signed by the party it makes worse off,
-	// so nobody can sign that someone else owes them: the way to say "you owe me for the bike" is
-	// a payment request, answered by the buyer's chit. These two entries show screens a flow the
-	// protocol forbids.
-	'issuer tally:sam-bike entry:0004: me 12000',
-	'issuer tally:mara-shop entry:0100: them -11250',
-	// The list says Closing; the detail fixture has no closing record, so the mock reads it Open.
-	// And a close completes at a settled zero, so "Closing at a level balance" is unreachable:
-	// the engine would say Closed.
-	'state tally:supplier-parts: list Closing, detail Open',
-	'closing-at-zero tally:supplier-parts',
-]
+const KNOWN_FIXTURE_DRIFT: string[] = []
 
 /** Every place the model contradicts itself or the protocol, as one line each. */
 async function drift(model: TaleusModel): Promise<string[]> {

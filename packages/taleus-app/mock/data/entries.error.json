@@ -50,7 +50,7 @@
       {
         "id": "entry:0004",
         "kind": "direct",
-        "issuer": "me",
+        "issuer": "them",
         "amount": {
           "units": 12000
         },
@@ -83,7 +83,7 @@
       {
         "id": "entry:0100",
         "kind": "direct",
-        "issuer": "them",
+        "issuer": "me",
         "amount": {
           "units": -11250
         },

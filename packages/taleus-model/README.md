@@ -43,10 +43,12 @@ built `dist/` (`yarn build` here, or `tsc -p tsconfig.build.json --watch`). Metr
 ## Engine mode
 
 `createEngineModel({ store, identity?, now?, agreements? })` gives one party's `TaleusModel` over any
-taleus-core store. `createLocalWorld({ schema })` is the one-device arrangement: this party plus a
+taleus-core store. `createLocalWorld()` is the one-device arrangement: this party plus a
 **simulated counterparty**, both on one in-memory fabric — real schema, real signatures, real
 refusals, no network. The counterparty is just a second engine model whose agent accepts offers
 without asking; a script (or a developer) drives everything else it does through its own model.
+`takeUpInvitations: true` also has it take up each invitation this party makes, on the offered
+terms — what an app on one device uses. The schema defaults to the core's `draft1`.
 
 What engine mode adds beyond translation:
 
@@ -71,7 +73,6 @@ assert days, not times (`docs/timestamps.md`).
 
 `src/contract.test.ts` runs the same checks against both implementations: well-formed tallies, the
 list agreeing with the detail, entries ending at the balance, requests and attention items pointing
-at things that exist, position summing the tallies, and no drift from the protocol. The mock has a
-short `KNOWN_FIXTURE_DRIFT` list — places the design fixtures show something the engine can never
-produce, each a question for the design. The suite fails on any drift not listed, so the list can
-only shrink.
+at things that exist, position summing the tallies, and no drift from the protocol. Fixtures that show
+something the engine can never produce fail it; `KNOWN_FIXTURE_DRIFT` names any exception accepted
+as a design question, and is empty.

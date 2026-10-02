@@ -6,6 +6,7 @@
  * -- real schema, real signatures, real refusals, and no network.
  */
 import { MemoryFabric } from 'taleus-core'
+import tallySchema from 'taleus-core/schema-text/draft1'
 
 import type { TaleusModel } from '../model.js'
 import type { AgreementDocument } from '../tally.js'
@@ -81,13 +82,19 @@ export async function createEngineModel(options: SessionOptions): Promise<Engine
 }
 
 export interface LocalWorldOptions {
-	/** The tally schema's text -- `draft1.qsql` -- which the host bundles or reads. */
-	schema: string
+	/** The tally schema's text. Defaults to the core's `draft1`. */
+	schema?: string
 	now?: () => Date
 	agreements?: AgreementDocument[]
 	/** This party's identity, if it already has one. */
 	identity?: PartyIdentity
 	counterpartyName?: string
+	/**
+	 * The counterparty takes up every invitation this party makes, as soon as it is made,
+	 * extending the same credit it was offered. For an app on one device, where nobody else
+	 * could; a test that takes them up itself leaves it off.
+	 */
+	takeUpInvitations?: boolean
 }
 
 export interface LocalWorld {
@@ -100,12 +107,13 @@ export interface LocalWorld {
 }
 
 export async function createLocalWorld(options: LocalWorldOptions): Promise<LocalWorld> {
-	const fabric = new MemoryFabric(options.schema)
+	const fabric = new MemoryFabric(options.schema ?? tallySchema)
 	const common = { now: options.now, agreements: options.agreements }
 	const me = await createEngineModel({ ...common, store: fabric.provider('me'), identity: options.identity })
 	const counterparty = await createEngineModel({ ...common, store: fabric.provider('counterparty'), acceptOffers: true })
 	await counterparty.model.party.createIdentity()
 	await counterparty.model.party.setDisplayName(options.counterpartyName ?? 'Sam (simulated)')
+	if (options.takeUpInvitations) takeUpInvitations(me.model, counterparty.model)
 
 	async function settled(): Promise<void> {
 		// Each party's act can wake the other, so wait until a full round passes with no new runs.
@@ -119,4 +127,20 @@ export async function createLocalWorld(options: LocalWorldOptions): Promise<Loca
 	}
 
 	return { me, counterparty, settled }
+}
+
+/** Have `them` take up every invitation `me` makes, on the terms it offers. */
+function takeUpInvitations(me: TaleusModel, them: TaleusModel): void {
+	const invitations = me.invitations
+	const createInvitation = invitations.createInvitation.bind(invitations)
+	invitations.createInvitation = async draft => {
+		const made = await createInvitation(draft)
+		if (made.ok) {
+			const response = { disclose: {}, creditLimit: draft.creditLimit, noticeDays: draft.noticeDays }
+			void them.invitations.respondToInvitation(made.value.token, 'accept', response).then(taken => {
+				if (!taken.ok) console.warn('simulated counterparty could not take up an invitation:', taken.error.message)
+			})
+		}
+		return made
+	}
 }

@@ -5,11 +5,13 @@
  * from `design/specs/mobile/navigation.md`. The theme is a provider rather than
  * a per-screen `useColorScheme()` because `global/ui.md` makes it selectable.
  */
+import { useEffect, useState } from 'react'
 import { StatusBar, View } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { Loading } from './src/components'
 import { ErrorBoundary } from './src/components/ErrorBoundary'
+import { modelStarted, startModel } from './src/data/config'
 import { useStoredPreferences } from './src/hooks/usePreferences'
 import { AppNavigator } from './src/navigation'
 import { SessionProvider } from './src/session'
@@ -28,13 +30,36 @@ function Themed(): React.JSX.Element {
 	)
 }
 
+/**
+ * Nothing reads before the model is up. In mock mode it already is, so this
+ * renders straight through; in engine mode it waits for the engine to start.
+ */
+function ModelGate({ children }: { children: React.ReactNode }): React.JSX.Element {
+	const [ready, setReady] = useState(modelStarted)
+	const [failure, setFailure] = useState<Error>()
+	useEffect(() => {
+		if (!ready) {
+			void startModel().then(
+				() => setReady(true),
+				(error: unknown) => setFailure(error instanceof Error ? error : new Error(String(error))),
+			)
+		}
+	}, [ready])
+	if (failure) throw failure
+	return ready ? <>{children}</> : <Loading />
+}
+
 function App(): React.JSX.Element {
 	return (
 		<SafeAreaProvider>
 			<ThemeProvider>
-				<SessionProvider>
-					<Themed />
-				</SessionProvider>
+				<ErrorBoundary>
+					<ModelGate>
+						<SessionProvider>
+							<Themed />
+						</SessionProvider>
+					</ModelGate>
+				</ErrorBoundary>
 			</ThemeProvider>
 		</SafeAreaProvider>
 	)

@@ -29,7 +29,7 @@ which implementation that is.
 | Mode | Behavior |
 |------|----------|
 | mock | Fixtures from `mock/data/*` with `variant=happy\|empty\|error`. No engine. |
-| engine + local store | Engine over a local database, single device, no peers. |
+| engine + local store | Engine over a local database, single device, no peers; a simulated counterparty takes up invitations. |
 | engine + cadre | Engine over the embedded cadre node: real strands, peers, lifts. |
 
 ## Tally states

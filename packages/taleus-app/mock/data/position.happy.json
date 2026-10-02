@@ -5,7 +5,7 @@
       "denom": "iso4217:USD",
       "scale": 2,
       "owedToMe": {
-        "units": 18000
+        "units": 22200
       },
       "owedByMe": {
         "units": 4250
@@ -40,13 +40,13 @@
     "unit": "iso4217:USD",
     "scale": 2,
     "owedToMe": {
-      "units": 18000
+      "units": 22200
     },
     "owedByMe": {
       "units": 4250
     },
     "net": {
-      "units": 13750
+      "units": 17950
     },
     "covers": [
       "iso4217:USD",
@@ -63,7 +63,7 @@
   },
   "spendingPower": {
     "heldByOthers": {
-      "units": 18000,
+      "units": 22200,
       "denom": "iso4217:USD",
       "scale": 2
     },

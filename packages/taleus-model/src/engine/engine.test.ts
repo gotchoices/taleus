@@ -1,4 +1,3 @@
-import { tallySchema } from '../test-fixtures.js'
 import type { Result } from '../types.js'
 import { createLocalWorld, STANDARD_AGREEMENT } from './index.js'
 
@@ -12,7 +11,7 @@ function must<T>(result: Result<T>): T {
 }
 
 async function openTally() {
-	const world = await createLocalWorld({ schema: tallySchema(), now: NOW })
+	const world = await createLocalWorld({ now: NOW })
 	const me = world.me.model
 	expect(must(await me.party.readParty())).toBeNull()
 	must(await me.party.createIdentity())
@@ -96,6 +95,19 @@ describe('a tally made through the model, with a simulated counterparty', () => 
 		expect(must(await me.attention.listAttention())).toEqual([])
 		expect(must(await me.requests.readRequest(asked.id)).state).toBe('answered')
 		expect(must(await me.tallies.listTallies())[0].balance).toEqual({ ...usd(1300), perspective: 'owed-to-me' })
+	})
+
+	it('can have the counterparty take up an invitation by itself', async () => {
+		const world = await createLocalWorld({ now: NOW, takeUpInvitations: true })
+		const me = world.me.model
+		must(await me.party.createIdentity())
+		must(await me.invitations.createInvitation({ unit: USD, creditLimit: usd(20000), noticeDays: 14, agreementId: STANDARD_AGREEMENT.id, goodForDays: 7 }))
+		await world.settled()
+		// This party proposed the contract with the invitation; the simulated one accepts it.
+		const [tally] = must(await me.tallies.listTallies())
+		const detail = must(await me.tally.readTally(tally.id))
+		expect(detail.state).toBe('Open')
+		expect(detail.terms.theirs.creditLimit).toEqual(usd(20000))
 	})
 
 	it('says plainly what the engine does not do yet', async () => {

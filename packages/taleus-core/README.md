@@ -12,5 +12,6 @@ Consumed by [`taleus-node`](../taleus-node) (the always-on trading service) and
 src/crypto/     hash + signature provider (sha256 / ed25519)
 src/lift/       conversion, discovery, referee, commit, agent
 src/transport/  /taleus/chipnet/1.0.0 protocol adapter
-schema/         Quereus sApp schema (draft1.qsql tally, portfolio.qsql)
+schema/         Quereus sApp schema (draft1.qsql tally, portfolio.qsql); the build also emits
+                each as a module, `taleus-core/schema-text/<name>`, for hosts that cannot read files
 ```

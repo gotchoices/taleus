@@ -19,13 +19,17 @@
 			"types": "./dist/crypto/index.d.ts",
 			"default": "./dist/crypto/index.js"
 		},
-		"./schema/*": "./schema/*"
+		"./schema/*": "./schema/*",
+		"./schema-text/*": {
+			"types": "./dist/schema-text/*.d.ts",
+			"default": "./dist/schema-text/*.js"
+		}
 	},
 	"engines": {
 		"node": ">=18"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
+		"build": "tsc -p tsconfig.build.json && node scripts/schema-text.mjs",
 		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
 		"lint": "eslint ./src"
 	},

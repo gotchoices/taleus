@@ -70,12 +70,13 @@
         "scale": 2
       },
       "balance": {
-        "units": 0,
-        "perspective": "level"
+        "units": 4200,
+        "perspective": "owed-to-me"
       },
       "state": "Closing",
-      "waitingOn": "nobody",
-      "lastActivity": "2026-08-28T09:15:00Z"
+      "waitingOn": "them",
+      "lastActivity": "2026-08-28T09:15:00Z",
+      "waitingReason": "closing"
     },
     {
       "id": "tally:rae-offer",

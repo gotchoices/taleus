@@ -152,9 +152,9 @@ test('movement that has not committed is visibly unfinished', async () => {
 })
 
 test('an entry the reader does not recognise is told everything held about it', async () => {
-	const view = await renderScreen(<EntryDetail {...entryProps('tally:mara-shop', 'entry:0100')} />)
-	await waitFor(() => expect(view.getByText('Brake service')).toBeTruthy())
-	expect(view.getByText(/Mara's Bike Shop did/)).toBeTruthy()
+	const view = await renderScreen(<EntryDetail {...entryProps('tally:sam-bike', 'entry:0004')} />)
+	await waitFor(() => expect(view.getByText('Bike')).toBeTruthy())
+	expect(view.getByText(/Sam Ortiz did/)).toBeTruthy()
 	expect(view.getByText(/Nothing in the history is anonymous/)).toBeTruthy()
 	expect(view.getByText('Where the balance stood after')).toBeTruthy()
 })
