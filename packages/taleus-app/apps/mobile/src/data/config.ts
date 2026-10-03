@@ -21,7 +21,7 @@ import { createMockModel, onWorldChanged, type MockControls, type TaleusModel } 
 import { fixtureSource } from './fixtures'
 import { bumpGeneration } from './generation'
 
-export const USE_ENGINE = false
+export const USE_ENGINE = true
 export const USE_CADRE = false
 
 /** True when adapters should serve fixtures rather than engine state. */
