@@ -395,7 +395,7 @@ class TallyEngine implements Tally {
 
 	async history(query?: HistoryQuery): Promise<Entry[]> {
 		const { code } = await this.denomination()
-		// `Date >= ?`, not `DayNumber(Date) >= DayNumber(?)`: dates are `YYYY-MM-DD` by `ValidDate`,
+		// `Date >= ?`, a predicate on the bare column: dates are `YYYY-MM-DD` by their `IsISODate` check,
 		// so text order is date order, and only a predicate on the bare column can use the
 		// `LedgerByDate` index. A function of the column cannot.
 		const rows = await this.store.query<LedgerRow>(

@@ -84,11 +84,11 @@ describe('SPEC § 5 — deterministic where a replica re-validates', () => {
 				.join('\n')
 			expect(sql).not.toMatch(/\bjulianday\s*\(/)
 			expect(sql).not.toMatch(/\bRandomUUID\s*\(/)
-			// `Today()` is volatile and allowed -- but only in a plain view, never inside a
+			// `date('now')` is volatile and allowed -- but only in a plain view, never inside a
 			// CHECK. Quereus rejects the latter, which is the enforcement; this records it.
 			const checks = sql.match(/constraint\s+\w+\s+check[^,]*/gi) ?? []
 			for (const check of checks) {
-				expect(check).not.toMatch(/\bToday\s*\(/)
+				expect(check).not.toMatch(/\bdate\s*\(\s*'now'/i)
 			}
 		}
 	})

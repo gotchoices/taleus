@@ -83,9 +83,10 @@ future dates against its own clock for the same reason it bounds past ones.
 
 - Gates key off `New.Date`, never a clock. Already true.
 - `Ledger.DateMonotonic` bounds how far back a chit may reach.
-- Date arithmetic and comparison inside constraints go through the deterministic host scalar
-  `DayNumber(date)` rather than `julianday()`, which Quereus classifies as non-deterministic because
-  it accepts `'now'`.
+- Dates are `YYYY-MM-DD` text, checked with `IsISODate`, and compared as text, which is calendar
+  order. Date arithmetic inside a constraint adds a `timespan` (`Date + timespan('P21D')`), which is
+  deterministic; `julianday()` and `date()` are not, because they accept `'now'`. Only Quereus
+  built-ins are used, so any Sereus node validates a tally strand without Taleus code.
 - Row identifiers are supplied by the caller, never defaulted in the database. A chit's `Id` is
   inside the digest the issuer signs, so the signer must know it before the insert; a
   database-generated default could never have been signed.

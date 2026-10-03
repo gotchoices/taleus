@@ -253,9 +253,9 @@ table PartyCertificate (
     constraint InsertOnly check on delete, update (0)
 );
 
--- ValidDenomination(id): prefix-dispatch validity check for a tally's denomination identifier
--- (feat-denomination-argument). A Taleus host scalar, like ValidDate and DayNumber --
--- referenced here, registered by `src/store/strand.ts` `registerFunctions`. NO general parser and NO currency-table lookup: three
+-- ValidDenomination: the prefix-dispatch validity check on a tally's denomination identifier
+-- (feat-denomination-argument), written in Quereus built-ins (`glob`) so that any Sereus node can
+-- validate it without Taleus code. NO general parser and NO currency-table lookup: three
 -- namespaces, each dispatched by prefix, and that is the whole contract:
 --   `CHIP`             -- the network reference unit; the reserved bare token, no prefix.
 --   `iso4217:<AAA>`    -- national currency; <AAA> is exactly three UPPERCASE ASCII letters
@@ -284,7 +284,7 @@ table TallyContractProposal (
     -- The load-bearing bilateral-signature coverage + life-of-tally immutability live on TallyContract.
     -- Defaults to CHIP at scale 0 -- an offer that omits the argument reproduces today's implicit
     -- single-denomination behavior with no ceremony.
-    Denomination text default 'CHIP' check (ValidDenomination(Denomination)),
+    Denomination text default 'CHIP' constraint ValidDenomination check (Denomination = 'CHIP' or glob('iso4217:[A-Z][A-Z][A-Z]', Denomination) or glob('cid:?*', Denomination)),
     DenominationScale integer default 0 check (DenominationScale >= 0),
     SignerKey text,        -- authorized PartyKey of the proposing party that signed
     Signature text,
@@ -342,7 +342,7 @@ table TallyContract (
     -- iso4217 it is NOT cross-checked against a currency table. Defaults to CHIP at scale 0 -- a tally
     -- created with no denomination argument behaves exactly as today (Ledger math is scale-independent,
     -- so the default is a true regression). ValidDenomination rejects malformed identifiers.
-    Denomination text default 'CHIP' check (ValidDenomination(Denomination)),
+    Denomination text default 'CHIP' constraint ValidDenomination check (Denomination = 'CHIP' or glob('iso4217:[A-Z][A-Z][A-Z]', Denomination) or glob('cid:?*', Denomination)),
     DenominationScale integer default 0 check (DenominationScale >= 0),
     StockSignerKey text,   -- authorized PartyKey of StockSid that signed StockSignature
     StockSignature text,
@@ -435,7 +435,7 @@ table TradingVariable (
 -- real-world notice it owes before a restrictive change bites. This is inherent to a
 -- unilateral, grantor-signed timestamp -- both parties replicate this strand and observe the
 -- signed Date, so a backdate is disputable, not silently exploitable. Not solved
--- cryptographically here; if a bound is later wanted, gate Date against Today() -- but that
+-- cryptographically here; if a bound is later wanted, gate Date against date('now') -- but that
 -- makes the insert volatile (non-deterministic), so it is deliberately left off.
 table CreditTerms (
     Sid text,               -- grantor (party extending credit)
@@ -443,8 +443,8 @@ table CreditTerms (
     CreditLimit integer default 0 check (CreditLimit >= 0),  -- CreditLimit not Limit (reserved word)
     CallDays integer default 0 check (CallDays >= 0),
     Args text,              -- optional JSON, contract-specific params
-    Date text check (ValidDate(Date)),                    -- grantor-signed issuance timestamp
-    EffectiveDate text check (ValidDate(EffectiveDate)),
+    Date text check ((IsISODate(Date) and length(Date) = 10)),                    -- grantor-signed issuance timestamp
+    EffectiveDate text check ((IsISODate(EffectiveDate) and length(EffectiveDate) = 10)),
     SignerKey text,         -- authorized PartyKey of Sid that signed this revision
     Signature text,
 
@@ -474,14 +474,14 @@ table CreditTerms (
     -- Shortening CallDays is itself restrictive: otherwise a grantor could instantly shorten notice,
     -- then yank the limit. A revision that raises CreditLimit but shortens CallDays is restrictive.
     constraint EffectiveDateValid check on insert (
-        (New.Revision = 1 and DayNumber(New.EffectiveDate) = DayNumber(New.Date))
+        (New.Revision = 1 and New.EffectiveDate = New.Date)
         or (New.Revision > 1 and
             case
                 when New.CreditLimit >= (select CreditLimit from committed.CreditTerms CT where CT.Sid = New.Sid and CT.Revision = New.Revision - 1)
                  and New.CallDays   >= (select CallDays   from committed.CreditTerms CT where CT.Sid = New.Sid and CT.Revision = New.Revision - 1)
-                then DayNumber(New.EffectiveDate) = DayNumber(New.Date)
-                else DayNumber(New.EffectiveDate) >= DayNumber(New.Date)
-                     + (select CallDays from committed.CreditTerms CT where CT.Sid = New.Sid and CT.Revision = New.Revision - 1)
+                then New.EffectiveDate = New.Date
+                else New.EffectiveDate >= New.Date
+                     + timespan('P' || (select CallDays from committed.CreditTerms CT where CT.Sid = New.Sid and CT.Revision = New.Revision - 1) || 'D')
             end)
     ),
     constraint InsertOnly check on delete, update (0)
@@ -503,7 +503,7 @@ table CreditTerms (
 -- supersedes -- see backlog if it comes up.
 table CloseRequest (
     Requester text check (Requester in ('S','F')),  -- party requesting closure
-    Date text check (ValidDate(Date)),
+    Date text check ((IsISODate(Date) and length(Date) = 10)),
     SignerKey text,        -- authorized PartyKey of the requesting party
     Signature text,        -- requester signs digest(Cid, Requester, Date)
 
@@ -556,7 +556,7 @@ table Ledger (
     Id text,               -- caller-supplied: it is inside the signed digest, so the signer must know it first
     Issuer text check (Issuer in ('S', 'F')), -- S = Stock, F = Foil
     Units integer check (Units > 0),
-    Date text check (ValidDate(Date)),
+    Date text check ((IsISODate(Date) and length(Date) = 10)),
     Reference text, -- JSON object
     Memo text,
     InvoiceId text null,   -- set when this chit answers an invoice (see InvoiceLink)
@@ -617,9 +617,9 @@ table Ledger (
     -- is the gap since the last chit; a long-dormant tally is the case this does not cover, and the
     -- receiving agent's own clock is the check there.
     constraint DateMonotonic check on insert (
-        DayNumber(New.Date) >= Coalesce(
-            (select DayNumber(Date) from committed.Ledger L where L.Number = New.Number - 1),
-            DayNumber(New.Date))
+        New.Date >= Coalesce(
+            (select Date from committed.Ledger L where L.Number = New.Number - 1),
+            New.Date)
     ),
     -- Credit gate. The prospective (stock-perspective) Balance must sit within the credit each
     -- party extended, effective as of THIS chit's own signed Date -- deterministic, no now().
@@ -650,12 +650,12 @@ table Ledger (
             Balance <= coalesce((
                 select CT.CreditLimit from CreditTerms CT
                 where CT.Sid = (select StockSid from TallyCore)
-                  and DayNumber(CT.EffectiveDate) <= DayNumber(New.Date)
+                  and CT.EffectiveDate <= New.Date
                 order by CT.Revision desc limit 1), 0)
             and Balance >= -coalesce((
                 select CT.CreditLimit from CreditTerms CT
                 where CT.Sid = (select FoilSid from TallyCore)
-                  and DayNumber(CT.EffectiveDate) <= DayNumber(New.Date)
+                  and CT.EffectiveDate <= New.Date
                 order by CT.Revision desc limit 1), 0)
         )
     ),
@@ -670,12 +670,12 @@ table Ledger (
             (select Balance from ReservedBalance) <= coalesce((
                 select CT.CreditLimit from CreditTerms CT
                 where CT.Sid = (select StockSid from TallyCore)
-                  and DayNumber(CT.EffectiveDate) <= DayNumber(New.Date)
+                  and CT.EffectiveDate <= New.Date
                 order by CT.Revision desc limit 1), 0)
             and (select Balance from ReservedBalance) >= -coalesce((
                 select CT.CreditLimit from CreditTerms CT
                 where CT.Sid = (select FoilSid from TallyCore)
-                  and DayNumber(CT.EffectiveDate) <= DayNumber(New.Date)
+                  and CT.EffectiveDate <= New.Date
                 order by CT.Revision desc limit 1), 0)
         )
     ),
@@ -811,8 +811,8 @@ table PendingLift (
     RefereeKey text,       -- agreed referee's public key; every resolution signature verifies against THIS key
     Issuer text check (Issuer in ('S','F')),  -- side pledging value on this edge (foil +Units, stock -Units, per BalanceCorrect)
     Units integer check (Units > 0),           -- edge amount in THIS tally's denomination (per the committed route's rates)
-    Date text check (ValidDate(Date)),         -- pledge timestamp; the date the reserved-credit gate keys off
-    Expiry text check (ValidDate(Expiry)),     -- advisory staleness bound + signed term; NOT a per-strand finalize gate (decision 2)
+    Date text check ((IsISODate(Date) and length(Date) = 10)),         -- pledge timestamp; the date the reserved-credit gate keys off
+    Expiry text check ((IsISODate(Expiry) and length(Expiry) = 10)),     -- advisory staleness bound + signed term; NOT a per-strand finalize gate (decision 2)
     SignerKey text,        -- authorized PartyKey of the issuing party
     Signature text,        -- issuer signs digest(Cid, LiftId, RefereeKey, Issuer, Units, Date, Expiry)
 
@@ -834,7 +834,7 @@ table PendingLift (
         New.SignerKey,
         'ed25519'
     )),
-    constraint ExpiryValid check on insert (DayNumber(Expiry) >= DayNumber(Date)),
+    constraint ExpiryValid check on insert (Expiry >= Date),
     -- Reserved-credit gate: the prospective RESERVED balance (settled + all open pending, INCLUDING this new
     -- pledge -- a plain ref to ReservedBalance already buffers it in) must sit within both parties' limits as
     -- of New.Date. Same limit lookup as Ledger.WithinCreditLimits (highest-Revision CreditTerms row whose
@@ -845,12 +845,12 @@ table PendingLift (
         (select Balance from ReservedBalance) <= coalesce((
             select CT.CreditLimit from CreditTerms CT
             where CT.Sid = (select StockSid from TallyCore)
-              and DayNumber(CT.EffectiveDate) <= DayNumber(New.Date)
+              and CT.EffectiveDate <= New.Date
             order by CT.Revision desc limit 1), 0)
         and (select Balance from ReservedBalance) >= -coalesce((
             select CT.CreditLimit from CreditTerms CT
             where CT.Sid = (select FoilSid from TallyCore)
-              and DayNumber(CT.EffectiveDate) <= DayNumber(New.Date)
+              and CT.EffectiveDate <= New.Date
             order by CT.Revision desc limit 1), 0)
     ),
     -- Closing gate (feat-schema-tally-close): while any CloseRequest is filed, a new pledge may only move the
@@ -957,7 +957,7 @@ table TallyCore (
     constraint StockSeated check on insert (New.StockSid in (select Sid from Stock)),
     constraint FoilSeated check on insert (New.FoilSid in (select Sid from Foil)),
     constraint ProtocolVersionPresent check on insert (New.ProtocolVersion is not null and New.ProtocolVersion <> ''),
-    constraint CreatedAtValid check on insert (ValidDate(New.CreatedAt)),
+    constraint CreatedAtValid check on insert ((IsISODate(New.CreatedAt) and length(New.CreatedAt) = 10)),
     -- Initiator (stock) creates the identity: SignerKey resolves against the STOCK party's authorized set.
     constraint SignerAuthorized check on insert (New.SignerKey in (select PublicKey from AuthorizedKey AK where AK.Sid = New.StockSid)),
     constraint SignatureValid check on insert (verify(
@@ -980,7 +980,7 @@ table Invoice (
     Id text,               -- caller-supplied: it is inside the signed digest, so the signer must know it first
     Requester text check (Requester in ('S', 'F')),  -- party requesting payment (future recipient)
     Units integer check (Units > 0),                 -- smallest denomination unit, exact-match by the answering chit
-    Date text check (ValidDate(Date)),
+    Date text check ((IsISODate(Date) and length(Date) = 10)),
     ExpiryDate text null,                           -- null = never expires
     Reference text,                                 -- machine-readable JSON (stored as text, no parser -- house rule)
     Memo text,
@@ -1001,7 +1001,7 @@ table Invoice (
     -- ExpiryDate, when present, must be a valid date at or after Date.
     constraint ExpiryValid check on insert (
         New.ExpiryDate is null
-        or (ValidDate(New.ExpiryDate) and DayNumber(New.ExpiryDate) >= DayNumber(New.Date))
+        or ((IsISODate(New.ExpiryDate) and length(New.ExpiryDate) = 10) and New.ExpiryDate >= New.Date)
     ),
     constraint InsertOnly check on delete, update (0)
 );
@@ -1058,9 +1058,9 @@ unique index LedgerByInvoice on Ledger (InvoiceId);
 unique index LedgerByLift on Ledger (LiftId);
 
 -- Reporting. The application layer asks for a date range -- a statement, a reconciliation, a
--- period close -- and `Date` is `YYYY-MM-DD` by `ValidDate`, so lexicographic order IS
--- chronological order and a plain range predicate can use this. (A predicate written as
--- `DayNumber(Date) >= ...` cannot: it is a function of the column, not the column.)
+-- period close -- and `Date` is `YYYY-MM-DD` by its `IsISODate` check, so lexicographic order IS
+-- chronological order and a plain range predicate can use this. (A predicate on a function of
+-- the column cannot.)
 index LedgerByDate on Ledger (Date);
 
 -- NOTE (upstream, not a workaround). These indexes are declared in the right shape, but a
@@ -1145,14 +1145,14 @@ view CurrentTradingVariable as
 -- Advisory only -- fuels LiftLading capacity advertisement; the hard safety gate is the
 -- deterministic, chit-dated Ledger.WithinCreditLimits below. Effective limit = CreditLimit of
 -- the highest-Revision CreditTerms row whose EffectiveDate <= now; absent any row -> 0.
--- NOTE: Today()/date('now') are VOLATILE -- fine in a plain view; NOT allowed in a
+-- NOTE: date('now') is VOLATILE -- fine in a plain view; NOT allowed in a
 -- MATERIALIZED view (Quereus hard-rejects volatile there). If a future runner rejects
 -- volatile-in-view, fall back to computing the effective revision in the lift agent
 -- (application) and keep the deterministic chit-dated Ledger gate as the safety boundary.
 view CurrentCreditLimit as
     select P.Sid,
         coalesce((select CT.CreditLimit from CreditTerms CT
-                  where CT.Sid = P.Sid and DayNumber(CT.EffectiveDate) <= Today()
+                  where CT.Sid = P.Sid and CT.EffectiveDate <= date('now')
                   order by CT.Revision desc limit 1), 0) as CreditLimit
     from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
 
@@ -1259,7 +1259,7 @@ view LiftLading as
 -- Invoice state, derived from the tables (never stored). Precedence paid > declined > expired > open.
 -- 'paid' is checked first, so the derived state stays deterministic even if a decline and a chit both
 -- somehow commit (self-inflicted -- both are the payer's own actions; see InvoiceLink / InvoiceDecline).
--- 'expired' is time-derived (Today() is VOLATILE -- fine in a plain view, NOT allowed in a
+-- 'expired' is time-derived (date('now') is VOLATILE -- fine in a plain view, NOT allowed in a
 -- MATERIALIZED view; same caveat as CurrentCreditLimit at schema/draft1.qsql:504). It is deliberately
 -- NOT gated at chit insert -- a late payment still succeeds and 'paid' wins by precedence.
 view InvoiceState as
@@ -1267,7 +1267,7 @@ view InvoiceState as
         case
             when exists (select 1 from Ledger L where L.InvoiceId = I.Id) then 'paid'
             when exists (select 1 from InvoiceDecline D where D.InvoiceId = I.Id) then 'declined'
-            when I.ExpiryDate is not null and DayNumber(I.ExpiryDate) < Today() then 'expired'
+            when I.ExpiryDate is not null and I.ExpiryDate < date('now') then 'expired'
             else 'open'
         end as State
     from Invoice I;

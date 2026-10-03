@@ -106,7 +106,8 @@ Every replica of a strand re-validates every write. A constraint that read a clo
 source would have replicas disagree about the same row, and the strand would diverge.
 
 So: no `now()`, no random defaults, no non-deterministic host scalar inside a `CHECK` or a column
-default. `DayNumber(column)` is pure; `Today()` is volatile and belongs only in a plain view. There
+default. Dates compare as `YYYY-MM-DD` text and shift by a `timespan`, both pure; `date('now')` is
+volatile and belongs only in a plain view. There
 is deliberately no spelling that lets a constraint read the clock by accident. Row identifiers are
 supplied by the caller, because they are inside the digest their signer signs.
 
@@ -195,10 +196,10 @@ so the suite exercises the same rules.
   not recognize. `applyAppSchema` in `src/store/strand.ts` applies it the same way.
 - **App code qualifies its tables** (`App.Ledger`), as the reference apps do; `appTable()` and the
   engine's SQL follow that.
-- **Register Taleus's own scalars on the host database before Sereus applies the schema** — views
-  call `DayNumber`, `Today`, `Greatest` and `Least`, and a view is planned when it is created. Sereus
-  registers the crypto plugin itself; registering it again, or anything named like it, is the bug in
-  § 4.
+- **The schema calls only Quereus built-ins and the stack's crypto.** Every node that holds a
+  replica re-validates every write, including always-on cadre machines that run no Taleus code, so
+  the schema registers nothing of its own. Sereus registers the crypto plugin itself; registering it
+  again, or anything named like it, is the bug in § 4.
 - **An event's key is minted once and held across attempts; a retry reads before it re-writes.** A
   strand write can fail without settling whether it landed (`TornActionError` not marked final,
   `SyncRetryExhaustedError`, a lost reply), and strand writes get no retry funnel. `pay` and

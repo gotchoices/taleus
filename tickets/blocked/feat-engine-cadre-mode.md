@@ -14,9 +14,16 @@ memory, no AppState handling, un-awaited async calls). Sereus's own
 `tickets/backlog/feat-rn-kit-secure-key-store.md` says the bring-up moves into `@serfab/cadre-rn`
 once a second app needs it. Rather than make a fourth copy, Taleus waits for that to land.
 
-**Unblocks when:** `@serfab/cadre-rn` publishes the key-store, node and lifecycle subpaths (stacked
-PRs to gotchoices/sereus, built from the reference app's bring-up), or Taleus links a local sereus
-checkout that carries them.
+**Unblocks when:** `@serfab/cadre-rn` publishes the key-store, node and lifecycle subpaths, or Taleus
+links a local sereus checkout that carries them. Status (2026-10-03): key store merged
+(gotchoices/sereus#29); phone node (#30) and lifecycle (#31) open. Only the on-device bring-up waits
+on these: the store provider below needs only `@serfab/cadre-core`, published at 1.11.
+
+**Done meanwhile:** the tally schema now calls only Quereus built-ins and the stack's crypto. Every
+node holding a replica re-validates every write, and an always-on cadre machine runs no Taleus
+code, so the six Taleus-registered scalars (`DayNumber`, `ValidDate`, `ValidDenomination`, `Today`,
+`Greatest`, `Least`) would have left such a node unable to accept a tally's rows. Dates compare as
+`YYYY-MM-DD` text; the notice period adds a `timespan`.
 
 ## The plan, once unblocked
 

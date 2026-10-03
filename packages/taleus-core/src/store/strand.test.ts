@@ -1,5 +1,3 @@
-import cryptoPlugin from '@optimystic/quereus-plugin-crypto/plugin'
-import { Database } from '@quereus/quereus'
 
 import { openStrand, readSchema } from './schema-node.js'
 import { appTable, functionsCalledBy, rows, statementsOf, stripComments } from './strand.js'
@@ -28,19 +26,21 @@ describe('the schema loads into Quereus', () => {
 	})
 })
 
-describe('every scalar the schema calls is registered', () => {
-	// A function used only inside a column CHECK is planned lazily, so a missing one is
-	// invisible until the first insert into that table -- `ValidDenomination` was missing
-	// and the load test above passed regardless. Read the schema, not memory.
+describe('the schema calls only what every Sereus node has', () => {
+	// Every node holding a replica re-validates every write -- an always-on cadre machine as much
+	// as either party's phone -- and none of them runs Taleus code. So the schema may call only
+	// Quereus's built-ins and the stack's crypto. A function used only inside a column CHECK is
+	// planned lazily, so a missing one is invisible until the first insert into that table;
+	// read the schema, not memory.
 
-	/** Taleus's own, registered by `registerFunctions`. */
-	const TALEUS_SCALARS = ['DayNumber', 'Greatest', 'Least', 'Today', 'ValidDate', 'ValidDenomination']
+	/** Quereus built-ins the schemas call. */
+	const BUILTIN_SCALARS = ['IsISODate', 'length', 'glob', 'date', 'timespan', 'Greatest', 'Least']
 	/** The stack's, from `@optimystic/quereus-plugin-crypto`, which Sereus registers itself. */
 	const STACK_SCALARS = ['digest', 'verify']
 
-	it.each(['draft1', 'portfolio'] as const)('%s.qsql calls nothing the host does not provide', name => {
+	it.each(['draft1', 'portfolio'] as const)('%s.qsql calls nothing a Sereus node lacks', name => {
 		for (const fn of functionsCalledBy(readSchema(name))) {
-			expect([...TALEUS_SCALARS, ...STACK_SCALARS]).toContain(fn)
+			expect([...BUILTIN_SCALARS, ...STACK_SCALARS]).toContain(fn)
 		}
 	})
 
@@ -48,34 +48,25 @@ describe('every scalar the schema calls is registered', () => {
 		// Without this, a scanner that matched nothing would pass the check above forever.
 		// (`portfolio.qsql` calls none, which is why the check above cannot assert a count.)
 		const called = functionsCalledBy(readSchema('draft1'))
-		expect(called).toEqual(expect.arrayContaining(['digest', 'verify', 'DayNumber']))
+		expect(called).toEqual(expect.arrayContaining(['digest', 'verify', 'IsISODate']))
 	})
 
-	it('and every one of them is actually registered', async () => {
+	it('and every one of them resolves on a database with only the crypto plugin', async () => {
 		const db = await openStrand('draft1')
 		// Arity differs, so call each with what it takes; the point is that it resolves.
 		const calls = [
-			"DayNumber('2026-03-02')",
-			"digest('a','b')",
+			"IsISODate('2026-03-02')",
+			"length('abc')",
+			"glob('a*', 'abc')",
+			"date('now')",
+			"timespan('P21D')",
 			'Greatest(1, 2)',
 			'Least(1, 2)',
+			"digest('a','b')",
 			"verify('d','s','k','ed25519')",
-			'Today()',
-			"ValidDate('2026-03-02')",
-			"ValidDenomination('CHIP')",
 		]
 		for (const call of calls) {
 			await expect(rows(db, `select ${call} as v`)).resolves.toHaveLength(1)
-		}
-	})
-
-	it('no Taleus scalar shares a name with the stack’s, in any letter case', () => {
-		// Quereus resolves function names case-insensitively. A Taleus `Digest` beside the
-		// plugin's `digest` replaced it in every schema on the database -- Sereus's own
-		// membership constraints included -- and that is exactly what this schema used to do.
-		const stack = cryptoPlugin(new Database(), {}).functions.map(f => f.schema.name.toLowerCase())
-		for (const ours of TALEUS_SCALARS) {
-			expect(stack).not.toContain(ours.toLowerCase())
 		}
 	})
 

@@ -1,14 +1,6 @@
 import cryptoPlugin from '@optimystic/quereus-plugin-crypto/plugin'
 import { Database, registerPlugin } from '@quereus/quereus'
 
-import {
-	dayNumber,
-	greatest,
-	least,
-	today,
-	validDate,
-	validDenomination,
-} from './functions.js'
 
 /**
  * A Taleus strand, open in Quereus.
@@ -56,28 +48,6 @@ export function statementsOf(sql: string): string[] {
 		.split(/;\s*\n/)
 		.map(statement => statement.trim())
 		.filter(Boolean)
-}
-
-/**
- * Register Taleus's own scalars. Every one is deterministic but `Today`; see `functions.ts`.
- *
- * This is deliberately NOT the crypto: `digest` and `verify` come from
- * `@optimystic/quereus-plugin-crypto`, which Sereus registers on every strand database before
- * the app's schema is applied. Quereus resolves function names **case-insensitively**, so a
- * Taleus scalar named `Digest` would silently replace the plugin's `digest` -- in Sereus's
- * own `Strand` membership constraints as much as in ours. The names below are checked
- * against the plugin's in `strand.test.ts`.
- */
-export function registerFunctions(db: Database): void {
-	db.createScalarFunction('DayNumber', { numArgs: 1, deterministic: true }, date => dayNumber(date))
-	db.createScalarFunction('ValidDate', { numArgs: 1, deterministic: true }, date => validDate(date))
-	db.createScalarFunction('ValidDenomination', { numArgs: 1, deterministic: true }, id =>
-		validDenomination(id),
-	)
-	// The one volatile scalar: plain views only, never a constraint. See functions.ts.
-	db.createScalarFunction('Today', { numArgs: 0, deterministic: false }, () => today())
-	db.createScalarFunction('Greatest', { numArgs: 2, deterministic: true }, (a, b) => greatest(a, b) as never)
-	db.createScalarFunction('Least', { numArgs: 2, deterministic: true }, (a, b) => least(a, b) as never)
 }
 
 /**
@@ -129,14 +99,14 @@ export async function applyAppSchema(db: Database, schema: string): Promise<void
 }
 
 /**
- * Open an in-memory database with a schema applied and its scalars registered -- composed
- * the way a Sereus strand database is, minus the storage: crypto plugin first, then Taleus's
- * own scalars, then the sApp schema declared and applied as `App`.
+ * Open an in-memory database with a schema applied -- composed the way a Sereus strand
+ * database is, minus the storage: the crypto plugin, then the sApp schema declared and
+ * applied as `App`. Nothing of Taleus's is registered: the schema needs nothing a Sereus node
+ * lacks (see `functions.ts`).
  */
 export async function openStrandFrom(sql: string): Promise<Database> {
 	const db = new Database()
 	await registerCrypto(db)
-	registerFunctions(db)
 	await applyAppSchema(db, sql)
 	return db
 }
@@ -168,8 +138,8 @@ export async function row<T = Record<string, unknown>>(
  *
  * A function used only inside a column CHECK is not resolved when the table is created --
  * Quereus plans those lazily -- so a missing one stays invisible until the first insert
- * into that table. `ValidDenomination` was missing for exactly that reason, and the
- * schema-loads test passed anyway. This is what finds the next one.
+ * into that table; a missing function once hid that way while the schema-loads test passed.
+ * This is what finds the next one.
  */
 export function functionsCalledBy(sql: string): string[] {
 	const code = stripComments(sql)

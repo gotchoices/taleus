@@ -2,7 +2,7 @@ import { Database } from '@quereus/quereus'
 
 import { generateKeyPair, type KeyPair } from '../crypto/index.js'
 import { digest as canonicalDigest, publicKeyText, toText } from '../lift/digest.js'
-import { dayNumber, digest, greatest, least, validDate } from './functions.js'
+import { digest } from './functions.js'
 import { signText } from './identity.js'
 import { registerCrypto, row } from './strand.js'
 
@@ -10,36 +10,9 @@ import { registerCrypto, row } from './strand.js'
 const asText = (pair: KeyPair) => ({ publicKey: publicKeyText(pair.publicKey), secretKey: pair.secretKey })
 
 /**
- * The host scalars are the seam between the schema and the host, and a schema constraint
+ * The crypto scalars are the seam between the schema and the stack, and a schema constraint
  * is only as sound as the function it calls. These are the floor under every other test.
  */
-
-describe('DayNumber', () => {
-	it('orders calendar dates', () => {
-		expect(dayNumber('2026-03-02')).toBeGreaterThan(dayNumber('2026-03-01')!)
-		expect(dayNumber('2027-01-01')).toBeGreaterThan(dayNumber('2026-12-31')!)
-	})
-
-	it('counts days, so the schema can add a notice period', () => {
-		expect(dayNumber('2026-03-02')! - dayNumber('2026-02-28')!).toBe(2)
-		// Across a month boundary and a leap year.
-		expect(dayNumber('2028-03-01')! - dayNumber('2028-02-28')!).toBe(2)
-	})
-
-	it('reads in UTC, so a civil date is the same day to both parties', () => {
-		// The bug this prevents: rendering or comparing 2026-03-02 through a local zone
-		// puts it on the first of March for half the world.
-		expect(dayNumber('2026-03-02')).toBe(Math.floor(Date.UTC(2026, 2, 2) / 86_400_000))
-	})
-
-	it('refuses anything that is not a calendar date', () => {
-		for (const bad of ['2026-03-02T00:00:00Z', '2026-3-2', 'today', '', null, 20260302]) {
-			expect(dayNumber(bad)).toBeNull()
-			expect(validDate(bad)).toBe(0)
-		}
-		expect(validDate('2026-03-02')).toBe(1)
-	})
-})
 
 describe('Digest', () => {
 	it('separates its arguments, so two splittings of the same text differ', () => {
@@ -127,18 +100,5 @@ describe('verify, as the schema calls it', () => {
 		const keys = generateKeyPair()
 		const d = digest('tally:1')
 		await expect(sqlVerify(d, signText(asText(keys), d), publicKeyText(keys.publicKey), '')).resolves.toBe(false)
-	})
-})
-
-describe('Greatest and Least', () => {
-	it('pick the larger and the smaller', () => {
-		expect(greatest(3, 7)).toBe(7)
-		expect(least(3, 7)).toBe(3)
-		expect(greatest(0, -5)).toBe(0)
-	})
-
-	it('fall through nulls, so a missing term does not zero the economics', () => {
-		expect(greatest(null, 4)).toBe(4)
-		expect(least(4, null)).toBe(4)
 	})
 })

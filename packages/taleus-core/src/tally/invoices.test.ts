@@ -16,7 +16,7 @@ import { TODAY, trading } from './test-harness.js'
 
 /**
  * A date that has already passed, and always will have. `InvoiceState` derives expiry from
- * `Today()`, the one volatile function in the schema, so a fixed past date is the only stable
+ * `date('now')`, the one volatile call in the schema, so a fixed past date is the only stable
  * way to test it -- the wall clock only moves further away from it.
  */
 const LONG_PAST = '2026-03-09'
