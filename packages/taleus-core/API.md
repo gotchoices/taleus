@@ -4,8 +4,10 @@
 `src/api/engine.ts` the implementation, and `src/api/store-memory.ts` a `StoreProvider` that runs
 several parties' replicas in one process. `src/api/engine.test.ts` carries two parties from an
 invitation through payment, requests, credit revision, key rotation and close — 18 tests, all
-through the API, none of them naming a table. The Sereus-backed `StoreProvider` is the piece still
-missing.
+through the API, none of them naming a table. The Sereus-backed `StoreProvider` is
+`taleus-model/cadre` (`cadreStoreProvider`): each tally a closed two-party strand on a running
+`CadreNode`. A host implementing a store uses `taleus-core/host` (the transaction batch, the schema's
+table list, the table watcher), so every store writes and watches the same way.
 
 This document is the argument for the shape — why these calls and not others, and what each one is
 hiding.
@@ -242,19 +244,19 @@ must(await janTally.pay({ amount: usd(30000) }))
 
 ## What is still open
 
-- **The store seam has an implementation waiting for it.** `@serfab/quereus-plugin-sereus` already
-  binds a Quereus database to a strand, applies a sApp schema, and exposes `begin`/`commit` — so
-  `TallyStore` / `StoreProvider` are an adapter away, not a research project
-  (`feat-formation-over-sereus-strand`). One question from `SPEC.md` § Where Sereus plugs in remains
-  behind the interface: whether invite redemption and Taleus seating commit as one act.
+- **Joining a strand and taking a seat are two acts.** A Sereus store's `join` redeems the strand
+  invitation that travels as the ticket's `ref.address`; the engine then seats the party with the
+  credential in `ticket.encoded`. They do not commit as one act (the question `SPEC.md` § Where Sereus
+  plugs in asked): a party can hold the strand without having taken its seat, and the engine reads
+  that state as forming.
 - **`watch` is built on the real path, and the distributed half of it is upstream work.**
   `TallyStore.subscribe` registers a Quereus `Database.watch` over the schema's base tables on the
   member's own replica, and the engine maps the tables a commit touched to a `ChangeKind`. That is
-  the whole mechanism — there is no polling anywhere and no fabric-level shortcut. In memory it
-  already delivers the counterparty's acts, because every replica commits in process. On the
-  distributed backend a peer's write will arrive through `notifyExternalTableChange(table)`, which
-  Quereus already exposes and the replication path does not yet call. When it does, this code does
-  not change.
+  the whole mechanism. In memory it delivers the counterparty's acts because every replica commits
+  in process. On a Sereus strand it delivers them because Optimystic reports a replicated commit
+  through Quereus's `notifyExternalChange`; `taleus-model/cadre`'s test opens a tally between two
+  nodes with no polling at all. The cadre store adds a slow backstop poll (10 s) in case a commit
+  ever arrives without a watch.
 - **`TallyState` is computed here**, because the schema does not materialize a negotiation state
   (`feat-schema-tally-state`). `forming` and `offered` are inferences from what has been signed.
   First thing to revisit when that ticket lands.

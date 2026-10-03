@@ -16,7 +16,7 @@ import type { Amount, Instant, Unit } from '../types.js'
 export interface Envelope {
 	v: 1
 	/** The core's invitation ticket: where to join, and the credential to take the seat. Opaque here. */
-	ticket: { ref: string; encoded: string }
+	ticket: { ref: string; address?: string; encoded: string }
 	inviter: { sid: string; disclosed: Record<string, string> }
 	unit: Unit
 	/** What the inviter will let the invitee owe them. */

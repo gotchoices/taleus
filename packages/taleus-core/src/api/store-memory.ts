@@ -1,13 +1,12 @@
 import type { Database } from '@quereus/quereus'
 
 import {
-	APP_SCHEMA,
-	insertStatement,
 	openStrandFrom,
 	row,
 	rows,
-	statementsOf,
-	stripComments,
+	tablesIn,
+	transactionBatch,
+	watchTables,
 	type RowWrite,
 } from '../store/strand.js'
 import type { InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe } from './types.js'
@@ -210,21 +209,7 @@ class MemoryTallyStore implements TallyStore {
 	 * locally *or* from a peer once the replication path calls `notifyExternalTableChange`.
 	 */
 	subscribe(listener: (tables: readonly string[]) => void): Unsubscribe {
-		const subscription = this.replica.db.watch(
-			{
-				watches: this.tables.map(table => ({
-					table: { schema: APP_SCHEMA, table },
-					columns: 'all' as const,
-					scope: { kind: 'full' as const },
-				})),
-				nonDeterministicSources: [],
-				unboundParameters: [],
-			},
-			event => {
-				listener(event.matched.map(m => m.watch.table.table))
-			},
-		)
-		return () => subscription.unsubscribe()
+		return watchTables(this.replica.db, this.tables, listener)
 	}
 
 	async close(): Promise<void> {
@@ -232,35 +217,14 @@ class MemoryTallyStore implements TallyStore {
 	}
 }
 
+/** One act, as one transaction: the same batch a Sereus strand database is given. */
 async function applyTo(db: Database, writes: RowWrite[]): Promise<void> {
-	await db.exec('begin')
-	try {
-		for (const write of writes) {
-			const { sql, params } = insertStatement(write)
-			await db.exec(sql, params as never)
-		}
-		await db.exec('commit')
-	} catch (error) {
-		await db.exec('rollback')
-		throw error
-	}
+	const { sql, params } = transactionBatch(writes)
+	await db.exec(sql, params as never, { transaction: true })
 }
 
 function messageOf(error: unknown): string {
 	return error instanceof Error ? error.message : String(error)
-}
-
-/**
- * The schema's base tables, read from the DDL rather than listed by hand -- a table added to
- * the schema and forgotten here would be a watch that silently never fires.
- */
-function tablesIn(schema: string): string[] {
-	const names: string[] = []
-	for (const statement of statementsOf(stripComments(schema))) {
-		const match = /^\s*table\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(statement)
-		if (match) names.push(match[1])
-	}
-	return names
 }
 
 /** Read one row, or undefined. Re-exported so the engine need not reach into `src/store/`. */

@@ -187,6 +187,12 @@ export interface KeyRecord {
 /** An opaque handle naming one tally within a host's storage. Never parsed by a consumer. */
 export interface TallyRef {
 	readonly id: string
+	/**
+	 * How someone not yet in the strand reaches it, set by a store whose strands need one -- for
+	 * a Sereus strand, the host's encoded invitation to it. It travels in an `InvitationTicket`
+	 * and is read only by the joiner's store. Absent where joining needs nothing more than `id`.
+	 */
+	readonly address?: string
 }
 
 /**
@@ -439,8 +445,8 @@ export interface KeyRevocation extends ActOptions {
  */
 export interface InvitationTicket {
 	/**
-	 * Which strand it admits the holder to. The store layer resolves this and nothing else --
-	 * in a real host it is the strand's address, the thing a joiner dials.
+	 * Which strand it admits the holder to, and (`ref.address`) how to reach it. The store layer
+	 * resolves this and nothing else.
 	 */
 	readonly ref: TallyRef
 	/**

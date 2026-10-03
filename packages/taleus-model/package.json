@@ -77,6 +77,10 @@
 		"./engine": {
 			"types": "./dist/engine/index.d.ts",
 			"default": "./dist/engine/index.js"
+		},
+		"./cadre": {
+			"types": "./dist/cadre/index.d.ts",
+			"default": "./dist/cadre/index.js"
 		}
 	},
 	"engines": {
@@ -89,6 +93,11 @@
 	},
 	"devDependencies": {
 		"@eslint/js": "10.0.1",
+		"@libp2p/circuit-relay-v2": "^4.2.13",
+		"@libp2p/crypto": "^5.1.23",
+		"@libp2p/websockets": "^10.1.21",
+		"@optimystic/db-p2p": "^1.9.0",
+		"@serfab/cadre-core": "^1.11.0",
 		"@types/jest": "30.0.0",
 		"@types/node": "26.1.1",
 		"cross-env": "7.0.3",
@@ -101,9 +110,13 @@
 		"typescript-eslint": "8.63.0"
 	},
 	"peerDependencies": {
+		"@serfab/cadre-core": "^1.11.0",
 		"taleus-core": "^0.1.0"
 	},
 	"peerDependenciesMeta": {
+		"@serfab/cadre-core": {
+			"optional": true
+		},
 		"taleus-core": {
 			"optional": true
 		}

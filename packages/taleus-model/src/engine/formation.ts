@@ -85,7 +85,11 @@ export function invitationsModel(session: Session): InvitationsModel {
 			const created = session.now()
 			const envelope = {
 				v: 1 as const,
-				ticket: { ref: invited.value.ticket.ref.id, encoded: invited.value.ticket.encoded },
+				ticket: {
+					ref: invited.value.ticket.ref.id,
+					...(invited.value.ticket.ref.address ? { address: invited.value.ticket.ref.address } : {}),
+					encoded: invited.value.ticket.encoded,
+				},
 				inviter: { sid: session.identity.sid, disclosed: session.certificate() },
 				unit: draft.unit,
 				creditLimit: draft.creditLimit,
@@ -139,7 +143,10 @@ export function invitationsModel(session: Session): InvitationsModel {
 			if (!response) return failed('terms', 'accepting needs the credit you will extend in return')
 			Object.assign(session.local.disclosed, response.disclose)
 			const accepted = await engine.accept(
-				{ ref: { id: envelope.ticket.ref }, encoded: envelope.ticket.encoded },
+				{
+					ref: { id: envelope.ticket.ref, ...(envelope.ticket.address ? { address: envelope.ticket.address } : {}) },
+					encoded: envelope.ticket.encoded,
+				},
 				{ certificate: session.certificate() },
 			)
 			if (!accepted.ok) return refused(accepted.refusal)

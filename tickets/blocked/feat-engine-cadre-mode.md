@@ -25,18 +25,30 @@ code, so the six Taleus-registered scalars (`DayNumber`, `ValidDate`, `ValidDeno
 `Greatest`, `Least`) would have left such a node unable to accept a tally's rows. Dates compare as
 `YYYY-MM-DD` text; the notice period adds a `timespan`.
 
-## The plan, once unblocked
+## Done (Node, against cadre-core 1.11)
 
-- **`CadreStoreProvider`** (in `taleus-model`, platform-neutral, given a `CadreNode`) implementing
-  taleus-core's `StoreProvider`:
-  - `create` → `foundStrand({ type: 'c', memberPrivateKey, sAppConfig: draft1 })`
-  - `join` → `redeemInvitation` → `addStrand`, then wait until the strand is writable (a joiner
-    has no database until the strand's header arrives)
-  - `query`/`apply` → `strand.database.getDatabase()`, writes in one transaction
-  - `subscribe` → Quereus watchers for local writes; replicated writes need an event too —
-    find how chat learns of incoming messages before falling back to polling
-- **Two-layer invitation:** the envelope carries the Sereus strand invite (join the strand) and the
-  Taleus seat credential (claim the seat). Formation needs both phones online, as in chat.
-- **Persist what Mode B kept in memory:** the Taleus identity secret (key store) and the session's
-  device-local state (invitations made, intended terms, display name).
-- **Verify** with two emulators forming a tally, then two phones.
+- **`cadreStoreProvider`** (`taleus-model/cadre`): `create` founds a closed strand and publishes a
+  single-use invitation, carried as `TallyRef.address`; `join` redeems it (`formStrand`) and attaches
+  the strand, treating a slow first sync as progress; writes go through `exec(…, { transaction: true })`
+  via `taleus-core/host`'s `transactionBatch`, which the in-memory store now uses too.
+- **Replicated commits wake `subscribe`**: `cadre.test.ts` opens a tally between two nodes and moves
+  an entry with the backstop poll off.
+
+## Remaining
+
+- **Mode C in the app** (needs the kit, #30/#31): `createPhoneNode` with a `react-native-keychain`
+  adapter for the secure store, the lifecycle runner, the tally sApp under `configure` (unsigned for
+  now: `requireSignedSchemas: false`), and `cadreStoreProvider` behind `config.ts`'s `USE_CADRE`.
+- **Restart.** After a restart every strand is re-offered as `strand:discovered`; the provider must
+  re-attach them (it assumes the node is Taleus's own). Needs the node's durable key store, which
+  `createPhoneNode` supplies.
+- **Persist the session's device-local state** (invitations made, intended terms, display name) and
+  the Taleus identity secret.
+- **`requestJoin`** in place of `formStrand`, so an invitee can join while the inviter is offline (needs
+  an enrolled owner, which a phone is).
+- **Partial commits.** A seating act spans several tables, each its own Optimystic collection, so it can
+  half-commit (`CoordinatorPartialCommitError`). The engine's read-before-write recovery covers a retry;
+  whether the engine should detect and finish a half-committed seating is open.
+- **A signed tally sApp** (`signSchema` with a Taleus author key, the signature shipped with the app),
+  so nodes need not relax schema signing.
+- **Verify** with two emulators, then two phones.

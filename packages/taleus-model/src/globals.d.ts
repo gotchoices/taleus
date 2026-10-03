@@ -14,3 +14,6 @@ declare class TextDecoder {
 declare function btoa(data: string): string
 declare function atob(data: string): string
 declare const console: { warn(...data: unknown[]): void }
+declare const crypto: { getRandomValues<T extends Uint8Array>(array: T): T }
+declare function setInterval(handler: () => void, ms: number): unknown
+declare function clearInterval(handle: unknown): void

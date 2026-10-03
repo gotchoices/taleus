@@ -19,6 +19,10 @@
 			"types": "./dist/crypto/index.d.ts",
 			"default": "./dist/crypto/index.js"
 		},
+		"./host": {
+			"types": "./dist/host.d.ts",
+			"default": "./dist/host.js"
+		},
 		"./schema/*": "./schema/*",
 		"./schema-text/*": {
 			"types": "./dist/schema-text/*.d.ts",

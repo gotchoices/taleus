@@ -62,6 +62,13 @@ What engine mode adds beyond translation:
 - **Device-local state** — settings, notifications, rates, devices, "set aside" — that never touches
   a tally. It starts empty: engine mode never borrows the mock's fixtures, which hold sample people.
 
+**On real strands.** `taleus-model/cadre` exports `cadreStoreProvider({ node, sApp })`, a
+taleus-core `StoreProvider` over a running Sereus `CadreNode` (built on a phone by
+`@serfab/cadre-rn`'s `createPhoneNode`). Each tally is a closed two-party strand with the Taleus sApp.
+`create` founds it and mints a single-use strand invitation, which travels in the ticket's
+`ref.address`; `join` redeems it and attaches the strand once it has synced. Its test runs two nodes
+over loopback and opens a tally with no polling: the counterparty's commits wake the agent.
+
 What the core does not support yet comes back as `{ kind: 'unsupported' }` naming its ticket:
 countering an offer, withdrawing a close, withdrawing or part-paying a request, one payment answering
 several requests, standing invitations, device management, and asking a counterparty for details.

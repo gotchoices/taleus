@@ -2,7 +2,7 @@ import type { Database } from '@quereus/quereus'
 
 import { newKey, sidFor, type KeyPairText } from './identity.js'
 import { openStrand } from './schema-node.js'
-import { insertStatement, row, rows, type RowWrite, type SchemaName } from './strand.js'
+import { row, rows, transactionBatch, type RowWrite, type SchemaName } from './strand.js'
 
 /**
  * Two parties, each holding their own replica of the same strand. **Test machinery** --
@@ -152,23 +152,10 @@ export class Tally {
 	}
 }
 
-/** Apply one act to one replica, atomically. */
+/** Apply one act to one replica, atomically: the same batch every store writes. */
 async function apply(replica: Replica, writes: RowWrite[]): Promise<void> {
-	await replica.db.exec('begin')
-	try {
-		for (const write of writes) {
-			const { sql, params } = insertStatement(write)
-			await replica.db.exec(sql, params as never)
-		}
-		await replica.db.exec('commit')
-	} catch (error) {
-		try {
-			await replica.db.exec('rollback')
-		} catch {
-			// A failed commit may have already unwound; the original error is the useful one.
-		}
-		throw error
-	}
+	const { sql, params } = transactionBatch(writes)
+	await replica.db.exec(sql, params as never, { transaction: true })
 }
 
 export function messageOf(error: unknown): string {

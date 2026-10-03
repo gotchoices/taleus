@@ -179,10 +179,67 @@ export interface RowWrite {
 	row: Record<string, unknown>
 }
 
-export function insertStatement({ table, row }: RowWrite): { sql: string; params: unknown[] } {
-	const columns = Object.keys(row)
-	return {
-		sql: `insert into ${appTable(table)} (${columns.join(', ')}) values (${columns.map(() => '?').join(', ')})`,
-		params: columns.map(c => row[c]),
-	}
+/**
+ * One act as a single batch -- every row's insert, with named parameters -- for
+ * `db.exec(sql, params, { transaction: true })`. That call begins, runs and commits the batch
+ * under one hold of Quereus's execution mutex, so no other statement runs inside it, and the
+ * schema's deferred checks run once, at its commit. A batch shares one parameter set, so each
+ * value is named for its row and column (`:w0_1`); positional `?` would not survive the join.
+ *
+ * Both stores write through this: the in-memory fabric and a Sereus strand database, which
+ * documents hand-rolled `begin` … `commit` as not equivalent.
+ */
+export function transactionBatch(writes: RowWrite[]): { sql: string; params: Record<string, unknown> } {
+	const params: Record<string, unknown> = {}
+	const statements = writes.map(({ table, row }, w) => {
+		const columns = Object.keys(row)
+		const names = columns.map((column, c) => {
+			const name = `w${w}_${c}`
+			params[name] = row[column]
+			return `:${name}`
+		})
+		return `insert into ${appTable(table)} (${columns.join(', ')}) values (${names.join(', ')})`
+	})
+	return { sql: statements.join(';\n'), params }
 }
+
+/**
+ * The schema's base tables, read from the DDL rather than listed by hand -- a table added to
+ * the schema and forgotten here would be a watch that silently never fires.
+ */
+export function tablesIn(schema: string): string[] {
+	const names: string[] = []
+	for (const statement of statementsOf(stripComments(schema))) {
+		const match = /^\s*table\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(statement)
+		if (match) names.push(match[1])
+	}
+	return names
+}
+
+/**
+ * Quereus's post-commit watchers over the app's tables, reporting which ones a commit touched.
+ * They fire for a commit made on this database, and -- on a strand database -- for one replicated
+ * from a peer, which Optimystic reports through `notifyExternalChange`.
+ */
+export function watchTables(
+	db: Database,
+	tables: readonly string[],
+	listener: (tables: readonly string[]) => void,
+): () => void {
+	const subscription = db.watch(
+		{
+			watches: tables.map(table => ({
+				table: { schema: APP_SCHEMA, table },
+				columns: 'all' as const,
+				scope: { kind: 'full' as const },
+			})),
+			nonDeterministicSources: [],
+			unboundParameters: [],
+		},
+		event => {
+			listener(event.matched.map(m => m.watch.table.table))
+		},
+	)
+	return () => subscription.unsubscribe()
+}
+
