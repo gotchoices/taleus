@@ -17,7 +17,7 @@ import { localAreas } from './local.js'
 import { Session, type PartyIdentity, type SessionOptions } from './session.js'
 import { offersModel, talliesModel, tallyModel } from './tallies.js'
 
-export type { PartyIdentity, SessionOptions } from './session.js'
+export type { DurableText, PartyIdentity, SessionOptions, SessionStorage } from './session.js'
 
 /** The agreement every Taleus app can offer until it is given others. */
 export const STANDARD_AGREEMENT: AgreementDocument = {
@@ -54,7 +54,10 @@ export interface EngineModel {
 
 export async function createEngineModel(options: SessionOptions): Promise<EngineModel> {
 	const session = new Session({ ...options, agreements: options.agreements ?? [STANDARD_AGREEMENT] })
-	if (options.identity) await session.start(options.identity)
+	// What this device kept: its local choices, then its identity. An identity passed in wins.
+	await session.restoreState()
+	const identity = options.identity ?? (await session.restoredIdentity())
+	if (identity) await session.start(identity)
 	const local = localAreas(session)
 	const model: TaleusModel = {
 		party: partyModel(session),
@@ -76,7 +79,10 @@ export async function createEngineModel(options: SessionOptions): Promise<Engine
 	return {
 		model,
 		settled: () => session.settled(),
-		stop: () => session.stop(),
+		stop: async () => {
+			await session.saved()
+			await session.stop()
+		},
 		runs: () => session.runs,
 	}
 }

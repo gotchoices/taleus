@@ -4,6 +4,7 @@
  */
 import {
 	createPartyIdentity,
+	localSigner,
 	openTaleus,
 	type LocalSigner,
 	type StoreProvider,
@@ -12,6 +13,9 @@ import {
 	type TallyView,
 } from 'taleus-core'
 
+import type { NotificationSettings } from '../notifications.js'
+import type { Rate } from '../rates.js'
+import type { Settings } from '../settings.js'
 import type { Amount, Unit } from '../types.js'
 import { notifyWorldChanged } from '../world.js'
 import type { AgreementDocument } from '../tally.js'
@@ -41,8 +45,9 @@ export interface IntendedTerms {
 }
 
 /**
- * Everything this device keeps that is not on any tally. In memory for now; the host will
- * persist it (and the identity's secret, in its platform's key store) when engine mode ships.
+ * Everything this device keeps that is not on any tally. Saved through the host's
+ * `SessionStorage.state` after every change, when the host supplies one; the identity's secret
+ * goes to `SessionStorage.identity` instead, which the host keeps in its platform's key store.
  */
 export interface LocalState {
 	displayName: string
@@ -57,14 +62,70 @@ export interface LocalState {
 	 */
 	units: Record<string, Unit>
 	setAside: Record<string, string>
+	settings: Omit<Settings, 'unitsHeld'>
+	notifications: NotificationSettings
+	rates: Rate[]
+	deviceName: string
+}
+
+/** One durable text value the host keeps: the same shape as cadre-core's `DurableSlot`. */
+export interface DurableText {
+	/** The saved text, or `undefined` when none is saved. A read fault throws. */
+	load(): Promise<string | undefined>
+	save(text: string): Promise<void>
+}
+
+/**
+ * Where a session keeps what must outlive the app: its device-local state, and its identity.
+ * The identity slot holds a secret key -- on a phone, a secure-store entry, never plain storage.
+ */
+export interface SessionStorage {
+	state: DurableText
+	identity: DurableText
+}
+
+/** A fresh device: nothing chosen, nothing held. Never the mock's fixtures, which hold sample people. */
+export function initialLocalState(): LocalState {
+	return {
+		displayName: '',
+		disclosed: {},
+		madeInvitations: [],
+		answeredInvitations: {},
+		intended: {},
+		units: {},
+		setAside: {},
+		settings: {
+			locale: 'en',
+			displayUnit: 'CHIP',
+			unitStyle: 'mark',
+			appearance: 'system',
+			availableLocales: [{ tag: 'en', name: 'English' }],
+		},
+		notifications: {
+			permission: 'unasked',
+			classes: [
+				{ id: 'signature', delivery: 'interrupt' },
+				{ id: 'asked', delivery: 'interrupt' },
+				{ id: 'arrived', delivery: 'inform' },
+				{ id: 'automatic', delivery: 'silent', fixed: true },
+			],
+			lockScreenDetail: 'minimal',
+			backgroundParticipation: false,
+			hasAlwaysOnDevice: false,
+		},
+		rates: [],
+		deviceName: 'This device',
+	}
 }
 
 export interface SessionOptions {
 	store: StoreProvider
 	/** An identity this party already has. Absent means first run: none until `createIdentity`. */
 	identity?: PartyIdentity
-	/** Called when a new identity is made, so the host can keep its secret. */
+	/** Called when a new identity is made. */
 	onIdentityCreated?: (identity: PartyIdentity) => void
+	/** Where to keep device-local state and the identity across restarts. Absent: memory only. */
+	storage?: SessionStorage
 	/** The clock. Injectable so a test can say what day it is. */
 	now?: () => Date
 	/** Agreements this app can offer, by content address. */
@@ -77,15 +138,7 @@ export interface SessionOptions {
 }
 
 export class Session {
-	readonly local: LocalState = {
-		displayName: '',
-		disclosed: {},
-		madeInvitations: [],
-		answeredInvitations: {},
-		intended: {},
-		units: {},
-		setAside: {},
-	}
+	readonly local: LocalState = initialLocalState()
 	identity: PartyIdentity | undefined
 	engine: Taleus | undefined
 	private readonly tallies = new Map<string, Tally>()
@@ -93,6 +146,8 @@ export class Session {
 	/** How many agent runs have been asked for -- lets a test tell "quiet" from "between steps". */
 	runs = 0
 	private unwatch: (() => void) | undefined
+	/** Saves in order, so a later state never lands under an earlier one. */
+	private saving: Promise<void> = Promise.resolve()
 
 	constructor(readonly options: SessionOptions) {}
 
@@ -123,9 +178,48 @@ export class Session {
 
 	async createIdentity(): Promise<PartyIdentity> {
 		const identity = createPartyIdentity()
+		// Kept before it is used: an identity that signed something and was then lost would
+		// leave this party unable to act on its own tallies.
+		await this.options.storage?.identity.save(serializeIdentity(identity))
 		this.options.onIdentityCreated?.(identity)
 		await this.start(identity)
 		return identity
+	}
+
+	/** The identity the host kept, if any. A read fault throws, rather than minting a second identity. */
+	async restoredIdentity(): Promise<PartyIdentity | undefined> {
+		const text = await this.options.storage?.identity.load()
+		return text === undefined ? undefined : parseIdentity(text)
+	}
+
+	/**
+	 * Load the device-local state the host kept, over the initial one, so a field added since it
+	 * was saved starts at its default. A read fault throws; an unreadable record is logged and
+	 * ignored, which costs this device its local choices but no tally.
+	 */
+	async restoreState(): Promise<void> {
+		const text = await this.options.storage?.state.load()
+		if (text === undefined) return
+		try {
+			Object.assign(this.local, JSON.parse(text) as Partial<LocalState>)
+		} catch (error) {
+			console.warn('taleus-model: ignoring unreadable saved device state:', error)
+		}
+	}
+
+	/** Record that device-local state changed: saved in the background, in order. */
+	changed(): void {
+		const storage = this.options.storage
+		if (!storage) return
+		const text = JSON.stringify(this.local)
+		this.saving = this.saving
+			.then(() => storage.state.save(text))
+			.catch(error => console.warn('taleus-model: saving device state failed:', error))
+	}
+
+	/** Resolves once every save asked for so far has finished. */
+	saved(): Promise<void> {
+		return this.saving
 	}
 
 	async stop(): Promise<void> {
@@ -224,4 +318,40 @@ export class Session {
 			}
 		}
 	}
+}
+
+/** The identity as kept: its sid (the genesis key's address, which survives a rotation) and current key. */
+interface IdentityRecord {
+	v: 1
+	sid: string
+	publicKey: string
+	secretKey: string
+}
+
+function serializeIdentity(identity: PartyIdentity): string {
+	const record: IdentityRecord = {
+		v: 1,
+		sid: identity.sid,
+		publicKey: identity.signer.publicKey,
+		secretKey: toHex(identity.signer.secretKey),
+	}
+	return JSON.stringify(record)
+}
+
+function parseIdentity(text: string): PartyIdentity {
+	const record = JSON.parse(text) as Partial<IdentityRecord>
+	if (record.v !== 1 || typeof record.sid !== 'string' || typeof record.publicKey !== 'string' || typeof record.secretKey !== 'string') {
+		throw new Error('the kept identity is not one this version can read')
+	}
+	return { sid: record.sid, signer: localSigner({ publicKey: record.publicKey, secretKey: fromHex(record.secretKey) }) }
+}
+
+function toHex(bytes: Uint8Array): string {
+	return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function fromHex(hex: string): Uint8Array {
+	const bytes = new Uint8Array(hex.length / 2)
+	for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
+	return bytes
 }

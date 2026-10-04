@@ -87,11 +87,13 @@ export function attentionModel(session: Session): AttentionModel {
 			// Setting aside stays on this device: nothing reaches the other party, and nothing on
 			// the tally changes. It is not a refusal.
 			aside[id] = session.now().toISOString()
+			session.changed()
 			return list()
 		},
 
 		async bringBack(id) {
 			delete aside[id]
+			session.changed()
 			return list()
 		},
 

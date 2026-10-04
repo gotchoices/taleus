@@ -1,5 +1,9 @@
+import type { Rate } from '../rates.js'
 import type { Result } from '../types.js'
-import { createLocalWorld, STANDARD_AGREEMENT } from './index.js'
+import { MemoryFabric } from 'taleus-core'
+import tallySchema from 'taleus-core/schema-text/draft1'
+
+import { createEngineModel, createLocalWorld, STANDARD_AGREEMENT, type DurableText } from './index.js'
 
 const USD = { denom: 'iso4217:USD', scale: 2 }
 const usd = (units: number) => ({ units, ...USD })
@@ -116,5 +120,63 @@ describe('a tally made through the model, with a simulated counterparty', () => 
 		const countered = await me.offers.respondToOffer(id, 'counter')
 		expect(countered.ok ? undefined : countered.error.kind).toBe('unsupported')
 		expect(countered.ok ? '' : countered.error.message).toMatch(/feat-offer-lifecycle/)
+	})
+})
+
+/** A host's durable slot, in memory: what a test needs to stand in for a phone's storage. */
+function memorySlot(): DurableText & { text?: string } {
+	const slot: DurableText & { text?: string } = {
+		load: async () => slot.text,
+		save: async text => {
+			slot.text = text
+		},
+	}
+	return slot
+}
+
+describe('a session kept across restarts', () => {
+	it('comes back as the same party, with its device-local choices', async () => {
+		const fabric = new MemoryFabric(tallySchema)
+		const storage = { state: memorySlot(), identity: memorySlot() }
+		const first = await createEngineModel({ store: fabric.provider('me'), now: NOW, storage })
+		const party = must(await first.model.party.createIdentity())
+		must(await first.model.party.setDisplayName('Jan'))
+		const invitation = must(
+			await first.model.invitations.createInvitation({
+				unit: USD,
+				creditLimit: usd(50000),
+				noticeDays: 21,
+				agreementId: STANDARD_AGREEMENT.id,
+				goodForDays: 7,
+				note: 'bike',
+			}),
+		)
+		const rate: Rate = {
+			...USD,
+			basis: 'fixed',
+			accept: 100,
+			part: 100,
+			signed: '2026-09-07T12:00:00Z',
+			updated: '2026-09-07T12:00:00Z',
+			permitsMovement: true,
+		}
+		must(await first.model.rates.setRate(rate))
+		must(await first.model.devices.renameDevice('this-device', 'Pixel'))
+		await first.stop()
+		expect(storage.identity.text).toEqual(expect.any(String))
+
+		const second = await createEngineModel({ store: fabric.provider('me'), now: NOW, storage })
+		expect(must(await second.model.party.readParty())).toMatchObject({ sid: party.sid, displayName: 'Jan' })
+		expect(must(await second.model.invitations.listInvitations())).toEqual([
+			expect.objectContaining({ token: invitation.token, note: 'bike', state: 'outstanding' }),
+		])
+		expect(must(await second.model.rates.readRates()).rates).toEqual([expect.objectContaining({ denom: 'iso4217:USD' })])
+		expect(must(await second.model.devices.listDevices())[0].name).toBe('Pixel')
+	})
+
+	it('refuses to start over a kept identity it cannot read, rather than minting another', async () => {
+		const storage = { state: memorySlot(), identity: memorySlot() }
+		storage.identity.text = '{"v":2}'
+		await expect(createEngineModel({ store: new MemoryFabric(tallySchema).provider('me'), storage })).rejects.toThrow(/kept identity/)
 	})
 })

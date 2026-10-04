@@ -7,13 +7,25 @@
  * is the app's own: every strand it holds is taken to be a tally.
  *
  * Joining is two layers. The inviter's store founds the strand and mints a Sereus invitation to
- * it, which travels as the ticket's `ref.address`; the invitee's store redeems that invitation
- * (`formStrand`) and attaches the strand. Taking a *seat* in the tally is the engine's business,
- * with the credential the ticket also carries.
+ * it, which travels as the ticket's `ref.address`; the invitee's store asks to join with it
+ * (`requestJoin`, which the party keeps retrying, from any of its owner machines, until the
+ * inviter's side answers) and attaches the strand. Taking a *seat* in the tally is the engine's
+ * business, with the credential the ticket also carries.
+ *
+ * Every strand reaches this store the same way: cadre-core offers it as `strand:discovered` --
+ * a strand this party joined, and after a restart every strand the node holds -- and the store
+ * attaches it, once.
  */
 
 import { generateStrandMemberKey, StrandAwaitingFirstSyncError } from '@serfab/cadre-core'
-import type { CadreNode, SAppConfig, StrandFormationDisclosure, StrandInstance } from '@serfab/cadre-core'
+import type {
+	CadreNode,
+	PendingJoinStatus,
+	SAppConfig,
+	StrandFormationDisclosure,
+	StrandInstance,
+	StrandRow,
+} from '@serfab/cadre-core'
 import type { Database } from '@quereus/quereus'
 import type { InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe } from 'taleus-core'
 import { tablesIn, transactionBatch, watchTables, type RowWrite } from 'taleus-core/host'
@@ -33,6 +45,11 @@ export interface CadreStoreOptions {
 	 */
 	firstSyncPatienceMs?: number
 	/**
+	 * How long `join` waits for the inviter's side to answer before failing. The party keeps
+	 * asking after that, and the strand is attached when it arrives. Default 120 s.
+	 */
+	joinPatienceMs?: number
+	/**
 	 * A backstop: report every table as changed this often, in case a replicated commit raises
 	 * no watch. Default 10 s; 0 turns it off.
 	 */
@@ -47,9 +64,21 @@ export function cadreStoreProvider(options: CadreStoreOptions): StoreProvider {
 
 class CadreStoreProvider implements StoreProvider {
 	private readonly tables: readonly string[]
+	/** Each strand's attach, started once and shared by everyone who waits for it. */
+	private readonly attaching = new Map<string, Promise<StrandInstance>>()
+	/** Callers waiting for a strand that has not been offered yet. */
+	private readonly awaited = new Map<string, ((instance: Promise<StrandInstance>) => void)[]>()
 
 	constructor(private readonly options: CadreStoreOptions) {
 		this.tables = tablesIn(options.sApp.schema)
+		// Subscribe, then drain what was offered before this store existed: a strand offered
+		// between the two is attached once either way.
+		options.node.on('strand:discovered', ({ strand }) => {
+			void this.attach(strand).catch(err => console.warn(`taleus-model/cadre: attaching ${strand.Id} failed:`, err))
+		})
+		for (const strand of options.node.getDiscoveredStrands().values()) {
+			void this.attach(strand).catch(err => console.warn(`taleus-model/cadre: attaching ${strand.Id} failed:`, err))
+		}
 	}
 
 	async list(): Promise<TallyRef[]> {
@@ -57,7 +86,7 @@ class CadreStoreProvider implements StoreProvider {
 	}
 
 	async open(ref: TallyRef): Promise<TallyStore> {
-		return this.storeFor(this.instance(ref.id))
+		return this.storeFor(await this.whenAttached(ref.id))
 	}
 
 	/**
@@ -74,6 +103,7 @@ class CadreStoreProvider implements StoreProvider {
 			memberPrivateKey: await generateStrandMemberKey(),
 			sAppConfig: sApp,
 		})
+		this.attaching.set(strandId, Promise.resolve(instance))
 		const lifetimeMs = this.options.invitationLifetimeMs ?? 30 * DAY_MS
 		const invitation = await node.createOpenInvitation(sApp.id, lifetimeMs)
 		await node.publishFormationInvite(invitation.token, sApp.id, {
@@ -84,20 +114,80 @@ class CadreStoreProvider implements StoreProvider {
 		return { ref: { id: strandId, address: node.encodeInvitation(invitation) }, store: this.storeFor(instance) }
 	}
 
-	/** Redeem the strand invitation the ticket carries, then attach the strand once it has synced. */
+	/**
+	 * Ask to join with the strand invitation the ticket carries, wait for the inviter's side to
+	 * answer, then for the strand -- offered as `strand:discovered` -- to be attached.
+	 */
 	async join(ticket: InvitationTicket): Promise<{ ref: TallyRef; store: TallyStore }> {
-		const { node, sApp } = this.options
+		const { node } = this.options
 		const address = ticket.ref.address
 		if (!address) throw new Error(`the invitation to ${ticket.ref.id} carries no strand address to join it by`)
-		const formed = await node.formStrand(node.decodeInvitation(address), this.options.disclosure)
-		if (formed.strandId !== ticket.ref.id) {
-			throw new Error(`the strand invitation admits to ${formed.strandId}, not the tally ${ticket.ref.id}`)
+		const status = await this.joined(await node.requestJoin(node.decodeInvitation(address), this.options.disclosure))
+		if (status.strandId !== ticket.ref.id) {
+			throw new Error(`the strand invitation admitted to ${status.strandId ?? 'nothing'}, not the tally ${ticket.ref.id}`)
 		}
-		const instance = await this.attachWhenWritable({
-			strandRow: { Id: formed.strandId, MemberPrivateKey: formed.memberPrivateKey ?? null, Type: 'c', FounderOwnerKey: null },
-			sAppConfig: sApp,
+		return { ref: { id: ticket.ref.id }, store: this.storeFor(await this.whenAttached(ticket.ref.id)) }
+	}
+
+	/** Follow a join request until it has joined, failing on a refusal or when patience runs out. */
+	private joined(first: PendingJoinStatus): Promise<PendingJoinStatus> {
+		const settled = (status: PendingJoinStatus) => status.state === 'joined' || status.state === 'failed'
+		const refusal = (status: PendingJoinStatus) =>
+			new Error(`the inviter refused the join: ${status.lastError?.reason ?? status.lastError?.code ?? 'no reason given'}`)
+		if (first.state === 'joined') return Promise.resolve(first)
+		if (first.state === 'failed') return Promise.reject(refusal(first))
+		const patienceMs = this.options.joinPatienceMs ?? 120_000
+		return new Promise<PendingJoinStatus>((resolve, reject) => {
+			const timer = setTimeout(() => {
+				unsubscribe()
+				reject(new Error(`the inviter's side has not answered after ${patienceMs / 1000} s; this party keeps asking`))
+			}, patienceMs)
+			const unsubscribe = this.onPendingJoin(first.id, status => {
+				if (!settled(status)) return
+				clearTimeout(timer)
+				unsubscribe()
+				if (status.state === 'joined') resolve(status)
+				else reject(refusal(status))
+			})
 		})
-		return { ref: { id: formed.strandId }, store: this.storeFor(instance) }
+	}
+
+	private onPendingJoin(id: string, listener: (status: PendingJoinStatus) => void): () => void {
+		const handler = (status: PendingJoinStatus) => {
+			if (status.id === id) listener(status)
+		}
+		this.options.node.on('pendingJoin:changed', handler)
+		return () => this.options.node.off('pendingJoin:changed', handler)
+	}
+
+	/** Attach an offered strand, once; a strand the node already runs is taken as it is. */
+	private attach(strand: StrandRow): Promise<StrandInstance> {
+		let attaching = this.attaching.get(strand.Id)
+		if (!attaching) {
+			const running = this.options.node.getStrands().get(strand.Id)
+			attaching = running?.database
+				? Promise.resolve(running)
+				: this.attachWhenWritable({ strandRow: strand, sAppConfig: this.options.sApp })
+			this.attaching.set(strand.Id, attaching)
+			// A failed attach may be offered again; let it start afresh.
+			attaching.catch(() => this.attaching.delete(strand.Id))
+		}
+		for (const waiter of this.awaited.get(strand.Id) ?? []) waiter(attaching)
+		this.awaited.delete(strand.Id)
+		return attaching
+	}
+
+	/** The strand once attached: now, or when it is offered. */
+	private whenAttached(id: string): Promise<StrandInstance> {
+		const attaching = this.attaching.get(id)
+		if (attaching) return attaching
+		const running = this.options.node.getStrands().get(id)
+		if (running?.database) return Promise.resolve(running)
+		return new Promise<StrandInstance>(resolve => {
+			const waiters = this.awaited.get(id) ?? []
+			waiters.push(instance => resolve(instance))
+			this.awaited.set(id, waiters)
+		})
 	}
 
 	/**
@@ -113,12 +203,6 @@ class CadreStoreProvider implements StoreProvider {
 				timeoutMs: this.options.firstSyncPatienceMs ?? 240_000,
 			})
 		}
-	}
-
-	private instance(id: string): StrandInstance {
-		const instance = this.options.node.getStrands().get(id)
-		if (!instance) throw new Error(`this node holds no strand ${id}`)
-		return instance
 	}
 
 	private storeFor(instance: StrandInstance): TallyStore {

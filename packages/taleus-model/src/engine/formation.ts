@@ -31,6 +31,7 @@ export function partyModel(session: Session): PartyModel {
 		},
 		async setDisplayName(name) {
 			session.local.displayName = name
+			session.changed()
 			// The name is what a counterparty sees, so every tally hears about it.
 			for (const { tally } of await session.views()) {
 				await tally.publishCertificate(session.certificate())
@@ -107,6 +108,7 @@ export function invitationsModel(session: Session): InvitationsModel {
 				propose: { agreementId: draft.agreementId },
 			}
 			session.local.units[tallyId] = draft.unit
+			session.changed()
 			const listed = (await this.listInvitations()) as { ok: true; value: Invitation[] }
 			return ok(listed.value.find(i => i.token === token) as Invitation)
 		},
@@ -136,6 +138,7 @@ export function invitationsModel(session: Session): InvitationsModel {
 				// Refusing an invitation sends nothing: the invitee never joined, so there is no
 				// tally to record it on, and the inviter sees it lapse.
 				session.local.answeredInvitations[token] = 'refused'
+				session.changed()
 				return ok('refused' as const)
 			}
 			const engine = session.engine
@@ -155,6 +158,7 @@ export function invitationsModel(session: Session): InvitationsModel {
 			session.local.intended[tallyId] = { creditLimit: response.creditLimit, noticeDays: response.noticeDays }
 			session.local.units[tallyId] = envelope.unit
 			session.local.answeredInvitations[token] = 'accepted'
+			session.changed()
 			await session.advance()
 			return ok('accepted' as const)
 		},

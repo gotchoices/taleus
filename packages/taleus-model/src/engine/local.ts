@@ -7,10 +7,10 @@
  * they hold sample people.
  */
 import type { Device, DevicesModel } from '../devices.js'
-import type { NotificationSettings, NotificationsModel } from '../notifications.js'
+import type { NotificationsModel } from '../notifications.js'
 import type { Delivery, Field, Profile, ProfileModel } from '../profile.js'
-import type { Rate, RatesModel } from '../rates.js'
-import type { HeldUnit, Settings, SettingsModel } from '../settings.js'
+import type { RatesModel } from '../rates.js'
+import type { HeldUnit, SettingsModel } from '../settings.js'
 import type { StandingModel } from '../standing.js'
 import type { Session } from './session.js'
 import { failed, nameOf, ok, stateOf, unsupported } from './translate.js'
@@ -27,50 +27,31 @@ export interface LocalAreas {
 }
 
 export function localAreas(session: Session): LocalAreas {
-	const settings: Omit<Settings, 'unitsHeld'> = {
-		locale: 'en',
-		displayUnit: 'CHIP',
-		unitStyle: 'mark',
-		appearance: 'system',
-		availableLocales: [{ tag: 'en', name: 'English' }],
-	}
-	const notifications: NotificationSettings = {
-		permission: 'unasked',
-		classes: [
-			{ id: 'signature', delivery: 'interrupt' },
-			{ id: 'asked', delivery: 'interrupt' },
-			{ id: 'arrived', delivery: 'inform' },
-			{ id: 'automatic', delivery: 'silent', fixed: true },
-		],
-		lockScreenDetail: 'minimal',
-		backgroundParticipation: false,
-		hasAlwaysOnDevice: false,
-	}
-	const rates: Rate[] = []
-	const thisDevice: Device = {
+	const { local } = session
+	const thisDevice = (): Device => ({
 		id: 'this-device',
-		name: 'This device',
+		name: local.deviceName,
 		kind: 'phone',
 		lastActive: session.now().toISOString(),
 		thisDevice: true,
 		contributes: ['durability', 'availability'],
-	}
+	})
 
 	/** The units this party holds: whatever its tallies are in. */
 	async function unitsHeld(): Promise<HeldUnit[]> {
 		const seen = new Map<string, HeldUnit>()
 		for (const { view } of await session.views()) {
 			const unit = session.unitOf(view)
-			seen.set(unit.denom, { ...unit, priced: rates.some(r => r.denom === unit.denom) })
+			seen.set(unit.denom, { ...unit, priced: local.rates.some(r => r.denom === unit.denom) })
 		}
 		return [...seen.values()]
 	}
 
-	const readSettings = async () => ok({ ...settings, unitsHeld: await unitsHeld() })
+	const readSettings = async () => ok({ ...local.settings, unitsHeld: await unitsHeld() })
 	const readRates = async () =>
 		ok({
-			against: settings.displayUnit,
-			rates: [...rates],
+			against: local.settings.displayUnit,
+			rates: [...local.rates],
 			unpriced: (await unitsHeld()).filter(u => !u.priced),
 			conversions: [],
 		})
@@ -105,54 +86,60 @@ export function localAreas(session: Session): LocalAreas {
 	}
 
 	return {
-		displayUnit: () => settings.displayUnit,
+		displayUnit: () => local.settings.displayUnit,
 
 		settings: {
 			readSettings,
 			async writeSettings(change) {
 				const { unitsHeld: _ignored, ...rest } = change
-				Object.assign(settings, rest)
+				Object.assign(local.settings, rest)
+				session.changed()
 				return readSettings()
 			},
 		},
 
 		notifications: {
 			async readNotifications() {
-				return ok({ ...notifications })
+				return ok({ ...local.notifications })
 			},
 			async setDelivery(id, delivery) {
-				notifications.classes = notifications.classes.map(c => (c.id === id && !c.fixed ? { ...c, delivery } : c))
-				return ok({ ...notifications })
+				local.notifications.classes = local.notifications.classes.map(c => (c.id === id && !c.fixed ? { ...c, delivery } : c))
+				session.changed()
+				return ok({ ...local.notifications })
 			},
 			async setNotifications(change) {
-				Object.assign(notifications, change)
-				return ok({ ...notifications })
+				Object.assign(local.notifications, change)
+				session.changed()
+				return ok({ ...local.notifications })
 			},
 		},
 
 		rates: {
 			readRates,
 			async setRate(rate) {
-				const at = rates.findIndex(r => r.denom === rate.denom)
-				if (at >= 0) rates[at] = rate
-				else rates.push(rate)
+				const at = local.rates.findIndex(r => r.denom === rate.denom)
+				if (at >= 0) local.rates[at] = rate
+				else local.rates.push(rate)
+				session.changed()
 				return readRates()
 			},
 			async clearRate(denom) {
-				const at = rates.findIndex(r => r.denom === denom)
-				if (at >= 0) rates.splice(at, 1)
+				const at = local.rates.findIndex(r => r.denom === denom)
+				if (at >= 0) local.rates.splice(at, 1)
+				session.changed()
 				return readRates()
 			},
 		},
 
 		devices: {
 			async listDevices() {
-				return ok([{ ...thisDevice, lastActive: session.now().toISOString() }])
+				return ok([thisDevice()])
 			},
 			async renameDevice(id, name) {
-				if (id !== thisDevice.id) return failed<Device[]>('not-found', `no device ${id}`)
-				thisDevice.name = name
-				return ok([{ ...thisDevice }])
+				if (id !== thisDevice().id) return failed<Device[]>('not-found', `no device ${id}`)
+				local.deviceName = name
+				session.changed()
+				return ok([thisDevice()])
 			},
 			async retireDevice() {
 				return unsupported('Retiring a device', 'feat-device-and-recovery-surface')
@@ -166,8 +153,9 @@ export function localAreas(session: Session): LocalAreas {
 			readProfile,
 			async setField(key, value) {
 				// Held on this device. It reaches a counterparty only when the party authorizes it.
-				if (key === 'name') session.local.displayName = value
-				else session.local.disclosed[key] = value
+				if (key === 'name') local.displayName = value
+				else local.disclosed[key] = value
+				session.changed()
 				return readProfile()
 			},
 			async authorizeCorrection(_key, tallyIds) {

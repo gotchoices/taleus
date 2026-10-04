@@ -59,15 +59,23 @@ What engine mode adds beyond translation:
 - **An invitation envelope.** The core's ticket says where to join and proves the seat is yours, but
   not what is offered — terms are signed against a tally that does not exist yet. The model's token
   carries the ticket plus the offered terms for display; the signed terms follow on the tally.
-- **Device-local state** — settings, notifications, rates, devices, "set aside" — that never touches
-  a tally. It starts empty: engine mode never borrows the mock's fixtures, which hold sample people.
+- **Device-local state** — invitations made, intended terms, settings, notifications, rates, the
+  device's name, "set aside" — that never touches a tally. It starts empty: engine mode never
+  borrows the mock's fixtures, which hold sample people. With `storage: { state, identity }` (two
+  `load`/`save` text slots, the shape of cadre-core's `DurableSlot`) the session saves that state
+  after every change and keeps its identity, sid and current key, in the identity slot, which the
+  host puts in its secure store; the next `createEngineModel` comes back as the same party. A
+  kept identity it cannot read stops the start rather than minting a second one.
 
 **On real strands.** `taleus-model/cadre` exports `cadreStoreProvider({ node, sApp })`, a
 taleus-core `StoreProvider` over a running Sereus `CadreNode` (built on a phone by
 `@serfab/cadre-rn`'s `createPhoneNode`). Each tally is a closed two-party strand with the Taleus sApp.
 `create` founds it and mints a single-use strand invitation, which travels in the ticket's
-`ref.address`; `join` redeems it and attaches the strand once it has synced. Its test runs two nodes
-over loopback and opens a tally with no polling: the counterparty's commits wake the agent.
+`ref.address`; `join` asks to join with it (`requestJoin`, which the party keeps retrying until the
+inviter's side answers) and waits for the strand. Every strand reaches the store as
+`strand:discovered` and is attached once, so a restarted node gets its tallies back. Its test runs two nodes
+over loopback, opens a tally with no polling (the counterparty's commits wake the agent), and
+restarts the invitee's node, which gets the tally back.
 
 What the core does not support yet comes back as `{ kind: 'unsupported' }` naming its ticket:
 countering an offer, withdrawing a close, withdrawing or part-paying a request, one payment answering

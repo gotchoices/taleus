@@ -15,6 +15,12 @@
 -- `verify` names the curve: its default is secp256k1, and a call that leaves it out refuses
 -- every genuine Taleus signature. Keys, signatures and digests are base64url text.
 
+-- Every table carries `"optimystic.network_watch" = true`: on a node built with Sereus's
+-- `strandReactivity`, a commit by another machine wakes this table's watchers even when this
+-- machine stores none of its blocks -- the case once always-on cadre hosts replicate a tally.
+-- On a node without the option the tag is inert and watchers wake on local commits only
+-- (sereus docs/strands.md -> "Change notifications (reactivity)").
+
 table Stock (
     Sid text,
     InvitationKey text,    --public key of sk sent to invited party
@@ -33,7 +39,7 @@ table Stock (
         'ed25519'
     )),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 table Foil (
     Sid text,
@@ -48,7 +54,7 @@ table Foil (
     )),
     constraint PartyExists check on insert ((select count(*) from PartyKey PK where PK.Sid = New.Sid)),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- PartyKey is an authorized-key SET with revocation, not a sole-authority chain.
 -- The party's identity (Sid) is the hash of the genesis (Revision 1) public key and
@@ -109,7 +115,7 @@ table PartyKey (
     constraint InsertOnly check on delete, update (0),
     -- Never introduce a third party. The new row's Sid is counted (plain ref).
     constraint TwoParties check on insert ((select count(distinct Sid) from PartyKey) <= 2)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- Forward-only revocation of an authorized key. Rows already committed under the key stay
 -- valid -- they are insert-only, their signature was checked once at their own insert against
@@ -165,7 +171,7 @@ table PartyKeyRevocation (
     -- it does not re-validate, this needs a stronger guard (e.g. serialize revocations per Sid).
     constraint NotLastKey check on insert ((select count(*) from AuthorizedKey AK where AK.Sid = New.Sid) >= 1),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- Counterparty re-key ceremony (ticket key-counterparty-rekey). The ONLY path that introduces a
 -- key into a party's authorized set WITHOUT an existing key of that party -- last-resort recovery
@@ -232,7 +238,7 @@ table PartyKeyAdoption (
         and (select count(*) from PartyKeyAdoption A where A.Sid = New.Sid and A.PublicKey = New.PublicKey) = 1
     ),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 table PartyCertificate (
     PartySid text,
@@ -251,7 +257,7 @@ table PartyCertificate (
         'ed25519'
     )),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- ValidDenomination: the prefix-dispatch validity check on a tally's denomination identifier
 -- (feat-denomination-argument), written in Quereus built-ins (`glob`) so that any Sereus node can
@@ -318,7 +324,7 @@ table TallyContractProposal (
         New.SignerKey,
         'ed25519'
     ))
-);
+) with tags ("optimystic.network_watch" = true);
 
 table TallyContract (
     Number integer,
@@ -387,7 +393,7 @@ table TallyContract (
             and New.DenominationScale = (select DenominationScale from TallyContract where Number = 1))
     ),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- Trading variables: each party's published lift policy for this tally, revisioned.
 -- Semantics follow MyCHIPs (mychips/schema/tallies.wmt), expressed from the issuing
@@ -419,7 +425,7 @@ table TradingVariable (
         'ed25519'
     )),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- Credit one party (Sid = grantor) extends to the counterparty. UNILATERAL: only the grantor
 -- signs. Same shape as TradingVariable (per-Sid, revisioned, insert-only, grantor-signed) --
@@ -485,7 +491,7 @@ table CreditTerms (
             end)
     ),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- Signed close request (feat-schema-tally-close): either party may sign one row to move the tally to
 -- Closing. Unilateral by design AND safe -- Closing does only two things: it FREEZES balance growth (no
@@ -518,7 +524,7 @@ table CloseRequest (
         'ed25519'
     )),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- A signed decline of an invoice by the PAYER (the counterparty of the requester). Expiry needs no row
 -- (it is time-derived); a decline is an explicit act and so needs a signed record. At most one per
@@ -548,7 +554,7 @@ table InvoiceDecline (
     -- not-declined guard; both are commit-time subqueries with the SAME isolation caveat noted there.
     constraint NotPaid check on insert (not exists (select 1 from Ledger L where L.InvoiceId = New.InvoiceId)),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 table Ledger (
     Number integer, -- Sequential, monotonically increasing
@@ -789,7 +795,7 @@ table Ledger (
             and New.SignerKey is null and New.Signature is null and New.InvoiceId is null)
     ),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- Conditional lift pledge on this edge (feat-schema-lift-chits). A lift clears credit around a cycle (or
 -- along a chain) in the tally graph: every participant pays one neighbor and is paid by another, net zero,
@@ -873,7 +879,7 @@ table PendingLift (
             and (select Balance from ReservedBalance) > (select Balance from ReservedBalance) - (New.Units * case when New.Issuer = 'F' then 1 else -1 end))  -- NR > PR
     ),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- Referee-signed void of a pending lift (feat-schema-lift-chits): an explicit abort OR a post-timeout void
 -- -- the SAME mechanism (decision 2). The referee is the sole arbiter; parties NEVER unilaterally void, so
@@ -902,7 +908,7 @@ table LiftVoid (
         'ed25519'
     )),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- Every key ever introduced for a party, revocation-agnostic: normal adds (PartyKey) plus
 -- counterparty-attested adoptions (PartyKeyAdoption, the key-counterparty-rekey ceremony).
@@ -967,7 +973,7 @@ table TallyCore (
         'ed25519'
     )),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- Payment request. One party formally asks the counterparty to pay it: the Requester is the party that
 -- wants to RECEIVE value (the future chit recipient), so the answering chit's Issuer is always the
@@ -1004,7 +1010,7 @@ table Invoice (
         or ((IsISODate(New.ExpiryDate) and length(New.ExpiryDate) = 10) and New.ExpiryDate >= New.Date)
     ),
     constraint InsertOnly check on delete, update (0)
-);
+) with tags ("optimystic.network_watch" = true);
 
 -- ── Indexes ──────────────────────────────────────────────────────────────────────────────
 --

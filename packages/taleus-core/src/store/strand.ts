@@ -157,7 +157,7 @@ export function functionsCalledBy(sql: string): string[] {
 			'values', 'order', 'by', 'limit', 'desc', 'asc', 'distinct', 'union', 'join',
 			'on', 'as', 'null', 'integer', 'text', 'real', 'blob', 'check', 'constraint',
 			'primary', 'key', 'insert', 'update', 'delete', 'default', 'committed', 'new',
-			'is', 'if', 'left', 'inner', 'outer', 'group', 'having', 'with',
+			'is', 'if', 'left', 'inner', 'outer', 'group', 'having', 'with', 'tags',
 		].map(k => k.toLowerCase()),
 	)
 
