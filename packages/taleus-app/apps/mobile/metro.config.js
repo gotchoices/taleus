@@ -35,6 +35,36 @@ const config = {
 	},
 };
 
+/**
+ * The Sereus stack, resolved from this app's node_modules whoever imports it.
+ *
+ * `taleus-model` and `taleus-core` are linked from the workspace, so Metro resolves their
+ * imports from the repository's node_modules, which holds its own copy of the stack for their
+ * Node tests. Two copies of cadre-core, Quereus or libp2p in one bundle break `instanceof`
+ * checks and libp2p itself (sereus 1.10: an embedder must resolve a single
+ * `@libp2p/interface`). So an import of the stack from outside this app is resolved as if the
+ * app made it -- the rule `withCadreMetro` already applies to the kit's own peers.
+ */
+const STACK = /^(@serfab|@quereus|@optimystic|@libp2p|@chainsafe|@multiformats)\/|^libp2p$/;
+const APP_ORIGIN = path.resolve(__dirname, 'index.js');
+const APP_DIR = path.join(__dirname, path.sep);
+
+function withOneStack(metroConfig) {
+	const next = metroConfig.resolver.resolveRequest;
+	metroConfig.resolver.resolveRequest = (context, moduleName, platform) => {
+		// The linked packages live outside this directory; anything under it, its own
+		// node_modules included, resolves as usual.
+		const fromOutside = !context.originModulePath.startsWith(APP_DIR);
+		const scoped = STACK.test(moduleName) && fromOutside
+			? { ...context, originModulePath: APP_ORIGIN }
+			: context;
+		return next ? next(scoped, moduleName, platform) : context.resolveRequest(scoped, moduleName, platform);
+	};
+	return metroConfig;
+}
+
 // Sereus's Metro settings for the stack (Node built-in shims, one copy of each
-// native module) on top of ours.
-module.exports = withCadreMetro(mergeConfig(getDefaultConfig(__dirname), config), { projectRoot: __dirname });
+// native module) on top of ours, then one copy of the stack itself.
+module.exports = withOneStack(
+	withCadreMetro(mergeConfig(getDefaultConfig(__dirname), config), { projectRoot: __dirname }),
+);

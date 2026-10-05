@@ -40,7 +40,7 @@
 	"dependencies": {
 		"@noble/curves": "^2.4.0",
 		"@noble/hashes": "^2.2.0",
-		"@optimystic/quereus-plugin-crypto": "^1.9.0",
+		"@optimystic/quereus-plugin-crypto": "^1.10.1",
 		"@quereus/quereus": "^4.20.0"
 	},
 	"devDependencies": {

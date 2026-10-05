@@ -104,13 +104,16 @@ class CadreStoreProvider implements StoreProvider {
 			sAppConfig: sApp,
 		})
 		this.attaching.set(strandId, Promise.resolve(instance))
+		console.warn('TMPDBG founded; creating invitation')
 		const lifetimeMs = this.options.invitationLifetimeMs ?? 30 * DAY_MS
 		const invitation = await node.createOpenInvitation(sApp.id, lifetimeMs)
+		console.warn('TMPDBG invitation minted; publishing')
 		await node.publishFormationInvite(invitation.token, sApp.id, {
 			strandId,
 			expiresAtMs: Date.now() + lifetimeMs,
 			totalUses: 1,
 		})
+		console.warn('TMPDBG invitation published')
 		return { ref: { id: strandId, address: node.encodeInvitation(invitation) }, store: this.storeFor(instance) }
 	}
 
@@ -120,6 +123,11 @@ class CadreStoreProvider implements StoreProvider {
 	 */
 	async join(ticket: InvitationTicket): Promise<{ ref: TallyRef; store: TallyStore }> {
 		const { node } = this.options
+		// Already joined -- an acceptance that failed after the strand arrived, now retried: the
+		// strand invitation is spent, so asking again could only be refused.
+		if (this.attaching.has(ticket.ref.id) || node.getStrands().has(ticket.ref.id)) {
+			return { ref: { id: ticket.ref.id }, store: this.storeFor(await this.whenAttached(ticket.ref.id)) }
+		}
 		const address = ticket.ref.address
 		if (!address) throw new Error(`the invitation to ${ticket.ref.id} carries no strand address to join it by`)
 		const status = await this.joined(await node.requestJoin(node.decodeInvitation(address), this.options.disclosure))
@@ -183,6 +191,7 @@ class CadreStoreProvider implements StoreProvider {
 		if (attaching) return attaching
 		const running = this.options.node.getStrands().get(id)
 		if (running?.database) return Promise.resolve(running)
+		if (running) return this.options.node.whenStrandWritable(id, { timeoutMs: this.options.firstSyncPatienceMs ?? 240_000 })
 		return new Promise<StrandInstance>(resolve => {
 			const waiters = this.awaited.get(id) ?? []
 			waiters.push(instance => resolve(instance))
@@ -195,33 +204,73 @@ class CadreStoreProvider implements StoreProvider {
 	 * `StrandAwaitingFirstSyncError` leaves the strand launched and syncing.
 	 */
 	private async attachWhenWritable(config: Parameters<CadreNode['addStrand']>[0]): Promise<StrandInstance> {
+		const patience = { timeoutMs: this.options.firstSyncPatienceMs ?? 240_000 }
 		try {
-			return await this.options.node.addStrand(config)
+			const instance = await this.options.node.addStrand(config)
+			// A strand the node already runs comes back as it is -- still syncing, after a restart.
+			return instance.database ? instance : await this.options.node.whenStrandWritable(config.strandRow.Id, patience)
 		} catch (err) {
 			if (!(err instanceof StrandAwaitingFirstSyncError)) throw err
-			return await this.options.node.whenStrandWritable(config.strandRow.Id, {
-				timeoutMs: this.options.firstSyncPatienceMs ?? 240_000,
-			})
+			return await this.options.node.whenStrandWritable(config.strandRow.Id, patience)
 		}
 	}
 
 	private storeFor(instance: StrandInstance): TallyStore {
-		const database = instance.database
-		if (!database) throw new Error(`strand ${instance.strandId} is not writable yet`)
-		return new CadreTallyStore(database.getDatabase(), this.tables, this.options.pollMs ?? 10_000)
+		return new CadreTallyStore(
+			this.options.node,
+			instance.strandId,
+			this.tables,
+			this.options.pollMs ?? 10_000,
+			this.options.firstSyncPatienceMs ?? 240_000,
+		)
 	}
 }
 
+/**
+ * A commit the strand's cohort did not approve in time: transient, and it committed nothing.
+ * The first writes after a node restarts alone hit it (sereus 1.9 notes), and so does a joiner's
+ * first write while its membership is still reaching the founder's machine.
+ *
+ * NOTE: matched on the message, because Optimystic throws a plain `Error` here. If it gains a
+ * typed error, match on that instead -- a reworded message would silently stop the retries.
+ */
+function lackedSuperMajority(error: unknown): boolean {
+	return /Failed to get super-majority/i.test(error instanceof Error ? error.message : String(error))
+}
+
+const WRITE_ATTEMPTS = 5
+const WRITE_RETRY_MS = 3_000
+
+/**
+ * One tally's strand, read and written through whatever database the node holds for it now.
+ * cadre-core replaces a strand's database when it restarts the strand (a first sync finishing,
+ * a wake from hibernation) and closes the old one, so a handle that kept the first would read a
+ * closed database ever after.
+ */
 class CadreTallyStore implements TallyStore {
 	constructor(
-		private readonly db: Database,
+		private readonly node: CadreNode,
+		private readonly strandId: string,
 		private readonly tables: readonly string[],
 		private readonly pollMs: number,
+		private readonly patienceMs: number,
 	) {}
 
+	/** The strand's current database, waiting for one while the strand is syncing. */
+	private async db(): Promise<Database> {
+		const current = this.node.getStrands().get(this.strandId)?.database
+		if (current) return current.getDatabase()
+		const instance = await this.node.whenStrandWritable(this.strandId, { timeoutMs: this.patienceMs })
+		if (!instance.database) throw new Error(`strand ${this.strandId} is not writable`)
+		return instance.database.getDatabase()
+	}
+
 	async query<T>(sql: string, params?: unknown[]): Promise<T[]> {
+		const db = await this.db()
 		const collected: T[] = []
-		for await (const row of this.db.eval(sql, params as never)) collected.push(row as T)
+		const t = Date.now()
+		for await (const row of db.eval(sql, params as never)) collected.push(row as T)
+		const ms = Date.now() - t; if (ms > 500) console.warn(`TMPDBG slow query ${ms}ms: ${sql.slice(0, 80)}`)
 		return collected
 	}
 
@@ -232,8 +281,23 @@ class CadreTallyStore implements TallyStore {
 	 * re-writes, so a retry after one does not double a row; the half that stood is visible.
 	 */
 	async apply(writes: RowWrite[]): Promise<void> {
+		for (let attempt = 1; ; attempt++) {
+			try {
+				return await this.applyOnce(writes)
+			} catch (error) {
+				if (!lackedSuperMajority(error) || attempt >= WRITE_ATTEMPTS) throw error
+				console.warn(`taleus-model/cadre: write attempt ${attempt} lacked a super-majority; retrying`)
+				await new Promise<void>(resolve => setTimeout(() => resolve(), WRITE_RETRY_MS))
+			}
+		}
+	}
+
+	private async applyOnce(writes: RowWrite[]): Promise<void> {
+		const db = await this.db()
 		const { sql, params } = transactionBatch(writes)
-		await this.db.exec(sql, params as never, { transaction: true })
+		const t = Date.now(); console.warn(`TMPDBG apply ${writes.map(w => w.table).join(',')}`)
+		await db.exec(sql, params as never, { transaction: true })
+		console.warn(`TMPDBG apply done ${Date.now() - t}ms`)
 	}
 
 	/**
@@ -241,10 +305,24 @@ class CadreTallyStore implements TallyStore {
 	 * notifier, for the counterparty's once they reach this node -- plus the backstop poll.
 	 */
 	subscribe(listener: (tables: readonly string[]) => void): Unsubscribe {
-		const unwatch = watchTables(this.db, this.tables, listener)
+		// Watch the strand's database now, and again on each database the node opens for it later.
+		let unwatch: (() => void) | undefined
+		const watchCurrent = () => {
+			unwatch?.()
+			const database = this.node.getStrands().get(this.strandId)?.database
+			unwatch = database ? watchTables(database.getDatabase(), this.tables, listener) : undefined
+		}
+		const onWritable = ({ strandId }: { strandId: string }) => {
+			if (strandId !== this.strandId) return
+			watchCurrent()
+			listener(this.tables)
+		}
+		watchCurrent()
+		this.node.on('strand:writable', onWritable)
 		const timer = this.pollMs > 0 ? setInterval(() => listener(this.tables), this.pollMs) : undefined
 		return () => {
-			unwatch()
+			unwatch?.()
+			this.node.off('strand:writable', onWritable)
 			if (timer) clearInterval(timer)
 		}
 	}

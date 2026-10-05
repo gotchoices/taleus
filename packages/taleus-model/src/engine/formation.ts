@@ -1,7 +1,7 @@
 /**
  * The party, and the invitations that make tallies: who this party is, and how a tally begins.
  */
-import type { InvitationsModel, Invitation, OpenInvitation, Agreement } from '../invitations.js'
+import type { Ask, InvitationsModel, Invitation, OpenInvitation, Agreement } from '../invitations.js'
 import type { Party, PartyModel } from '../party.js'
 import type { Result } from '../types.js'
 import { decodeEnvelope, encodeEnvelope } from './envelope.js'
@@ -9,6 +9,13 @@ import type { Session } from './session.js'
 import { failed, ok, refused, unsupported } from './translate.js'
 
 const DAY = 86_400_000
+
+/**
+ * What an invitee is asked to disclose before taking up an invitation: a name, which is how the
+ * inviter will see them. Which further fields an inviter may ask for, per invitation, is
+ * `feat-disclosure-selection`.
+ */
+const ASKS: Ask[] = [{ field: 'name', required: true }]
 
 export function partyModel(session: Session): PartyModel {
 	const party = (): Party | null =>
@@ -81,7 +88,9 @@ export function invitationsModel(session: Session): InvitationsModel {
 		async createInvitation(draft) {
 			const engine = session.engine
 			if (!engine || !session.identity) return failed('no-identity', 'create an identity before inviting anyone')
+			const t0 = Date.now(); console.warn('TMPDBG invite start')
 			const invited = await engine.invite({ as: 'stock', denomination: draft.unit.denom, certificate: session.certificate() })
+			console.warn(`TMPDBG invite done ${Date.now() - t0}ms`)
 			if (!invited.ok) return refused(invited.refusal)
 			const created = session.now()
 			const envelope = {
@@ -127,7 +136,7 @@ export function invitationsModel(session: Session): InvitationsModel {
 				theirNoticeDays: envelope.noticeDays,
 				agreement: agreementFor(envelope.agreementId),
 				expires: envelope.expires,
-				asks: [],
+				asks: ASKS,
 			})
 		},
 
@@ -145,13 +154,19 @@ export function invitationsModel(session: Session): InvitationsModel {
 			if (!engine) return failed('no-identity', 'create an identity before accepting an invitation')
 			if (!response) return failed('terms', 'accepting needs the credit you will extend in return')
 			Object.assign(session.local.disclosed, response.disclose)
-			const accepted = await engine.accept(
-				{
-					ref: { id: envelope.ticket.ref, ...(envelope.ticket.address ? { address: envelope.ticket.address } : {}) },
-					encoded: envelope.ticket.encoded,
-				},
-				{ certificate: session.certificate() },
-			)
+			const ticket = {
+				ref: { id: envelope.ticket.ref, ...(envelope.ticket.address ? { address: envelope.ticket.address } : {}) },
+				encoded: envelope.ticket.encoded,
+			}
+			let accepted: Awaited<ReturnType<typeof engine.accept>>
+			try {
+				accepted = await engine.accept(ticket, { certificate: session.certificate() })
+			} catch (error) {
+				// Joining the strand failed -- the inviter's side unreachable or slow to answer. A
+				// network failure, not a refusal: the party may keep asking, and the person can retry.
+				console.warn('taleus-model: joining the invitation\'s strand failed:', error)
+				return failed('unreachable', error instanceof Error ? error.message : String(error), true)
+			}
 			if (!accepted.ok) return refused(accepted.refusal)
 			const tallyId = accepted.value.ref.id
 			session.remember(tallyId, accepted.value)

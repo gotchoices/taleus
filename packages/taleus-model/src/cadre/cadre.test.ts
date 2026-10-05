@@ -18,19 +18,18 @@ import {
 	MemoryEnrolledMachineStore,
 	MemoryStrandNetworkStateStore,
 	MemoryTrustedOwnerStore,
-	type SAppConfig,
 } from '@serfab/cadre-core'
-import tallySchema from 'taleus-core/schema-text/draft1'
 
 import { createEngineModel, type EngineModel, type PartyIdentity } from '../engine/index.js'
 import type { Result } from '../types.js'
+import { taleusSApp } from './sapp.js'
 import { cadreStoreProvider } from './store.js'
 
 const LIFECYCLE_MS = 120_000
 const CONVERGE_MS = 60_000
 
 /** The tally sApp, unsigned: the nodes below relax schema signing, as a development build would. */
-const TALEUS_SAPP: SAppConfig = { id: 'taleus-tally', version: '1', schema: tallySchema, latencyHint: 'interactive' }
+const TALEUS_SAPP = taleusSApp()
 
 const USD = { denom: 'iso4217:USD', scale: 2 }
 const usd = (units: number) => ({ units, ...USD })
@@ -94,6 +93,8 @@ class Device {
 			strandNetworkState: { store: this.strandNetworkState },
 			hibernation: { enabled: false },
 			requireSignedSchemas: false,
+			// Push wakes for the tagged tally tables (Optimystic 1.10.1 fixed the registration burst).
+			strandReactivity: { enabled: true },
 		})
 		await node.start()
 		const { privateKeyB64, publicKeyB64 } = node.getIdentityOwnerKey()

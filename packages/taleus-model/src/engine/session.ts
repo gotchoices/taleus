@@ -264,15 +264,31 @@ export class Session {
 		return this.local.units[view.ref.id] ?? { denom: view.denomination, scale: view.denominationScale }
 	}
 
+	/** True while a run is queued and has not started: a further request joins it. */
+	private queued = false
+
 	/**
 	 * Run the agent once more, after whatever is already running. Serialized, so two changes
-	 * arriving together cannot both decide to publish the same terms.
+	 * arriving together cannot both decide to publish the same terms; and coalesced, so a burst
+	 * of changes -- a commit touches several tables, each a watch -- queues one run, not one per
+	 * change. A run reads every tally, which on a phone takes seconds, so an uncoalesced queue
+	 * would grow faster than the agent could drain it.
 	 */
 	advance(): Promise<void> {
 		this.runs++
-		this.agentRun = this.agentRun.then(() => this.step()).catch(error => {
-			console.warn('taleus-model agent:', error)
-		})
+		if (this.queued) return this.agentRun
+		this.queued = true
+		const t = Date.now()
+		this.agentRun = this.agentRun
+			.then(async () => {
+				this.queued = false
+				console.warn(`TMPDBG step ${this.runs} start`)
+				await this.step()
+				console.warn(`TMPDBG step done ${Date.now() - t}ms`)
+			})
+			.catch(error => {
+				console.warn('taleus-model agent:', error)
+			})
 		return this.agentRun
 	}
 

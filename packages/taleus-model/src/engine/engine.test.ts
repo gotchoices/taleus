@@ -37,6 +37,8 @@ async function openTally() {
 	const read = must(await them.invitations.readInvitation(invitation.token))
 	expect(read.theirCreditLimit).toEqual(usd(50000))
 	expect(read.inviter.disclosed).toEqual({ name: 'Jan' })
+	// The invitee is asked for a name: it is how the inviter will see them.
+	expect(read.asks).toEqual([{ field: 'name', required: true }])
 	must(await them.invitations.respondToInvitation(invitation.token, 'accept', { disclose: {}, creditLimit: usd(0), noticeDays: 21 }))
 	await world.settled()
 	return { world, me, them, token: invitation.token }

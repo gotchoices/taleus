@@ -119,15 +119,17 @@ export async function createLocalWorld(options: LocalWorldOptions): Promise<Loca
 	const counterparty = await createEngineModel({ ...common, store: fabric.provider('counterparty'), acceptOffers: true })
 	await counterparty.model.party.createIdentity()
 	await counterparty.model.party.setDisplayName(options.counterpartyName ?? 'Sam (simulated)')
-	if (options.takeUpInvitations) takeUpInvitations(me.model, counterparty.model)
+	const takingUp = new Set<Promise<void>>()
+	if (options.takeUpInvitations) takeUpInvitations(me.model, counterparty.model, takingUp)
 
 	async function settled(): Promise<void> {
 		// Each party's act can wake the other, so wait until a full round passes with no new runs.
 		for (let round = 0; round < 50; round++) {
+			await Promise.all([...takingUp])
 			const before = me.runs() + counterparty.runs()
 			await me.settled()
 			await counterparty.settled()
-			if (me.runs() + counterparty.runs() === before) return
+			if (me.runs() + counterparty.runs() === before && takingUp.size === 0) return
 		}
 		throw new Error('the two parties never went quiet')
 	}
@@ -135,17 +137,19 @@ export async function createLocalWorld(options: LocalWorldOptions): Promise<Loca
 	return { me, counterparty, settled }
 }
 
-/** Have `them` take up every invitation `me` makes, on the terms it offers. */
-function takeUpInvitations(me: TaleusModel, them: TaleusModel): void {
+/** Have `them` take up every invitation `me` makes, on the terms it offers; `pending` holds each take-up until done. */
+function takeUpInvitations(me: TaleusModel, them: TaleusModel, pending: Set<Promise<void>>): void {
 	const invitations = me.invitations
 	const createInvitation = invitations.createInvitation.bind(invitations)
 	invitations.createInvitation = async draft => {
 		const made = await createInvitation(draft)
 		if (made.ok) {
 			const response = { disclose: {}, creditLimit: draft.creditLimit, noticeDays: draft.noticeDays }
-			void them.invitations.respondToInvitation(made.value.token, 'accept', response).then(taken => {
+			const takingUp = them.invitations.respondToInvitation(made.value.token, 'accept', response).then(taken => {
 				if (!taken.ok) console.warn('simulated counterparty could not take up an invitation:', taken.error.message)
 			})
+			pending.add(takingUp)
+			void takingUp.finally(() => pending.delete(takingUp))
 		}
 		return made
 	}

@@ -9,7 +9,8 @@
  *   The taleus engine over a local database: one device, no peers.
  *
  * Mode C — engine in a cadre (USE_ENGINE = true, USE_CADRE = true)
- *   The engine over the embedded cadre node: real strands, peers, lifts.
+ *   The engine over this phone's own cadre node (`engine-cadre.ts`): each tally a
+ *   strand shared with the counterparty, kept across restarts.
  *
  * Screens and components check neither of these. They call the adapters in
  * `src/data/`, which forward to one `TaleusModel` (package `taleus-model`), and
@@ -21,8 +22,8 @@ import { createMockModel, onWorldChanged, type MockControls, type TaleusModel } 
 import { fixtureSource } from './fixtures'
 import { bumpGeneration } from './generation'
 
-export const USE_ENGINE = false
-export const USE_CADRE = false
+export const USE_ENGINE = true
+export const USE_CADRE = true
 
 /** True when adapters should serve fixtures rather than engine state. */
 export const mockMode = !USE_ENGINE
@@ -54,10 +55,19 @@ export function startModel(): Promise<void> {
 	return starting
 }
 
-/** Mode B, loaded on demand (see `engine.ts`); Mode C is not built yet. */
+/**
+ * Relays a Mode C phone reserves on when it starts as a new party: what makes it reachable, so
+ * that an invitation it issues can be redeemed. Empty here; set one for a device run (for two
+ * emulators, a relay on the host machine at `10.0.2.2`). A phone that has started before uses
+ * the relays it saved.
+ */
+const CADRE_RELAYS: string[] = ["/ip4/10.0.2.2/tcp/4002/ws/p2p/12D3KooWKYBa4PwUhac6SE6YDUv1NvYDz87D8DtYQ8f4uDP471Zz", "/ip4/127.0.0.1/tcp/4002/ws/p2p/12D3KooWKYBa4PwUhac6SE6YDUv1NvYDz87D8DtYQ8f4uDP471Zz"]
+
+/** Mode B (`engine.ts`) or Mode C (`engine-cadre.ts`), each loaded only when chosen. */
 async function startEngine(): Promise<TaleusModel> {
 	if (USE_CADRE) {
-		throw new Error('Mode C (engine in a cadre) is not built yet -- see tickets/backlog/feat-engine-run-modes.md')
+		const { startCadreEngine } = await import('./engine-cadre')
+		return startCadreEngine(CADRE_RELAYS)
 	}
 	const { startLocalEngine } = await import('./engine')
 	return startLocalEngine()
