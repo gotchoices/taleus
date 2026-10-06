@@ -1,38 +1,47 @@
 #!/bin/sh
-# env-defaults.sh — per-project, override-friendly emulator/Metro settings.
+# env-defaults.sh — per-project, override-friendly emulator/Metro/device settings.
+#
+# The same file is carried by ser/chat, ser/health and ser/taleus; keep the copies
+# identical except for the marked PROJECT-SPECIFIC section, so a fix made in one
+# can be copied to the others wholesale. See the README's "Devices and ports".
 #
 # SOURCE this (don't execute it) so the vars carry into the calling shell —
 # the package.json scripts do exactly that, e.g.:
 #     . ./env-defaults.sh && react-native start --port "$METRO_PORT"
 #
 # Precedence, lowest to highest:
-#   1. the defaults below                    — applied only when the var is unset/empty
-#   2. values already in the environment      — kept, because ${VAR:=default} won't clobber them
-#   3. .env.ports.local at the project root   — git-ignored; wins over 1 and 2
-#   4. a value given on the command line      — wins over everything (see below)
+#   1. the defaults below                   — applied only when the var is unset/empty
+#   2. .env.ports.local at the project root — git-ignored; this bench's real settings
+#   3. TARGET_* on the command line         — a deliberate one-off, see below
 #
-# The defaults below are the stock React Native / Android ones, so a fresh clone
-# just works. Running this project alongside another (e.g. ser/chat, ser/health)
-# is what .env.ports.local is for — put the divergent ports there, not here.
+# The defaults are the stock React Native / Android ones, so a fresh clone on any
+# bench just works. Running this project alongside a sibling is what
+# .env.ports.local is for — put the divergent ports there, not here.
 #
 # When choosing an emulator port: the console port must be EVEN and in 5554..5682;
 # the odd port right above it is the paired adb port (so emulator-5554 speaks adb
 # on 5555). 5555 is therefore not a legal console port — step by twos.
+#
+# WHY NOT "anything already exported wins".  That was once the rule, until it caused
+# a genuinely confusing failure: a terminal that had sourced this file BEFORE
+# .env.ports.local changed still had the old METRO_PORT exported, so `yarn start` in
+# that terminal silently bound the OLD port while every other tool used the new one.
+# The app then could not find Metro, and nothing said why.  A shell cannot tell a
+# deliberate `METRO_PORT=… yarn …` from a stale leftover — they are the same thing —
+# so the override moved to names nothing ever exports by accident.
 
-# (4) is captured FIRST, before the defaults below fill these in: afterwards every
-# one of them is non-empty, so there would be no way to tell a value the caller
-# gave from one we defaulted.
-_cli_METRO_PORT=${METRO_PORT:-}
-_cli_EMULATOR_PORT=${EMULATOR_PORT:-}
-_cli_DEVICE_SERIAL=${DEVICE_SERIAL:-}
-_cli_AVD_NAME=${AVD_NAME:-}
-_cli_PREVIEW_PORT=${PREVIEW_PORT:-}
-
-# (1) + (2): defaults that yield to anything already exported.
 : "${METRO_PORT:=8081}"
 : "${EMULATOR_PORT:=5554}"
 : "${DEVICE_SERIAL:=emulator-5554}"
 : "${AVD_NAME:=Pixel_A}"
+
+# DEVICES: every device `yarn android` (scripts/android.sh) installs to — raw adb
+# serials, space-separated, e.g. DEVICES="emulator-5564 6a61c968". Empty means
+# just DEVICE_SERIAL. Not defaulted here: a stale export must not leak in, so it
+# is cleared and comes only from .env.ports.local or TARGET_DEVICES.
+DEVICES=
+
+# ── PROJECT-SPECIFIC ─────────────────────────────────────────────────────────
 # The appeus scenario previewer. It binds a port and drives one device, so both
 # belong here for the same reason the Metro port does: two projects previewing at
 # once must not collide, and links must open on this project's emulator.
@@ -45,40 +54,54 @@ _cli_PREVIEW_PORT=${PREVIEW_PORT:-}
 : "${PUBLISH_HOST:=gotchoices.org}"
 : "${SEREUS_ROOT:=/var/www/sereus.org}"
 : "${SCENARIOS_DEST:=${PUBLISH_USER}@${PUBLISH_HOST}:${SEREUS_ROOT}/taleus/preview}"
+export PREVIEW_PORT PUBLISH_USER PUBLISH_HOST SEREUS_ROOT SCENARIOS_DEST
+# ── end PROJECT-SPECIFIC ─────────────────────────────────────────────────────
 
-# (3): project-local overrides, not committed. Sourced from the project root
-# (the package.json scripts run there). The leading "./" is required: POSIX `.`
-# searches PATH for a bare name, so `. ./.env.ports.local` sources the local file.
-#
-# (4): a value passed on the command line beats the local file.
-#
-# The local file assigns plainly (`DEVICE_SERIAL="emulator-5566"`), so without the
-# save/restore below it would clobber an explicit `DEVICE_SERIAL=<serial> yarn …`
-# and quietly act on the WRONG DEVICE — installing to the emulator when you meant
-# the phone on the cable, with nothing to indicate it. The ports are per-project
-# and belong in the file; the target device is a one-off and belongs on the
-# command line, so the command line has to win.
+# (2): project-local settings, not committed. Sourced from the project root (the
+# package.json scripts run there). The leading "./" is required: POSIX `.` searches
+# PATH for a bare name, so `. ./.env.ports.local` sources the local file.
+# Assigns plainly, so it beats the defaults above.
 if [ -f ./.env.ports.local ]; then
   . ./.env.ports.local
 fi
 
-[ -n "$_cli_METRO_PORT" ] && METRO_PORT=$_cli_METRO_PORT
-[ -n "$_cli_EMULATOR_PORT" ] && EMULATOR_PORT=$_cli_EMULATOR_PORT
-[ -n "$_cli_DEVICE_SERIAL" ] && DEVICE_SERIAL=$_cli_DEVICE_SERIAL
-[ -n "$_cli_AVD_NAME" ] && AVD_NAME=$_cli_AVD_NAME
-[ -n "$_cli_PREVIEW_PORT" ] && PREVIEW_PORT=$_cli_PREVIEW_PORT
-unset _cli_METRO_PORT _cli_EMULATOR_PORT _cli_DEVICE_SERIAL _cli_AVD_NAME _cli_PREVIEW_PORT
+# (3): one-off overrides. Distinct names, never set by the file or by sourcing this,
+# so a leftover cannot masquerade as an intention:
+#
+#   TARGET_DEVICE=6a61c968 yarn android               this phone only, not the set
+#   TARGET_DEVICES="478db6f0 6a61c968" yarn android   this set instead of DEVICES
+#   TARGET_METRO_PORT=8090 yarn start                 Metro somewhere else
+#
+# Announced on stderr: an override that changes which device or port you are acting
+# on should never be silent.
+if [ -n "${TARGET_METRO_PORT:-}" ]; then
+  echo "env-defaults: METRO_PORT $METRO_PORT -> $TARGET_METRO_PORT (TARGET_METRO_PORT)" >&2
+  METRO_PORT=$TARGET_METRO_PORT
+fi
+if [ -n "${TARGET_DEVICE:-}" ]; then
+  echo "env-defaults: DEVICE_SERIAL $DEVICE_SERIAL -> $TARGET_DEVICE (TARGET_DEVICE)" >&2
+  DEVICE_SERIAL=$TARGET_DEVICE
+  # Naming one device means that device — not it plus the usual set.
+  [ -z "${TARGET_DEVICES:-}" ] && DEVICES=$TARGET_DEVICE
+fi
+if [ -n "${TARGET_DEVICES:-}" ]; then
+  echo "env-defaults: DEVICES ${DEVICES:-$DEVICE_SERIAL} -> $TARGET_DEVICES (TARGET_DEVICES)" >&2
+  DEVICES=$TARGET_DEVICES
+fi
+DEVICES=$(echo "${DEVICES:-$DEVICE_SERIAL}" | tr ',' ' ' | xargs)
 
-# ANDROID_SERIAL pins every adb and Gradle operation to one device.
+# ANDROID_SERIAL pins every adb and Gradle operation to ONE device.
 #
 # This is load-bearing, not a convenience. `react-native run-android` shells out to
 # Gradle's `app:installDebug`, and that task installs to EVERY connected device --
-# the CLI's own --device/--deviceId flag is not passed through to it. So with a
-# phone on the cable and other projects' emulators up, `yarn android` tries to
-# install on all of them and the whole build fails if ANY one is out of space,
-# even when the emulator you actually targeted had room. adb honors this variable
-# too, so the launch:/preview-style scripts inherit the same targeting for free.
+# the CLI's own --deviceId flag is not passed through to it. So with phones on the
+# cable and other projects' emulators up, an unpinned `yarn android` installs on all
+# of them, and the whole build fails if ANY one is out of space or still booting.
+# adb honors this variable too, so the launch/logs-style scripts inherit it.
+#
+# Gradle also accepts a comma-separated list here, which is how scripts/android.sh
+# targets a multi-device DEVICES set — but only for its own Gradle run. adb rejects
+# a list, so the exported value stays a single serial.
 ANDROID_SERIAL=$DEVICE_SERIAL
 
-export METRO_PORT EMULATOR_PORT DEVICE_SERIAL AVD_NAME PREVIEW_PORT ANDROID_SERIAL
-export PUBLISH_USER PUBLISH_HOST SEREUS_ROOT SCENARIOS_DEST
+export METRO_PORT EMULATOR_PORT DEVICE_SERIAL AVD_NAME DEVICES ANDROID_SERIAL
