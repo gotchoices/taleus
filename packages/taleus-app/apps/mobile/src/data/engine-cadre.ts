@@ -18,6 +18,7 @@ import type { TaleusModel } from 'taleus-model'
 import { cadreStoreProvider, taleusSApp } from 'taleus-model/cadre'
 import { createEngineModel } from 'taleus-model/engine'
 
+import { installDevBridge } from './dev-bridge'
 import { keychainSecureStore } from './keychain'
 
 const leveldb = { openFn: (name: string, create: boolean, errorIfExists: boolean) => new LevelDB(name, create, errorIfExists), WriteBatch: LevelDBWriteBatch }
@@ -67,8 +68,6 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 	const saved = await phone.loadSavedStart()
 	const options: PhoneNodeOptions = saved?.options ?? { partyId: `taleus-${randomId()}`, bootstrapAddrs: [], relayAddrs: [...relayAddrs] }
 	const node = await phone.start(options)
-	console.warn('TMPDBG node', node.peerId?.toString(), JSON.stringify(node.getMultiaddrs().map(a => a.toString())))
-	setInterval(() => console.warn('TMPDBG relay', JSON.stringify(node.getRelayReservationState())), 30_000)
 	createBackgroundRunner({ ...phoneNodeLifecycle(phone), appState: AppState }).start()
 
 	const session = new LevelDBKVStore(openOptimysticRNDb({ ...leveldb, name: SESSION_DB }), 'taleus:session:')
@@ -78,6 +77,12 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 			state: kvStoreSlot(session, SESSION_STATE_KEY),
 			identity: secureStoreSlot(keychainSecureStore, IDENTITY_SLOT),
 		},
+	})
+	installDevBridge(engine.model, () => {
+		const running = phone.node
+		return running
+			? { peerId: running.peerId?.toString(), addrs: running.getMultiaddrs().map(a => a.toString()), relay: running.getRelayReservationState(), strands: [...running.getStrands().keys()] }
+			: { status: phone.status.state }
 	})
 	return engine.model
 }

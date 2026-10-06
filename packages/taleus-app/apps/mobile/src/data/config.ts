@@ -61,7 +61,7 @@ export function startModel(): Promise<void> {
  * emulators, a relay on the host machine at `10.0.2.2`). A phone that has started before uses
  * the relays it saved.
  */
-const CADRE_RELAYS: string[] = ["/ip4/10.0.2.2/tcp/4002/ws/p2p/12D3KooWKYBa4PwUhac6SE6YDUv1NvYDz87D8DtYQ8f4uDP471Zz", "/ip4/127.0.0.1/tcp/4002/ws/p2p/12D3KooWKYBa4PwUhac6SE6YDUv1NvYDz87D8DtYQ8f4uDP471Zz"]
+const CADRE_RELAYS: string[] = ["/dns4/relay.sereus.org/tcp/4011/ws/p2p/12D3KooWMD7E7UH4rkCqiFE69n7FNqrKo1Xx3yDUU8JvwtaH39bD"]
 
 /** Mode B (`engine.ts`) or Mode C (`engine-cadre.ts`), each loaded only when chosen. */
 async function startEngine(): Promise<TaleusModel> {
