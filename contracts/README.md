@@ -11,23 +11,21 @@ has not been revised for Taleus.
 
 ## Working on the documents
 
-Stroc's guides: [Authoring](../../../stroc/docs/Authoring.md), [Deploying](../../../stroc/docs/Deploying.md).
-The scripts run `stroc` from `PATH`, or the command in `STROC`. Until the Stroc release:
+Stroc's guides: [Authoring](https://github.com/gotchoices/stroc/blob/main/docs/Authoring.md),
+[Deploying](https://github.com/gotchoices/stroc/blob/main/docs/Deploying.md). The `stroc` command
+is the repo's `@stroc/cli` dev dependency: run it as `yarn stroc` from anywhere in the repo
+(`publish.sh` does; set `STROC` to use another build).
 
 ```
-export STROC="node $HOME/share/devel/stroc/packages/cli/dist/src/index.js"
-```
-
-```
-stroc serve . --editor --watch      # index, catalog and editor at http://localhost:3000
-stroc lint *.yaml
-stroc status .                      # each document's CID, and whether every include is current
-stroc update . --all                # after editing a clause: re-point the documents that include it
-stroc render Tally_Contract.yaml -o tally.pdf
+yarn stroc serve . --editor --watch   # index, catalog and editor at http://localhost:3000
+yarn stroc lint *.yaml
+yarn stroc status .                   # each document's CID, and whether every include is current
+yarn stroc update . --all             # after editing a clause: re-point the documents that include it
+yarn stroc render Tally_Contract.yaml -o tally.pdf
 ```
 
 While drafting, an include may be written as a file link (`source: {/: ./Ethics.yaml}`);
-`stroc link .` replaces it with the file's CID.
+`yarn stroc link .` replaces it with the file's CID.
 
 Every document sereus.org issues says `author: sereus.org`. `stroc status` and `stroc update` keep
 `.stroc-record.json` and `.stroc-archive/` (every recorded version's exact bytes): commit both, and

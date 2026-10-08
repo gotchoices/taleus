@@ -19,6 +19,7 @@
 	},
 	"devDependencies": {
 		"@eslint/js": "10.0.1",
+		"@stroc/cli": "^0.1.0",
 		"@types/jest": "30.0.0",
 		"@types/node": "26.1.1",
 		"cross-env": "7.0.3",

@@ -12,7 +12,7 @@ set -euo pipefail
 #   USER: root
 #   DOCS_ROOT: /srv/stroc/sereus.org   (the folder the Stroc server serves; see README.md)
 # Environment:
-#   STROC          the stroc command (default: stroc on PATH)
+#   STROC          the stroc command (default: yarn stroc, the repo's @stroc/cli)
 #   STROC_RELOAD   run on the host after publishing (default: reload a container named stroc-server)
 #
 # The server folder is SHARED by every Sereus app that publishes documents for sereus.org, and a
@@ -36,7 +36,7 @@ fi
 DOCS_ROOT="${2:-/srv/stroc/sereus.org}"
 RELOAD="${STROC_RELOAD:-docker kill -s HUP stroc-server >/dev/null}"
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
-read -ra STROC_CMD <<< "${STROC:-stroc}"
+read -ra STROC_CMD <<< "${STROC:-yarn stroc}"
 
 stroc() { "${STROC_CMD[@]}" "$@"; }
 
