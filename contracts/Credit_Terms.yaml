@@ -6,14 +6,13 @@ language: en
 title: Credit Terms and Conditions
 author: sereus.org
 text: >-
-  When executing a Tally Agreement, the Parties each decide the limits of Pledges of Value they will accept from the other Party.
-  The Parties may also specify other terms and conditions that influence how and when the obligation will be satisfied.
-  Those various parameters are together referred to as Credit Terms.
-  Each Party states the Credit Terms it extends to the other Party: terms stated by the Vendor apply to credit issued by the Client, and terms stated by the Client apply to credit issued by the Vendor, in such cases where the Tally develops a negative balance.
-  A Party's Credit Terms are recorded in the Tally Data and digitally signed by the Party stating them, and the Credit Terms in force when the Tally is signed form part of the Agreement.
-  In such cases where a particular Credit Term is not explicitly included in the Tally Data, the default value for that term, as listed below, shall apply.
+  Each Party authorizes credit to the other Party by recording Credit Terms on the Tally: the amount of indebtedness it will accept from the other Party, the notice it will give before calling a balance due, and any other terms that influence how and when the obligation will be satisfied.
+  Terms recorded by the Vendor apply to credit issued by the Client, and terms recorded by the Client apply to credit issued by the Vendor, in such cases where the Tally develops a negative balance.
+  Credit Terms are digitally signed by the Party recording them and bind only that Party.
+  A Party may record revised Credit Terms at any time; the terms in force are the most recently recorded, except that a revision which reduces what the other Party may rely on takes effect only after the Call Notice previously in force has first elapsed.
+  In such cases where a particular Credit Term is not included in the Credit Terms recorded, the default value for that term, as listed below, shall apply.
   Amounts are stated in the Denomination of the Tally.
-  These various credit terms are defined in the Tally Data by the property name shown in parentheses and are interpreted as follows:
+  The Credit Terms are recorded by the property name shown in parentheses and are interpreted as follows:
 sections:
   - title: "Credit Limit (CreditLimit); Default: 0"
     text: >-
@@ -23,8 +22,7 @@ sections:
     text: >-
       The number of days notice required to be given by the Recipient to the Issuer before the balance of principal and/or accrued interest can be called due and payable.
       If not specified, the Issuer has no obligation to reduce principal any faster than is indicated by the Minimum Payment.
-      Call terms can be changed at any time by either Party, but never in such a way as to limit the Issuer's rights under the Tally.
-      For example, when reducing the call from 120 to 30, the effective terms will still be 120 until that period of time has first elapsed, after which the new call period will become effective.
+      For example, when a Recipient reduces the call it extends from 120 to 30, the effective terms remain 120 until that period of time has first elapsed, after which the new call period becomes effective.
   - title: "Security (lien); Default: None"
     text: >-
       This specifies any assets that are offered by the Issuer as collateral against amounts owed under the Agreement.

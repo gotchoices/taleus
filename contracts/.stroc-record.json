@@ -1,0 +1,68 @@
+{
+  "files": {
+    "CHIP_Definition.yaml": {
+      "cid": "baguqeeragq3zqqtkntyjxillpl5hbqte67imofdd5wrbzsxvjrz3imi2dwma",
+      "previous": []
+    },
+    "Credit_Terms.yaml": {
+      "cid": "baguqeeraqsqbqagit22i7ohmvbodw2zqiegbz4kjvqwlm77u26mzjz7n6xiq",
+      "previous": []
+    },
+    "Defaults.yaml": {
+      "cid": "baguqeerazyaytvs2gtnlm2smbzto5wc3n7fjr6fb64sxua3o56oqhgddfina",
+      "previous": []
+    },
+    "Denomination.yaml": {
+      "cid": "baguqeera5w6fbcdebvug5j7ud3bsecrlpxxkogw3in34aft24wpiw7rso4uq",
+      "previous": []
+    },
+    "Disputes_Arbitration.yaml": {
+      "cid": "baguqeerank457z2ceyjk75zjhii5s4z3syapbzfoskdmj67jhyfdcjuvlnja",
+      "previous": []
+    },
+    "Disputes_Courts.yaml": {
+      "cid": "baguqeera6cezqiyuke645zn3ebwd2i3gstyxfbh3lrdcgo37lf2kobtqjilq",
+      "previous": []
+    },
+    "Duties_Rights.yaml": {
+      "cid": "baguqeeradg4wpmi5fmdhy6dx6flw5txhxfm7ctlo736diybbd4gawidlwvqa",
+      "previous": []
+    },
+    "Ethics.yaml": {
+      "cid": "baguqeerauscso65ktlzpe26xsoldymgies7mnpad35at77piafynkv7pa47a",
+      "previous": []
+    },
+    "Recitals.yaml": {
+      "cid": "baguqeerageamcwm7cz5man7hd26r7hkj5lwgnbihus5gtawhpxwzprlcenqq",
+      "previous": []
+    },
+    "Representations.yaml": {
+      "cid": "baguqeeranls5sbcols3xtnpzocfgbv4s3l35u2e4ovrnecbr4bh2obrm64ca",
+      "previous": []
+    },
+    "Sending_Value.yaml": {
+      "cid": "baguqeerayd46q27gvx4t2ghzr4mi2wpwn7hrqmgh3wxkvnzqwfbaygl4vwaq",
+      "previous": []
+    },
+    "Tally_Contract.yaml": {
+      "cid": "baguqeera4micsp6dypudlgq233thdexue4nbhsk4ftqz3sfxt6drblkeldca",
+      "previous": []
+    },
+    "Tally_Contract_Arbitration.yaml": {
+      "cid": "baguqeerak35tspr5m2axo3bojm4pptzujjppkmckazgrh2s7hf2wcsr6iwwa",
+      "previous": []
+    },
+    "Tally_Definition.yaml": {
+      "cid": "baguqeerapoibdx34ybbb3snkmutctznninl2caqch6korbb7qiqefhafmfxq",
+      "previous": []
+    },
+    "Tally_Testing.yaml": {
+      "cid": "baguqeerarmotagafxskblqfuulpjavk5wj4wgf2zp3nyb3n4yrhslnfu7yxq",
+      "previous": []
+    },
+    "Values.yaml": {
+      "cid": "baguqeerahc5s5dwl5assfq4hdlkrds5qtvpmwjfcp23wgzerc7y7clj6nejq",
+      "previous": []
+    }
+  }
+}

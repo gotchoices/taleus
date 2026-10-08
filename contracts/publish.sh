@@ -51,6 +51,7 @@ if (( ${#DOCS[@]} == 0 )); then
 	exit 1
 fi
 echo "Checking ${#DOCS[@]} documents ..."
+stroc link .            # committed drafts hold file links (see draft.sh); publishing fixes the CIDs
 stroc lint "${DOCS[@]}"
 if ! stroc status . ; then
 	echo "ERROR: outdated includes; run 'stroc update . --all' and review before publishing." >&2

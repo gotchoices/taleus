@@ -12,7 +12,7 @@ sections:
       Each Party has the age and mental capacity to understand the obligations it is assuming by executing this Agreement.
   - title: Financial Capacity
     text: >-
-      Each Party has the financial means to satisfy the debts it may incur under this Agreement.
+      Each Party has the financial means to satisfy the obligations it may incur under this Agreement.
   - title: Network Connections
     text: >-
       Each Party will maintain sufficient additional Tally relationships to reasonably facilitate Credit Lifts, which are the primary means by which debts are expected to be satisfied.
@@ -25,14 +25,14 @@ sections:
   - title: Nature of Credit Obligations
     text: >-
       This Tally will not be used to issue an equity or financial interest where a future return is promised which is a function of the financial success of a venture.
-      Rather, the Tally use will be limited to recording and tracking debt obligations such as the following:
+      Rather, the Tally use will be limited to recording and tracking obligations such as the following:
     sections:
       - text: >-
           A note delivered in consumer financing
       - text: >-
-          A note secured by a lien on real property such as a home
+          A note secured by a lien on real property
       - text: >-
-          A note secured by a lien on a small business or some of its assets
+          A note secured by a lien on a business or some of its assets
       - text: >-
           A note relating to a character loan
       - text: >-

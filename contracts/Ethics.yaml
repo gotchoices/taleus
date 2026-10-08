@@ -1,5 +1,5 @@
 # Derived from MyCHIPs contract/Ethics.yaml (published 2020-04-01), via the Stroc sample library.
-# Revised for Taleus. Draft; not yet published.
+# Revised for Taleus; dispute remedies moved to the Disputes_*.yaml clauses. Draft; not yet published.
 stroc: '1.0'
 language: en
 title: Ethical Conduct
@@ -16,15 +16,6 @@ sections:
       Both parties are reasonably informed by the other as to all material terms of the transaction.
       This includes the nature and quality of the Product.
       It also includes the ability of the Issuer to provide the agreed upon Value within the agreed upon terms.
-  - title: Dispute Resolution
-    text: >-
-      In the case of a dispute between the Parties over any associated transaction that is resolved by legal remedy, the prevailing Party shall be entitled to collect actual damages incurred from the losing Party, plus all collection costs, including attorneys' fees.
-  - title: Frivolous Claims
-    text: >-
-      Should any cause of action brought by one Party against the other be shown to be frivolous, or without basis, the penalty shall be increased to two times the actual damages incurred, plus all collection costs, including attorneys' fees.
-  - title: Fraud
-    text: >-
-      When intentional fraud can be proven in a dispute between the Parties, the penalty shall be increased to three times the actual damages incurred, plus all collection costs, including attorneys' fees.
   - title: Severability
     text: >-
       If any portion of this Agreement is deemed to be unenforceable in any way, such portion shall be severed from the Agreement and the remaining portions shall remain in full force and effect.

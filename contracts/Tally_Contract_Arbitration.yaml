@@ -1,8 +1,8 @@
-# Derived from MyCHIPs contract/Tally_Contract.yaml (published 2020-04-01, revised 2024-02-06), via the Stroc sample library. Revised for Taleus. Disputes go to court; see Tally_Contract_Arbitration.yaml for the other variant.
+# Variant of Tally_Contract.yaml differing only in the disputes clause: binding arbitration instead of court.
 # Draft; not yet published.
 stroc: '1.0'
 language: en
-title: Taleus Tally Agreement (Courts)
+title: Taleus Tally Agreement (Arbitration)
 author: sereus.org
 text: >-
   This written Contract is part of an Agreement by and between the Parties, with one Party hereinafter referred to as Foil Holder and the other as Stock Holder.
@@ -27,7 +27,7 @@ sections:
   - id: ethics
     source: {/: baguqeerauscso65ktlzpe26xsoldymgies7mnpad35at77piafynkv7pa47a}
   - id: disputes
-    source: {/: baguqeera6cezqiyuke645zn3ebwd2i3gstyxfbh3lrdcgo37lf2kobtqjilq}
+    source: {/: baguqeerank457z2ceyjk75zjhii5s4z3syapbzfoskdmj67jhyfdcjuvlnja}
   - id: duties-rights
     source: {/: baguqeeradg4wpmi5fmdhy6dx6flw5txhxfm7ctlo736diybbd4gawidlwvqa}
   - id: representations

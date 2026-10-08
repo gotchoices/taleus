@@ -1,0 +1,18 @@
+# Remedy clauses formerly in Ethics.yaml (MyCHIPs contract/Ethics.yaml, published 2020-04-01): disputes resolved in court.
+# Draft; not yet published.
+stroc: '1.0'
+language: en
+title: Resolution of Disputes by Legal Remedy
+author: sereus.org
+text: >-
+  A dispute between the Parties under this Agreement that the Parties cannot resolve between themselves may be brought by either Party before any court of competent jurisdiction.
+sections:
+  - title: Damages
+    text: >-
+      In the case of a dispute between the Parties over any associated transaction that is resolved by legal remedy, the prevailing Party shall be entitled to collect actual damages incurred from the losing Party, plus all collection costs, including attorneys' fees.
+  - title: Frivolous Claims
+    text: >-
+      Should any cause of action brought by one Party against the other be shown to be frivolous, or without basis, the penalty shall be increased to two times the actual damages incurred, plus all collection costs, including attorneys' fees.
+  - title: Fraud
+    text: >-
+      When intentional fraud can be proven in a dispute between the Parties, the penalty shall be increased to three times the actual damages incurred, plus all collection costs, including attorneys' fees.
