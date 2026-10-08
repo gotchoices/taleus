@@ -6,6 +6,7 @@ Focus: Taleus — MyCHIPs reboot on Sereus. Tallies (private credit relationship
 - `docs/old/` — legacy docs from the pre-Sereus prototype (bespoke bootstrap protocol, chunk negotiation design). Reference only; do **not** treat as current design. The old `src/`/`test/` bootstrap module is retired — Sereus strand formation replaces it.
 - Yarn-workspaces monorepo under `packages/`: `taleus-core` (platform-neutral core library + Quereus sApp schema in `packages/taleus-core/schema/`, `draft1.qsql`), `taleus-model` (the Taleus apps' shared model: what screens read and do, behind one switch between mock fixtures and the engine; framework-free, consumed by every `taleus-app` target), `taleus-node` (always-on trading service, a client of the cadre), `taleus-app` (client application(s); an [appeus](packages/taleus-app/appeus/README.md) project — design surface in `packages/taleus-app/design/`, generated targets in `packages/taleus-app/apps/<target>/`, framework TBD). Root scripts `yarn build` / `yarn test` / `yarn lint` delegate to workspaces.
 - `web/` — static public site (`sereus.org/taleus`) + `publish.sh`; same shape as `../chat/web`.
+- `contracts/` — tally contract documents sereus.org publishes ([Stroc](../../stroc) format) + `publish.sh` into the shared sereus.org Stroc catalog. Tallies reference them by CID only.
 - Docs are timeless (describe the intended system); outstanding work lives in `tickets/`, not in doc TODO sections.
 
 ## Sibling workspaces (reference/debug)

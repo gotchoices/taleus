@@ -1,0 +1,6 @@
+# Folder configuration for the Stroc tools (not a document). Used locally by `stroc serve` to preview
+# the catalog. The live catalog's configuration is the server folder's own .stroc.yaml, shared by
+# every app publishing for sereus.org; publish.sh never overwrites it (see README.md).
+domain: sereus.org
+endorse: []
+withdrawn: []
