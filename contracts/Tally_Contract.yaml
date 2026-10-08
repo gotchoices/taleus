@@ -1,32 +1,33 @@
-# From MyCHIPs contract/Tally_Contract.yaml (published 2020-04-01), by way of the Stroc sample library.
-# Draft for Taleus; not yet revised or published.
+# Derived from MyCHIPs contract/Tally_Contract.yaml (published 2020-04-01, revised 2024-02-06), via the Stroc sample library.
+# Revised for Taleus. Draft; not yet published.
 stroc: '1.0'
 language: en
-title: MyCHIPS Tally Agreement
+title: Taleus Tally Agreement
 author: sereus.org
-published: '2020-04-01'
 text: >-
-  This written Contract is part of an Agreement by and between the Parties, with one Party hereinafter referred to as Foil Holder and the the as Stock Holder.
-  A digital hash of this Contract has been incorporated into a MyCHIPs digital Tally which also contains other Data relevant to the Agreement.
-  Tally Data includes details about the identities of the Parties as well as digital signatures by the Parties attesting to their acceptance of this Agreement and is shown at the end of the Contract.
-  This Contract also incorporates further documents by reference, including their digital hashes.
+  This written Contract is part of an Agreement by and between the Parties, with one Party hereinafter referred to as Foil Holder and the other as Stock Holder.
+  The content identifier of this Contract has been recorded in a Taleus digital Tally which also contains other Data relevant to the Agreement.
+  Tally Data includes details about the identities of the Parties, the Denomination and Credit Terms of the Tally, and digital signatures by the Parties attesting to their acceptance of this Agreement.
+  This Contract also incorporates further documents by reference, by their content identifiers.
   All terms and conditions, including those contained in the Tally itself, this document, the other documents it references, and the communications between the Parties, together form the complete Tally Agreement between the Parties.
 sections:
   - id: recitals
-    source: {/: baguqeeranyuli2dpeyyy43smsboox2mxzpefdmii5s3f6gy62zqyggaez7pq}
+    source: {/: baguqeerageamcwm7cz5man7hd26r7hkj5lwgnbihus5gtawhpxwzprlcenqq}
   - id: values
-    source: {/: baguqeerawwuy5kilzscnpuuvue3lwmdjd2xsmff2pnzljmxs6df4loklw42q}
+    source: {/: baguqeeravjilrpk24b3cxegewkci53nex4sjvzct4clkrszh7qmc5ac2vrmq}
   - id: tally-definition
-    source: {/: baguqeeraywhea2txgmmitt2u2xfljeiay7wiwkz3q36glvjoujqnhny4srua}
+    source: {/: baguqeerapoibdx34ybbb3snkmutctznninl2caqch6korbb7qiqefhafmfxq}
+  - id: denomination
+    source: {/: baguqeera5w6fbcdebvug5j7ud3bsecrlpxxkogw3in34aft24wpiw7rso4uq}
   - id: chip-definition
-    source: {/: baguqeerahsjip3jbgu77ple43ng3hw2j2pkibikpjxlxlf7ck7kdagb3gmua}
+    source: {/: baguqeeragq3zqqtkntyjxillpl5hbqte67imofdd5wrbzsxvjrz3imi2dwma}
   - id: ethics
-    source: {/: baguqeeralzpphk2g63vchyb6h6liqisqwdxjd4nqww2alypbgy4eokxltu3a}
+    source: {/: baguqeeravyv2bvjr7c5gk3maviacy3ielblm5xmuxawvkkxsdy2qubz3heaa}
   - id: duties-rights
-    source: {/: baguqeera6nvrrrjs4ndabvgud7cfjprphfcxhjsopuoxfjztqrv3xth7vzja}
+    source: {/: baguqeeradg4wpmi5fmdhy6dx6flw5txhxfm7ctlo736diybbd4gawidlwvqa}
   - id: representations
-    source: {/: baguqeerafbpfqv4knlrjqsdccs4zth2rclhbxdzmeh22kehpgsh65ywojyqa}
+    source: {/: baguqeeraghc6uvnkw6jv5r7pw7ud3q6blwlqglepswckyqaxkzcdmkgm7t3q}
   - id: defaults
-    source: {/: baguqeerahftkbmoowg3photn27a7rdes4phf5alfrq324grn3ss2ye3kbldq}
+    source: {/: baguqeerazyaytvs2gtnlm2smbzto5wc3n7fjr6fb64sxua3o56oqhgddfina}
   - id: credit-terms
-    source: {/: baguqeeradjf624e2ps3vhlvqvntmtslweutan6lv6ezo5ncgiqc4jp4cqsga}
+    source: {/: baguqeeralgmcs4ign2y2vwwmz3gbqy74lyujdi3ilf45vt3wep4mohmn4b7q}

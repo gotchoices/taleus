@@ -5,9 +5,12 @@ format. A tally names the contract it is under only by CID (`TallyContractPropos
 `TallyContract.ContractCid`); the documents themselves are published here and kept by the parties'
 apps, not written into the tally.
 
-The current set is the MyCHIPs contract library, converted by Stroc and re-authored to
-`sereus.org`. It is a draft: the wording still describes MyCHIPs (CHIPs only, MyCHIPs servers) and
-has not been revised for Taleus.
+The set is the MyCHIPs contract library (as revised 2024-02-06), converted by Stroc, re-authored
+to `sereus.org`, and revised for Taleus: protocol and publisher names, no servers (a tally is one
+shared record on both parties' devices), key sets rather than one key, credit terms named as in the
+schema, and a new `Denomination.yaml` (Unit of Account) carrying the clauses that used to assume
+CHIPs so a tally may be kept in any unit. `CHIP_Definition.yaml` now defines only the CHIP itself.
+Still a draft under review; nothing is published.
 
 ## Working on the documents
 
@@ -17,7 +20,8 @@ is the repo's `@stroc/cli` dev dependency: run it as `yarn stroc` from anywhere 
 (`publish.sh` does; set `STROC` to use another build).
 
 ```
-yarn stroc serve . --editor --watch   # index, catalog and editor at http://localhost:3000
+yarn contracts:serve                  # from the repo root: index, catalog and editor at http://localhost:3000
+yarn stroc serve . --editor --watch   # the same, from this folder
 yarn stroc lint *.yaml
 yarn stroc status .                   # each document's CID, and whether every include is current
 yarn stroc update . --all             # after editing a clause: re-point the documents that include it
@@ -31,8 +35,17 @@ Every document sereus.org issues says `author: sereus.org`. `stroc status` and `
 `.stroc-record.json` and `.stroc-archive/` (every recorded version's exact bytes): commit both, and
 never delete from the archive once a version has been published.
 
-Before the first publish, the archive may hold draft versions nobody signed; deleting
-`.stroc-archive/` and `.stroc-record.json` then is harmless. After it, never.
+**Until the first publish, do not commit `.stroc-record.json` or `.stroc-archive/`.** Only
+`stroc link`, `stroc status` and `stroc update` write them (`lint`, `cid`, `render` and `serve` do
+not), and before anything is published they would only preserve draft bytes nobody signed. While
+drafting, run `yarn stroc link .` when includes change, then delete both again:
+
+```
+yarn stroc link . && rm -rf .stroc-record.json .stroc-archive
+```
+
+`publish.sh` runs `stroc status`, which creates them for real at the first publish; commit them
+from then on, and never delete from the archive once a version has been published.
 
 ## Publishing
 

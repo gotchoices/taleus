@@ -1,10 +1,9 @@
-# From MyCHIPs contract/Recitals.yaml (published 2020-04-01), by way of the Stroc sample library.
-# Draft for Taleus; not yet revised or published.
+# Derived from MyCHIPs contract/Recitals.yaml (published 2020-04-01), via the Stroc sample library.
+# Revised for Taleus. Draft; not yet published.
 stroc: '1.0'
 language: en
 title: Purpose of The Contract
 author: sereus.org
-published: '2020-04-01'
 text: >-
   Whereas:
 sections:
@@ -17,8 +16,8 @@ sections:
   - text: >-
       The Parties want to issue, receive, and formalize such Pledges of Value, or Credit, in a system of open-account indebtedness and in a digital format for the sake of convenience and accuracy; and
   - text: >-
-      The Parties desire to use the MyCHIPs Protocol as defined published by MyCHIPs.org and demonstrated by its Reference Implementation, to accomplish this; and
+      The Parties desire to use the Taleus protocol, as published by sereus.org and demonstrated by its reference implementation, to accomplish this; and
   - text: >-
       The Parties desire to exchange value and credits among their trusted network to facilitate and encourage interactions and transactions in that network and to enable the satisfaction of outstanding Pledges of Value;
   - text: >-
-      Now, thereforet is hereby agreed as follows:
+      Now, therefore, it is hereby agreed as follows:

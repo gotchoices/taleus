@@ -1,10 +1,9 @@
-# From MyCHIPs contract/Representations.yaml (published 2020-04-01), by way of the Stroc sample library.
-# Draft for Taleus; not yet revised or published.
+# Derived from MyCHIPs contract/Representations.yaml (published 2020-04-01), via the Stroc sample library.
+# Revised for Taleus. Draft; not yet published.
 stroc: '1.0'
 language: en
 title: General Representations of the Parties
 author: sereus.org
-published: '2020-04-01'
 text: >-
   The Parties represent as follows about themselves:
 sections:

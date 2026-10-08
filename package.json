@@ -15,7 +15,8 @@
 	"scripts": {
 		"build": "yarn workspaces foreach --all --topological run build",
 		"test": "yarn workspaces foreach --all run test",
-		"lint": "yarn workspaces foreach --all run lint"
+		"lint": "yarn workspaces foreach --all run lint",
+		"contracts:serve": "yarn stroc serve contracts --editor --watch"
 	},
 	"devDependencies": {
 		"@eslint/js": "10.0.1",

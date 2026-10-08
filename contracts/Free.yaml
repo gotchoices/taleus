@@ -1,20 +1,22 @@
-# From MyCHIPs contract/Free.yaml (published 2020-04-01), by way of the Stroc sample library.
-# Draft for Taleus; not yet revised or published.
+# Derived from MyCHIPs contract/Free.yaml (published 2020-04-01), via the Stroc sample library.
+# Carried over with names changed only; whether a royalty-free-use condition applies to Taleus (MIT) is undecided.
+# Draft; not yet published.
 stroc: '1.0'
 language: en
-title: How to Use MyCHIPs at No Cost
+title: How to Use Taleus at No Cost
 author: sereus.org
-published: '2020-04-01'
 text: >-
-  End users may use MyCHIPs royalty free on the condition that, in all contracts and transactions, the following contract sections are included in their full force and intent, and abided by:
+  End users may use Taleus royalty free on the condition that, in all contracts and transactions, the following contract sections are included in their full force and intent, and abided by:
 sections:
   - id: recitals
-    source: {/: baguqeeranyuli2dpeyyy43smsboox2mxzpefdmii5s3f6gy62zqyggaez7pq}
+    source: {/: baguqeerageamcwm7cz5man7hd26r7hkj5lwgnbihus5gtawhpxwzprlcenqq}
   - id: values
-    source: {/: baguqeerawwuy5kilzscnpuuvue3lwmdjd2xsmff2pnzljmxs6df4loklw42q}
+    source: {/: baguqeeravjilrpk24b3cxegewkci53nex4sjvzct4clkrszh7qmc5ac2vrmq}
   - id: tally-definition
-    source: {/: baguqeeraywhea2txgmmitt2u2xfljeiay7wiwkz3q36glvjoujqnhny4srua}
+    source: {/: baguqeerapoibdx34ybbb3snkmutctznninl2caqch6korbb7qiqefhafmfxq}
+  - id: denomination
+    source: {/: baguqeera5w6fbcdebvug5j7ud3bsecrlpxxkogw3in34aft24wpiw7rso4uq}
   - id: chip-definition
-    source: {/: baguqeerahsjip3jbgu77ple43ng3hw2j2pkibikpjxlxlf7ck7kdagb3gmua}
+    source: {/: baguqeeragq3zqqtkntyjxillpl5hbqte67imofdd5wrbzsxvjrz3imi2dwma}
   - id: ethics
-    source: {/: baguqeeralzpphk2g63vchyb6h6liqisqwdxjd4nqww2alypbgy4eokxltu3a}
+    source: {/: baguqeeravyv2bvjr7c5gk3maviacy3ielblm5xmuxawvkkxsdy2qubz3heaa}

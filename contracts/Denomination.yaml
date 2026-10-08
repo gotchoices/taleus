@@ -1,0 +1,37 @@
+# New for Taleus: the unit-of-account clauses formerly inside CHIP_Definition, generalized to any Denomination.
+# Draft; not yet published.
+stroc: '1.0'
+language: en
+title: Unit of Account
+author: sereus.org
+text: >-
+  Every Tally is kept in a single unit of account, referred to as its Denomination.
+  The Denomination is stated in the Tally Data, is agreed to by both Parties when the Tally is signed, and cannot be changed for the life of the Tally.
+  Every Chit on the Tally is quantified in the Denomination.
+sections:
+  - title: Kinds of Denomination
+    text: >-
+      The Denomination is one of the following:
+    sections:
+      - text: >-
+          the CHIP, as defined in the section of this Agreement titled Defining a CHIP;
+      - text: >-
+          a national currency, identified in the Tally Data by its ISO 4217 code; or
+      - text: >-
+          any other unit the Parties agree upon, identified in the Tally Data by the content identifier of a descriptor document, held by both Parties, which states the unit's name, symbol and meaning.
+  - title: Subdivision
+    text: >-
+      Amounts are recorded in the Tally as whole multiples of the smallest unit of the Denomination.
+      The Tally Data states the Scale, being the number of decimal places by which the smallest unit divides the Denomination's display unit; for example, two for a currency divided into cents, or three for CHIPs recorded in thousandths.
+      User interfaces are expected to render amounts in the display unit.
+  - title: Tally Denominated Exclusively
+    text: >-
+      All transactions associated with this Tally shall be quantified exclusively in its Denomination, as stated in the Tally Data, and not in any other unit of measure.
+      For example, where the Denomination is the CHIP, it is a breach of this covenant to produce a Pledge of Value which the Parties understand to be measured in Dollars or Euros.
+      It is not necessarily a breach to buy or sell Dollars, or any other currency or unit, using this Tally and/or at a price denominated in the Denomination.
+      Nor is it necessarily a breach to satisfy a Pledge of Value by payment in Dollars, or any other currency, where acceptable to the Parties.
+  - title: Exchange Between Denominations
+    text: >-
+      A Credit Lift may pass through Tallies kept in different Denominations.
+      A Party participating in such a Lift converts between units at a rate it has itself posted for that purpose, and the amount by which that Party's balance on this Tally changes is the amount, in this Tally's Denomination, that the Party has signed.
+      No estimate or rate used in a Lift shall be construed to bind a Party to any future payment by, or exchange into, any unit at any particular rate.

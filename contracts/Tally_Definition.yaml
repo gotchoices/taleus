@@ -1,30 +1,30 @@
-# From MyCHIPs contract/Tally_Definition.yaml (published 2020-04-01), by way of the Stroc sample library.
-# Draft for Taleus; not yet revised or published.
+# Derived from MyCHIPs contract/Tally_Definition.yaml (published 2020-04-01), via the Stroc sample library.
+# Revised for Taleus. Draft; not yet published.
 stroc: '1.0'
 language: en
 title: What a Tally is and How it Works
 author: sereus.org
-published: '2020-04-01'
 text: >-
   Pledges of Value are tracked by means of a Tally.
-  A Tally is an agreement between two willing Parties, normally stored as a digital electronic record, and by which the Parties document and enforce a series of Pledges of Value, called Chits, made between them.
+  A Tally is an agreement between two willing Parties, stored as a digital electronic record, and by which the Parties document and enforce a series of Pledges of Value, called Chits, made between them.
   These all constitute an enforceable agreement between the Parties to deliver certain value at a future point and in a manner agreed upon by the Parties.
 sections:
   - title: Signing Keys
     text: >-
-      Each Party is in possession of a digital key consisting of a private part and a public part.
-      Each Party is responsible to maintain knowledge and possession of its key and to keep the private portion absolutely confidential.
-      The public part of the key is used to validate the Party's digital signature and so it must be shared with the other Party.
-      This is accomplished by including both Parties' public keys in the Tally Data.
+      Each Party is in possession of one or more digital keys, each consisting of a private part and a public part.
+      Each Party is responsible to maintain knowledge and possession of its keys and to keep the private portions absolutely confidential.
+      The public part of a key is used to validate the Party's digital signature and so it must be shared with the other Party.
+      This is accomplished by recording each Party's public keys in the Tally Data.
+      A Party may, as the protocol provides, record additional keys and withdraw keys it no longer uses, and a signature made with any key so recorded and not withdrawn binds the Party.
   - title: Signing the Tally
     text: >-
-      The Parties agree to the terms and conditions incorporated into the Tally by computing a standardized hash from the normalized contents of the Tally, and encrypting that hash using their private key.
+      The Parties agree to the terms and conditions incorporated into the Tally by digitally signing, each with one of its recorded keys, the record of this Contract and of the terms set forth in the Tally Data.
       This act of signing is normally conducted by a user interacting with an application running on a computer or mobile device.
-      By producing and sharing a digital signature of the hash of the Tally, the Party is agreeing to all the terms and conditions of this Agreement.
+      By producing and sharing a digital signature over the Tally, the Party is agreeing to all the terms and conditions of this Agreement.
   - title: Stock and Foil
     text: >-
       The two Parties to a Tally are distinct with respect to their expected roles as Foil Holder and Stock Holder.
-      Specifically, the Tally is stored as two complementary counterparts: a Foil, and a Stock, each held or stored by one of the Parties directly or by an agent service provider.
+      Specifically, the Tally is a single shared record, kept on the devices of both Parties, in which one Party is designated as holding the Stock and the other as holding the Foil.
   - title: Client Role
     text: >-
       The Foil Holder is expected to most often be the recipient or purchaser of Product.
@@ -48,7 +48,6 @@ sections:
     text: >-
       Neither Party may unilaterally authorize a Chit as Receiver, meaning a Chit that would grant value from the other Party to itself.
       However, either Party may request such a Pledge from the other Party, with such request only becoming binding if it is duly signed by the Issuer.
-      It just does not become binding until it is duly signed by the Issuer.
   - title: Net Credit
     text: >-
       In spite of the distinct definition of the Vendor and Client, individual Pledges may be made by either Party, to the other Party.
