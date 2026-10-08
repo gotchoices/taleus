@@ -15,24 +15,24 @@ text: >-
   Entries so recorded are made under this Agreement, not amendments to it.
 sections:
   - id: recitals
-    source: {/: baguqeerageamcwm7cz5man7hd26r7hkj5lwgnbihus5gtawhpxwzprlcenqq}
+    source: {/: ./Recitals.yaml}
   - id: values
-    source: {/: baguqeerahc5s5dwl5assfq4hdlkrds5qtvpmwjfcp23wgzerc7y7clj6nejq}
+    source: {/: ./Values.yaml}
   - id: tally-definition
-    source: {/: baguqeerapoibdx34ybbb3snkmutctznninl2caqch6korbb7qiqefhafmfxq}
+    source: {/: ./Tally_Definition.yaml}
   - id: denomination
-    source: {/: baguqeera5w6fbcdebvug5j7ud3bsecrlpxxkogw3in34aft24wpiw7rso4uq}
+    source: {/: ./Denomination.yaml}
   - id: chip-definition
-    source: {/: baguqeeragq3zqqtkntyjxillpl5hbqte67imofdd5wrbzsxvjrz3imi2dwma}
+    source: {/: ./CHIP_Definition.yaml}
   - id: ethics
-    source: {/: baguqeerauscso65ktlzpe26xsoldymgies7mnpad35at77piafynkv7pa47a}
+    source: {/: ./Ethics.yaml}
   - id: disputes
-    source: {/: baguqeera6cezqiyuke645zn3ebwd2i3gstyxfbh3lrdcgo37lf2kobtqjilq}
+    source: {/: ./Disputes_Courts.yaml}
   - id: duties-rights
-    source: {/: baguqeeradg4wpmi5fmdhy6dx6flw5txhxfm7ctlo736diybbd4gawidlwvqa}
+    source: {/: ./Duties_Rights.yaml}
   - id: representations
-    source: {/: baguqeeranls5sbcols3xtnpzocfgbv4s3l35u2e4ovrnecbr4bh2obrm64ca}
+    source: {/: ./Representations.yaml}
   - id: defaults
-    source: {/: baguqeerazyaytvs2gtnlm2smbzto5wc3n7fjr6fb64sxua3o56oqhgddfina}
+    source: {/: ./Defaults.yaml}
   - id: credit-terms
-    source: {/: baguqeeraqsqbqagit22i7ohmvbodw2zqiegbz4kjvqwlm77u26mzjz7n6xiq}
+    source: {/: ./Credit_Terms.yaml}

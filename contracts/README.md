@@ -104,6 +104,19 @@ sereus.org {
 }
 ```
 
+Apache (what gotchoices.org runs; inside the sereus.org SSL `<VirtualHost>`, with
+`a2enmod proxy proxy_http`):
+
+```apache
+ProxyPass        /ipfs/               http://127.0.0.1:3100/ipfs/
+ProxyPassReverse /ipfs/               http://127.0.0.1:3100/ipfs/
+ProxyPass        /.well-known/stroc/  http://127.0.0.1:3100/.well-known/stroc/
+ProxyPassReverse /.well-known/stroc/  http://127.0.0.1:3100/.well-known/stroc/
+```
+
+Only these two prefixes are forwarded; the rest of `/.well-known/` (the apps' deep-link
+association files) stays on disk.
+
 Verify:
 
 ```

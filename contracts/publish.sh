@@ -6,10 +6,10 @@ set -euo pipefail
 #
 # Usage:
 #   ./publish.sh [--dry-run] [USER@HOST] [DOCS_ROOT]
-#   USER=myuser ./publish.sh [HOST] [DOCS_ROOT]
+#   PUBLISH_USER=myuser ./publish.sh [HOST] [DOCS_ROOT]
 # Defaults:
 #   HOST: gotchoices.org          (the host that serves sereus.org)
-#   USER: root
+#   PUBLISH_USER: root   (not $USER, which the shell always sets to the local login)
 #   DOCS_ROOT: /srv/stroc/sereus.org   (the folder the Stroc server serves; see README.md)
 # Environment:
 #   STROC          the stroc command (default: yarn stroc, the repo's @stroc/cli)
@@ -31,7 +31,7 @@ HOST_ARG="${1:-gotchoices.org}"
 if [[ "$HOST_ARG" == *"@"* ]]; then
 	REMOTE="$HOST_ARG"
 else
-	REMOTE="${USER:-root}@${HOST_ARG}"
+	REMOTE="${PUBLISH_USER:-root}@${HOST_ARG}"
 fi
 DOCS_ROOT="${2:-/srv/stroc/sereus.org}"
 RELOAD="${STROC_RELOAD:-docker kill -s HUP stroc-server >/dev/null}"

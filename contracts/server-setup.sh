@@ -7,7 +7,7 @@ set -euo pipefail
 # Usage:
 #   ./server-setup.sh [USER@HOST] [DOCS_ROOT] [STROC_SRC]
 # Defaults:
-#   HOST: gotchoices.org, USER: root
+#   HOST: gotchoices.org, PUBLISH_USER: root
 #   DOCS_ROOT: /srv/stroc/sereus.org   (the shared document folder every app publishes into)
 #   STROC_SRC: /srv/stroc/src          (a checkout of github.com/gotchoices/stroc, built into the image)
 #
@@ -18,7 +18,7 @@ HOST_ARG="${1:-gotchoices.org}"
 if [[ "$HOST_ARG" == *"@"* ]]; then
 	REMOTE="$HOST_ARG"
 else
-	REMOTE="${USER:-root}@${HOST_ARG}"
+	REMOTE="${PUBLISH_USER:-root}@${HOST_ARG}"
 fi
 DOCS_ROOT="${2:-/srv/stroc/sereus.org}"
 STROC_SRC="${3:-/srv/stroc/src}"
