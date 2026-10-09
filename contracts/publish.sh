@@ -73,8 +73,8 @@ ssh "$REMOTE" "test -d '$WEB_ROOT'" || {
 	echo "ERROR: $WEB_ROOT is not a directory on the host." >&2
 	exit 1
 }
-rsync -a "${DRY_RUN[@]}" "$STAGE/site/ipfs/" "$REMOTE:$WEB_ROOT/ipfs/"
-rsync -a "${DRY_RUN[@]}" "$STAGE/site/.well-known/stroc/" "$REMOTE:$WEB_ROOT/.well-known/stroc/"
+rsync -a ${DRY_RUN[@]+"${DRY_RUN[@]}"} "$STAGE/site/ipfs/" "$REMOTE:$WEB_ROOT/ipfs/"
+rsync -a ${DRY_RUN[@]+"${DRY_RUN[@]}"} "$STAGE/site/.well-known/stroc/" "$REMOTE:$WEB_ROOT/.well-known/stroc/"
 
 if (( ${#DRY_RUN[@]} )); then
 	echo "Dry run: nothing changed on the host."

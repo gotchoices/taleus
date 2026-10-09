@@ -16,24 +16,24 @@ text: >-
   Entries so recorded are made under this Agreement, not amendments to it.
 sections:
   - id: recitals
-    source: {/: ./Recitals.yaml}
+    source: {/: baguqeerareablc3hrc36ybxtvkwp5znysck3hri22pp7xkjfrsu6wko2tfra}
   - id: values
-    source: {/: ./Values.yaml}
+    source: {/: baguqeeraersmllrd774piylqrmstv6wr4ihhg4y44aiglew2z3kkfivaoiza}
   - id: tally-definition
-    source: {/: ./Tally_Definition.yaml}
+    source: {/: baguqeera7apbsyeazua7ocvmy5blg5dbeiz54g5oe2foqtofmfkurjtnfiwq}
   - id: denomination
-    source: {/: ./Denomination.yaml}
+    source: {/: baguqeeraajioyjuz52fnoufr53pstwncczogx35znh6oxueodj3qbwyndqdq}
   - id: chip-definition
-    source: {/: ./CHIP_Definition.yaml}
+    source: {/: baguqeerawfpnfnxsxcsjfbb7yweptxr7t6x42plrrj7zlgpnfn7rdj72w3ha}
   - id: ethics
-    source: {/: ./Ethics.yaml}
+    source: {/: baguqeera4ybzbw73yitmabjp2tu4ubjlz7wjrxwm2ttvlohrsd3dvbdhudma}
   - id: disputes
-    source: {/: ./Disputes_Courts.yaml}
+    source: {/: baguqeeraybolqfozi53raf2qrkil43wlibstteuwiz5zijnyiscdqihihria}
   - id: duties-rights
-    source: {/: ./Duties_Rights.yaml}
+    source: {/: baguqeera4jkwgvlwweoat7j6r4z2gardhivwglfiocvuwd4qkuwfzuhcbstq}
   - id: representations
-    source: {/: ./Representations.yaml}
+    source: {/: baguqeera6wa5tf3youbf37tgor62msunq7cslfowswfhciuaa4aykkxp2zka}
   - id: defaults
-    source: {/: ./Defaults.yaml}
+    source: {/: baguqeerajnl6vzljh3ingmu6dszvvnh4bz43efbk3lgpafthfe3pn6n4vasa}
   - id: credit-terms
-    source: {/: ./Credit_Terms.yaml}
+    source: {/: baguqeera6sobo5bf422v4q5f2wnjudlbokq3lm22swnerg5n3xhb56yyyt5a}
