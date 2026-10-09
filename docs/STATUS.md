@@ -12,10 +12,21 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [x] **Stack pinned at Sereus 1.8 / Optimystic 1.8 / Quereus 4.20**, one copy each.
-  `taleus-core` depends on `@quereus/quereus` and `@optimystic/quereus-plugin-crypto` directly; the
-  prescribed-usage checklist the Sereus adapter must follow is in
-  `packages/taleus-core/SPEC.md` § Where Sereus plugs in.
+- [ ] **Stack: on Sereus 1.12 / Optimystic 1.10.1 / Quereus 4.20.1 / FRET 1.0.1, one copy each;
+  upgrading to Sereus 1.14 / Optimystic 1.12.1.** `taleus-core` depends on `@quereus/quereus` and
+  `@optimystic/quereus-plugin-crypto` directly; the prescribed-usage checklist the Sereus adapter must
+  follow is in `packages/taleus-core/SPEC.md` § Where Sereus plugs in.
+- [ ] **Upstream items we filed** (2026-10-05):
+  - gotchoices/sereus#33 — native Ed25519 in `@serfab/cadre-rn` (`/polyfills/native-crypto`). Open.
+    When it ships, the mobile app drops its own `src/polyfills/native-crypto.js` for the kit's.
+  - gotchoices/Optimystic#30 — `quereus-plugin-crypto` has no native-crypto seam: its SQL `verify` runs
+    pure-JS Ed25519 (408 ms of a 29 s invite on a Galaxy S7). Open.
+  - gotchoices/Optimystic#31 — cohort-topic proof-of-work starved the phone's JS thread. **Fixed in
+    Optimystic 1.12** (keyed nodes skip it); lets the phone run `strandReactivity` again.
+- [ ] **To file with Sereus: an app protocol on a strand's libp2p node.** cadre-core exposes only the
+  control node (`getControlNode()`); its own strand protocols are registered internally. Fetching a
+  contract from the partner (contracts phase 2, below) needs a hook to register and dial an app
+  protocol on a strand node.
 - [ ] **Read-dependency validation must be live on the consensus commit path — now for cross-table
   rules only.** Sereus guarantees that a declared unique value (primary key or secondary index)
   refuses the second of two racing rows, so every "at most one" rule in the schema is now a
@@ -74,9 +85,10 @@ module keeps its in-process suite against doubles until direct chits work on a r
   runs today. Two parties go from invitation to close through the API alone. It surfaced a defect
   no row-level test could: a `TallyContract` could not be completed by two parties who do not share
   a key (fixed — see that package's `test/STATUS.md` § 0).
-- [ ] Next: `feat-formation-over-sereus-strand` — a `StoreProvider` over
-  `@serfab/quereus-plugin-sereus`, which already binds Quereus to a strand and applies the sApp
-  schema. Then migrate the row-level suite up per `test/STATUS.md` § Roadmap step 4.
+- [x] **A store over real strands.** `taleus-model/cadre`'s `cadreStoreProvider` founds a tally strand,
+  invites, joins, seats and trades between two cadre-core nodes in Node, across a restart
+  (`cadre.test.ts`). Details and what remains: `tickets/blocked/feat-engine-cadre-mode.md`.
+- [ ] Migrate the row-level suite up per `test/STATUS.md` § Roadmap step 4.
 - [ ] Mine `mc/mychips/test/auto` for scenarios (5,543 lines; the code does not transfer, the
   scenarios do).
 
@@ -113,19 +125,66 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   with a simulated counterparty for one-device use -- and one contract suite run against both. The
   app's data layer forwards to it, so screens see no backend at all. Wiring engine mode into the app
   is next -- `feat-engine-run-modes` § Progress.
-- [ ] **Run a cadre node in the mobile app** (not started; the app still runs on mock data and does not
-  consume `taleus-core`). The prescribed kit as of Sereus 1.6+ is `@serfab/cadre-rn` —
-  `polyfills` as the app's first import, `withCadreMetro` for Metro, `buildNoiseCrypto` for native
-  connection crypto — which the Sereus reference app uses. `ser/chat` depends on the kit but still
-  carries copied `polyfills/` and its own Metro config, so it is not the model to copy for that part.
-  **Tripwire before adopting the kit:** its `Intl.PluralRules` is an English-only shim (`one` only
-  when n = 1), installed whenever `PluralRules` is missing. This app needs the full formatjs chain in
-  `src/i18n/intl.ts` (i18next resolves plurals through it — the "Waiting 1 days" bug). Imported in the
-  kit's prescribed order the shim lands first, and formatjs may then decline to polyfill. Order the
-  formatjs chain ahead of the kit, and verify a non-English plural on the device, not in Jest.
+- [ ] **Run a cadre node for Taleus.** Not done: being prepared in a separate effort. The phone
+  app's Mode C (below) runs a phone node through `@serfab/cadre-rn`; an always-on cadre node serving
+  a party's tallies (and `taleus-node`, `feat-taleus-node-service`) is the part still to come.
 
 (The `feat-taleus-app-shell` ticket has been retired — the app is scaffolded and now evolves through
 the appeus design/generation cycle. Toolchain decisions live in `design/specs/project.md`.)
+
+## Mode C: the phone app over a real cadre (`feat-engine-cadre-mode`)
+
+Runs on an emulator and a Galaxy S7 against the public relay (`relay.sereus.org`): onboarding,
+invitation, acceptance and trading work, but slowly. Measured on Sereus 1.12 / Optimystic 1.10.1:
+invite 29 s (S7) to 71 s (emulator); accept 256 s (join about 3 min, seating 44 s); reads 9–70 s or
+more, and the tally list times out. The dev bridge (`apps/mobile/scripts/dev-drive.mjs`) drives it
+without the UI.
+
+- [x] **Upgraded to Sereus 1.14 / Optimystic 1.12.1 / Quereus 4.20.2 / FRET 1.0.2** (2026-10-08); core
+  301 and model 35 tests pass; the phone runs `strandReactivity` again. A device's control store from
+  1.12 does not open under 1.14 (Sereus's documented no-migration policy: the party is recreated).
+- [ ] **Re-measured on 1.14 (emulator accepts the S7's invitation): still failing.** Invite 28 s on
+  the S7. Accept: the first strand start failed after 173 s (`optimystic/schema` unavailable,
+  `claimed-elsewhere`), the automatic retry started it in 24 s; a second accept waited 245 s for the
+  first sync; a third got the strand writable and then failed after 235 s reading
+  `PartyKeyRevocation` (`cohort-unreachable`), with the two strand nodes connected through the relay.
+  Meanwhile the S7's agent runs a step every 10 s (the backstop poll) costing about 2.7 s each.
+  Next: lengthen or drop the backstop poll now that reactivity is on, and profile the S7 while it is
+  serving the joiner's reads.
+- [ ] **Read volume.** If reads stay slow: cut what the Taleus agent and screens read, then make a
+  minimal read-latency repro for upstream.
+- [ ] **Held, pending the re-measure:** a joiner's first write failing to get a super-majority
+  (retried today); a restarted joiner not syncing (seen with a local relay only); an untraced
+  uncaught "Database is closed".
+- [ ] An acceptance that outlives `joinPatienceMs`; reads failing while the counterparty is offline;
+  half-committed seating; a signed tally sApp; verify on two phones (all in the ticket).
+- [ ] **Clean-up:** `TMPDBG` logs in `taleus-model` (`cadre/store.ts`, `engine/session.ts`,
+  `engine/formation.ts`); `USE_ENGINE`/`USE_CADRE` back to `false` in `apps/mobile/src/data/config.ts`;
+  `probe-*.tmp.mjs` at the root and `profile.tmp.cjs` in the app.
+
+## Contracts (Stroc)
+
+sereus.org publishes the tally contracts from [`contracts/`](../contracts/) (Stroc documents, two
+variants: `Tally_Contract` and `Tally_Contract_Arbitration`) into its shared catalog
+(`https://sereus.org/.well-known/stroc/catalog.json`). A tally carries only the contract's CID; each
+party keeps a copy of every contract it references and can hand it to its partner.
+
+- [x] Documents drafted, published, served by sereus.org; `@stroc/cli` installed (`yarn stroc`).
+- [ ] **Phase 1, in the app** (needs no network beyond an HTTP fetch):
+  - choose a contract from sereus.org's catalog (current, `author` entries), with the published CIDs
+    shipped as an offline fallback;
+  - a per-device document store keyed by CID, verified on arrival (LevelDB on the phone);
+  - the offer's `agreementId` becomes the Stroc CID, replacing the `STANDARD_AGREEMENT` placeholder;
+    a CID-format check on `ContractCid` in the schema;
+  - review by Stroc composition and rendering, with the author check ("issued by sereus.org") and
+    "you have read this before". **Decision:** a WebView of Stroc's HTML, or native components from
+    its layout model. Check Stroc on Hermes first;
+  - the tally's own facts (denomination, scale, each side's credit-terms revision, the parties) render
+    as app blocks beside the text: the contracts declare no `parameters`;
+  - stories 01/02 and the `TallyTerms` and invitation-review specs updated, so screens regenerate
+    through appeus.
+- [ ] **Phase 2: fetch from the partner** by CID over the strand. Waits on the Sereus app-protocol
+  hook (cross-repo, above).
 
 ## Negotiation gaps (app design pass, `packages/taleus-app`)
 

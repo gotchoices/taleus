@@ -40,8 +40,8 @@
 	"dependencies": {
 		"@noble/curves": "^2.4.0",
 		"@noble/hashes": "^2.2.0",
-		"@optimystic/quereus-plugin-crypto": "^1.10.1",
-		"@quereus/quereus": "^4.20.0"
+		"@optimystic/quereus-plugin-crypto": "^1.12.1",
+		"@quereus/quereus": "^4.20.2"
 	},
 	"devDependencies": {
 		"@eslint/js": "10.0.1",

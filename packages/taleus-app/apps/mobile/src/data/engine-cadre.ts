@@ -51,11 +51,11 @@ const phone = createPhoneNode({
 		...config,
 		// The tally sApp is unsigned until Taleus signs it at release (`taleusSApp`).
 		requireSignedSchemas: false,
-		// No `strandReactivity` yet, though the tally tables carry `optimystic.network_watch`:
-		// each watched table pays a registration proof of work at every strand build, hashed
-		// in pure JS (@noble/hashes, not crypto.subtle), which under Hermes starves the JS thread
-		// for minutes -- long enough for the relay reservation to lapse. The store's backstop
-		// poll stands in until that proof of work is cheap on a phone.
+		// The tally tables carry `optimystic.network_watch`, so a counterparty's commit reaches
+		// this phone's `subscribe` without polling. Before Optimystic 1.12 each watched table paid
+		// a registration proof of work in pure JS that starved Hermes for minutes
+		// (gotchoices/Optimystic#31); a keyed node now signs a self-endorsement instead.
+		strandReactivity: { enabled: true },
 	}),
 })
 
@@ -81,7 +81,18 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 	installDevBridge(engine.model, () => {
 		const running = phone.node
 		return running
-			? { peerId: running.peerId?.toString(), addrs: running.getMultiaddrs().map(a => a.toString()), relay: running.getRelayReservationState(), strands: [...running.getStrands().keys()] }
+			? {
+					peerId: running.peerId?.toString(),
+					addrs: running.getMultiaddrs().map(a => a.toString()),
+					relay: running.getRelayReservationState(),
+					strands: [...running.getStrands().values()].map(strand => ({
+						id: strand.strandId,
+						status: strand.status,
+						connectedPeers: strand.connectedPeers,
+						error: strand.error,
+						connections: strand.libp2pNode?.getConnections().map(c => ({ peer: c.remotePeer.toString(), addr: c.remoteAddr.toString(), status: c.status })),
+					})),
+				}
 			: { status: phone.status.state }
 	})
 	return engine.model
