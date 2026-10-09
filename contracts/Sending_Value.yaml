@@ -4,6 +4,7 @@ stroc: '1.0'
 language: en
 title: How Value is Transmitted in a Taleus Network
 author: sereus.org
+published: '2026-10-08'
 text: >-
   A Tally contains individual Pledges or Chits, each of which constitutes a promise by the Issuer to deliver value, quantified in the Denomination of the Tally, to the Recipient at some future time.
   Since this promise can be offered in exchange for Product, the credit on a Tally can be thought of as money, or a substitute for money.

@@ -4,6 +4,7 @@ stroc: '1.0'
 language: en
 title: Unit of Account
 author: sereus.org
+published: '2026-10-08'
 text: >-
   Every Tally is kept in a single unit of account, referred to as its Denomination.
   The Denomination is stated in the Tally Data, is agreed to by both Parties when the Tally is signed, and cannot be changed for the life of the Tally.

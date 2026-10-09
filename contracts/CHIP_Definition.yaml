@@ -4,6 +4,7 @@ stroc: '1.0'
 language: en
 title: Defining a CHIP
 author: sereus.org
+published: '2026-10-08'
 text: >-
   The CHIP is the reference unit of the Taleus network and the Denomination of a Tally unless the Parties choose another.
   Where the Denomination of this Tally is the CHIP, the Chits on the Tally are promises, made by one Party for the benefit of the other Party, to deliver future value measured in CHIPs according to terms and conditions mutually agreed upon hereby.

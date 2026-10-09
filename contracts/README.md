@@ -59,67 +59,64 @@ from then on, and never delete from the archive once a version has been publishe
 ## Publishing
 
 ```
-./publish.sh --dry-run              # what would change on the host
-./publish.sh                        # root@gotchoices.org:/srv/stroc/sereus.org
+./publish.sh --dry-run              # what would be copied to the host
+./publish.sh                        # root@gotchoices.org:/var/www/sereus.org
 ```
 
-It refuses to publish an invalid document or an outdated include, then uploads into the shared
-folder the Stroc server serves for sereus.org:
+Static files, no Stroc server on the host (Stroc 0.2's `stroc export`). The script refuses to
+publish an invalid document or an outdated include, records every current version
+(`.stroc-record.json`, `.stroc-archive/`), exports the set, and copies only two trees into
+sereus.org's Apache document root, never deleting anything there:
 
 ```
-/srv/stroc/sereus.org/
-  .stroc.yaml              # the domain's: domain, endorse, withdrawn (edited on the host)
-  .stroc-archive/<cid>.json  # every version any app has published, never removed
-  taleus.Tally_Contract.yaml # Taleus's current documents, under its prefix
-  chat.….yaml                # another app's, under its own
+/var/www/sereus.org/
+  ipfs/<cid>                 # each document's bytes, current and archived; never removed
+  ipfs/<cid>.html            # its readable page (browsers get it via the exported .htaccess)
+  ipfs/.htaccess             # headers + the Accept: text/html rewrite, rewritten each publish
+  .well-known/stroc/catalog.json   # which CIDs sereus.org issues, and their status
+  .well-known/stroc/.htaccess
 ```
 
-sereus.org has **one catalog for every Sereus app**: authorship is confirmed from the domain alone,
-so Stroc does not support a set per path (`sereus.org/taleus/...`). Each app publishes into the
-same folder with its own file prefix. File names carry no meaning to the server (documents are
-found by CID), so the prefix only keeps one app's publish from replacing or removing another's
-files. An app that adopts documents copies this script and changes `APP`.
+**After the first publish, commit `.stroc-record.json` and `.stroc-archive/`** and keep committing
+them: the catalog marks a version `superseded` only because the archive still holds it, and
+`draft.sh` switches off its link/unlink behaviour once the record is tracked. Withdrawing or
+endorsing a document is done in this folder's `.stroc.yaml` (`withdrawn`, `endorse`) and
+published like any other change.
 
-Withdrawing or endorsing a document is a decision for the domain, not one app: edit
-`/srv/stroc/sereus.org/.stroc.yaml` on the host and reload. The local `.stroc.yaml` is only for
-previewing with `stroc serve`.
+**One catalog per domain.** Authorship is confirmed from the domain alone, so sereus.org has one
+`catalog.json` for every Sereus app, and whichever app exports last writes it. Today Taleus is the
+only publisher. When a second app publishes documents for sereus.org, the export has to run over
+the union of both sets (one folder holding every app's documents and archive, or one repo that
+owns the catalog); the `ipfs/` files themselves never conflict, being named by content.
 
-## Server
+## Apache
 
-Once, or after a Stroc release: `./server-setup.sh` creates the shared folder and its
-`.stroc.yaml`, builds the Stroc server image from a checkout on the host, and runs it as the
-container `stroc-server` on `127.0.0.1:3100`. `publish.sh` reloads it with `SIGHUP`.
-
-The front end forwards only Stroc's paths, at the root of the domain:
-
-```nginx
-location /ipfs/ { proxy_pass http://127.0.0.1:3100; }
-location /.well-known/stroc/ { proxy_pass http://127.0.0.1:3100; }
-```
-
-```
-sereus.org {
-	handle /ipfs/* { reverse_proxy 127.0.0.1:3100 }
-	handle /.well-known/stroc/* { reverse_proxy 127.0.0.1:3100 }
-}
-```
-
-Apache (what gotchoices.org runs; inside the sereus.org SSL `<VirtualHost>`, with
-`a2enmod proxy proxy_http`):
+sereus.org is served by Apache from `/var/www/sereus.org`. The exported `.htaccess` files need
+`mod_headers`, `mod_rewrite` (both enabled on gotchoices.org) and `AllowOverride FileInfo`, which
+the default `/var/www` block does not grant (`AllowOverride None`). Add to the sereus.org SSL
+`<VirtualHost>`:
 
 ```apache
-ProxyPass        /ipfs/               http://127.0.0.1:3100/ipfs/
-ProxyPassReverse /ipfs/               http://127.0.0.1:3100/ipfs/
-ProxyPass        /.well-known/stroc/  http://127.0.0.1:3100/.well-known/stroc/
-ProxyPassReverse /.well-known/stroc/  http://127.0.0.1:3100/.well-known/stroc/
+<Directory /var/www/sereus.org/ipfs>
+	AllowOverride FileInfo
+</Directory>
+<Directory /var/www/sereus.org/.well-known/stroc>
+	AllowOverride FileInfo
+</Directory>
 ```
 
-Only these two prefixes are forwarded; the rest of `/.well-known/` (the apps' deep-link
-association files) stays on disk.
+then `apachectl configtest && systemctl reload apache2`. Without it the files are still served and
+the app still works (it fetches `?format=raw` and verifies by CID), but browser-based clients lack
+`Access-Control-Allow-Origin: *`, the raw files get a guessed content type, and a browser opening
+`/ipfs/<cid>` gets bytes instead of the page.
+
+Running the Stroc server instead (Docker, proxied under the same two paths) remains possible; see
+Stroc's [Deploying](https://github.com/gotchoices/stroc/blob/main/docs/Deploying.md).
 
 Verify:
 
 ```
+curl -sI https://sereus.org/.well-known/stroc/catalog.json | grep -i -e '^HTTP' -e access-control
 curl -s https://sereus.org/.well-known/stroc/catalog.json | head
-curl -s -H 'Accept: application/vnd.ipld.raw' https://sereus.org/ipfs/<contract-cid> | head -c 200
+curl -s 'https://sereus.org/ipfs/<contract-cid>?format=raw' | head -c 200
 ```

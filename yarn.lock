@@ -1669,98 +1669,98 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stroc/cli@npm:^0.1.0":
-  version: 0.1.0
-  resolution: "@stroc/cli@npm:0.1.0"
+"@stroc/cli@npm:^0.2.0":
+  version: 0.2.0
+  resolution: "@stroc/cli@npm:0.2.0"
   dependencies:
-    "@stroc/compose": "npm:0.1.0"
-    "@stroc/core": "npm:0.1.0"
-    "@stroc/pdf": "npm:0.1.0"
-    "@stroc/render": "npm:0.1.0"
-    "@stroc/server": "npm:0.1.0"
-    "@stroc/yaml": "npm:0.1.0"
+    "@stroc/compose": "npm:0.2.0"
+    "@stroc/core": "npm:0.2.0"
+    "@stroc/pdf": "npm:0.2.0"
+    "@stroc/render": "npm:0.2.0"
+    "@stroc/server": "npm:0.2.0"
+    "@stroc/yaml": "npm:0.2.0"
   bin:
     stroc: dist/src/index.js
-  checksum: 10c0/b17da7df27680b0036bf7018fa537ba9e9fe5135e9edc446e945d5244fc8f98aeca7a0e85915f3e802613802a9df2a2b2efc3badbd48cb0116b7d561ee8ab54e
+  checksum: 10c0/3aa445f8d620e089c61ce7aa867270c4c3e734f401ad02461ab5790e8616c1c48bd1116c74f3da9a3abbb9b655bf23b828d83a105e4cbcc27d58d16627de0789
   languageName: node
   linkType: hard
 
-"@stroc/compose@npm:0.1.0":
-  version: 0.1.0
-  resolution: "@stroc/compose@npm:0.1.0"
+"@stroc/compose@npm:0.2.0":
+  version: 0.2.0
+  resolution: "@stroc/compose@npm:0.2.0"
   dependencies:
-    "@stroc/core": "npm:0.1.0"
+    "@stroc/core": "npm:0.2.0"
     multiformats: "npm:^13.4 || ^14"
-  checksum: 10c0/8853b930326480b0145b5f7c9c150580d0df7b8c700239bbc3c1948493dad2d7c60eb923264f19c3a4621d51a2f74974d819d527480091d972caaca424a2b3c1
+  checksum: 10c0/363612a2f258b64d4eee8c4d95e6be92bc0ee6764954e9cf9ffba768200991963b3fef711a301ba73f5247ae8a4f8c900924ea507aa5d8f062044f9273271358
   languageName: node
   linkType: hard
 
-"@stroc/core@npm:0.1.0":
-  version: 0.1.0
-  resolution: "@stroc/core@npm:0.1.0"
+"@stroc/core@npm:0.2.0":
+  version: 0.2.0
+  resolution: "@stroc/core@npm:0.2.0"
   dependencies:
     "@ipld/dag-json": "npm:^10.2.0"
     "@noble/hashes": "npm:^2"
     multiformats: "npm:^13.4 || ^14"
-  checksum: 10c0/5ab4467a430976ae49e01bdac82c8e9bb68cb9b75ac4dcb65a88c2b7e2de93a4a84c48e5d8ab02eba1571fc13a4b29d546642fda2eb38fa09faed48299718c26
+  checksum: 10c0/feb5641fde4b2ec1a89bb498812d2775ffb1a16db9f3443300ef8a7e1dd371615a6d429357e0d68d6c1df0f5f8813db465b9adc06865056b766bbbd261a093fc
   languageName: node
   linkType: hard
 
-"@stroc/pdf@npm:0.1.0":
-  version: 0.1.0
-  resolution: "@stroc/pdf@npm:0.1.0"
+"@stroc/pdf@npm:0.2.0":
+  version: 0.2.0
+  resolution: "@stroc/pdf@npm:0.2.0"
   dependencies:
     "@expo-google-fonts/noto-sans-mono": "npm:^0.4"
     "@expo-google-fonts/noto-serif": "npm:^0.4"
-    "@stroc/render": "npm:0.1.0"
+    "@stroc/render": "npm:0.2.0"
     pdfmake: "npm:^0.3"
-  checksum: 10c0/91f3405e746ab141c069ca9514163c693fcacf21f261bb1c3eb52190026200cf7b08d10a9ea60fbd2fe1d6485b5345c96cb54f191f5224ffdc38980e41449570
+  checksum: 10c0/6616d98e3feba27490714019be01cbcaad9217dfc91dc2f19f7541e32e89c2ae4083f408584b34edf7a7c002a7529ad0533be674b66150d7575e1c2f92030bdf
   languageName: node
   linkType: hard
 
-"@stroc/render@npm:0.1.0":
-  version: 0.1.0
-  resolution: "@stroc/render@npm:0.1.0"
+"@stroc/render@npm:0.2.0":
+  version: 0.2.0
+  resolution: "@stroc/render@npm:0.2.0"
   dependencies:
-    "@stroc/compose": "npm:0.1.0"
-    "@stroc/core": "npm:0.1.0"
+    "@stroc/compose": "npm:0.2.0"
+    "@stroc/core": "npm:0.2.0"
     qrcode-generator: "npm:^1"
-  checksum: 10c0/5500f0bb0b34f02d7f9ffc15193484097198ad93cb47310b6b60ccff36b53fc30bd476924fb99b7807cf684fb6a11421ebfe0efe646958d29ddfc489f00911f2
+  checksum: 10c0/021c5053520c33917c919d9d3be67aa5be9aaa4708d855e74bc85a3f1c5946c3ab43d8fd61390da9a29caf4d9384acbccd7b501495b677ab4da29a1c4df7a929
   languageName: node
   linkType: hard
 
-"@stroc/server@npm:0.1.0":
-  version: 0.1.0
-  resolution: "@stroc/server@npm:0.1.0"
+"@stroc/server@npm:0.2.0":
+  version: 0.2.0
+  resolution: "@stroc/server@npm:0.2.0"
   dependencies:
-    "@stroc/compose": "npm:0.1.0"
-    "@stroc/core": "npm:0.1.0"
-    "@stroc/render": "npm:0.1.0"
-    "@stroc/ui": "npm:0.1.0"
-    "@stroc/yaml": "npm:0.1.0"
+    "@stroc/compose": "npm:0.2.0"
+    "@stroc/core": "npm:0.2.0"
+    "@stroc/render": "npm:0.2.0"
+    "@stroc/ui": "npm:0.2.0"
+    "@stroc/yaml": "npm:0.2.0"
     express: "npm:^4.19.2"
     multiformats: "npm:^13.4 || ^14"
     yaml: "npm:^2"
   bin:
     stroc-server: dist/src/bin.js
-  checksum: 10c0/60bfcea1e16dc65a115313d5f1b75a251bdd608a1e50b1401af34fa9ee97debb53e92a03f55c068639f0f846b7116e31feacb6d07f525c0df11e51b69431a303
+  checksum: 10c0/638166b7a044bfb048883c3579c23317c5fad8334afdacf943eabc2f3ed1af976bd2e3b857b9a35b39d2a83d732d945f81b6aac883f51dfaace675c59095c155
   languageName: node
   linkType: hard
 
-"@stroc/ui@npm:0.1.0":
-  version: 0.1.0
-  resolution: "@stroc/ui@npm:0.1.0"
-  checksum: 10c0/4ac7d7a99bc4569dd07ee3e0fc05ce8f35abf71025ab28ce1c6a8dc382880b25daccb2e9443bbffdad9bf8a565797a00b0471ed70bcb0f7e1bf885d3fce2b7b0
+"@stroc/ui@npm:0.2.0":
+  version: 0.2.0
+  resolution: "@stroc/ui@npm:0.2.0"
+  checksum: 10c0/67061115fea9e563942784526aaa19da3929ec293ac8965dd4ae79383fad8b0196955a8425577e62839d07d62f5752fccd643afe5b093c58187b30326de9e5c0
   languageName: node
   linkType: hard
 
-"@stroc/yaml@npm:0.1.0":
-  version: 0.1.0
-  resolution: "@stroc/yaml@npm:0.1.0"
+"@stroc/yaml@npm:0.2.0":
+  version: 0.2.0
+  resolution: "@stroc/yaml@npm:0.2.0"
   dependencies:
-    "@stroc/core": "npm:0.1.0"
+    "@stroc/core": "npm:0.2.0"
     yaml: "npm:^2"
-  checksum: 10c0/e7f673b29c989f78b84b28bd7fe47a79f08f09ee4118395bbe78e7ab58ff85ccc4ef32cd90e56c35f6bd5404254514ee66ff09c67fd511f23b535f6f0145fe87
+  checksum: 10c0/8447d4ec8e4393ff8072ff1b5b99267b1412fd64a19fbc19fc63d079adc00969d13e715c2a58588eea1df8b72c98c852963099dba054831076f9a61e090350e0
   languageName: node
   linkType: hard
 
@@ -5859,7 +5859,7 @@ __metadata:
   resolution: "taleus-monorepo@workspace:."
   dependencies:
     "@eslint/js": "npm:10.0.1"
-    "@stroc/cli": "npm:^0.1.0"
+    "@stroc/cli": "npm:^0.2.0"
     "@types/jest": "npm:30.0.0"
     "@types/node": "npm:26.1.1"
     cross-env: "npm:7.0.3"
