@@ -11,7 +11,28 @@
 import { type Composed, compose, HttpResolver, type Resolver } from '@stroc/compose'
 import { verifyDocument, type StrocDocument, type StrocSection } from '@stroc/core'
 import type { StoredDocument, Tally } from 'taleus-core'
+import type { DurableText } from '../engine/session.js'
 import { CID } from 'multiformats/cid'
+
+/**
+ * The slice of `fetch` documents are read with. Every platform Taleus runs on has `fetch`, but the
+ * model compiles without DOM types, so it names only what it uses.
+ */
+export type Fetch = (url: string, init?: { headers?: Record<string, string> }) => Promise<FetchResponse>
+
+export interface FetchResponse {
+	ok: boolean
+	status: number
+	json(): Promise<unknown>
+	arrayBuffer(): Promise<ArrayBuffer>
+}
+
+/** The platform's `fetch`. */
+export function platformFetch(): Fetch {
+	const { fetch } = globalThis as { fetch?: Fetch }
+	if (!fetch) throw new Error('this platform has no fetch')
+	return (url, init) => fetch(url, init)
+}
 
 /** This device's copies of documents, by CID. */
 export interface DocumentCache {
@@ -31,12 +52,20 @@ export class MemoryDocumentCache implements DocumentCache {
 	}
 }
 
+/** A cache over the host's durable storage: one slot per document (LevelDB on the phone). */
+export function slotDocumentCache(slot: (cid: string) => DurableText): DocumentCache {
+	return {
+		get: cid => slot(cid).load(),
+		put: document => slot(document.cid).save(document.json),
+	}
+}
+
 export interface ContractLibraryOptions {
 	/** The domains documents may be fetched from, in order (sereus.org to start with). */
 	sources: () => readonly string[]
 	cache?: DocumentCache
 	/** The HTTP client; the platform's `fetch` by default. */
-	fetch?: typeof globalThis.fetch
+	fetch?: Fetch
 }
 
 /** A contract with all its documents, or the CIDs it could not find. */
@@ -128,7 +157,8 @@ export class ContractLibrary {
 
 	private async fetchFrom(domain: string, cid: string): Promise<Uint8Array | undefined> {
 		try {
-			return await new HttpResolver(`https://${domain}`, { fetch: this.options.fetch }).get(CID.parse(cid))
+			const fetch = this.options.fetch ?? platformFetch()
+			return await new HttpResolver(`https://${domain}`, { fetch: fetch as never }).get(CID.parse(cid))
 		} catch (error) {
 			console.warn(`taleus-model: fetching ${cid} from ${domain} failed:`, error)
 			return undefined

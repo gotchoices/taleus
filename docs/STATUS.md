@@ -197,13 +197,15 @@ needed. A tally whose contract cannot be read in full is a reason to decline it.
 - [ ] **Stroc: a document kind**, so an app can tell an offerable agreement from a clause (the
   catalog and documents do not distinguish them today). In progress in Stroc; then mark the
   agreements in `contracts/` and republish.
-- [ ] **Upstream: base32 output from `@optimystic/quereus-plugin-crypto`'s `digest`**, so the schema
-  can check a document against its CID (`Cid = 'baguqeera' || digest(Bytes, 'sha256', 'base32')`).
-  Until then the app verifies every document it reads and refuses a mismatch.
-- [ ] **Schema:** the `Document(Cid, Bytes)` table (insert-only, network-watched); an offered
-  `ContractCid` must be present in `Document`; a CID-format check on `ContractCid` now, the hash
-  check once the plugin can.
-- [ ] **Engine and model:**
+- [ ] **Upstream: `cid()` names dag-json** (gotchoices/Optimystic#33, open): the crypto plugin's
+  `cid()` already builds CIDv1s and lacked only Stroc's codec. Once released, `Document`'s interim
+  `CidFormat` becomes `check (Cid = cid(Json, 'dag-json'))`. Until then every reader verifies.
+- [x] **Schema:** `Document(Cid, Json)` (insert-only, network-watched, interim CID-format check);
+  `TallyContractProposal.ContractStored` requires the offered contract in `Document`. Core: offers
+  carry `documents` (stored `insert or ignore`), `Tally.document(cid)` reads one back.
+- [ ] **Schema, later:** the hash check above.
+- [x] **Engine and model** (`taleus-model/contracts`, tested in Node, including the two-node strand
+  test where the invitee reads the contract from the tally):
   - a per-device list of document sources, seeded with sereus.org; a source is added when the user
     imports a contract from it, without being asked to think about "publishers";
   - the offerable agreements = current `author` entries of the Taleus kind across those sources;
@@ -211,8 +213,13 @@ needed. A tally whose contract cannot be read in full is a reason to decline it.
   - an offer writes its contract and every document it includes into `Document`;
   - `readAgreement(cid)` reads the strand, then the cache, then the sources, verifying each copy;
   - the agent declines an offer whose contract cannot be read in full;
-  - `STANDARD_AGREEMENT` removed. Tested in Node; no mock-mode work for now.
-- [ ] **Phone spike:** Stroc compose and layout inside the app on the S7 (`TextEncoder`/`TextDecoder`).
+  - `STANDARD_AGREEMENT` removed. No mock-mode work for now.
+  - NOTE: "declines" is the agent not accepting -- the core has no refusal act yet
+    (`feat-offer-lifecycle`).
+- [ ] **Offerable list by kind:** INTERIM, an agreement is told from a clause by including other
+  documents (`offerableAgreements`). Replace with the Stroc kind once released.
+- [x] **Phone spike** (S7, 2026-10-10): listing sereus.org's agreements 27 s cold, 9 s warm; composing
+  the Courts agreement (11 sections) 4 s from the device cache. Stroc runs in the app as is.
 - [ ] **Native rendering** of the review screens from Stroc's layout model, with "issued by
   <domain>" and "you have read this before".
 - [ ] **Import by QR or link:** a `/ipfs/<cid>` URL is fetched, verified, its author domain confirmed,

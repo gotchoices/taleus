@@ -4,7 +4,7 @@
  */
 import { documentCid, fromPlain } from '@stroc/core'
 import type { StoredDocument } from 'taleus-core'
-import { MemoryDocumentCache } from './library.js'
+import { MemoryDocumentCache, type Fetch } from './library.js'
 
 export interface TestContract {
 	/** The agreement's CID: what an invitation names and a tally signs. */
@@ -12,7 +12,7 @@ export interface TestContract {
 	title: string
 	documents: StoredDocument[]
 	/** A cache holding both documents, as a device that has already seen the contract would. */
-	cache(): MemoryDocumentCache
+	cache: () => MemoryDocumentCache
 }
 
 /** A document written in its plain DAG-JSON form (links as `{ '/': cid }`), filed under its CID. */
@@ -53,6 +53,6 @@ export async function testContract(): Promise<TestContract> {
 }
 
 /** A `fetch` for tests that must not reach the network: every request fails. */
-export const offline: typeof globalThis.fetch = async input => {
-	throw new Error(`offline: ${String(input)}`)
+export const offline: Fetch = async url => {
+	throw new Error(`offline: ${url}`)
 }

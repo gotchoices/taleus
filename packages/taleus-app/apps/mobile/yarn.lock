@@ -1689,6 +1689,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@ipld/dag-json@npm:^10.2.0":
+  version: 10.2.9
+  resolution: "@ipld/dag-json@npm:10.2.9"
+  dependencies:
+    cborg: "npm:^5.0.0"
+    multiformats: "npm:^13.1.0"
+  checksum: 10c0/28b61c64b4ecc1527e3b11ca9c5418b8e55174cfdcd78a5994013f9614086d6cd68db29ea531c9b3470484a3cc629953d847189edfc86d39a2b32a936c7d5ad0
+  languageName: node
+  linkType: hard
+
 "@isaacs/fs-minipass@npm:^4.0.0":
   version: 4.0.1
   resolution: "@isaacs/fs-minipass@npm:4.0.1"
@@ -2511,7 +2521,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@noble/hashes@npm:2.4.0, @noble/hashes@npm:^2.0.0, @noble/hashes@npm:^2.0.1":
+"@noble/hashes@npm:2.4.0, @noble/hashes@npm:^2, @noble/hashes@npm:^2.0.0, @noble/hashes@npm:^2.0.1":
   version: 2.4.0
   resolution: "@noble/hashes@npm:2.4.0"
   checksum: 10c0/f5820a38c52886073a69722a030688ad188bbacb822d01554545371259961c2b916266c57c013c2ce5a0d78aec977142fc68fd2a79be4c97b0644fcee9bb35f6
@@ -3429,6 +3439,27 @@ __metadata:
   dependencies:
     "@sinonjs/commons": "npm:^3.0.0"
   checksum: 10c0/2e2fb6cc57f227912814085b7b01fede050cd4746ea8d49a1e44d5a0e56a804663b0340ae2f11af7559ea9bf4d087a11f2f646197a660ea3cb04e19efc04aa63
+  languageName: node
+  linkType: hard
+
+"@stroc/compose@npm:^0.2.0":
+  version: 0.2.0
+  resolution: "@stroc/compose@npm:0.2.0"
+  dependencies:
+    "@stroc/core": "npm:0.2.0"
+    multiformats: "npm:^13.4 || ^14"
+  checksum: 10c0/363612a2f258b64d4eee8c4d95e6be92bc0ee6764954e9cf9ffba768200991963b3fef711a301ba73f5247ae8a4f8c900924ea507aa5d8f062044f9273271358
+  languageName: node
+  linkType: hard
+
+"@stroc/core@npm:0.2.0, @stroc/core@npm:^0.2.0":
+  version: 0.2.0
+  resolution: "@stroc/core@npm:0.2.0"
+  dependencies:
+    "@ipld/dag-json": "npm:^10.2.0"
+    "@noble/hashes": "npm:^2"
+    multiformats: "npm:^13.4 || ^14"
+  checksum: 10c0/feb5641fde4b2ec1a89bb498812d2775ffb1a16db9f3443300ef8a7e1dd371615a6d429357e0d68d6c1df0f5f8813db465b9adc06865056b766bbbd261a093fc
   languageName: node
   linkType: hard
 
@@ -4450,6 +4481,15 @@ __metadata:
   version: 1.0.30001810
   resolution: "caniuse-lite@npm:1.0.30001810"
   checksum: 10c0/d29bc73f33c888025d54c7ff2984372d3b350b15a6a9e174884fb40976175e9177f202e2a72c2d428dddfc032784bc8ba635a31d168fcab9fac65756d7b3d6b4
+  languageName: node
+  linkType: hard
+
+"cborg@npm:^5.0.0":
+  version: 5.1.11
+  resolution: "cborg@npm:5.1.11"
+  bin:
+    cborg: lib/bin.js
+  checksum: 10c0/2202d7d329235f7f0d0e0672e65e6c70fea51950a59f521d557798c5ce8b75b974f1257f2fa323b2d1f4d7c73a4aa6bbb4dfcecc78bd1e5824e3b2dea26a715d
   languageName: node
   linkType: hard
 
@@ -8317,6 +8357,8 @@ __metadata:
     "@react-navigation/native-stack": "npm:^7.18.10"
     "@serfab/cadre-core": "npm:^1.14.0"
     "@serfab/cadre-rn": "npm:^1.14.0"
+    "@stroc/compose": "npm:^0.2.0"
+    "@stroc/core": "npm:^0.2.0"
     "@testing-library/react-native": "npm:^14.0.1"
     "@types/jest": "npm:^29.5.13"
     "@types/react": "npm:^19.2.0"
@@ -8325,6 +8367,7 @@ __metadata:
     eslint: "npm:^8.19.0"
     i18next: "npm:^26.4.2"
     jest: "npm:^29.6.3"
+    multiformats: "npm:^14.0.5"
     prettier: "npm:2.8.8"
     react: "npm:19.2.3"
     react-i18next: "npm:^17.0.13"
@@ -8379,14 +8422,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"multiformats@npm:^13.0.0":
+"multiformats@npm:^13.0.0, multiformats@npm:^13.1.0":
   version: 13.4.2
   resolution: "multiformats@npm:13.4.2"
   checksum: 10c0/b7be09b8bf8198d601c8f8c9a358b9a6aca5a14d61239a84f88d8266322e4e7c3015fe7bdf88b589b9993a4abb752defabb932719d1b457a53277e264c4cee11
   languageName: node
   linkType: hard
 
-"multiformats@npm:^14.0.0, multiformats@npm:^14.0.5":
+"multiformats@npm:^13.4 || ^14, multiformats@npm:^14.0.0, multiformats@npm:^14.0.5":
   version: 14.0.5
   resolution: "multiformats@npm:14.0.5"
   checksum: 10c0/3e3de2da477e51434099636b1d107f1f431dab3441f485665c38e6b33d16db673919c55c2bafc2170295173d84ff78c3ff540e4a62682b20d6cdea8d2ed7fd2b

@@ -16,6 +16,7 @@ import { buildNoiseCrypto, DEFAULT_NOISE_CRYPTO_MODE } from '@serfab/cadre-rn/no
 import { createPhoneNode, type PhoneNodeOptions } from '@serfab/cadre-rn/phone-node'
 import type { TaleusModel } from 'taleus-model'
 import { cadreStoreProvider, taleusSApp } from 'taleus-model/cadre'
+import { slotDocumentCache } from 'taleus-model/contracts'
 import { createEngineModel } from 'taleus-model/engine'
 
 import { installDevBridge } from './dev-bridge'
@@ -35,6 +36,7 @@ const NAMES = {
 }
 const SESSION_DB = 'taleus-session'
 const SESSION_STATE_KEY = 'state'
+const DOCUMENT_KEY_PREFIX = 'document:'
 const IDENTITY_SLOT = 'taleus.identity'
 
 /** The format of the data this build writes, reported back by the next start's saved record. */
@@ -79,6 +81,8 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 			state: kvStoreSlot(session, SESSION_STATE_KEY),
 			identity: secureStoreSlot(keychainSecureStore, IDENTITY_SLOT),
 		},
+		// Every contract document this party has seen, kept beside the device state.
+		documents: slotDocumentCache(cid => kvStoreSlot(session, `${DOCUMENT_KEY_PREFIX}${cid}`)),
 	})
 	installDevBridge(engine.model, () => {
 		const running = phone.node

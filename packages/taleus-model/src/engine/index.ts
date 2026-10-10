@@ -9,7 +9,7 @@ import { MemoryFabric } from 'taleus-core'
 import tallySchema from 'taleus-core/schema-text/draft1'
 
 import type { TaleusModel } from '../model.js'
-import type { DocumentCache } from '../contracts/index.js'
+import type { DocumentCache, Fetch } from '../contracts/index.js'
 import { invitationsModel, partyModel } from './formation.js'
 import { attentionModel, positionModel } from './derived.js'
 import { entriesModel, requestsModel } from './ledger.js'
@@ -70,7 +70,7 @@ export interface LocalWorldOptions {
 	/** Each party's copies of contract documents (one cache per party); memory if absent. */
 	documents?: () => DocumentCache
 	/** Where documents are fetched from; the platform's `fetch` by default. */
-	fetch?: typeof globalThis.fetch
+	fetch?: Fetch
 	/** This party's identity, if it already has one. */
 	identity?: PartyIdentity
 	counterpartyName?: string

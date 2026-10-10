@@ -41,18 +41,31 @@ function methods(model: TaleusModel, diagnostics: () => unknown, query: StrandQu
 			value(await model.party.setDisplayName(name))
 			return value(await model.party.readParty())
 		},
-		/** A USD invitation; returns its token, the thing a link carries. */
-		async invite(creditLimitUnits = 50000) {
+		/**
+		 * A USD invitation under the first agreement the party can offer (`agreementId` picks
+		 * another); returns its token, the thing a link carries.
+		 */
+		async invite(creditLimitUnits = 50000, agreementId?: string) {
+			const agreement = agreementId ?? value(await model.invitations.listAgreements())[0]?.id
+			if (!agreement) throw new Error('no agreement can be offered: no source lists one')
 			const made = value(
 				await model.invitations.createInvitation({
 					unit: USD,
 					creditLimit: usd(creditLimitUnits),
 					noticeDays: 14,
-					agreementId: 'cid:standard-tally-v1',
+					agreementId: agreement,
 					goodForDays: 7,
 				}),
 			)
 			return made.token
+		},
+		/** The agreements this party can offer, from its document sources. */
+		async agreements() {
+			return value(await model.invitations.listAgreements())
+		},
+		/** An agreement composed for reading. */
+		async agreement(agreementId: string) {
+			return value(await model.tally.readAgreement(agreementId))
 		},
 		/** Take up an invitation as `name`, extending `creditLimitUnits` in return. */
 		async accept(token: string, name: string, creditLimitUnits = 20000) {

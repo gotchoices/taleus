@@ -81,6 +81,10 @@
 		"./cadre": {
 			"types": "./dist/cadre/index.d.ts",
 			"default": "./dist/cadre/index.js"
+		},
+		"./contracts": {
+			"types": "./dist/contracts/index.d.ts",
+			"default": "./dist/contracts/index.js"
 		}
 	},
 	"engines": {

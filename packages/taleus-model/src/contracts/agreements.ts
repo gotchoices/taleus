@@ -5,7 +5,7 @@
 import { type ComposedInline, type ComposedSection, formatNumber, parseCatalog } from '@stroc/compose'
 import type { Tally } from 'taleus-core'
 import type { Agreement, AgreementDocument } from '../tally.js'
-import type { ContractLibrary } from './library.js'
+import { platformFetch, type ContractLibrary, type Fetch } from './library.js'
 
 /** What `cid` is called and who issued it; the bare CID when its document cannot be read. */
 export async function agreementOf(library: ContractLibrary, cid: string, tally?: Tally): Promise<Agreement> {
@@ -45,7 +45,7 @@ export async function agreementDocumentOf(
 export async function offerableAgreements(
 	library: ContractLibrary,
 	sources: readonly string[],
-	fetch: typeof globalThis.fetch = globalThis.fetch,
+	fetch: Fetch = platformFetch(),
 ): Promise<Agreement[]> {
 	const offerable: Agreement[] = []
 	for (const domain of sources) {
@@ -59,9 +59,9 @@ export async function offerableAgreements(
 	return offerable
 }
 
-async function currentIssuedBy(domain: string, fetch: typeof globalThis.fetch) {
+async function currentIssuedBy(domain: string, fetch: Fetch) {
 	try {
-		const response = await fetch(`https://${domain}/.well-known/stroc/catalog.json`)
+		const response = await fetch(`https://${domain}/.well-known/stroc/catalog.json`, { headers: { Accept: 'application/json' } })
 		if (!response.ok) throw new Error(`HTTP ${response.status}`)
 		const { catalog, error } = parseCatalog(await response.json())
 		if (!catalog) throw new Error(error)

@@ -18,7 +18,7 @@ import type { Rate } from '../rates.js'
 import type { Settings } from '../settings.js'
 import type { Amount, Unit } from '../types.js'
 import { notifyWorldChanged } from '../world.js'
-import { ContractLibrary, type DocumentCache } from '../contracts/library.js'
+import { ContractLibrary, type DocumentCache, type Fetch } from '../contracts/library.js'
 import type { Envelope } from './envelope.js'
 
 export interface PartyIdentity {
@@ -137,7 +137,7 @@ export interface SessionOptions {
 	/** This device's copies of contract documents. Absent: memory only. */
 	documents?: DocumentCache
 	/** The HTTP client documents are fetched with; the platform's `fetch` by default. */
-	fetch?: typeof globalThis.fetch
+	fetch?: Fetch
 	/**
 	 * Accept any contract offer waiting on this party without asking. Never for a person: it is
 	 * the simulated counterparty's policy, so one device has someone who says yes.
