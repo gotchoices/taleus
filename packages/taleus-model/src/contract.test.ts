@@ -6,11 +6,14 @@
  * means the fixtures describe something the engine could never produce -- which is how mock and
  * engine stop drifting apart.
  */
-import { createLocalWorld, STANDARD_AGREEMENT } from './engine/index.js'
+import { createLocalWorld } from './engine/index.js'
+import { offline, testContract } from './contracts/test-contract.js'
 import { createMockModel } from './mock/index.js'
 import type { TaleusModel } from './model.js'
 import { diskFixtures, tallySchema } from './test-fixtures.js'
 import type { Result, TallySummary } from './types.js'
+
+const CONTRACT = await testContract()
 
 const STATES = ['Forming', 'Offered', 'Expired', 'Open', 'Amending', 'Closing', 'Closed']
 const ROUTES = ['ReviewOffer', 'RequestView', 'TallyView', 'ReviewInvitation']
@@ -31,13 +34,13 @@ async function mockWorld(): Promise<TaleusModel> {
 async function engineWorld(): Promise<TaleusModel> {
 	const USD = { denom: 'iso4217:USD', scale: 2 }
 	const CHIP = { denom: 'CHIP', scale: 3 }
-	const world = await createLocalWorld({ schema: tallySchema(), now: () => new Date('2026-09-07T12:00:00Z') })
+	const world = await createLocalWorld({ schema: tallySchema(), now: () => new Date('2026-09-07T12:00:00Z'), documents: CONTRACT.cache, fetch: offline })
 	const me = world.me.model
 	const them = world.counterparty.model
 	must(await me.party.createIdentity())
 	must(await me.party.setDisplayName('Jan'))
 	for (const unit of [USD, CHIP]) {
-		const made = must(await me.invitations.createInvitation({ unit, creditLimit: { units: 50000, ...unit }, noticeDays: 21, agreementId: STANDARD_AGREEMENT.id, goodForDays: 7 }))
+		const made = must(await me.invitations.createInvitation({ unit, creditLimit: { units: 50000, ...unit }, noticeDays: 21, agreementId: CONTRACT.cid, goodForDays: 7 }))
 		must(await them.invitations.respondToInvitation(made.token, 'accept', { disclose: {}, creditLimit: { units: 20000, ...unit }, noticeDays: 21 }))
 		await world.settled()
 	}

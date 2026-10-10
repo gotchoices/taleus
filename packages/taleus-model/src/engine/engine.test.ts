@@ -3,7 +3,10 @@ import type { Result } from '../types.js'
 import { MemoryFabric } from 'taleus-core'
 import tallySchema from 'taleus-core/schema-text/draft1'
 
-import { createEngineModel, createLocalWorld, STANDARD_AGREEMENT, type DurableText } from './index.js'
+import { createEngineModel, createLocalWorld, type DurableText } from './index.js'
+import { offline, testContract } from '../contracts/test-contract.js'
+
+const CONTRACT = await testContract()
 
 const USD = { denom: 'iso4217:USD', scale: 2 }
 const usd = (units: number) => ({ units, ...USD })
@@ -15,7 +18,7 @@ function must<T>(result: Result<T>): T {
 }
 
 async function openTally() {
-	const world = await createLocalWorld({ now: NOW })
+	const world = await createLocalWorld({ now: NOW, documents: CONTRACT.cache, fetch: offline })
 	const me = world.me.model
 	expect(must(await me.party.readParty())).toBeNull()
 	must(await me.party.createIdentity())
@@ -26,7 +29,7 @@ async function openTally() {
 			unit: USD,
 			creditLimit: usd(50000),
 			noticeDays: 21,
-			agreementId: STANDARD_AGREEMENT.id,
+			agreementId: CONTRACT.cid,
 			goodForDays: 7,
 		}),
 	)
@@ -65,7 +68,7 @@ describe('a tally made through the model, with a simulated counterparty', () => 
 		const detail = must(await me.tally.readTally(id))
 		expect(detail.terms.mine.creditLimit).toEqual(usd(50000))
 		expect(detail.terms.theirs.creditLimit).toEqual(usd(0))
-		expect(detail.agreement.title).toBe('Standard tally')
+		expect(detail.agreement.title).toBe(CONTRACT.title)
 	})
 
 	it('moves value both ways and reads it from each side', async () => {
@@ -104,10 +107,10 @@ describe('a tally made through the model, with a simulated counterparty', () => 
 	})
 
 	it('can have the counterparty take up an invitation by itself', async () => {
-		const world = await createLocalWorld({ now: NOW, takeUpInvitations: true })
+		const world = await createLocalWorld({ now: NOW, takeUpInvitations: true, documents: CONTRACT.cache, fetch: offline })
 		const me = world.me.model
 		must(await me.party.createIdentity())
-		must(await me.invitations.createInvitation({ unit: USD, creditLimit: usd(20000), noticeDays: 14, agreementId: STANDARD_AGREEMENT.id, goodForDays: 7 }))
+		must(await me.invitations.createInvitation({ unit: USD, creditLimit: usd(20000), noticeDays: 14, agreementId: CONTRACT.cid, goodForDays: 7 }))
 		await world.settled()
 		// This party proposed the contract with the invitation; the simulated one accepts it.
 		const [tally] = must(await me.tallies.listTallies())
@@ -140,7 +143,7 @@ describe('a session kept across restarts', () => {
 	it('comes back as the same party, with its device-local choices', async () => {
 		const fabric = new MemoryFabric(tallySchema)
 		const storage = { state: memorySlot(), identity: memorySlot() }
-		const first = await createEngineModel({ store: fabric.provider('me'), now: NOW, storage })
+		const first = await createEngineModel({ store: fabric.provider('me'), now: NOW, storage, documents: CONTRACT.cache(), fetch: offline })
 		const party = must(await first.model.party.createIdentity())
 		must(await first.model.party.setDisplayName('Jan'))
 		const invitation = must(
@@ -148,7 +151,7 @@ describe('a session kept across restarts', () => {
 				unit: USD,
 				creditLimit: usd(50000),
 				noticeDays: 21,
-				agreementId: STANDARD_AGREEMENT.id,
+				agreementId: CONTRACT.cid,
 				goodForDays: 7,
 				note: 'bike',
 			}),
@@ -167,7 +170,7 @@ describe('a session kept across restarts', () => {
 		await first.stop()
 		expect(storage.identity.text).toEqual(expect.any(String))
 
-		const second = await createEngineModel({ store: fabric.provider('me'), now: NOW, storage })
+		const second = await createEngineModel({ store: fabric.provider('me'), now: NOW, storage, documents: CONTRACT.cache(), fetch: offline })
 		expect(must(await second.model.party.readParty())).toMatchObject({ sid: party.sid, displayName: 'Jan' })
 		expect(must(await second.model.invitations.listInvitations())).toEqual([
 			expect.objectContaining({ token: invitation.token, note: 'bike', state: 'outstanding' }),

@@ -72,7 +72,9 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 
 	const session = new LevelDBKVStore(openOptimysticRNDb({ ...leveldb, name: SESSION_DB }), 'taleus:session:')
 	const engine = await createEngineModel({
-		store: cadreStoreProvider({ node, sApp: taleusSApp(), disclosure: { purpose: 'tally' } }),
+		// Reactivity carries a counterparty's commits, so the backstop poll only catches a missed
+		// watch. At the default 10 s it kept the S7's agent busy about a quarter of the time.
+		store: cadreStoreProvider({ node, sApp: taleusSApp(), disclosure: { purpose: 'tally' }, pollMs: 120_000 }),
 		storage: {
 			state: kvStoreSlot(session, SESSION_STATE_KEY),
 			identity: secureStoreSlot(keychainSecureStore, IDENTITY_SLOT),
@@ -94,6 +96,12 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 					})),
 				}
 			: { status: phone.status.state }
+	}, async (strandId, text) => {
+		const database = phone.node?.getStrand(strandId)?.database
+		if (!database) throw new Error(`no database for ${strandId}`)
+		const rows: unknown[] = []
+		for await (const row of database.getDatabase().eval(text)) rows.push(row)
+		return rows
 	})
 	return engine.model
 }

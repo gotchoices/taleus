@@ -5,6 +5,7 @@
 // Must be the first import: gesture-handler patches the native view hierarchy
 // before anything renders. React Navigation's gestures depend on it.
 import 'react-native-gesture-handler';
+import './src/debug-namespaces'; // TMPDBG
 
 // Before anything reads a string. Hermes has no Intl.PluralRules, i18next uses
 // it, and a polyfill installed after i18next initialises is a polyfill that

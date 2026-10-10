@@ -1686,7 +1686,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stroc/compose@npm:0.2.0":
+"@stroc/compose@npm:0.2.0, @stroc/compose@npm:^0.2.0":
   version: 0.2.0
   resolution: "@stroc/compose@npm:0.2.0"
   dependencies:
@@ -1696,7 +1696,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stroc/core@npm:0.2.0":
+"@stroc/core@npm:0.2.0, @stroc/core@npm:^0.2.0":
   version: 0.2.0
   resolution: "@stroc/core@npm:0.2.0"
   dependencies:
@@ -5834,12 +5834,15 @@ __metadata:
     "@libp2p/websockets": "npm:^10.1.21"
     "@optimystic/db-p2p": "npm:^1.12.1"
     "@serfab/cadre-core": "npm:^1.14.0"
+    "@stroc/compose": "npm:^0.2.0"
+    "@stroc/core": "npm:^0.2.0"
     "@types/jest": "npm:30.0.0"
     "@types/node": "npm:26.1.1"
     cross-env: "npm:7.0.3"
     eslint: "npm:10.7.0"
     globals: "npm:17.7.0"
     jest: "npm:30.4.2"
+    multiformats: "npm:^14.0.5"
     taleus-core: "workspace:^"
     ts-jest: "npm:29.4.11"
     typescript: "npm:6.0.3"

@@ -29,27 +29,36 @@ const args = rawArgs.map(a => {
 	}
 })
 
-const pages = await (await fetch(`http://localhost:${port}/json/list`)).json()
-const page = pages.find(p => `${p.deviceName} ${p.title}`.includes(device))
-if (!page) {
-	console.error(`no inspector page matching ${device}: ${pages.map(p => p.deviceName).join(', ')}`)
-	process.exit(2)
-}
-
-const ws = new WebSocket(page.webSocketDebuggerUrl, { headers: { Origin: `http://localhost:${port}` } })
-await new Promise((resolve, reject) => {
-	ws.once('open', resolve)
-	ws.once('error', reject)
-})
-
+// An inspector page can drop and come back while a long call runs (a busy emulator, a reload of
+// the bundle), so every evaluation opens its page afresh if the last socket closed.
+let ws
 let nextId = 0
 const pending = new Map()
-ws.on('message', data => {
-	const message = JSON.parse(data)
-	pending.get(message.id)?.(message)
-	pending.delete(message.id)
-})
-function evaluate(expression) {
+
+async function connect() {
+	const pages = await (await fetch(`http://localhost:${port}/json/list`)).json()
+	const page = pages.find(p => `${p.deviceName} ${p.title}`.includes(device))
+	if (!page) throw new Error(`no inspector page matching ${device}: ${pages.map(p => p.deviceName).join(', ')}`)
+	const socket = new WebSocket(page.webSocketDebuggerUrl, { headers: { Origin: `http://localhost:${port}` } })
+	await new Promise((resolve, reject) => {
+		socket.once('open', resolve)
+		socket.once('error', reject)
+	})
+	socket.on('message', data => {
+		const message = JSON.parse(data)
+		pending.get(message.id)?.(message)
+		pending.delete(message.id)
+	})
+	socket.on('close', () => {
+		for (const settle of pending.values()) settle({ closed: true })
+		pending.clear()
+	})
+	return socket
+}
+
+/** Evaluate `expression` on the page; undefined if the socket closed before it answered. */
+async function evaluate(expression) {
+	if (!ws || ws.readyState !== WebSocket.OPEN) ws = await connect()
 	const id = ++nextId
 	return new Promise(resolve => {
 		pending.set(id, message => resolve(message.result?.result?.value))
@@ -58,14 +67,20 @@ function evaluate(expression) {
 }
 
 const callId = `drive-${Date.now()}`
-const started = await evaluate(`globalThis.__taleusDev ? __taleusDev.start(${JSON.stringify(callId)}, ${JSON.stringify(method)}, ...${JSON.stringify(args)}) : 'no bridge'`)
+let started
+try {
+	started = await evaluate(`globalThis.__taleusDev ? __taleusDev.start(${JSON.stringify(callId)}, ${JSON.stringify(method)}, ...${JSON.stringify(args)}) : 'no bridge'`)
+} catch (error) {
+	console.error(error.message)
+	process.exit(2)
+}
 if (started !== true) {
 	console.error(`could not start ${method}: ${started}`)
 	process.exit(1)
 }
 const t0 = Date.now()
 for (;;) {
-	const outcome = await evaluate(`JSON.stringify(__taleusDev.take(${JSON.stringify(callId)}) ?? null)`)
+	const outcome = await evaluate(`JSON.stringify(__taleusDev.take(${JSON.stringify(callId)}) ?? null)`).catch(() => undefined)
 	const parsed = outcome ? JSON.parse(outcome) : null
 	if (parsed) {
 		console.log(JSON.stringify({ ms: Date.now() - t0, ...parsed }, null, 1))

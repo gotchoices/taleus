@@ -3,6 +3,7 @@
  */
 import type { CreditTerms, PaymentRequest as CorePaymentRequest, Tally, TallyView } from 'taleus-core'
 
+import { agreementDocumentOf, agreementOf } from '../contracts/index.js'
 import type { Offer, OffersModel } from '../offers.js'
 import type { TalliesModel } from '../tallies.js'
 import type { Terms, TallyDetail, TallyModel, TermsRecord } from '../tally.js'
@@ -100,13 +101,6 @@ export function talliesModel(session: Session): TalliesModel {
 }
 
 export function tallyModel(session: Session): TallyModel {
-	const agreementFor = (cid: string) => {
-		const known = session.options.agreements?.find(a => a.id === cid)
-		return known
-			? { id: known.id, title: known.title, publisher: known.publisher, language: known.language }
-			: { id: cid, title: cid, publisher: '', language: '' }
-	}
-
 	async function detail(tallyId: string) {
 		const tally = await session.tally(tallyId)
 		if (!tally) return failed<TallyDetail>('not-found', `no tally ${tallyId}`)
@@ -122,7 +116,7 @@ export function tallyModel(session: Session): TallyModel {
 			state: summary.state,
 			waitingOn: summary.waitingOn,
 			opened: instantOf(view.createdAt),
-			agreement: agreementFor(view.contract?.cid ?? view.offer?.contractCid ?? ''),
+			agreement: await agreementOf(session.library, view.contract?.cid ?? view.offer?.contractCid ?? '', tally),
 			terms: { mine: termsOf(view.terms.mine, unit, today), theirs: termsOf(view.terms.theirs, unit, today) },
 			roomToSpend: fromCore(view.balances.capacity.canSend, unit),
 			// In memory, the counterparty is always here. Over a network this becomes a real
@@ -164,8 +158,8 @@ export function tallyModel(session: Session): TallyModel {
 		},
 
 		async readAgreement(agreementId) {
-			const document = session.options.agreements?.find(a => a.id === agreementId)
-			return document ? ok(document) : failed('not-found', `no agreement ${agreementId} is known to this app`)
+			const document = await agreementDocumentOf(session.library, agreementId)
+			return document ? ok(document) : failed('not-found', `the agreement ${agreementId} cannot be read in full`)
 		},
 
 		async requestClose(tallyId) {
@@ -190,7 +184,6 @@ export function offersModel(session: Session): OffersModel {
 			const view = await tally.read()
 			if (!view.offer) return ok(null)
 			const unit = session.unitOf(view)
-			const agreement = session.options.agreements?.find(a => a.id === view.offer?.contractCid)
 			const offer: Offer = {
 				id: `${tallyId}:offer`,
 				tallyId,
@@ -198,9 +191,7 @@ export function offersModel(session: Session): OffersModel {
 				waitingOn: view.offer.by === 'me' ? 'them' : 'me',
 				drafted: instantOf(session.today()),
 				unit,
-				agreement: agreement
-					? { id: agreement.id, title: agreement.title, publisher: agreement.publisher, language: agreement.language }
-					: { id: view.offer.contractCid, title: view.offer.contractCid, publisher: '', language: '' },
+				agreement: await agreementOf(session.library, view.offer.contractCid, tally),
 				proposed: {
 					mine: { creditLimit: fromCore(view.terms.mine?.limit ?? { units: 0, denomination: unit.denom }, unit), noticeDays: view.terms.mine?.callDays ?? 0 },
 					theirs: { creditLimit: fromCore(view.terms.theirs?.limit ?? { units: 0, denomination: unit.denom }, unit), noticeDays: view.terms.theirs?.callDays ?? 0 },

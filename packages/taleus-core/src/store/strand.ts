@@ -177,6 +177,8 @@ export function functionsCalledBy(sql: string): string[] {
 export interface RowWrite {
 	table: string
 	row: Record<string, unknown>
+	/** Insert only if no row with the same key exists (`insert or ignore`): a row anyone may supply. */
+	ifAbsent?: boolean
 }
 
 /**
@@ -191,14 +193,14 @@ export interface RowWrite {
  */
 export function transactionBatch(writes: RowWrite[]): { sql: string; params: Record<string, unknown> } {
 	const params: Record<string, unknown> = {}
-	const statements = writes.map(({ table, row }, w) => {
+	const statements = writes.map(({ table, row, ifAbsent }, w) => {
 		const columns = Object.keys(row)
 		const names = columns.map((column, c) => {
 			const name = `w${w}_${c}`
 			params[name] = row[column]
 			return `:${name}`
 		})
-		return `insert into ${appTable(table)} (${columns.join(', ')}) values (${names.join(', ')})`
+		return `insert ${ifAbsent ? 'or ignore ' : ''}into ${appTable(table)} (${columns.join(', ')}) values (${names.join(', ')})`
 	})
 	return { sql: statements.join(';\n'), params }
 }

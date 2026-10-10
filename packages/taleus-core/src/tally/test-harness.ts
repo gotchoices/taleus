@@ -1,6 +1,7 @@
 import { Tally, newInvitation, newParty, type Party } from '../store/test-harness.js'
 import { issueChit, type Chit } from './chits.js'
 import { requestClose } from './close.js'
+import { storeDocument, type DocumentRow } from './documents.js'
 import { createTally, seatFoil, seatStock, tallyCid } from './formation.js'
 import { declineInvoice, requestPayment, type InvoiceRequest } from './invoices.js'
 import { proposeContract, publishCreditTerms, signContract, type Side } from './negotiation.js'
@@ -20,7 +21,12 @@ import { proposeContract, publishCreditTerms, signContract, type Side } from './
 
 export const TODAY = '2026-03-02'
 export const PROTOCOL = 'taleus/1'
-export const CONTRACT = 'cid:standard-tally-v1'
+/** A Stroc document standing in for a tally contract: canonical DAG-JSON and its true CID. */
+export const CONTRACT_DOCUMENT: DocumentRow = {
+	cid: 'baguqeeraxb5azc4wbx5uvyaka7ip54fohmbltmwgo7hmbzkskfkmssbxxqga',
+	json: '{"author":"test.invalid","language":"en","stroc":"1.0","text":"A contract for tests: it binds nobody.","title":"Test Tally Contract"}',
+}
+export const CONTRACT = CONTRACT_DOCUMENT.cid
 
 export interface TradingTally {
 	jan: Party
@@ -53,6 +59,7 @@ export async function trading({ janGrants = 50000, samGrants = 0 } = {}): Promis
 		createdAt: TODAY,
 	}
 	await tally.propose(createTally({ ...identity, signer: jan.keys[0] }))
+	await tally.propose([storeDocument(CONTRACT_DOCUMENT)])
 	const cid = tallyCid(identity)
 
 	for (const [sid, signer, creditLimit] of [

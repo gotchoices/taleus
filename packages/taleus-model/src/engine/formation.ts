@@ -1,7 +1,8 @@
 /**
  * The party, and the invitations that make tallies: who this party is, and how a tally begins.
  */
-import type { Ask, InvitationsModel, Invitation, OpenInvitation, Agreement } from '../invitations.js'
+import { agreementOf, offerableAgreements } from '../contracts/index.js'
+import type { Ask, InvitationsModel, Invitation, OpenInvitation } from '../invitations.js'
 import type { Party, PartyModel } from '../party.js'
 import type { Result } from '../types.js'
 import { decodeEnvelope, encodeEnvelope } from './envelope.js'
@@ -49,12 +50,6 @@ export function partyModel(session: Session): PartyModel {
 }
 
 export function invitationsModel(session: Session): InvitationsModel {
-	const agreements = (): Agreement[] =>
-		(session.options.agreements ?? []).map(({ id, title, publisher, language }) => ({ id, title, publisher, language }))
-
-	const agreementFor = (id: string): Agreement =>
-		agreements().find(a => a.id === id) ?? { id, title: id, publisher: '', language: '' }
-
 	async function stateOf(made: { tallyId: string; envelope: { expires: string }; withdrawn?: boolean }): Promise<Invitation['state']> {
 		if (made.withdrawn) return 'withdrawn'
 		const tally = await session.tally(made.tallyId)
@@ -82,7 +77,7 @@ export function invitationsModel(session: Session): InvitationsModel {
 		},
 
 		async listAgreements() {
-			return ok(agreements())
+			return ok(await offerableAgreements(session.library, session.local.documentSources, session.options.fetch))
 		},
 
 		async createInvitation(draft) {
@@ -134,7 +129,7 @@ export function invitationsModel(session: Session): InvitationsModel {
 				unit: envelope.unit,
 				theirCreditLimit: envelope.creditLimit,
 				theirNoticeDays: envelope.noticeDays,
-				agreement: agreementFor(envelope.agreementId),
+				agreement: await agreementOf(session.library, envelope.agreementId),
 				expires: envelope.expires,
 				asks: ASKS,
 			})

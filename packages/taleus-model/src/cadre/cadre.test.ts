@@ -20,6 +20,7 @@ import {
 	MemoryTrustedOwnerStore,
 } from '@serfab/cadre-core'
 
+import { offline, testContract } from '../contracts/test-contract.js'
 import { createEngineModel, type EngineModel, type PartyIdentity } from '../engine/index.js'
 import type { Result } from '../types.js'
 import { taleusSApp } from './sapp.js'
@@ -30,6 +31,8 @@ const CONVERGE_MS = 60_000
 
 /** The tally sApp, unsigned: the nodes below relax schema signing, as a development build would. */
 const TALEUS_SAPP = taleusSApp()
+
+const CONTRACT = await testContract()
 
 const USD = { denom: 'iso4217:USD', scale: 2 }
 const usd = (units: number) => ({ units, ...USD })
@@ -109,10 +112,13 @@ function controlAddrs(node: CadreNode): string[] {
 }
 
 /** A party's engine model over the cadre store, keeping the identity it creates. */
-async function engineOn(node: CadreNode, options: { acceptOffers?: boolean; identity?: PartyIdentity } = {}) {
+async function engineOn(node: CadreNode, options: { acceptOffers?: boolean; identity?: PartyIdentity; holdsContract?: boolean } = {}) {
 	let identity = options.identity
 	const engine = await createEngineModel({
 		store: cadreStoreProvider({ node, sApp: TALEUS_SAPP, pollMs: 0, disclosure: { purpose: 'tally' } }),
+		// Only the inviter holds the contract: the invitee has to read it from the tally.
+		documents: options.holdsContract ? CONTRACT.cache() : undefined,
+		fetch: offline,
 		acceptOffers: options.acceptOffers,
 		identity: options.identity,
 		onIdentityCreated: created => {
@@ -133,7 +139,7 @@ async function openTally(me: EngineModel, them: EngineModel): Promise<string> {
 			unit: USD,
 			creditLimit: usd(50000),
 			noticeDays: 21,
-			agreementId: 'cid:standard-tally-v1',
+			agreementId: CONTRACT.cid,
 			goodForDays: 7,
 		}),
 	)
@@ -172,7 +178,7 @@ describe('a tally formed through the engine, on real strands', () => {
 		let invitee = await inviteeDevice.start(controlAddrs(inviter))
 		nodes.push(inviter, invitee)
 
-		const me = (await engineOn(inviter)).engine
+		const me = (await engineOn(inviter, { holdsContract: true })).engine
 		const first = await engineOn(invitee, { acceptOffers: true })
 		engines.push(me, first.engine)
 		const tallyId = await openTally(me, first.engine)

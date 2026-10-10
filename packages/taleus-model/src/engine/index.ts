@@ -9,7 +9,7 @@ import { MemoryFabric } from 'taleus-core'
 import tallySchema from 'taleus-core/schema-text/draft1'
 
 import type { TaleusModel } from '../model.js'
-import type { AgreementDocument } from '../tally.js'
+import type { DocumentCache } from '../contracts/index.js'
 import { invitationsModel, partyModel } from './formation.js'
 import { attentionModel, positionModel } from './derived.js'
 import { entriesModel, requestsModel } from './ledger.js'
@@ -18,30 +18,6 @@ import { Session, type PartyIdentity, type SessionOptions } from './session.js'
 import { offersModel, talliesModel, tallyModel } from './tallies.js'
 
 export type { DurableText, PartyIdentity, SessionOptions, SessionStorage } from './session.js'
-
-/** The agreement every Taleus app can offer until it is given others. */
-export const STANDARD_AGREEMENT: AgreementDocument = {
-	id: 'cid:standard-tally-v1',
-	title: 'Standard tally',
-	publisher: 'Taleus',
-	language: 'en',
-	version: '1',
-	parameters: ['credit limit', 'notice days'],
-	sections: [
-		{
-			heading: 'What this tally is',
-			body: 'A running record of value between two parties, each extending the other the credit they choose.',
-		},
-		{
-			heading: 'Credit',
-			body: 'Each party sets the most the other may owe it, and gives the notice it states before lowering that limit.',
-		},
-		{
-			heading: 'Closing',
-			body: 'Either party may ask to close. Nothing new may then be owed; the tally closes when the balance is settled.',
-		},
-	],
-}
 
 export interface EngineModel {
 	model: TaleusModel
@@ -53,7 +29,7 @@ export interface EngineModel {
 }
 
 export async function createEngineModel(options: SessionOptions): Promise<EngineModel> {
-	const session = new Session({ ...options, agreements: options.agreements ?? [STANDARD_AGREEMENT] })
+	const session = new Session(options)
 	// What this device kept: its local choices, then its identity. An identity passed in wins.
 	await session.restoreState()
 	const identity = options.identity ?? (await session.restoredIdentity())
@@ -91,7 +67,10 @@ export interface LocalWorldOptions {
 	/** The tally schema's text. Defaults to the core's `draft1`. */
 	schema?: string
 	now?: () => Date
-	agreements?: AgreementDocument[]
+	/** Each party's copies of contract documents (one cache per party); memory if absent. */
+	documents?: () => DocumentCache
+	/** Where documents are fetched from; the platform's `fetch` by default. */
+	fetch?: typeof globalThis.fetch
 	/** This party's identity, if it already has one. */
 	identity?: PartyIdentity
 	counterpartyName?: string
@@ -114,9 +93,9 @@ export interface LocalWorld {
 
 export async function createLocalWorld(options: LocalWorldOptions): Promise<LocalWorld> {
 	const fabric = new MemoryFabric(options.schema ?? tallySchema)
-	const common = { now: options.now, agreements: options.agreements }
-	const me = await createEngineModel({ ...common, store: fabric.provider('me'), identity: options.identity })
-	const counterparty = await createEngineModel({ ...common, store: fabric.provider('counterparty'), acceptOffers: true })
+	const common = { now: options.now, fetch: options.fetch }
+	const me = await createEngineModel({ ...common, store: fabric.provider('me'), identity: options.identity, documents: options.documents?.() })
+	const counterparty = await createEngineModel({ ...common, store: fabric.provider('counterparty'), acceptOffers: true, documents: options.documents?.() })
 	await counterparty.model.party.createIdentity()
 	await counterparty.model.party.setDisplayName(options.counterpartyName ?? 'Sam (simulated)')
 	const takingUp = new Set<Promise<void>>()

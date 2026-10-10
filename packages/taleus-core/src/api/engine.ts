@@ -5,6 +5,7 @@ import type { RowWrite } from '../store/strand.js'
 import { publishCertificate } from '../tally/certificates.js'
 import { issueChit } from '../tally/chits.js'
 import { requestClose as closeRow } from '../tally/close.js'
+import { storeDocument } from '../tally/documents.js'
 import { createTally, seatFoil, seatStock } from '../tally/formation.js'
 import { declineInvoice, requestPayment } from '../tally/invoices.js'
 import {
@@ -21,6 +22,7 @@ import {
 	type Side,
 } from '../tally/negotiation.js'
 import { attempt, locally, no, ok, uniqueViolation } from './refusal.js'
+import { SharedReadStore } from './shared-reads.js'
 import type {
 	AcceptRequest,
 	ActOptions,
@@ -53,6 +55,7 @@ import type {
 	Payment,
 	Result,
 	Role,
+	StoredDocument,
 	Taleus,
 	Tally,
 	TallyRef,
@@ -223,6 +226,11 @@ class TallyEngine implements Tally {
 			...(await this.closeView()),
 			createdAt: core?.CreatedAt ?? '',
 		}
+	}
+
+	async document(cid: string): Promise<StoredDocument | undefined> {
+		const row = await this.one<{ Json: string }>('select Json from App.Document where Cid = ?', [cid])
+		return row ? { cid, json: row.Json } : undefined
 	}
 
 	private async contractView(): Promise<Pick<TallyView, 'contract'>> {
@@ -540,6 +548,7 @@ class TallyEngine implements Tally {
 			const revisions = await this.termsRevisions(core)
 			if (!revisions) throw new MissingTerms()
 			await this.store.apply([
+				...offer.documents.map(storeDocument),
 				proposeContract({
 					tallyCid: core.Cid,
 					sequenceNumber: 1,
@@ -1070,10 +1079,15 @@ class NotOpen extends Error {}
 
 /* ── the engine ──────────────────────────────────────────────────────────── */
 
+/** How long a shared read may answer for a tally that has raised no change since (`SharedReadStore`). */
+const SHARED_READ_MS = 5_000
+
 class TaleusEngine implements Taleus {
 	readonly identity: { sid: string }
 	/** Each engine-level listener, with its per-tally subscriptions keyed by tally id. */
 	private readonly listeners = new Map<(change: Change) => void, Map<string, Unsubscribe>>()
+	/** One store per tally, however many times it is opened, so its reads are shared. */
+	private readonly stores = new Map<string, Promise<SharedReadStore>>()
 
 	constructor(private readonly env: Environment) {
 		this.identity = { sid: env.sid }
@@ -1090,8 +1104,30 @@ class TaleusEngine implements Taleus {
 		return stock?.Sid === this.env.sid ? 'stock' : 'foil'
 	}
 
+	/** The tally's shared store, opening it from the provider the first time it is asked for. */
+	private storeOf(ref: TallyRef): Promise<SharedReadStore> {
+		let store = this.stores.get(ref.id)
+		if (!store) {
+			store = this.env.store.open(ref).then(opened => this.share(opened))
+			this.stores.set(ref.id, store)
+			store.catch(() => this.stores.delete(ref.id))
+		}
+		return store
+	}
+
+	/** Keep a store the provider has just made (`create`, `join`) as the tally's shared one. */
+	private adopt(ref: TallyRef, store: TallyStore): SharedReadStore {
+		const shared = this.share(store)
+		this.stores.set(ref.id, Promise.resolve(shared))
+		return shared
+	}
+
+	private share(store: TallyStore): SharedReadStore {
+		return new SharedReadStore(store, SHARED_READ_MS)
+	}
+
 	async open(ref: TallyRef): Promise<Tally> {
-		const store = await this.env.store.open(ref)
+		const store = await this.storeOf(ref)
 		return new TallyEngine(ref, await this.roleOn(store), store, {
 			...this.env,
 			signer: this.env.signer,
@@ -1117,7 +1153,9 @@ class TaleusEngine implements Taleus {
 	}
 
 	async invite(request: InviteRequest): Promise<Result<PendingInvitation>> {
-		const { ref, store } = await this.env.store.create({ denomination: request.denomination })
+		const created = await this.env.store.create({ denomination: request.denomination })
+		const { ref } = created
+		const store = this.adopt(ref, created.store)
 		await this.attach(ref)
 		const invitation = newKeyPair()
 		const on = request.on ?? this.now()
@@ -1142,7 +1180,9 @@ class TaleusEngine implements Taleus {
 	async accept(ticket: InvitationTicket, request?: AcceptRequest): Promise<Result<Tally>> {
 		const decoded = decodeTicket(ticket)
 		if (!decoded) return no(locally('not-found', 'that invitation cannot be read'))
-		const { ref, store } = await this.env.store.join(ticket)
+		const joined = await this.env.store.join(ticket)
+		const { ref } = joined
+		const store = this.adopt(ref, joined.store)
 		await this.attach(ref)
 		const seat = decoded.role === 'stock' ? seatStock : seatFoil
 		const signer = asPair(request?.signer ?? this.env.signer)
@@ -1216,6 +1256,11 @@ class TaleusEngine implements Taleus {
 			for (const stop of subscriptions.values()) stop()
 		}
 		this.listeners.clear()
+		const stores = [...this.stores.values()]
+		this.stores.clear()
+		for (const store of await Promise.allSettled(stores)) {
+			if (store.status === 'fulfilled') await store.value.close()
+		}
 	}
 }
 

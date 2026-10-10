@@ -413,9 +413,25 @@ export interface CreditOffer extends ActOptions {
 	effectiveFrom?: IsoDate
 }
 
+/**
+ * A document a tally's contract is made of: a Stroc document (canonical DAG-JSON text) and its
+ * CIDv1. The core stores and returns it as given; checking that `json` hashes to `cid` is the
+ * reader's (and, once the crypto plugin can, the schema's).
+ */
+export interface StoredDocument {
+	cid: string
+	json: string
+}
+
 export interface ContractOffer extends ActOptions {
 	/** Content address of the contract text both parties are agreeing to. */
 	contractCid: string
+	/**
+	 * The contract and every document it includes, stored in the tally with the offer (each kept
+	 * unless already there), so the counterparty reads the whole contract from the tally itself.
+	 * The contract's own document must be among them, or the offer is refused.
+	 */
+	documents: StoredDocument[]
 	/**
 	 * The tally's unit of account, fixed for its life. It belongs here rather than on the
 	 * invitation because it is a **bilateral** term: one shared value both parties sign, unlike
@@ -541,6 +557,8 @@ export interface Tally {
 	readonly role: Role
 
 	read(): Promise<TallyView>
+	/** A document the tally holds (a contract or a part of one), as stored; undefined if it holds none by that CID. */
+	document(cid: string): Promise<StoredDocument | undefined>
 	balances(): Promise<Balances>
 	history(query?: HistoryQuery): Promise<Entry[]>
 	requests(): Promise<PaymentRequest[]>

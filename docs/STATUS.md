@@ -23,10 +23,6 @@ citations) is prepared separately for transmission to Nathan; this is the digest
     pure-JS Ed25519 (408 ms of a 29 s invite on a Galaxy S7). Open.
   - gotchoices/Optimystic#31 — cohort-topic proof-of-work starved the phone's JS thread. **Fixed in
     Optimystic 1.12** (keyed nodes skip it); lets the phone run `strandReactivity` again.
-- [ ] **To file with Sereus: an app protocol on a strand's libp2p node.** cadre-core exposes only the
-  control node (`getControlNode()`); its own strand protocols are registered internally. Fetching a
-  contract from the partner (contracts phase 2, below) needs a hook to register and dial an app
-  protocol on a strand node.
 - [ ] **Read-dependency validation must be live on the consensus commit path — now for cross-table
   rules only.** Sereus guarantees that a declared unique value (primary key or secondary index)
   refuses the second of two racing rows, so every "at most one" rule in the schema is now a
@@ -149,10 +145,35 @@ without the UI.
   first sync; a third got the strand writable and then failed after 235 s reading
   `PartyKeyRevocation` (`cohort-unreachable`), with the two strand nodes connected through the relay.
   Meanwhile the S7's agent runs a step every 10 s (the backstop poll) costing about 2.7 s each.
-  Next: lengthen or drop the backstop poll now that reactivity is on, and profile the S7 while it is
-  serving the joiner's reads.
-- [ ] **Read volume.** If reads stay slow: cut what the Taleus agent and screens read, then make a
-  minimal read-latency repro for upstream.
+- [ ] **Second run (backstop poll at 120 s, both parties fresh, 2026-10-09): the accept completes the
+  join but seating never lands** — strand first sync 222 s, then reads of 168–226 s, then the
+  three-row seating transaction 300 s; both sides still show the tally Forming. An S7 CPU profile
+  over the first sync: busy 168 of 240 s, almost all in the network stack (libp2p streams, Noise,
+  WebSockets, yamux, circuit relay, peer-store; cadre-rn's Noise crypto 27 s, a third of it creating
+  a quick-crypto cipher object per frame; peer-store address sorting with `localeCompare` 8 s);
+  Quereus and Taleus code barely register. After seating, the emulator issued 149 slow reads in a
+  minute, mostly repeats (`TallyCore` 30 times).
+- [x] **Shared reads** (`taleus-core` `SharedReadStore`, 2026-10-09): one store per tally in the engine;
+  identical reads in flight or answered since the tally last changed share one query (held at most
+  5 s); a write or any change heard drops them.
+- [ ] **Third run (shared reads, gate log on): the accept completed, 540 s** — strand database
+  initialize 135 s; the first-sync probe 155 s, failing at `App.CloseRequest` (a table nobody had
+  written: `cohort-unreachable`, "could not determine whether it exists"); re-probes 51 s; the
+  three-row seating transaction 128 s. **Then the inviter never saw the seat:** 28 minutes later,
+  and after a restart, the S7 answered `select Sid from App.Foil` empty in 87 ms, so its agent
+  could not establish the tally. Not yet confirmed what the joiner holds (the emulator stopped
+  loading its bundle under host load). Candidate upstream issues: a joiner's rows in a table the
+  founder never wrote stay invisible to the founder; and the first-sync gate reads the App tables
+  one by one and restarts from the first on any failure (`strand-first-sync-gate.ts`
+  `appTablesReadable`), so its cost grows with the table count and the slowest peer.
+- [ ] **Reproduced in Node, filed as gotchoices/sereus#44:** a joiner's strand node holding only the
+  relay connection when its strand becomes writable commits with a cohort of itself
+  (`commit:solo-cohort`, `quorum: 'local'`), reports success, and the rows are lost if it stops.
+  Sereus scenario `joiner-first-commit-over-slow-relay` (branch
+  `test/joiner-first-commit-over-slow-relay`, worktree `ser/sereus-wt-repro`), 3 of 3 runs on a
+  20 ms serial frame cap with a 70%-busy event loop; loopback and 100 ms pass.
+- [ ] **Upstream, once Taleus's own volume is cut:** phone transport cost (per-frame cipher objects in
+  `@serfab/cadre-rn/noise-crypto`, libp2p peer-store churn), with the S7 profile as evidence.
 - [ ] **Held, pending the re-measure:** a joiner's first write failing to get a super-majority
   (retried today); a restarted joiner not syncing (seen with a local relay only); an untraced
   uncaught "Database is closed".
@@ -164,27 +185,40 @@ without the UI.
 
 ## Contracts (Stroc)
 
-sereus.org publishes the tally contracts from [`contracts/`](../contracts/) (Stroc documents, two
-variants: `Tally_Contract` and `Tally_Contract_Arbitration`) into its shared catalog
-(`https://sereus.org/.well-known/stroc/catalog.json`). A tally carries only the contract's CID; each
-party keeps a copy of every contract it references and can hand it to its partner.
+sereus.org publishes the tally contracts from [`contracts/`](../contracts/) as Stroc documents into
+its shared catalog (`https://sereus.org/.well-known/stroc/catalog.json`): two offerable agreements,
+**Taleus Tally Agreement (Courts)** and **(Arbitration)**, a non-binding **Testing** agreement, and
+the clauses they include. A tally signs only its contract's CID. The documents travel **in the
+strand**: a `Document` table, insert-only, keyed by CID, which whoever holds a document fills if it
+is missing -- so the partner "asks" for a contract by reading the table, and no Sereus protocol is
+needed. A tally whose contract cannot be read in full is a reason to decline it.
 
 - [x] Documents drafted, published, served by sereus.org; `@stroc/cli` installed (`yarn stroc`).
-- [ ] **Phase 1, in the app** (needs no network beyond an HTTP fetch):
-  - choose a contract from sereus.org's catalog (current, `author` entries), with the published CIDs
-    shipped as an offline fallback;
-  - a per-device document store keyed by CID, verified on arrival (LevelDB on the phone);
-  - the offer's `agreementId` becomes the Stroc CID, replacing the `STANDARD_AGREEMENT` placeholder;
-    a CID-format check on `ContractCid` in the schema;
-  - review by Stroc composition and rendering, with the author check ("issued by sereus.org") and
-    "you have read this before". **Decision:** a WebView of Stroc's HTML, or native components from
-    its layout model. Check Stroc on Hermes first;
-  - the tally's own facts (denomination, scale, each side's credit-terms revision, the parties) render
-    as app blocks beside the text: the contracts declare no `parameters`;
-  - stories 01/02 and the `TallyTerms` and invitation-review specs updated, so screens regenerate
-    through appeus.
-- [ ] **Phase 2: fetch from the partner** by CID over the strand. Waits on the Sereus app-protocol
-  hook (cross-repo, above).
+- [ ] **Stroc: a document kind**, so an app can tell an offerable agreement from a clause (the
+  catalog and documents do not distinguish them today). In progress in Stroc; then mark the
+  agreements in `contracts/` and republish.
+- [ ] **Upstream: base32 output from `@optimystic/quereus-plugin-crypto`'s `digest`**, so the schema
+  can check a document against its CID (`Cid = 'baguqeera' || digest(Bytes, 'sha256', 'base32')`).
+  Until then the app verifies every document it reads and refuses a mismatch.
+- [ ] **Schema:** the `Document(Cid, Bytes)` table (insert-only, network-watched); an offered
+  `ContractCid` must be present in `Document`; a CID-format check on `ContractCid` now, the hash
+  check once the plugin can.
+- [ ] **Engine and model:**
+  - a per-device list of document sources, seeded with sereus.org; a source is added when the user
+    imports a contract from it, without being asked to think about "publishers";
+  - the offerable agreements = current `author` entries of the Taleus kind across those sources;
+  - a per-device document store (LevelDB on the phone) as a cache;
+  - an offer writes its contract and every document it includes into `Document`;
+  - `readAgreement(cid)` reads the strand, then the cache, then the sources, verifying each copy;
+  - the agent declines an offer whose contract cannot be read in full;
+  - `STANDARD_AGREEMENT` removed. Tested in Node; no mock-mode work for now.
+- [ ] **Phone spike:** Stroc compose and layout inside the app on the S7 (`TextEncoder`/`TextDecoder`).
+- [ ] **Native rendering** of the review screens from Stroc's layout model, with "issued by
+  <domain>" and "you have read this before".
+- [ ] **Import by QR or link:** a `/ipfs/<cid>` URL is fetched, verified, its author domain confirmed,
+  and the domain added to the sources.
+- [ ] **Design surface:** stories 01, 02, 07 and the `TallyTerms` and invitation-review specs, then
+  regenerate the screens through appeus.
 
 ## Negotiation gaps (app design pass, `packages/taleus-app`)
 

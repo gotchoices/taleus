@@ -5,6 +5,7 @@ import { digest } from '../store/functions.js'
 import { readSchema } from '../store/schema-node.js'
 import { newKey } from '../store/index.js'
 import { publishCertificate } from '../tally/certificates.js'
+import { CONTRACT_DOCUMENT } from '../tally/test-harness.js'
 import { MemoryFabric } from './store-memory.js'
 import { createPartyIdentity, localSigner, openTaleus } from './engine.js'
 import { registerCrypto, row, type RowWrite } from '../store/strand.js'
@@ -115,7 +116,8 @@ async function opened(world: World): Promise<{ janTally: Tally; samTally: Tally 
 	must(await samTally.offerCredit({ limit: usd(0), callDays: 21 }))
 	must(
 		await janTally.offerContract({
-			contractCid: 'cid:standard-tally-v1',
+			contractCid: CONTRACT_DOCUMENT.cid,
+			documents: [CONTRACT_DOCUMENT],
 			denomination: USD,
 			denominationScale: 2,
 		}),
@@ -518,9 +520,11 @@ describe('what the view says about whose move it is', () => {
 		must(await samTally.offerCredit({ limit: usd(0), callDays: 21 }))
 		expect((await janTally.read()).offer).toBeUndefined()
 
-		must(await janTally.offerContract({ contractCid: 'cid:standard-tally-v1', denomination: USD, denominationScale: 2 }))
-		expect((await janTally.read()).offer).toEqual({ contractCid: 'cid:standard-tally-v1', by: 'me' })
-		expect((await samTally.read()).offer).toEqual({ contractCid: 'cid:standard-tally-v1', by: 'them' })
+		must(await janTally.offerContract({ contractCid: CONTRACT_DOCUMENT.cid, documents: [CONTRACT_DOCUMENT], denomination: USD, denominationScale: 2 }))
+		expect((await janTally.read()).offer).toEqual({ contractCid: CONTRACT_DOCUMENT.cid, by: 'me' })
+		expect((await samTally.read()).offer).toEqual({ contractCid: CONTRACT_DOCUMENT.cid, by: 'them' })
+		// The offer brought its contract: the counterparty reads it from the tally itself.
+		expect(await samTally.document(CONTRACT_DOCUMENT.cid)).toEqual(CONTRACT_DOCUMENT)
 
 		must(await samTally.acceptContract())
 		expect((await samTally.read()).offer).toBeUndefined()

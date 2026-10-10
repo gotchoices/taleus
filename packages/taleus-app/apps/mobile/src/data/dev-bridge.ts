@@ -26,7 +26,10 @@ function value<T>(result: { ok: true; value: T } | { ok: false; error: { kind: s
 	return result.value
 }
 
-function methods(model: TaleusModel, diagnostics: () => unknown) {
+/** A raw read of a strand's database, for looking under the model (`sql`). */
+export type StrandQuery = (strandId: string, sql: string) => Promise<unknown[]>
+
+function methods(model: TaleusModel, diagnostics: () => unknown, query: StrandQuery) {
 	return {
 		/** Where this phone stands: its node and relay, its party. */
 		async status() {
@@ -61,6 +64,10 @@ function methods(model: TaleusModel, diagnostics: () => unknown) {
 				}),
 			)
 		},
+		/** A raw read of one tally's strand database, bypassing the model and its shared reads. */
+		async sql(strandId: string, text: string) {
+			return query(strandId, text)
+		},
 		async tallies() {
 			return value(await model.tallies.listTallies())
 		},
@@ -71,9 +78,9 @@ function methods(model: TaleusModel, diagnostics: () => unknown) {
 	}
 }
 
-export function installDevBridge(model: TaleusModel, diagnostics: () => unknown): void {
+export function installDevBridge(model: TaleusModel, diagnostics: () => unknown, query: StrandQuery): void {
 	if (!__DEV__) return
-	const calls = methods(model, diagnostics)
+	const calls = methods(model, diagnostics, query)
 	const results = new Map<string, Outcome>()
 	const bridge = {
 		...calls,

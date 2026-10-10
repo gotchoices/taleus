@@ -1,6 +1,7 @@
 export * from './certificates.js'
 export * from './chits.js'
 export * from './close.js'
+export * from './documents.js'
 export * from './formation.js'
 export * from './invoices.js'
 export * from './keys.js'

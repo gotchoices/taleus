@@ -91,6 +91,11 @@
 		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
 		"lint": "eslint ./src"
 	},
+	"dependencies": {
+		"@stroc/compose": "^0.2.0",
+		"@stroc/core": "^0.2.0",
+		"multiformats": "^14.0.5"
+	},
 	"devDependencies": {
 		"@eslint/js": "10.0.1",
 		"@libp2p/circuit-relay-v2": "^4.2.13",

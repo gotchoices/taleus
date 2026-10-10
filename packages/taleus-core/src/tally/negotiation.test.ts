@@ -8,8 +8,10 @@ import {
 	newParty,
 	type Party,
 } from '../store/test-harness.js'
+import { storeDocument } from './documents.js'
 import { createTally, seatFoil, seatStock, tallyCid } from './formation.js'
 import { proposeContract, publishCreditTerms, signContract } from './negotiation.js'
+import { CONTRACT_DOCUMENT } from './test-harness.js'
 
 /**
  * Negotiation between two parties, each validating on their own replica.
@@ -22,7 +24,7 @@ import { proposeContract, publishCreditTerms, signContract } from './negotiation
 
 const TODAY = '2026-03-02'
 const PROTOCOL = 'taleus/1'
-const CONTRACT = 'cid:standard-tally-v1'
+const CONTRACT = CONTRACT_DOCUMENT.cid
 
 async function opened() {
 	const jan = newParty('jan')
@@ -38,6 +40,7 @@ async function opened() {
 		createdAt: TODAY,
 	}
 	await tally.propose(createTally({ ...identity, signer: jan.keys[0] }))
+	await tally.propose([storeDocument(CONTRACT_DOCUMENT)])
 	return { jan, sam, tally, cid: tallyCid(identity) }
 }
 

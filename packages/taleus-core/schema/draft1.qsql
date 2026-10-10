@@ -259,6 +259,22 @@ table PartyCertificate (
     constraint InsertOnly check on delete, update (0)
 ) with tags ("optimystic.network_watch" = true);
 
+-- The documents a tally's contracts are made of, kept IN the strand: each a Stroc document (canonical
+-- DAG-JSON text) filed under its CID. Whoever holds a document stores it if it is not here yet, so a
+-- party "asks" for a contract by reading this table, and a contract stays readable for as long as the
+-- tally is held, whoever published it. A proposal's contract must be here (TallyContractProposal
+-- ContractStored); the documents it includes are the proposer's to store with it, and a party that
+-- cannot read a contract in full declines it.
+-- CidFormat admits only a Stroc CIDv1 (dag-json, sha2-256, base32: 'baguqeera' and 52 more). It is
+-- the interim check: once the crypto plugin's cid() names dag-json, it becomes
+-- `check (Cid = cid(Json, 'dag-json'))`, so bytes that do not hash to their CID cannot occupy the key
+-- a genuine copy needs. Until then every reader verifies a document against its CID.
+table Document (
+    Cid text primary key constraint CidFormat check (glob('baguqeera*', Cid) and length(Cid) = 61),
+    Json text,
+    constraint InsertOnly check on delete, update (0)
+) with tags ("optimystic.network_watch" = true);
+
 -- ValidDenomination: the prefix-dispatch validity check on a tally's denomination identifier
 -- (feat-denomination-argument), written in Quereus built-ins (`glob`) so that any Sereus node can
 -- validate it without Taleus code. NO general parser and NO currency-table lookup: three
@@ -279,7 +295,9 @@ table PartyCertificate (
 -- display-only, so label collisions are harmless. See docs/architecture.md "Denomination registry".
 table TallyContractProposal (
     SequenceNumber integer,
-    ContractCid text,
+    -- The contract's documents travel with it: the root must already be in Document (stored in the
+    -- same transaction is enough -- the check runs at COMMIT).
+    ContractCid text constraint ContractStored check on insert (exists (select 1 from Document D where D.Cid = New.ContractCid)),
     Proposer text check (Proposer in ('S', 'F')),
     -- Terms revisions this proposal expects the accepted contract to lock (folded into Signature).
     -- Load-bearing coverage is on TallyContract; the proposal carries them for a complete offer.

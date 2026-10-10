@@ -18,7 +18,7 @@ import type { Rate } from '../rates.js'
 import type { Settings } from '../settings.js'
 import type { Amount, Unit } from '../types.js'
 import { notifyWorldChanged } from '../world.js'
-import type { AgreementDocument } from '../tally.js'
+import { ContractLibrary, type DocumentCache } from '../contracts/library.js'
 import type { Envelope } from './envelope.js'
 
 export interface PartyIdentity {
@@ -66,6 +66,11 @@ export interface LocalState {
 	notifications: NotificationSettings
 	rates: Rate[]
 	deviceName: string
+	/**
+	 * Where this device looks for contract documents it does not hold, by domain. Starts with
+	 * sereus.org; a source is added when the party imports a contract published there.
+	 */
+	documentSources: string[]
 }
 
 /** One durable text value the host keeps: the same shape as cadre-core's `DurableSlot`. */
@@ -115,6 +120,7 @@ export function initialLocalState(): LocalState {
 		},
 		rates: [],
 		deviceName: 'This device',
+		documentSources: ['sereus.org'],
 	}
 }
 
@@ -128,8 +134,10 @@ export interface SessionOptions {
 	storage?: SessionStorage
 	/** The clock. Injectable so a test can say what day it is. */
 	now?: () => Date
-	/** Agreements this app can offer, by content address. */
-	agreements?: AgreementDocument[]
+	/** This device's copies of contract documents. Absent: memory only. */
+	documents?: DocumentCache
+	/** The HTTP client documents are fetched with; the platform's `fetch` by default. */
+	fetch?: typeof globalThis.fetch
 	/**
 	 * Accept any contract offer waiting on this party without asking. Never for a person: it is
 	 * the simulated counterparty's policy, so one device has someone who says yes.
@@ -149,7 +157,16 @@ export class Session {
 	/** Saves in order, so a later state never lands under an earlier one. */
 	private saving: Promise<void> = Promise.resolve()
 
-	constructor(readonly options: SessionOptions) {}
+	/** The contracts this party's tallies are made under, and where their documents come from. */
+	readonly library: ContractLibrary
+
+	constructor(readonly options: SessionOptions) {
+		this.library = new ContractLibrary({
+			sources: () => this.local.documentSources,
+			cache: options.documents,
+			fetch: options.fetch,
+		})
+	}
 
 	now(): Date {
 		return this.options.now?.() ?? new Date()
@@ -298,6 +315,20 @@ export class Session {
 	}
 
 	/**
+	 * An offer waiting on this party: keep a copy of its contract, and (for the simulated
+	 * counterparty) accept it -- but only a contract that can be read in full. One that cannot is
+	 * a reason to decline: nobody should be bound by text they cannot read.
+	 */
+	private async consider(tally: Tally, contractCid: string): Promise<void> {
+		const contract = await this.library.gather(contractCid, tally)
+		if (contract.missing.length > 0) {
+			console.warn(`taleus-model: the offer on ${tally.ref.id} names a contract missing ${contract.missing.join(', ')}`)
+			return
+		}
+		if (this.options.acceptOffers) await tally.acceptContract()
+	}
+
+	/**
 	 * The protocol steps that follow from the state of each tally, and that no person needs to
 	 * decide: the inviter names a tally once the invitee is seated; each party publishes the terms
 	 * it already chose; the inviter then proposes the contract. Accepting it is a decision, so the
@@ -312,7 +343,7 @@ export class Session {
 				continue
 			}
 			if (view.state === 'offered') {
-				if (this.options.acceptOffers && view.offer?.by === 'them') await tally.acceptContract()
+				if (view.offer?.by === 'them') await this.consider(tally, view.offer.contractCid)
 				continue
 			}
 			if (view.state !== 'forming') continue
@@ -326,8 +357,14 @@ export class Session {
 				continue
 			}
 			if (intended.propose && view.terms.theirs) {
+				const contract = await this.library.gather(intended.propose.agreementId)
+				if (contract.missing.length > 0) {
+					console.warn(`taleus-model: not offering ${view.ref.id}: its contract is missing ${contract.missing.join(', ')}`)
+					continue
+				}
 				await tally.offerContract({
 					contractCid: intended.propose.agreementId,
+					documents: contract.documents,
 					denomination: this.local.units[view.ref.id]?.denom ?? view.denomination,
 					denominationScale: this.local.units[view.ref.id]?.scale ?? view.denominationScale,
 				})
