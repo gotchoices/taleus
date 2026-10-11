@@ -23,8 +23,8 @@ and has extended nothing to anyone. Jan is waiting across the table.
 3. He installs it and comes back. He lands on Jan's invitation, not on a blank start — he does not
    have to ask Jan to send it again.
 4. Sam sees that Jan is inviting him, that Jan is willing to be owed up to $500, that Jan wants two
-   weeks' notice, that the tally counts in dollars, and which agreement governs it. He can read that
-   agreement before agreeing to anything, and he has disclosed nothing so far.
+   weeks' notice, that the tally counts in dollars, and which agreement governs it and who issued
+   it. He can read that agreement before agreeing to anything, and he has disclosed nothing so far.
 5. He is asked what to tell Jan about himself. His name is needed. His phone number and address are
    offered but marked as his choice; he gives his phone number and skips the address.
 6. He is asked what he is willing to be owed by Jan. He has no reason to extend Jan credit yet, so he
@@ -52,6 +52,21 @@ and has extended nothing to anyone. Jan is waiting across the table.
 1.1. Sam finds the message a week later and opens it. The invitation has expired.
 1.2. He is told it is no longer good, and offered a way to ask Jan for another.
 
+### Alternative Path E: the agreement cannot be read
+4.1. The agreement the invitation names cannot be read in full — part of it cannot be found, or a
+     copy is not the document it claims to be.
+4.2. Sam is told he cannot read what he would be agreeing to, so he cannot accept it. Nobody should
+     be bound by text they cannot read.
+4.3. He can refuse, and Jan learns that the agreement was the problem rather than the terms.
+     → path B
+
+### Alternative Path F: an agreement Sam has read before
+4.1. Sam already tallies with his landlord under the same standard agreement.
+4.2. He is told he has read this exact text before. That saves him reading it again, though it is
+     still his to read; it says nothing about whether the text suits this tally.
+4.3. Had a single word of it changed, it would be a different agreement, and he would not be told
+     he had read it.
+
 ### Alternative Path D: Sam at Mara's shop
 1.1. Sam is buying a tube at Mara's shop and uses the invitation posted by the register.
 1.2. He sees the terms Mara offers everyone, and continues from step 4.
@@ -63,7 +78,10 @@ and has extended nothing to anyone. Jan is waiting across the table.
 - [ ] An invitation can be acted on with or without the app installed; installing does not lose it
 - [ ] The invitee sees who is inviting them, on what terms, and under which agreement, before
       disclosing anything
-- [ ] The governing agreement is readable before the invitee commits
+- [ ] The governing agreement is readable before the invitee commits, with who issued it and
+      whether that is confirmed
+- [ ] An agreement that cannot be read in full cannot be accepted; refusing it tells the inviter why
+- [ ] An agreement the invitee has read before is recognised as exactly the same text
 - [ ] The app explains what a tally is, without relying on the inviter to have explained it
 - [ ] Required identifying information is distinguishable from optional information
 - [ ] The invitee sets their own limit and notice period, independently of the inviter's, and zero is
@@ -78,5 +96,5 @@ and has extended nothing to anyone. Jan is waiting across the table.
 ## Variants
 - happy: Sam accepts, Jan agrees, tally opens
 - empty: Sam is brand new, with nothing else in the app
-- error: invitation expired; disclosure cannot be delivered
+- error: invitation expired; disclosure cannot be delivered; agreement cannot be read in full
 

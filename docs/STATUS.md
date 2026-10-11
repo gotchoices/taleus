@@ -224,8 +224,12 @@ needed. A tally whose contract cannot be read in full is a reason to decline it.
 - [x] **Import by link** (model, `importAgreement`; S7 3 s, author confirmed): a
   `https://<host>/ipfs/<cid>` link is fetched with its includes, verified, its author checked, kept,
   and offered from then on; the host joins the device's sources. The QR scanner itself is a screen.
-- [ ] **Design surface:** stories 01, 02, 07 and the `TallyTerms` and invitation-review specs, then
-  regenerate the screens through appeus.
+- [ ] **Design surface** (drafted 2026-10-11, awaiting review): stories 01, 02, 07 revised (see
+  `stories/mobile/STATUS.md` "Ready for review"); a new `Agreement` reading screen and `Scan` taking
+  an agreement's code in the navigation and screen plan; the agreement asks in
+  `specs/domain/interfaces.md`. After review, the model still owes the screens: the issuer check on
+  every agreement shown (today only on import), a per-device record of agreements read, and the
+  composed document's structure (not flattened text) for native rendering.
 
 ## Negotiation gaps (app design pass, `packages/taleus-app`)
 

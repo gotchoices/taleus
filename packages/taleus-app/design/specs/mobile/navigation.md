@@ -15,11 +15,15 @@ stories in `design/stories/mobile/`; each area below names the stories it serves
     - `TallyHistory` — entries, running balance, outstanding requests alongside (24)
       - `EntryDetail` — one entry, what it answered, who signed it (24)
     - `TallyTerms` — terms in force, previous terms, the governing agreement (07)
+      - `Agreement` — the governing agreement itself, read in full (07)
     - `TradingSettings` — what may accumulate here and at what price (31)
     - `CloseTally` — request, withdraw, settle, or watch it age (05)
   - `CreateInvitation` — terms, unit, agreement, then share (01)
+    - `Agreement` — read an agreement before offering it (01 path E)
   - `ReviewInvitation` — the invitee's side; also the universal-link landing (02)
+    - `Agreement` — read the agreement before accepting (02)
   - `ReviewOffer` — an offer waiting on this party; counter or accept (03)
+    - `Agreement` — read the agreement the offer names (03)
 
 **ATTENTION tab**
 - `Attention` (root) — everything waiting on this party, across tallies (23)
@@ -32,7 +36,8 @@ stories in `design/stories/mobile/`; each area below names the stories it serves
   - `PayThroughNetwork` — pay a party with no tally, from their request (30)
   - `CreateRequest` — ask a partner for payment (21)
   - `RequestView` — one request: state, ageing, what was applied (21, 22)
-  - `Scan` — open anything handed over in person: invitation, request, standing code
+  - `Scan` — open anything handed over in person: invitation, request, standing code, or an
+    agreement's code (01 path F)
 
 **POSITION tab**
 - `Position` (root) — owed / owing per unit, estimate, spending power (40)
@@ -74,7 +79,9 @@ stories in `design/stories/mobile/`; each area below names the stories it serves
 - `ReviewInvitation`, `ReviewOffer`, `RequestView`, `PayThroughNetwork` are reachable from a
   notification and must stand alone — arriving at one directly is a first-class entry, not a
   deep-link special case (43)
-- `Scan` is modal from anywhere in the PAY tab
+- `Scan` is modal from anywhere in the PAY tab, and from `CreateInvitation`'s agreement choice
+- `Agreement` takes the agreement's CID and, when it is a tally's, the tally: a tally's agreement is
+  read from the tally itself (07 step 5); any other from this device or where it is published
 - Destructive or binding routes (`CloseTally`, `PayPartner`, `ReviewOffer` accept, `TradingSettings`
   save) confirm in-screen; nothing binding is a side effect of navigating
 

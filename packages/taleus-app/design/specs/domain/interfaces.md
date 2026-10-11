@@ -62,6 +62,9 @@ rewired when it differs.
 | a tally's requests | outstanding and settled requests, what was applied, how long outstanding | 21, 22, 24 |
 | what needs me | items across all tallies waiting on this party, with deadline and cost | 23 |
 | my position | owed and owing per unit, an estimate in my display unit, spending power | 40, 41 |
+| agreements I can offer | each source's published tally contracts plus any I imported: title, issuer, language | 01 |
+| bring in an agreement | from a code or link: fetched whole, checked, its issuer confirmed or not, then offered | 01 |
+| an agreement | its full text, numbered, with who issued it (confirmed or not), whether I have read this exact text before, and whether it can be read in full at all | 01, 02, 07 |
 | offer terms | propose, counter, accept, refuse — each a signed act | 01, 02, 03 |
 | record value | give value on a tally, optionally answering one or more requests | 20, 22 |
 | request value | ask, withdraw, see ageing | 21 |
@@ -70,6 +73,20 @@ rewired when it differs.
 
 Two properties every ask carries, because the stories depend on them: an act either happened or did
 not (never partially), and the app is told which — see story 20 path D.
+
+## Agreements
+
+A tally signs only its agreement's content address; the agreement itself (a Stroc document and the
+clauses it includes) travels in the tally, so either party reads it from there, and each keeps a
+copy of every agreement it has seen. Publishers (sereus.org to start with) list the agreements meant
+for tallies; the apps never hold a list of their own, and a party never needs to know where an
+agreement is kept. Every copy is checked against its address before it is shown or used, so a
+document that does not match, or a part that cannot be found, makes the agreement unreadable — and
+an unreadable agreement is never accepted ([`contracts/`](../../../../../contracts/README.md),
+`taleus-model` `contracts/`).
+
+"Read before" means this exact text: one changed word is a different agreement. It says nothing
+about whether the text suits a tally, and the apps must not imply otherwise.
 
 ## Dates and instants
 

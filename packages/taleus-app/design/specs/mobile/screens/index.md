@@ -18,6 +18,7 @@ and should not acquire one.
 | Tally history | TallyHistory | — | 24 | happy, empty, error | generated |
 | Entry detail | EntryDetail | — | 24 | happy, error | generated |
 | Tally terms | TallyTerms | — | 07, 03 | happy, error | generated |
+| Agreement | Agreement | — | 01, 02, 07 | happy, error | draft |
 | Trading settings | TradingSettings | — | 31 | happy, empty | draft |
 | Close tally | CloseTally | — | 05 | happy, closing | generated |
 | Create invitation | CreateInvitation | — | 01 | happy, empty | generated |
@@ -31,7 +32,7 @@ and should not acquire one.
 | Pay through the network | PayThroughNetwork | — | 30 | happy, empty, error | draft |
 | Create request | CreateRequest | — | 21 | happy | generated |
 | Request view | RequestView | — | 21, 22 | happy | generated |
-| Scan | Scan | — | 02, 21, 30 | happy, error | draft |
+| Scan | Scan | — | 01, 02, 21, 30 | happy, error | draft |
 | Position | Position | — | 40 | happy, empty, error | generated |
 | Exchange rates | ExchangeRates | — | 41 | happy, error | generated |
 | Settings | Settings | — | 42 | happy | generated |
