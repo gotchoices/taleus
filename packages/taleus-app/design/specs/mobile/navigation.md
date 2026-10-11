@@ -52,6 +52,7 @@ stories in `design/stories/mobile/`; each area below names the stories it serves
   - `RecoverySetup` — protection before value accumulates (12, 50)
   - `Notifications` — what interrupts, what merely informs (43)
   - `StandingInvitation` — a code others can take up (01 path C, 10 path E)
+  - `TrustedPublishers` — whose agreements this party trusts; kept for them, viewable and editable (08)
 
 ## Deep Links
 

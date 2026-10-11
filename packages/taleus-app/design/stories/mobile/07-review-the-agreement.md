@@ -24,8 +24,9 @@ disclosed.
 4. He can look back at what came before: the original terms from lunch, and the change they
    negotiated in March. Each shows what changed and when it took effect.
 5. He can read the agreement itself — the terms are arguments to a contract both of them signed, and
-   he can see which contract that is, who issued it, and what it says. It comes from the tally
-   itself, so it reads the same whether or not whoever published it still does.
+   he can see which contract that is, who published it, whether he trusts that publisher, whether it
+   still recommends it, and what it says. It comes from the tally itself, so it reads the same
+   whether or not whoever published it still does.
 6. He can see what Jan has disclosed about himself, and that it is Jan's own claim rather than
    anything Taleus vouches for.
 7. Sam is satisfied and goes ahead with the purchase.
@@ -79,8 +80,8 @@ disclosed.
 - [ ] It is visible which terms govern value already outstanding and which govern new activity
 - [ ] Successive changes are individually visible, each with what it governs
 - [ ] A restrictive change on a tally with nothing outstanding is shown as applying immediately
-- [ ] The contract behind the terms is identifiable and readable, with who issued it, from the tally
-      itself rather than from wherever it was published
+- [ ] The contract behind the terms is identifiable and readable, with its publisher and whether
+      the party trusts it, from the tally itself rather than from wherever it was published
 - [ ] The counterparty's disclosure is visible, and presented as their claim rather than a verified fact
 - [ ] Absent information is not presented as evidence of anything about the counterparty
 - [ ] A closed tally remains fully reviewable

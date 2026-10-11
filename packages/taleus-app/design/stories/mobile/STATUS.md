@@ -8,14 +8,18 @@ States: **stub** (topic only) → **drafted** (written, not yet human-reviewed) 
 
 ## Ready for review
 
-Contract handling (Stroc documents, 2026-10-11) touched three reviewed stories; each change is
-listed so it can be read on its own:
+Contract handling (Stroc documents, 2026-10-11), revised after the first read to judge agreements
+by who publishes them rather than by reading them:
 
-- **01** step 6: two published agreements offered, each with its issuer. Path E 6.4: the agreement
-  travels with the tally. New path F: an agreement brought in by its code or link.
-- **02** step 4: the issuer shown. New path E: an agreement that cannot be read in full cannot be
-  accepted. New path F: an agreement read before is recognised as the same text.
-- **07** step 5: the contract read from the tally itself, with its issuer.
+- **08 Publishers I trust** — new, drafted: the trusted publishers (sereus.org built in), trusting on
+  accepting, recommendations shown as information, a claim that does not hold, look-alikes, a
+  publisher withdrawing or replacing an agreement, removing a publisher, offline.
+- **01** step 6: the agreements offered are trusted publishers'. Path E 6.4: the agreement travels
+  with the tally. Path F: an agreement brought in by its code — use it alone, or trust its publisher.
+- **02** step 4: the publisher shown, trusted or not. Path E: an agreement that cannot be read in
+  full cannot be accepted. Path F: a publisher Sam does not know.
+- **07** step 5: the contract read from the tally itself, with its publisher and whether it is
+  trusted and still recommended.
 
 ## Reviewed
 
@@ -24,13 +28,14 @@ Group 1 — tally negotiation, one continuous thread (Jan and Sam, carried over 
 
 | # | Story | State |
 |---|-------|-------|
-| 01 | [Invite a partner](01-invite-a-partner.md) | revised — agreements' issuers; importing an agreement (pending review) |
-| 02 | [Respond to an invitation](02-respond-to-an-invitation.md) | revised — unreadable agreement; read-before (pending review) |
+| 01 | [Invite a partner](01-invite-a-partner.md) | revised — trusted publishers' agreements; importing one (pending review) |
+| 02 | [Respond to an invitation](02-respond-to-an-invitation.md) | revised — unreadable agreement; unknown publisher (pending review) |
 | 03 | [Negotiate terms](03-negotiate-terms.md) | reviewed |
 | 04 | [First look at an open tally](04-first-look-at-an-open-tally.md) | reviewed |
 | 05 | [Close a tally](05-close-a-tally.md) | revised — closing permits entries toward zero |
 | 06 | [Find a tally](06-find-a-tally.md) | reviewed |
 | 07 | [Review the agreement](07-review-the-agreement.md) | revised — contract read from the tally (pending review) |
+| 08 | [Publishers I trust](08-publishers-i-trust.md) | drafted (pending review) |
 | 10 | [First run](10-first-run.md) | reviewed |
 | 11 | [My profile and what I disclose](11-my-profile-and-disclosure.md) | revised — dropped withdrawal path; corrections now authorized |
 | 12 | [Keys and backup](12-keys-and-backup.md) | reviewed |

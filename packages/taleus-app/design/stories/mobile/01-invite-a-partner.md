@@ -30,9 +30,10 @@ across the table and does not have the app. Jan does. Two-party story — Sam's 
 5. He is asked what the tally counts in. Dollars is offered because that is what his other tallies
    use.  CHIPs is also offered.  He is told this one cannot be changed later, so he thinks for a second before confirming.
 6. He is asked which agreement governs the tally — what the two of them are actually agreeing to
-   when they lend and settle. Two published standard ones are offered, each showing who issued it:
-   one that settles disputes in court and one that uses arbitration. He takes the first. He is told
-   he can read it, and that whoever accepts has to accept the same one.
+   when they lend and settle. He is offered the agreements published by publishers he trusts: two
+   standard ones from sereus.org, which makes Taleus — one that settles disputes in court and one
+   that uses arbitration. He takes the first. He is told he can read it, and that whoever accepts
+   has to accept the same one. → [08](08-publishers-i-trust.md)
 7. He is asked how long the invitation should stay good. Sam is right there, so a day is plenty.
 8. Jan shares the invitation with Sam directly, since they are together.
 9. Jan can see the invitation is outstanding and when it runs out. Nothing is owed yet; there is no
@@ -71,13 +72,13 @@ across the table and does not have the app. Jan does. Two-party story — Sam's 
      it for as long as the tally exists, whether or not whoever published it is still around.
 
 ### Alternative Path F: an agreement from somewhere else
-6.1. Jan's trade association publishes an agreement written for its members, with a code beside it
-     on its website. Jan scans it.
-6.2. He is told what it is and who issued it. If that cannot be confirmed — the association does
-     not vouch for it where it says it lives — he is told so plainly: he should read it in full, or
-     have someone read it, before offering it to anyone.
-6.3. From then on it is among the agreements he can offer, and other agreements the association
-     publishes for tallies are offered too. He never has to know where agreements are kept.
+6.1. Jan's trade association recommends an agreement written for its members by fair-n-square.org,
+     with a code beside it on the association's website. Jan scans it.
+6.2. He is told what it is and who published it, and that fair-n-square.org is not among the
+     publishers he trusts. He can use this agreement only, trust fair-n-square.org from now on, or
+     leave it. → [08](08-publishers-i-trust.md)
+6.3. He uses it for this tally. Trusting the publisher would also have offered him its other
+     agreements; using one agreement offers him that one.
 6.4. If the code does not lead to an agreement that can be read in full, he is told it cannot be
      used, and nothing changes.
 
@@ -94,9 +95,10 @@ across the table and does not have the app. Jan does. Two-party story — Sam's 
 - [ ] The inviter sets their own credit limit and notice period, and is told these bind only them
 - [ ] The unit of account is chosen at invitation time, with the user warned it is permanent
 - [ ] A governing agreement is chosen at invitation time, from published agreements, and is readable
-- [ ] Each agreement offered shows who issued it, and whether that is confirmed
-- [ ] An agreement can be brought in by scanning its code or opening its link; once in, it is offered
-      like the standard ones, and one that cannot be read in full is refused
+- [ ] The agreements offered are those of publishers the party trusts, each naming its publisher
+- [ ] An agreement can be brought in by scanning its code or opening its link, naming its publisher
+      and whether it is trusted; the party may use it alone or trust its publisher, and one that
+      cannot be read in full is refused
 - [ ] The governing agreement travels with the tally: both parties can read it without its publisher
 - [ ] The invitee must accept the same agreement for the tally to open
 - [ ] The inviter chooses how long the invitation stays good

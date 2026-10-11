@@ -62,9 +62,10 @@ rewired when it differs.
 | a tally's requests | outstanding and settled requests, what was applied, how long outstanding | 21, 22, 24 |
 | what needs me | items across all tallies waiting on this party, with deadline and cost | 23 |
 | my position | owed and owing per unit, an estimate in my display unit, spending power | 40, 41 |
-| agreements I can offer | each source's published tally contracts plus any I imported: title, issuer, language | 01 |
-| bring in an agreement | from a code or link: fetched whole, checked, its issuer confirmed or not, then offered | 01 |
-| an agreement | its full text, numbered, with who issued it (confirmed or not), whether I have read this exact text before, and whether it can be read in full at all | 01, 02, 07 |
+| agreements I can offer | my trusted publishers' tally contracts plus any I chose to use: title, publisher | 01, 08 |
+| bring in an agreement | from a code or link: fetched whole and checked; who published it and whether I trust them | 01, 08 |
+| an agreement | its full text, numbered; its publisher, whether that publisher stands behind it, whether I trust them, who else recommends it, whether it is still recommended; whether it can be read in full at all | 01, 02, 07, 08 |
+| publishers I trust | the list, sereus.org fixed in it; trust an agreement or a publisher (usually on accepting); add by name; remove | 02, 08 |
 | offer terms | propose, counter, accept, refuse — each a signed act | 01, 02, 03 |
 | record value | give value on a tally, optionally answering one or more requests | 20, 22 |
 | request value | ask, withdraw, see ageing | 21 |
@@ -85,8 +86,16 @@ document that does not match, or a part that cannot be found, makes the agreemen
 an unreadable agreement is never accepted ([`contracts/`](../../../../../contracts/README.md),
 `taleus-model` `contracts/`).
 
-"Read before" means this exact text: one changed word is a different agreement. It says nothing
-about whether the text suits a tally, and the apps must not imply otherwise.
+Few parties can judge an agreement by reading it, so the apps say who stands behind it, and leave
+the choice to the party ([story 08](../../stories/mobile/08-publishers-i-trust.md)). Three separate
+facts, never merged into one verdict:
+
+- **the text** is exactly what its address names — checked on every copy, never a judgement;
+- **the publisher stands behind it** — the domain the agreement names lists it as its own (a claim
+  that does not hold is a stronger warning than an unknown publisher);
+- **the party trusts that publisher** — their own list, sereus.org built in, kept for them as they
+  decide on agreements. A recommendation by another publisher (a catalog `endorse`) is reported as
+  information, never as trust.
 
 ## Dates and instants
 

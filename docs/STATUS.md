@@ -224,12 +224,13 @@ needed. A tally whose contract cannot be read in full is a reason to decline it.
 - [x] **Import by link** (model, `importAgreement`; S7 3 s, author confirmed): a
   `https://<host>/ipfs/<cid>` link is fetched with its includes, verified, its author checked, kept,
   and offered from then on; the host joins the device's sources. The QR scanner itself is a screen.
-- [ ] **Design surface** (drafted 2026-10-11, awaiting review): stories 01, 02, 07 revised (see
-  `stories/mobile/STATUS.md` "Ready for review"); a new `Agreement` reading screen and `Scan` taking
-  an agreement's code in the navigation and screen plan; the agreement asks in
-  `specs/domain/interfaces.md`. After review, the model still owes the screens: the issuer check on
-  every agreement shown (today only on import), a per-device record of agreements read, and the
-  composed document's structure (not flattened text) for native rendering.
+- [ ] **Design surface** (drafted 2026-10-11, revised for trusted publishers, awaiting review):
+  stories 01, 02, 07 revised and a new 08 "Publishers I trust" (see `stories/mobile/STATUS.md`);
+  new `Agreement` and `TrustedPublishers` screens, `Scan` taking an agreement's code; the agreement
+  asks and the trust model in `specs/domain/interfaces.md`. The model then owes: the device's
+  sources becoming its trusted publishers (sereus.org fixed); trusting one agreement apart from its
+  publisher; per agreement, whether its publisher stands behind it, whether it is trusted, who
+  recommends it, and its catalog status; the composed document's structure for native rendering.
 
 ## Negotiation gaps (app design pass, `packages/taleus-app`)
 

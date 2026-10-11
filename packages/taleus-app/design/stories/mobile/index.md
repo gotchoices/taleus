@@ -10,7 +10,7 @@ planned story; it states the topic and what it must not lose from MyCHIPs.
 
 ## Grouping
 
-- **01–07 Tally lifecycle** — negotiation through close
+- **01–08 Tally lifecycle** — negotiation through close, and the agreements tallies are made under
 - **10–14 Identity** — who I am, what I disclose, my keys, devices, and machines
 - **20–25 Trading** — direct chits between two partners, and getting the record out
 - **30–31 Network** — lifts, and the settings that make them possible
@@ -30,6 +30,8 @@ net worth and the nature of value, not merely list transactions. That intent dri
 
 ## Taleus additions (no MyCHIPs precedent)
 
+- **08 Publishers I trust** — agreements are judged by who stands behind them; the app keeps the
+  party's trusted publishers (sereus.org built in) and says who published every agreement it shows
 - **14 My cadre** — a party's own machines; tallies survive with counterparties, private records do not
 - **25 My records in my books** — accounting integration, with Bonum on the same platform as the
   case worth designing for

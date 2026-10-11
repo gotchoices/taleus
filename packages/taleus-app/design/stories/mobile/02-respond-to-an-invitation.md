@@ -23,8 +23,9 @@ and has extended nothing to anyone. Jan is waiting across the table.
 3. He installs it and comes back. He lands on Jan's invitation, not on a blank start — he does not
    have to ask Jan to send it again.
 4. Sam sees that Jan is inviting him, that Jan is willing to be owed up to $500, that Jan wants two
-   weeks' notice, that the tally counts in dollars, and which agreement governs it and who issued
-   it. He can read that agreement before agreeing to anything, and he has disclosed nothing so far.
+   weeks' notice, that the tally counts in dollars, and which agreement governs it. He is told it is
+   published by sereus.org, which makes Taleus and which he therefore trusts. He can read it before
+   agreeing to anything, and he has disclosed nothing so far.
 5. He is asked what to tell Jan about himself. His name is needed. His phone number and address are
    offered but marked as his choice; he gives his phone number and skips the address.
 6. He is asked what he is willing to be owed by Jan. He has no reason to extend Jan credit yet, so he
@@ -60,12 +61,12 @@ and has extended nothing to anyone. Jan is waiting across the table.
 4.3. He can refuse, and Jan learns that the agreement was the problem rather than the terms.
      → path B
 
-### Alternative Path F: an agreement Sam has read before
-4.1. Sam already tallies with his landlord under the same standard agreement.
-4.2. He is told he has read this exact text before. That saves him reading it again, though it is
-     still his to read; it says nothing about whether the text suits this tally.
-4.3. Had a single word of it changed, it would be a different agreement, and he would not be told
-     he had read it.
+### Alternative Path F: a publisher Sam does not know
+4.1. The invitation is under an agreement published by fair-n-square.org, which Sam has never heard
+     of. He is told it is not among the publishers he trusts — and, if a publisher he does trust
+     recommends it, that too.
+4.2. He can accept it anyway, accept and trust fair-n-square.org from now on, or refuse. Accepting
+     does not require trusting anyone. → [08](08-publishers-i-trust.md)
 
 ### Alternative Path D: Sam at Mara's shop
 1.1. Sam is buying a tube at Mara's shop and uses the invitation posted by the register.
@@ -78,10 +79,11 @@ and has extended nothing to anyone. Jan is waiting across the table.
 - [ ] An invitation can be acted on with or without the app installed; installing does not lose it
 - [ ] The invitee sees who is inviting them, on what terms, and under which agreement, before
       disclosing anything
-- [ ] The governing agreement is readable before the invitee commits, with who issued it and
-      whether that is confirmed
+- [ ] The governing agreement is readable before the invitee commits, naming its publisher and
+      whether the invitee trusts that publisher
+- [ ] An agreement from a publisher not trusted can still be accepted, and accepting it can trust
+      the publisher too
 - [ ] An agreement that cannot be read in full cannot be accepted; refusing it tells the inviter why
-- [ ] An agreement the invitee has read before is recognised as exactly the same text
 - [ ] The app explains what a tally is, without relying on the inviter to have explained it
 - [ ] Required identifying information is distinguishable from optional information
 - [ ] The invitee sets their own limit and notice period, independently of the inviter's, and zero is
