@@ -3442,24 +3442,24 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stroc/compose@npm:^0.2.0":
-  version: 0.2.0
-  resolution: "@stroc/compose@npm:0.2.0"
+"@stroc/compose@npm:^0.3.0":
+  version: 0.3.0
+  resolution: "@stroc/compose@npm:0.3.0"
   dependencies:
-    "@stroc/core": "npm:0.2.0"
+    "@stroc/core": "npm:0.3.0"
     multiformats: "npm:^13.4 || ^14"
-  checksum: 10c0/363612a2f258b64d4eee8c4d95e6be92bc0ee6764954e9cf9ffba768200991963b3fef711a301ba73f5247ae8a4f8c900924ea507aa5d8f062044f9273271358
+  checksum: 10c0/68a75057e232a3e6ea5d9f3e47dbda27137688b4fdbcddb9dcc40d5086d4e3912766b48290e5cb19068e30fb3f2cbae3ef8e9b36203aa85e520a629158a9e16a
   languageName: node
   linkType: hard
 
-"@stroc/core@npm:0.2.0, @stroc/core@npm:^0.2.0":
-  version: 0.2.0
-  resolution: "@stroc/core@npm:0.2.0"
+"@stroc/core@npm:0.3.0, @stroc/core@npm:^0.3.0":
+  version: 0.3.0
+  resolution: "@stroc/core@npm:0.3.0"
   dependencies:
     "@ipld/dag-json": "npm:^10.2.0"
     "@noble/hashes": "npm:^2"
     multiformats: "npm:^13.4 || ^14"
-  checksum: 10c0/feb5641fde4b2ec1a89bb498812d2775ffb1a16db9f3443300ef8a7e1dd371615a6d429357e0d68d6c1df0f5f8813db465b9adc06865056b766bbbd261a093fc
+  checksum: 10c0/f2756b45c37490391bf16c0d0d95c1671989d71e1c62a3f3b89c2d50d61cb9f9160eead382d2055efd875ccdb19cf9555a6307462d77bbb6b826f6ba40227202
   languageName: node
   linkType: hard
 
@@ -8357,8 +8357,8 @@ __metadata:
     "@react-navigation/native-stack": "npm:^7.18.10"
     "@serfab/cadre-core": "npm:^1.14.0"
     "@serfab/cadre-rn": "npm:^1.14.0"
-    "@stroc/compose": "npm:^0.2.0"
-    "@stroc/core": "npm:^0.2.0"
+    "@stroc/compose": "npm:^0.3.0"
+    "@stroc/core": "npm:^0.3.0"
     "@testing-library/react-native": "npm:^14.0.1"
     "@types/jest": "npm:^29.5.13"
     "@types/react": "npm:^19.2.0"

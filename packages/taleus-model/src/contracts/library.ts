@@ -8,7 +8,7 @@
  * if its bytes hash to its CID, so no source has to be trusted. Whatever is found is kept, so a
  * party holds every contract it has seen.
  */
-import { type Composed, compose, HttpResolver, type Resolver } from '@stroc/compose'
+import { AuthorChecker, type Composed, compose, HttpResolver, type Resolver } from '@stroc/compose'
 import { verifyDocument, type StrocDocument, type StrocSection } from '@stroc/core'
 import type { StoredDocument, Tally } from 'taleus-core'
 import type { DurableText } from '../engine/session.js'
@@ -25,6 +25,20 @@ export interface FetchResponse {
 	status: number
 	json(): Promise<unknown>
 	arrayBuffer(): Promise<ArrayBuffer>
+}
+
+/**
+ * A link to a published document -- what a contract's QR code or share link carries:
+ * `https://<host>/ipfs/<cid>`. Undefined for anything else.
+ */
+export function documentLink(link: string): { domain: string; cid: string } | undefined {
+	const match = /^https:\/\/([a-z0-9.-]+(?::[0-9]+)?)\/ipfs\/([a-z2-7]+)\/?(?:[?#].*)?$/i.exec(link.trim())
+	if (!match) return undefined
+	try {
+		return { domain: match[1].toLowerCase(), cid: CID.parse(match[2]).toString() }
+	} catch {
+		return undefined
+	}
 }
 
 /** The platform's `fetch`. */
@@ -84,9 +98,12 @@ export class ContractLibrary {
 		this.cache = options.cache ?? new MemoryDocumentCache()
 	}
 
-	/** One document, verified: from `tally` if given, else this device, else a source. */
-	async document(cid: string, tally?: Tally): Promise<StoredDocument | undefined> {
-		const found = (await this.fromTally(cid, tally)) ?? (await this.fromCache(cid)) ?? (await this.fromSources(cid))
+	/**
+	 * One document, verified: from `tally` if given, else this device, else a source -- the known
+	 * ones, then any `also` (a place the party has just been pointed at).
+	 */
+	async document(cid: string, tally?: Tally, also: readonly string[] = []): Promise<StoredDocument | undefined> {
+		const found = (await this.fromTally(cid, tally)) ?? (await this.fromCache(cid)) ?? (await this.fromSources(cid, also))
 		if (found) await this.cache.put(found)
 		return found
 	}
@@ -96,14 +113,14 @@ export class ContractLibrary {
 	 * contract with any part missing is not one a party can read, so `missing` lists what was not
 	 * found and `documents` is then incomplete.
 	 */
-	async gather(root: string, tally?: Tally): Promise<Gathered> {
+	async gather(root: string, tally?: Tally, also: readonly string[] = []): Promise<Gathered> {
 		const documents = new Map<string, StoredDocument>()
 		const missing: string[] = []
 		const queue = [root]
 		while (queue.length > 0) {
 			const cid = queue.shift()!
 			if (documents.has(cid) || missing.includes(cid)) continue
-			const found = await this.document(cid, tally)
+			const found = await this.document(cid, tally, also)
 			if (!found) {
 				missing.push(cid)
 				continue
@@ -135,6 +152,13 @@ export class ContractLibrary {
 		}
 	}
 
+	/** Whether the domain `document` names as its author lists it, under `cid`, as its own. */
+	async authorConfirms(document: StrocDocument, cid: string): Promise<boolean> {
+		const fetch = this.options.fetch ?? platformFetch()
+		const check = await new AuthorChecker({ fetch: fetch as never }).check(document, cid)
+		return check.status === 'confirmed'
+	}
+
 	private async fromTally(cid: string, tally?: Tally): Promise<StoredDocument | undefined> {
 		const held = tally ? await tally.document(cid) : undefined
 		return held && (await decoded(held)) ? held : undefined
@@ -146,8 +170,8 @@ export class ContractLibrary {
 		return held && (await decoded(held)) ? held : undefined
 	}
 
-	private async fromSources(cid: string): Promise<StoredDocument | undefined> {
-		for (const domain of this.options.sources()) {
+	private async fromSources(cid: string, also: readonly string[]): Promise<StoredDocument | undefined> {
+		for (const domain of [...this.options.sources(), ...also.filter(d => !this.options.sources().includes(d))]) {
 			const bytes = await this.fetchFrom(domain, cid)
 			const fetched = bytes ? { cid, json: decoder.decode(bytes) } : undefined
 			if (fetched && (await decoded(fetched))) return fetched

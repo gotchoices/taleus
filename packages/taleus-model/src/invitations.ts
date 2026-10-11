@@ -56,9 +56,24 @@ export interface Response {
 }
 
 /** What a screen can read and do about invitations. Both the mock and the engine implement it. */
+/** An agreement the party brought in from a link or QR code. */
+export interface ImportedAgreement extends Agreement {
+	/** Whether the domain the agreement names as its author lists it as its own. */
+	authorConfirmed: boolean
+	/** Where it was found; this device now looks there for documents too. */
+	source: string
+}
+
 export interface InvitationsModel {
 	listInvitations(): Promise<Result<Invitation[]>>
+	/** The agreements this party can offer: its sources' tally contracts and any it imported. */
 	listAgreements(): Promise<Result<Agreement[]>>
+	/**
+	 * Bring in an agreement from a link to a published document (`https://<host>/ipfs/<cid>`, what
+	 * a contract's QR code carries): it is fetched with everything it includes, checked against its
+	 * CID, kept on this device, and offered from then on.
+	 */
+	importAgreement(link: string): Promise<Result<ImportedAgreement>>
 	/**
 	 * Story 01: terms without a recipient. The token is what gets shared; whoever
 	 * takes it up becomes the other party.

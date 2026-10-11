@@ -63,6 +63,10 @@ function methods(model: TaleusModel, diagnostics: () => unknown, query: StrandQu
 		async agreements() {
 			return value(await model.invitations.listAgreements())
 		},
+		/** Bring in an agreement from a link to a published document (what a contract's QR code carries). */
+		async import(link: string) {
+			return value(await model.invitations.importAgreement(link))
+		},
 		/** An agreement composed for reading. */
 		async agreement(agreementId: string) {
 			return value(await model.tally.readAgreement(agreementId))

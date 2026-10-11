@@ -56,6 +56,14 @@ links and removes the record:
 `publish.sh` runs `stroc status`, which creates them for real at the first publish; commit them
 from then on, and never delete from the archive once a version has been published.
 
+## Which documents the app offers
+
+The catalog lists every document, clauses included. `.stroc.yaml`'s `tally-contracts` collection
+names the agreements Taleus offers for a new tally (catalog 1.1); the app lists that collection's
+current entries from each source it knows (`taleus-model` `offerableAgreements`). Add a new top-level
+agreement to the collection by file name; a clause belongs in none. An edit's new version is offered
+from the next publish, and the version it replaces stays in the collection, marked superseded.
+
 ## Publishing
 
 ```

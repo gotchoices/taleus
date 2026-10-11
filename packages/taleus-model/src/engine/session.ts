@@ -71,6 +71,8 @@ export interface LocalState {
 	 * sereus.org; a source is added when the party imports a contract published there.
 	 */
 	documentSources: string[]
+	/** Agreements the party imported by link, by CID: offered whether or not a source lists them. */
+	importedAgreements: string[]
 }
 
 /** One durable text value the host keeps: the same shape as cadre-core's `DurableSlot`. */
@@ -121,6 +123,7 @@ export function initialLocalState(): LocalState {
 		rates: [],
 		deviceName: 'This device',
 		documentSources: ['sereus.org'],
+		importedAgreements: [],
 	}
 }
 

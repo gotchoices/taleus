@@ -5,7 +5,7 @@ import {
 	type Result,
 	type Unit,
 } from '../types.js'
-import type { Agreement, Invitation, OpenInvitation, Response } from '../invitations.js'
+import type { Agreement, ImportedAgreement, Invitation, OpenInvitation, Response } from '../invitations.js'
 
 /** Mock writes, as in `party.ts`: enough to walk the flow, gone on restart. */
 let issued: Invitation[] | undefined
@@ -19,6 +19,11 @@ export async function listInvitations(): Promise<Result<Invitation[]>> {
 export async function listAgreements(): Promise<Result<Agreement[]>> {
 	const data = fixture('agreements.happy') as { agreements: Agreement[] }
 	return { ok: true, value: data.agreements }
+}
+
+/** Mock mode reads no links: importing needs the engine's contract library. */
+export async function importAgreement(_link: string): Promise<Result<ImportedAgreement>> {
+	return { ok: false, error: { kind: 'unsupported', message: 'importing an agreement needs the engine', retryable: false } }
 }
 
 /**

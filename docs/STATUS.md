@@ -194,9 +194,10 @@ is missing -- so the partner "asks" for a contract by reading the table, and no 
 needed. A tally whose contract cannot be read in full is a reason to decline it.
 
 - [x] Documents drafted, published, served by sereus.org; `@stroc/cli` installed (`yarn stroc`).
-- [ ] **Stroc: a document kind**, so an app can tell an offerable agreement from a clause (the
-  catalog and documents do not distinguish them today). In progress in Stroc; then mark the
-  agreements in `contracts/` and republish.
+- [x] **Stroc collections** (Stroc 0.3, catalog 1.1): `contracts/.stroc.yaml` lists the Courts and
+  Arbitration agreements in `tally-contracts`; the model offers each source's current entries of it.
+- [ ] **Publish** the catalog with collections (`contracts/publish.sh`): until then the live catalog
+  is 1.0 and the app offers only agreements imported by link.
 - [ ] **Upstream: `cid()` names dag-json** (gotchoices/Optimystic#33, open): the crypto plugin's
   `cid()` already builds CIDv1s and lacked only Stroc's codec. Once released, `Document`'s interim
   `CidFormat` becomes `check (Cid = cid(Json, 'dag-json'))`. Until then every reader verifies.
@@ -216,14 +217,13 @@ needed. A tally whose contract cannot be read in full is a reason to decline it.
   - `STANDARD_AGREEMENT` removed. No mock-mode work for now.
   - NOTE: "declines" is the agent not accepting -- the core has no refusal act yet
     (`feat-offer-lifecycle`).
-- [ ] **Offerable list by kind:** INTERIM, an agreement is told from a clause by including other
-  documents (`offerableAgreements`). Replace with the Stroc kind once released.
 - [x] **Phone spike** (S7, 2026-10-10): listing sereus.org's agreements 27 s cold, 9 s warm; composing
   the Courts agreement (11 sections) 4 s from the device cache. Stroc runs in the app as is.
 - [ ] **Native rendering** of the review screens from Stroc's layout model, with "issued by
   <domain>" and "you have read this before".
-- [ ] **Import by QR or link:** a `/ipfs/<cid>` URL is fetched, verified, its author domain confirmed,
-  and the domain added to the sources.
+- [x] **Import by link** (model, `importAgreement`; S7 3 s, author confirmed): a
+  `https://<host>/ipfs/<cid>` link is fetched with its includes, verified, its author checked, kept,
+  and offered from then on; the host joins the device's sources. The QR scanner itself is a screen.
 - [ ] **Design surface:** stories 01, 02, 07 and the `TallyTerms` and invitation-review specs, then
   regenerate the screens through appeus.
 

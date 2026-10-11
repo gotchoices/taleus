@@ -1,6 +1,11 @@
-# Folder configuration for the Stroc tools (not a document). Used locally by `stroc serve` to preview
-# the catalog. The live catalog's configuration is the server folder's own .stroc.yaml, shared by
-# every app publishing for sereus.org; publish.sh never overwrites it (see README.md).
+# Folder configuration for the Stroc tools (not a document). `stroc export` (publish.sh) builds
+# sereus.org's catalog from it, so what is here is what the published catalog says.
 domain: sereus.org
 endorse: []
 withdrawn: []
+
+# Named lists for apps (catalog 1.1). Taleus offers the current entries of `tally-contracts` as the
+# contracts a new tally can be made under; the clauses they include are in no collection. Listed by
+# file, so each published edit's new version is offered and earlier ones stay, marked superseded.
+collections:
+  tally-contracts: [Tally_Contract.yaml, Tally_Contract_Arbitration.yaml]

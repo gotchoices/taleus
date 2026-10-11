@@ -1,8 +1,8 @@
 /**
  * The party, and the invitations that make tallies: who this party is, and how a tally begins.
  */
-import { agreementOf, offerableAgreements } from '../contracts/index.js'
-import type { Ask, InvitationsModel, Invitation, OpenInvitation } from '../invitations.js'
+import { agreementOf, documentLink, offerableAgreements } from '../contracts/index.js'
+import type { Ask, ImportedAgreement, InvitationsModel, Invitation, OpenInvitation } from '../invitations.js'
 import type { Party, PartyModel } from '../party.js'
 import type { Result } from '../types.js'
 import { decodeEnvelope, encodeEnvelope } from './envelope.js'
@@ -77,7 +77,32 @@ export function invitationsModel(session: Session): InvitationsModel {
 		},
 
 		async listAgreements() {
-			return ok(await offerableAgreements(session.library, session.local.documentSources, session.options.fetch))
+			const listed = await offerableAgreements(session.library, session.local.documentSources, session.options.fetch)
+			const imported = await Promise.all(
+				session.local.importedAgreements
+					.filter(cid => !listed.some(agreement => agreement.id === cid))
+					.map(cid => agreementOf(session.library, cid)),
+			)
+			return ok([...listed, ...imported])
+		},
+
+		async importAgreement(link) {
+			const target = documentLink(link)
+			if (!target) return failed<ImportedAgreement>('invalid', 'that is not a link to a published document')
+			const gathered = await session.library.gather(target.cid, undefined, [target.domain])
+			if (gathered.missing.length > 0) {
+				return failed<ImportedAgreement>('not-found', `the agreement cannot be read in full from ${target.domain}`)
+			}
+			const document = (await session.library.describe(target.cid))!
+			const local = session.local
+			if (!local.documentSources.includes(target.domain)) local.documentSources.push(target.domain)
+			if (!local.importedAgreements.includes(target.cid)) local.importedAgreements.push(target.cid)
+			session.changed()
+			return ok({
+				...(await agreementOf(session.library, target.cid)),
+				authorConfirmed: await session.library.authorConfirms(document, target.cid),
+				source: target.domain,
+			})
 		},
 
 		async createInvitation(draft) {

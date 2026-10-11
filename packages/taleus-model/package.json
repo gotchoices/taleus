@@ -96,8 +96,8 @@
 		"lint": "eslint ./src"
 	},
 	"dependencies": {
-		"@stroc/compose": "^0.2.0",
-		"@stroc/core": "^0.2.0",
+		"@stroc/compose": "^0.3.0",
+		"@stroc/core": "^0.3.0",
 		"multiformats": "^14.0.5"
 	},
 	"devDependencies": {

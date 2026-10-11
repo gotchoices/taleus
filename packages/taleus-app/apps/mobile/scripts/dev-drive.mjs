@@ -6,7 +6,8 @@
  *   node scripts/dev-drive.mjs <device> <method> [json-arg ...]
  *
  * <device> matches the inspector page's device name or title (e.g. `SM-G935V`, `sdk_gphone`).
- * Methods: status, onboard <name>, invite [creditLimitUnits], accept <token> <name>
+ * Methods: status, onboard <name>, invite [creditLimitUnits] [agreementId], agreements, agreement <cid>,
+ * import <link>, sql <tallyId> <sql>, accept <token> <name>
  * [creditLimitUnits], tallies, pay <tallyId> <units> <memo>. Arguments are JSON (a bare word is
  * taken as a string). Prints the outcome as JSON; exits non-zero on an error.
  *

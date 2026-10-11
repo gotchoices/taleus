@@ -2,7 +2,7 @@
  * Contracts as the model shows them: what an agreement is called and who issued it, its text for
  * reading, and which agreements a party can offer.
  */
-import { type ComposedInline, type ComposedSection, formatNumber, parseCatalog } from '@stroc/compose'
+import { collectionEntries, type ComposedInline, type ComposedSection, fetchCatalog, formatNumber } from '@stroc/compose'
 import type { Tally } from 'taleus-core'
 import type { Agreement, AgreementDocument } from '../tally.js'
 import { platformFetch, type ContractLibrary, type Fetch } from './library.js'
@@ -37,11 +37,12 @@ export async function agreementDocumentOf(
 }
 
 /**
- * The agreements a party can offer: those each known source issues as current.
- *
- * INTERIM until Stroc marks a document's kind: an offerable agreement is told from a clause by
- * including other documents, which every agreement here does and no clause does.
+ * The collection a publisher lists tally contracts in (Stroc catalog 1.1): the agreements to offer,
+ * not the clauses they include. Agreed with sereus.org; another publisher uses the same name.
  */
+export const TALLY_CONTRACTS = 'tally-contracts'
+
+/** The agreements a party can offer: each known source's current tally contracts. */
 export async function offerableAgreements(
 	library: ContractLibrary,
 	sources: readonly string[],
@@ -49,27 +50,16 @@ export async function offerableAgreements(
 ): Promise<Agreement[]> {
 	const offerable: Agreement[] = []
 	for (const domain of sources) {
-		for (const entry of await currentIssuedBy(domain, fetch)) {
-			const gathered = await library.gather(entry.cid)
-			if (gathered.missing.length === 0 && gathered.documents.length > 1) {
-				offerable.push(await agreementOf(library, entry.cid))
-			}
+		const { catalog, error } = await fetchCatalog(`https://${domain}`, { fetch: fetch as never })
+		if (!catalog) {
+			console.warn(`taleus-model: reading ${domain}'s document catalog failed: ${error}`)
+			continue
+		}
+		for (const entry of collectionEntries(catalog, TALLY_CONTRACTS)) {
+			offerable.push(await agreementOf(library, entry.cid))
 		}
 	}
 	return offerable
-}
-
-async function currentIssuedBy(domain: string, fetch: Fetch) {
-	try {
-		const response = await fetch(`https://${domain}/.well-known/stroc/catalog.json`, { headers: { Accept: 'application/json' } })
-		if (!response.ok) throw new Error(`HTTP ${response.status}`)
-		const { catalog, error } = parseCatalog(await response.json())
-		if (!catalog) throw new Error(error)
-		return catalog.entries.filter(entry => entry.role === 'author' && entry.status === 'current')
-	} catch (error) {
-		console.warn(`taleus-model: reading ${domain}'s document catalog failed:`, error)
-		return []
-	}
 }
 
 function titleOf(section: ComposedSection): string {
