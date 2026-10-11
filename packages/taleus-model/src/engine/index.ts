@@ -14,6 +14,7 @@ import { invitationsModel, partyModel } from './formation.js'
 import { attentionModel, positionModel } from './derived.js'
 import { entriesModel, requestsModel } from './ledger.js'
 import { localAreas } from './local.js'
+import { publishersModel } from './publishers.js'
 import { Session, type PartyIdentity, type SessionOptions } from './session.js'
 import { offersModel, talliesModel, tallyModel } from './tallies.js'
 
@@ -50,6 +51,7 @@ export async function createEngineModel(options: SessionOptions): Promise<Engine
 		rates: local.rates,
 		devices: local.devices,
 		profile: local.profile,
+		publishers: publishersModel(session),
 		standing: local.standing,
 	}
 	return {

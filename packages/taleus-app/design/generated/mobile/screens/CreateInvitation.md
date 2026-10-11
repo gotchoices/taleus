@@ -17,6 +17,8 @@ dependsOn:
   - mock/data/invitations.happy.json
   - mock/data/invitations.empty.json
   - mock/data/agreements.happy.json
+  - design/stories/mobile/08-publishers-i-trust.md
+  - design/generated/mobile/screens/Agreement.md
 depHashes: {}
 ---
 
@@ -66,3 +68,17 @@ standing invitation for a shop counter (path C) are `StandingInvitation`'s and a
 
 `npx tsc --noEmit` clean; `npx jest` — seven tests over this arc, including that a created invitation
 carries no counterparty field at all.
+
+## Contracts (2026-10-11)
+
+- **The agreements offered are the trusted publishers' tally contracts** (story 01 step 6): the
+  model lists each trusted publisher's `tally-contracts` collection plus agreements trusted alone. The
+  chosen one shows `PublisherNote` and opens `Agreement`. An empty list says the publishers could not
+  be reached rather than showing nothing.
+- **An agreement from elsewhere** (story 01 path F): a link (what an agreement's code carries) is
+  looked up with `importAgreement`, which fetches and verifies it but trusts nothing. The result shows
+  `PublisherNote`; the party can use this agreement (trusting it alone), trust its publisher (offered
+  only when the publisher confirmed it), or leave it. Scanning the code itself is `Scan`'s, still a
+  draft; pasting the link is the same path.
+- **An unreadable agreement cannot be offered.** `createInvitation` refuses it; the message shows in
+  place.

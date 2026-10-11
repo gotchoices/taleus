@@ -3,7 +3,7 @@
  */
 import type { CreditTerms, PaymentRequest as CorePaymentRequest, Tally, TallyView } from 'taleus-core'
 
-import { agreementDocumentOf, agreementOf } from '../contracts/index.js'
+import { agreementDocumentOf, agreementOf, agreementToDecide } from '../contracts/index.js'
 import type { Offer, OffersModel } from '../offers.js'
 import type { TalliesModel } from '../tallies.js'
 import type { Terms, TallyDetail, TallyModel, TermsRecord } from '../tally.js'
@@ -116,7 +116,7 @@ export function tallyModel(session: Session): TallyModel {
 			state: summary.state,
 			waitingOn: summary.waitingOn,
 			opened: instantOf(view.createdAt),
-			agreement: await agreementOf(session.library, view.contract?.cid ?? view.offer?.contractCid ?? '', tally),
+			agreement: await agreementOf(session.agreements, view.contract?.cid ?? view.offer?.contractCid ?? '', tally),
 			terms: { mine: termsOf(view.terms.mine, unit, today), theirs: termsOf(view.terms.theirs, unit, today) },
 			roomToSpend: fromCore(view.balances.capacity.canSend, unit),
 			// In memory, the counterparty is always here. Over a network this becomes a real
@@ -157,8 +157,9 @@ export function tallyModel(session: Session): TallyModel {
 			return ok({ history })
 		},
 
-		async readAgreement(agreementId) {
-			const document = await agreementDocumentOf(session.library, agreementId)
+		async readAgreement(agreementId, tallyId) {
+			const tally = tallyId ? await session.tally(tallyId) : undefined
+			const document = await agreementDocumentOf(session.agreements, agreementId, tally)
 			return document ? ok(document) : failed('not-found', `the agreement ${agreementId} cannot be read in full`)
 		},
 
@@ -191,7 +192,7 @@ export function offersModel(session: Session): OffersModel {
 				waitingOn: view.offer.by === 'me' ? 'them' : 'me',
 				drafted: instantOf(session.today()),
 				unit,
-				agreement: await agreementOf(session.library, view.offer.contractCid, tally),
+				agreement: await agreementToDecide(session.agreements, view.offer.contractCid, tally),
 				proposed: {
 					mine: { creditLimit: fromCore(view.terms.mine?.limit ?? { units: 0, denomination: unit.denom }, unit), noticeDays: view.terms.mine?.callDays ?? 0 },
 					theirs: { creditLimit: fromCore(view.terms.theirs?.limit ?? { units: 0, denomination: unit.denom }, unit), noticeDays: view.terms.theirs?.callDays ?? 0 },
@@ -206,6 +207,11 @@ export function offersModel(session: Session): OffersModel {
 			if (answer === 'counter') return unsupported('Countering an offer', 'feat-offer-lifecycle')
 			const tally = await session.tally(tallyId)
 			if (!tally) return failed('not-found', `no tally ${tallyId}`)
+			const offered = (await tally.read()).offer?.contractCid
+			// Story 02 path E: nobody should be bound by text they cannot read.
+			if (offered && (await session.library.gather(offered, tally)).missing.length > 0) {
+				return failed('agreement-unreadable', 'the agreement this offer names cannot be read in full')
+			}
 			const accepted = await tally.acceptContract()
 			if (!accepted.ok) return refused(accepted.refusal)
 			return ok('accepted' as const)

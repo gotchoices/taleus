@@ -19,6 +19,7 @@ import type { OffersModel } from './offers.js'
 import type { PartyModel } from './party.js'
 import type { PositionModel } from './position.js'
 import type { ProfileModel } from './profile.js'
+import type { PublishersModel } from './publishers.js'
 import type { RatesModel } from './rates.js'
 import type { RequestsModel } from './requests.js'
 import type { SettingsModel } from './settings.js'
@@ -37,6 +38,7 @@ export interface TaleusModel {
 	party: PartyModel
 	position: PositionModel
 	profile: ProfileModel
+	publishers: PublishersModel
 	rates: RatesModel
 	requests: RequestsModel
 	settings: SettingsModel

@@ -70,6 +70,14 @@
 			"types": "./dist/tallies.d.ts",
 			"default": "./dist/tallies.js"
 		},
+		"./publishers": {
+			"types": "./dist/publishers.d.ts",
+			"default": "./dist/publishers.js"
+		},
+		"./agreement": {
+			"types": "./dist/agreement.d.ts",
+			"default": "./dist/agreement.js"
+		},
 		"./tally": {
 			"types": "./dist/tally.d.ts",
 			"default": "./dist/tally.js"

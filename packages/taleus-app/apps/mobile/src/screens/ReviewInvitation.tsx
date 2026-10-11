@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react'
 import { ScrollView, Text, TextInput, View } from 'react-native'
 
-import { Action, Amount, Card, Empty, Failed, Loading, Row, unitNamesFor } from '../components'
+import { Action, Amount, Card, Empty, Failed, Loading, OpenableRow, Options, PublisherNote, Row, unitNamesFor } from '../components'
 import { readInvitation, respondToInvitation, type OpenInvitation } from '../data/invitations'
+import { trustAgreement, trustPublisher } from '../data/publishers'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
 import { divisorOf } from '../util/amount'
@@ -22,7 +23,7 @@ type Props = ScreenProps<'ReviewInvitation'>
  * asked of them (steps 5 and 6). Reversing it would have them paying before
  * they know the price.
  */
-export function ReviewInvitation({ route }: Props): React.JSX.Element {
+export function ReviewInvitation({ route, navigation }: Props): React.JSX.Element {
 	const styles = useStyles(make)
 	const { token } = route.params
 	const { state, value, error, reload } = useLoad(
@@ -33,6 +34,8 @@ export function ReviewInvitation({ route }: Props): React.JSX.Element {
 	const [limit, setLimit] = useState('0')
 	const [notice, setNotice] = useState('14')
 	const [outcome, setOutcome] = useState<'accepted' | 'refused' | undefined>()
+	const [trust, setTrust] = useState<TrustChoice>('neither')
+	const [problem, setProblem] = useState<string | undefined>()
 
 	if (state === 'loading') {
 		return <Loading />
@@ -63,15 +66,28 @@ export function ReviewInvitation({ route }: Props): React.JSX.Element {
 	}
 
 	const name = (disclosed.name ?? '').trim()
+	const { agreement } = value
+	// Story 02 path E: nobody should be bound by text they cannot read.
+	const readable = agreement.readable !== false
+	// Story 08 step 3: asked as they accept, only about an agreement nobody vouched for to them,
+	// and never about one whose claimed publisher does not stand behind it (path B).
+	const askTrust = readable && agreement.standing?.trust === 'none' && agreement.standing.publisherConfirms !== 'no'
 	const respond = async (answer: 'accept' | 'refuse') => {
+		setProblem(undefined)
 		const result = await respondToInvitation(token, answer, {
 			disclose: disclosed,
 			creditLimit: { units: Math.round(Number(limit || '0') * divisorOf(value.unit)) },
 			noticeDays: Number(notice || '0'),
 		})
-		if (result.ok) {
-			setOutcome(result.value)
+		if (!result.ok) {
+			setProblem(result.error.message)
+			return
 		}
+		if (result.value === 'accepted' && askTrust) {
+			if (trust === 'agreement') await trustAgreement(agreement.id)
+			if (trust === 'publisher') await trustPublisher(agreement.publisher)
+		}
+		setOutcome(result.value)
 	}
 
 	return (
@@ -99,14 +115,19 @@ export function ReviewInvitation({ route }: Props): React.JSX.Element {
 				/>
 			</Card>
 
-			<Card title={t('screens.review-invitation.agreement')} footnote={value.agreement.summary}>
-				<Text style={styles.body}>{value.agreement.title}</Text>
-				<Text style={styles.meta}>
-					{t('screens.tally-view.agreement-meta', {
-						publisher: value.agreement.publisher,
-						language: value.agreement.language,
-					})}
-				</Text>
+			<Card title={t('screens.review-invitation.agreement')} footnote={agreement.summary}>
+				<Text style={styles.body}>{agreement.title}</Text>
+				<PublisherNote agreement={agreement} />
+				{readable ? (
+					<OpenableRow
+						onPress={() => navigation.navigate('Agreement', { agreementId: agreement.id })}
+						accessibilityLabel={t('screens.review-invitation.agreement-read')}
+					>
+						<Text style={styles.body}>{t('screens.review-invitation.agreement-read')}</Text>
+					</OpenableRow>
+				) : (
+					<Text style={styles.warn}>{t('screens.review-invitation.agreement-unreadable')}</Text>
+				)}
 			</Card>
 
 			<Card title={t('screens.review-invitation.about-you')}>
@@ -144,15 +165,45 @@ export function ReviewInvitation({ route }: Props): React.JSX.Element {
 			<Text style={styles.caption}>
 				{t('screens.create-invitation.expires', { date: formatInstant(value.expires) })}
 			</Text>
+			{askTrust ? (
+				<Card title={t('screens.review-invitation.trust-title')} footnote={t('screens.review-invitation.trust-note')}>
+					<Options<TrustChoice>
+						options={[
+							{ value: 'neither', label: t('screens.review-invitation.trust-neither') },
+							{ value: 'agreement', label: t('screens.review-invitation.trust-agreement') },
+							// A publisher is trusted only on its own word: not while it cannot be asked.
+							...(agreement.standing?.publisherConfirms === 'yes'
+								? [
+										{
+											value: 'publisher' as const,
+											label: t('screens.review-invitation.trust-publisher', { publisher: agreement.publisher }),
+										},
+									]
+								: []),
+						]}
+						chosen={[trust]}
+						onChoose={setTrust}
+					/>
+				</Card>
+			) : null}
+
+			{problem ? <Text style={styles.warn}>{problem}</Text> : null}
 			<Action
 				label={t('screens.review-invitation.accept')}
-				onPress={name ? () => void respond('accept') : undefined}
+				onPress={name && readable ? () => void respond('accept') : undefined}
 			/>
-			{name ? null : <Text style={styles.caption}>{t('screens.review-invitation.name-needed')}</Text>}
+			{!readable ? (
+				<Text style={styles.caption}>{t('screens.review-invitation.cannot-accept')}</Text>
+			) : name ? null : (
+				<Text style={styles.caption}>{t('screens.review-invitation.name-needed')}</Text>
+			)}
 			<Action label={t('screens.review-invitation.refuse')} onPress={() => void respond('refuse')} secondary />
 		</ScrollView>
 	)
 }
+
+/** What the invitee decides to trust as they accept (story 08 step 3). Accepting never requires it. */
+type TrustChoice = 'neither' | 'agreement' | 'publisher'
 
 /** Only what the inviter chose to disclose — never anything the invitee typed. */
 function inviterName(invitation: OpenInvitation): string {
@@ -184,6 +235,7 @@ const make = (tokens: Tokens) => ({
 	body: { ...typography.body, color: tokens.textPrimary },
 	caption: { ...typography.caption, color: tokens.textSecondary },
 	meta: { ...typography.small, color: tokens.textSecondary },
+	warn: { ...typography.caption, color: tokens.negative },
 	input: {
 		...typography.body,
 		color: tokens.textPrimary,

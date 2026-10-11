@@ -9,6 +9,7 @@ dependsOn:
   - design/specs/mobile/global/ui.md
   - design/specs/mobile/global/i18n.md
   - design/specs/mobile/global/toolchain.md
+  - design/stories/mobile/08-publishers-i-trust.md
 ---
 
 # Consolidation: shared foundation
@@ -36,6 +37,7 @@ it is exactly the code twenty-five more screens will inherit.
 | `src/components/Screen.tsx` | `Loading`, `Failed`, `Empty` | `components/index.md` |
 | `src/components/ErrorBoundary.tsx` | says what failed instead of going blank | `components/index.md` |
 | `src/components/Options.tsx` | a set of choices, one or several at a time | story 42 |
+| `src/components/PublisherNote.tsx` | who stands behind an agreement, said one way everywhere | story 08 |
 | `src/components/Segmented.tsx` | one choice from a few, in a row rather than a column | story 43 |
 | `src/components/Input.tsx` | a labelled text field | — |
 | `src/components/index.ts` | the barrel every screen imports from | — |
@@ -45,6 +47,7 @@ it is exactly the code twenty-five more screens will inherit.
 | `src/data/config.ts` | the one mock/engine switch | `interfaces.md` § Run modes |
 | `src/data/types.ts` | app-side shapes mirroring the domain contract | `interfaces.md` |
 | `src/data/party.ts` | who this party is; the first adapter that writes | `interfaces.md` |
+| `src/data/publishers.ts` | the publishers this party trusts (story 08) | `interfaces.md` § Agreements |
 | `src/i18n/index.ts` | i18next behind a two-function surface: keys in, text out | `global/i18n.md` |
 | `src/i18n/intl.ts` | the `Intl` polyfill chain Hermes needs, loaded before any string | `global/i18n.md` |
 | `jest.setup.js` | strips what Hermes lacks so tests run the device's runtime | — |

@@ -72,6 +72,12 @@ Phases are defined in `appeus/docs/DESIGN.md` (authoritative).
   can read without doing arithmetic, setting something aside without it being a refusal, and routing
   to the request itself. Story 23's claim is that nothing quietly disappears — an item leaving the
   list is an event with an outcome
+- [x] `Agreement` and `TrustedPublishers`, and contracts through `CreateInvitation`,
+  `ReviewInvitation`, `ReviewOffer`, `TallyTerms` and `Settings` (stories 01, 02, 07, 08). Agreements
+  are Stroc documents rendered natively from their numbered sections; every one shown says who
+  stands behind it (`PublisherNote`); an agreement that cannot be read in full cannot be agreed to;
+  trust is decided as the party accepts, and the list is kept for them. Importing by link is built;
+  by scanning its code waits on `Scan`
 - [ ] The remaining 5 screens in `screens/index.md`, all blocked: `PayChooser` and `Scan` on a
   platform API and on `PayThroughNetwork`; `TradingSettings`, `PayThroughNetwork` and
   `RecoverySetup` on engine decisions

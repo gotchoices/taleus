@@ -17,6 +17,9 @@ dependsOn:
   - mock/data/offer.happy.json
   - mock/data/offer.empty.json
   - mock/data/offer.superseded.json
+  - design/stories/mobile/08-publishers-i-trust.md
+  - design/stories/mobile/02-respond-to-an-invitation.md
+  - design/generated/mobile/screens/Agreement.md
 depHashes: {}
 ---
 
@@ -75,3 +78,9 @@ offer going stale, needs an expiry the app can watch rather than a fixture times
 
 `npx tsc --noEmit` clean; `npx jest` — eight tests, including that the superseded case names both
 offers and that an attention item naming `ReviewOffer` now routes there.
+
+## Contracts (2026-10-11)
+
+The offer now shows what it is made under: the agreement's title, `PublisherNote`, and a row opening
+`Agreement` with the tally. An agreement that cannot be read in full (`agreement.readable === false`)
+disables accepting, with the reason (story 02 path E); the model refuses such an accept too.

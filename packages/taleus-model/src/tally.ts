@@ -1,4 +1,7 @@
 /** tally: shapes and policy shared by every implementation of the model. */
+import type { Agreement, AgreementDocument } from './agreement.js'
+
+export type { Agreement, AgreementDocument, AgreementSection, TextRun } from './agreement.js'
 import type { Result } from './types.js'
 import {
 	type Amount,
@@ -18,26 +21,6 @@ export interface Terms {
 	effective: CivilDate
 	/** Set when a change has been agreed but has not yet taken effect. */
 	pending?: { creditLimit: Amount; noticeDays: number; effective: CivilDate }
-}
-
-export interface Agreement {
-	id: string
-	title: string
-	publisher: string
-	language: string
-}
-
-/**
- * The contract the terms are arguments to (story 07 step 5).
- *
- * A tally's terms are not the agreement: they are the figures a party filled in
- * on a document both signed. `parameters` names which figures those are, so the
- * reader can see the join rather than being asked to assume it.
- */
-export interface AgreementDocument extends Agreement {
-	version: string
-	parameters: string[]
-	sections: { heading: string; body: string }[]
 }
 
 /**
@@ -147,9 +130,10 @@ export interface TallyModel {
 	readTerms(tallyId: string): Promise<Result<TermsRecord>>
 	/**
 	 * The contract itself. Story 07's error case is this failing while the terms in
-	 * force stay readable, so it is a separate read rather than part of the tally.
+	 * force stay readable, so it is a separate read rather than part of the tally. Given the
+	 * tally, the agreement is read from the tally itself (story 07 step 5).
 	 */
-	readAgreement(agreementId: string): Promise<Result<AgreementDocument>>
+	readAgreement(agreementId: string, tallyId?: string): Promise<Result<AgreementDocument>>
 	/**
 	 * Story 05 step 1: either party may ask, without the other's agreement. A second
 	 * request changes nothing (path F) — one was already enough.

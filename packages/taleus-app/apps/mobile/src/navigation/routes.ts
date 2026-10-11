@@ -14,6 +14,11 @@ export type TalliesParams = {
 	EntryDetail: { tallyId: string; entryId: string }
 	/** Terms in force, how they got there, and the contract behind them. */
 	TallyTerms: { tallyId: string }
+	/**
+	 * An agreement, read in full (stories 01, 02, 07, 08). A tally's agreement is read from the
+	 * tally itself, so `tallyId` is passed when there is one.
+	 */
+	Agreement: { agreementId: string; tallyId?: string }
 	CreateInvitation: undefined
 	/** The universal-link landing: `https://sereus.org/taleus/invite/<token>`. */
 	ReviewInvitation: { token: string }
@@ -60,6 +65,8 @@ export type SettingsParams = {
 	Devices: undefined
 	/** The machines acting for this party, and what each contributes (story 14). */
 	Cadre: undefined
+	/** Whose agreements this party trusts (story 08). */
+	TrustedPublishers: undefined
 }
 
 /** The tabs, each holding a stack of its own. */
@@ -81,6 +88,7 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	TallyHistory: 'Tallies',
 	EntryDetail: 'Tallies',
 	TallyTerms: 'Tallies',
+	Agreement: 'Tallies',
 	CreateInvitation: 'Tallies',
 	ReviewInvitation: 'Tallies',
 	ReviewOffer: 'Tallies',
@@ -99,6 +107,7 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	Notifications: 'SettingsTab',
 	Devices: 'SettingsTab',
 	Cadre: 'SettingsTab',
+	TrustedPublishers: 'SettingsTab',
 }
 
 /**
@@ -169,6 +178,7 @@ interface ScreenPropsByRoute {
 	TallyHistory: TalliesScreenProps<'TallyHistory'>
 	EntryDetail: TalliesScreenProps<'EntryDetail'>
 	TallyTerms: TalliesScreenProps<'TallyTerms'>
+	Agreement: TalliesScreenProps<'Agreement'>
 	CreateInvitation: TalliesScreenProps<'CreateInvitation'>
 	ReviewInvitation: TalliesScreenProps<'ReviewInvitation'>
 	ReviewOffer: TalliesScreenProps<'ReviewOffer'>
@@ -199,6 +209,7 @@ interface ScreenPropsByRoute {
 	Notifications: SettingsScreenProps<'Notifications'>
 	Devices: SettingsScreenProps<'Devices'>
 	Cadre: SettingsScreenProps<'Cadre'>
+	TrustedPublishers: SettingsScreenProps<'TrustedPublishers'>
 }
 
 export type ScreenProps<R extends RouteName> = ScreenPropsByRoute[R]

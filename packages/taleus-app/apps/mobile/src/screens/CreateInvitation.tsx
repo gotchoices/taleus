@@ -1,14 +1,17 @@
 import { useCallback, useState } from 'react'
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
-import { Action, Amount, Card, Chip, Failed, Loading, Row } from '../components'
+import { Action, Amount, Card, Chip, Failed, Input as LabelledInput, Loading, OpenableRow, PublisherNote, Row } from '../components'
 import {
 	createInvitation,
+	importAgreement,
 	listAgreements,
 	listInvitations,
 	type Agreement,
+	type ImportedAgreement,
 	type Invitation,
 } from '../data/invitations'
+import { trustAgreement, trustPublisher } from '../data/publishers'
 import type { Result, Unit } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
@@ -45,7 +48,7 @@ const goodFor = [
  * note exists so a party can tell their outstanding invitations apart; it is a
  * memo, never a claim.
  */
-export function CreateInvitation(_props: Props): React.JSX.Element {
+export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 	const styles = useStyles(make)
 	const load = useCallback(async (): Promise<Result<Page>> => {
 		const [agreements, invitations] = await Promise.all([listAgreements(), listInvitations()])
@@ -67,6 +70,9 @@ export function CreateInvitation(_props: Props): React.JSX.Element {
 	const [days, setDays] = useState(1)
 	const [made, setMade] = useState<Invitation | undefined>()
 	const [failed, setFailed] = useState<string | undefined>()
+	const [link, setLink] = useState('')
+	const [found, setFound] = useState<ImportedAgreement | undefined>()
+	const [linkProblem, setLinkProblem] = useState<string | undefined>()
 
 	if (state === 'loading') {
 		return <Loading />
@@ -76,6 +82,28 @@ export function CreateInvitation(_props: Props): React.JSX.Element {
 	}
 
 	const agreement = agreementId ?? value.agreements.find(a => a.recommended)?.id ?? value.agreements[0]?.id
+	const chosen = value.agreements.find(a => a.id === agreement)
+
+	// Story 01 path F: an agreement from a link -- what its code carries.
+	const look = async () => {
+		setLinkProblem(undefined)
+		setFound(undefined)
+		const result = await importAgreement(link.trim())
+		if (!result.ok) {
+			setLinkProblem(result.error.message)
+			return
+		}
+		setFound(result.value)
+	}
+	const take = async (how: 'agreement' | 'publisher') => {
+		if (!found) return
+		if (how === 'agreement') await trustAgreement(found.id)
+		else await trustPublisher(found.publisher)
+		setAgreementId(found.id)
+		setFound(undefined)
+		setLink('')
+		reload()
+	}
 	const amount = { units: Math.round(Number(limit || '0') * divisorOf(unit)) }
 
 	const share = async () => {
@@ -151,12 +179,61 @@ export function CreateInvitation(_props: Props): React.JSX.Element {
 				label={t('screens.create-invitation.agreement-label')}
 				note={t('screens.create-invitation.agreement-note')}
 			>
-				<Choices
-					options={value.agreements.map(a => ({ key: a.id, label: a.title }))}
-					selected={agreement}
-					onSelect={setAgreementId}
-				/>
+				{value.agreements.length > 0 ? (
+					<Choices
+						options={value.agreements.map(a => ({ key: a.id, label: a.title }))}
+						selected={agreement}
+						onSelect={setAgreementId}
+					/>
+				) : (
+					<Text style={styles.caption}>{t('screens.create-invitation.agreement-none')}</Text>
+				)}
+				{chosen ? (
+					<Card>
+						<PublisherNote agreement={chosen} />
+						<OpenableRow
+							onPress={() => navigation.navigate('Agreement', { agreementId: chosen.id })}
+							accessibilityLabel={t('screens.create-invitation.agreement-read')}
+						>
+							<Text style={styles.body}>{t('screens.create-invitation.agreement-read')}</Text>
+						</OpenableRow>
+					</Card>
+				) : null}
 			</Field>
+
+			<Card title={t('screens.create-invitation.other-title')} footnote={t('screens.create-invitation.other-note')}>
+				<LabelledInput
+					label={t('screens.create-invitation.other-label')}
+					value={link}
+					onChangeText={setLink}
+					autoCapitalize="none"
+					autoCorrect={false}
+					keyboardType="url"
+				/>
+				{linkProblem ? <Text style={styles.error}>{linkProblem}</Text> : null}
+				<Action label={t('screens.create-invitation.other-look')} onPress={link.trim() ? () => void look() : undefined} secondary />
+				{found ? (
+					<View style={styles.field}>
+						<Text style={styles.body}>{found.title}</Text>
+						<PublisherNote agreement={found} />
+						<OpenableRow
+							onPress={() => navigation.navigate('Agreement', { agreementId: found.id })}
+							accessibilityLabel={t('screens.create-invitation.agreement-read')}
+						>
+							<Text style={styles.body}>{t('screens.create-invitation.agreement-read')}</Text>
+						</OpenableRow>
+						<Action label={t('screens.create-invitation.other-use')} onPress={() => void take('agreement')} />
+						{found.standing?.publisherConfirms === 'yes' && found.standing.trust === 'none' ? (
+							<Action
+								label={t('screens.create-invitation.other-trust', { publisher: found.publisher })}
+								onPress={() => void take('publisher')}
+								secondary
+							/>
+						) : null}
+						<Action label={t('screens.create-invitation.other-leave')} onPress={() => setFound(undefined)} secondary />
+					</View>
+				) : null}
+			</Card>
 
 			<Field label={t('screens.create-invitation.good-for-label')}>
 				<Choices

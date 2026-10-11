@@ -15,6 +15,8 @@ dependsOn:
   - design/stories/mobile/07-review-the-agreement.md
   - design/stories/mobile/03-negotiate-terms.md
   - design/generated/mobile/screens/TallyTerms.md
+  - design/stories/mobile/08-publishers-i-trust.md
+  - design/generated/mobile/screens/Agreement.md
 depHashes: {}
 ---
 
@@ -42,11 +44,11 @@ with nowhere to go from it.
   opposite — there is no runway to shorten, so the reduction applies at once (paths D and E).
 - **A proposal is not history.** `proposals` is a separate field for that reason. Nothing about a
   proposal changes what either party may do today, and the card says so.
-- **The contract is a separate read, allowed to fail.** Story 07's error case is exactly this: the
-  document unavailable while the terms in force stay readable, because those are this party's own
-  record. `readAgreement` is retryable and the card offers it.
-- **The terms are shown as arguments to the contract.** Step 5. The document names its parameters and
-  the screen says which figures above filled them, rather than leaving the join to be assumed.
+- **The contract is named here and read on `Agreement`.** The card shows its title and
+  `PublisherNote`, and opens `Agreement` with the tally, which reads the document from the tally
+  itself (story 07 step 5). The terms in force no longer wait on the document at all, so story 07's
+  error case (the contract unreadable, the terms readable) holds by construction; the failure and its
+  retry are `Agreement`'s. Which figures fill the contract in is said there too.
 - **Figures are rendered, never interpolated.** `amountText` returns the *spoken* form, which puts a
   decimal point back into the sentence — the one notation this app does not use. Every figure here
   goes through `Amount`, so "Becomes, on Oct 1" carries a rendered fraction rather than a string.
@@ -65,3 +67,8 @@ which exercises the same state-independence.
 - `npx tsc --noEmit` clean; `npx jest` 116 tests in 14 suites; `npm run lint` no errors.
 - Ten tests in `__tests__/terms.test.tsx`, one per acceptance criterion this screen owns.
 - Captured on `emulator-5566`.
+
+## Contracts (2026-10-11)
+
+The inline document (flat heading/body sections) gave way to the `Agreement` screen once agreements
+became Stroc documents with numbered, nested sections and a publisher's standing (story 08).

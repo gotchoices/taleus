@@ -156,6 +156,13 @@ export function Settings({ navigation }: Props): React.JSX.Element {
 					<Text style={styles.meta}>{t('screens.settings.about-me-note')}</Text>
 				</OpenableRow>
 				<OpenableRow
+					onPress={() => navigation.navigate('TrustedPublishers')}
+					accessibilityLabel={t('screens.settings.publishers-open')}
+				>
+					<Text style={styles.body}>{t('screens.settings.publishers-open')}</Text>
+					<Text style={styles.meta}>{t('screens.settings.publishers-note')}</Text>
+				</OpenableRow>
+				<OpenableRow
 					onPress={() => navigation.navigate('StandingInvitation')}
 					accessibilityLabel={t('screens.settings.standing-open')}
 				>

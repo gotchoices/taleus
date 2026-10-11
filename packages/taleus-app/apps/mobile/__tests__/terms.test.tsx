@@ -73,25 +73,27 @@ test('a tally nobody has amended says so, without a fixture saying it twice', as
 	await waitFor(() => expect(view.getByText(/Neither of you has changed them/)).toBeTruthy())
 })
 
-test('the contract is identifiable, readable, and joined to the figures', async () => {
-	const view = await renderScreen(<TallyTerms {...termsProps('tally:sam-bike')} />)
+test('the contract is named, with who published it, and opens to be read from the tally', async () => {
+	const navigate = jest.fn()
+	const view = await renderScreen(<TallyTerms {...termsProps('tally:sam-bike', navigate)} />)
 	await waitFor(() => expect(view.getByText('Standard Tally Agreement')).toBeTruthy())
-	expect(view.getByText(/taleus.org · version 1.0 · en/)).toBeTruthy()
-	// Step 5: the terms are arguments to it, and the reader can see which.
-	expect(view.getByText(/what you filled in on it: the limit, the notice period/)).toBeTruthy()
-	expect(view.getByText('What each may be owed')).toBeTruthy()
+	expect(view.getByText('Published by taleus.org')).toBeTruthy()
+	fireEvent.press(view.getByLabelText('Read the agreement'))
+	// Story 07 step 5: read from the tally itself, so the tally travels with it.
+	expect(navigate).toHaveBeenCalledWith('Agreement', {
+		agreementId: 'cid:bafy-standard-tally-v1',
+		tallyId: 'tally:sam-bike',
+	})
 })
 
-test('a contract that cannot be fetched leaves the terms readable', async () => {
+test('the terms stay readable whether or not the contract can be', async () => {
 	setVariant('error')
 	const document = await readAgreement('cid:bafy-standard-tally-v1')
 	expect(document.ok).toBe(false)
 	const view = await renderScreen(<TallyTerms {...termsProps('tally:sam-bike')} />)
-	await waitFor(() => expect(view.getByText(/could not be fetched right now/)).toBeTruthy())
 	// The terms in force are this party's own record and do not depend on it.
-	expect(view.getByText('In force today')).toBeTruthy()
+	await waitFor(() => expect(view.getByText('In force today')).toBeTruthy())
 	expect(view.getAllByText('I let Sam Ortiz owe me').length).toBeGreaterThan(0)
-	expect(view.getByText('Try again')).toBeTruthy()
 })
 
 test('the counterparty’s disclosure is their claim, and openable', async () => {

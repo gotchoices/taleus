@@ -1,18 +1,16 @@
 import { useCallback } from 'react'
 import { ScrollView, Text, View } from 'react-native'
 
-import { Action, Amount, Card, Chip, Failed, Loading, OpenableRow, Row } from '../components'
+import { Amount, Card, Chip, Failed, Loading, OpenableRow, PublisherNote, Row } from '../components'
 import {
-	readAgreement,
 	readTally,
 	readTerms,
-	type AgreementDocument,
 	type TallyDetail,
 	type TermsChange,
 	type TermsProposal,
 	type TermsRecord,
 } from '../data/tally'
-import type { DataError, Result, Unit } from '../data/types'
+import type { Result, Unit } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
 import type { ScreenProps } from '../navigation/routes'
@@ -25,9 +23,6 @@ type Props = ScreenProps<'TallyTerms'>
 interface TermsPage {
 	tally: TallyDetail
 	terms: TermsRecord
-	agreement?: AgreementDocument
-	/** Why the contract is missing, when it is. The terms still read. */
-	agreementError?: DataError
 }
 
 /**
@@ -54,18 +49,7 @@ export function TallyTerms({ route, navigation }: Props): React.JSX.Element {
 		if (!terms.ok) {
 			return terms
 		}
-		// The contract is fetched separately and is allowed to fail: story 07's
-		// error case is exactly this, with the terms in force still readable.
-		const document = await readAgreement(detail.value.agreement.id)
-		return {
-			ok: true,
-			value: {
-				tally: detail.value,
-				terms: terms.value,
-				agreement: document.ok ? document.value : undefined,
-				agreementError: document.ok ? undefined : document.error,
-			},
-		}
+		return { ok: true, value: { tally: detail.value, terms: terms.value } }
 	}, [tallyId])
 
 	const { state, value, error, reload } = useLoad(load)
@@ -77,7 +61,8 @@ export function TallyTerms({ route, navigation }: Props): React.JSX.Element {
 		return <Failed title={t('screens.tally-terms.unreadable-title')} error={error} onRetry={reload} />
 	}
 
-	const { tally, terms, agreement, agreementError } = value
+	const { tally, terms } = value
+	const { agreement } = tally
 	const name = tally.counterparty.name
 	const today = new Date().toISOString().slice(0, 10)
 	// Soonest first: these are read as "next this happens, then that", which is
@@ -166,41 +151,19 @@ export function TallyTerms({ route, navigation }: Props): React.JSX.Element {
 				))}
 			</Card>
 
-			{agreement ? (
-				<Card title={t('screens.tally-terms.agreement')}>
-					<Text style={styles.body}>{agreement.title}</Text>
-					<Text style={styles.meta}>
-						{t('screens.tally-terms.agreement-meta', {
-							publisher: agreement.publisher,
-							version: agreement.version,
-							language: agreement.language,
-						})}
-					</Text>
-					{/* Step 5: the terms are arguments to this document, and the reader
-					    can see which arguments rather than being asked to assume it. */}
-					<Text style={styles.caption}>
-						{t('screens.tally-terms.agreement-parameters', {
-							fields: agreement.parameters.map(termLabel).join(', '),
-						})}
-					</Text>
-					{agreement.sections.map(section => (
-						<View key={section.heading} style={styles.block}>
-							<Text style={styles.heading}>{section.heading}</Text>
-							<Text style={styles.body}>{section.body}</Text>
-						</View>
-					))}
-				</Card>
-			) : (
-				<Card title={t('screens.tally-terms.agreement')}>
-					<Text style={styles.caption}>{t('screens.tally-terms.agreement-unavailable')}</Text>
-					{agreementError?.message ? (
-						<Text style={styles.meta}>{agreementError.message}</Text>
-					) : null}
-					{agreementError?.retryable ? (
-						<Action label={t('screens.tally-terms.agreement-retry')} onPress={reload} secondary />
-					) : null}
-				</Card>
-			)}
+			{/* Step 5: which contract the terms are arguments to, and who stands behind it. The
+			    text itself is the Agreement screen's, read from the tally; reading it there may
+			    fail (story 07's error case) while these terms stay readable here. */}
+			<Card title={t('screens.tally-terms.agreement')}>
+				<Text style={styles.body}>{agreement.title}</Text>
+				<PublisherNote agreement={agreement} />
+				<OpenableRow
+					onPress={() => navigation.navigate('Agreement', { agreementId: agreement.id, tallyId: tally.id })}
+					accessibilityLabel={t('screens.tally-terms.agreement-read')}
+				>
+					<Text style={styles.body}>{t('screens.tally-terms.agreement-read')}</Text>
+				</OpenableRow>
+			</Card>
 
 			<Card title={t('screens.tally-terms.who', { name })} footnote={t('screens.tally-terms.who-note')}>
 				{Object.entries(tally.counterparty.disclosed ?? {}).map(([field, disclosed]) => (
@@ -333,11 +296,6 @@ function notice(days: number): string {
 	return t('screens.tally-terms.notice', { count: days, days })
 }
 
-/** A contract's parameter, named the way the terms above name it. */
-function termLabel(parameter: string): string {
-	return parameter === 'creditLimit' ? 'the limit' : 'the notice period'
-}
-
 const make = (tokens: Tokens) => ({
 	screen: { flex: 1, backgroundColor: tokens.background },
 	content: { padding: spacing[3], gap: spacing[3] },
@@ -349,7 +307,6 @@ const make = (tokens: Tokens) => ({
 		alignItems: 'center' as const,
 		gap: spacing[2],
 	},
-	heading: { ...typography.small, color: tokens.textSecondary },
 	body: { ...typography.body, color: tokens.textPrimary, flexShrink: 1 },
 	caption: { ...typography.caption, color: tokens.textSecondary },
 	meta: { ...typography.small, color: tokens.textSecondary },

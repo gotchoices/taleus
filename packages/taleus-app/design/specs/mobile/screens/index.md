@@ -18,7 +18,7 @@ and should not acquire one.
 | Tally history | TallyHistory | — | 24 | happy, empty, error | generated |
 | Entry detail | EntryDetail | — | 24 | happy, error | generated |
 | Tally terms | TallyTerms | — | 07, 03 | happy, error | generated |
-| Agreement | Agreement | — | 01, 02, 07, 08 | happy, error | draft |
+| Agreement | Agreement | — | 01, 02, 07, 08 | happy, error | generated |
 | Trading settings | TradingSettings | — | 31 | happy, empty | draft |
 | Close tally | CloseTally | — | 05 | happy, closing | generated |
 | Create invitation | CreateInvitation | — | 01 | happy, empty | generated |
@@ -42,7 +42,7 @@ and should not acquire one.
 | Cadre | Cadre | — | 14, 51 | happy, empty | generated |
 | Recovery setup | RecoverySetup | — | 12, 50 | happy, error | draft |
 | Notifications | Notifications | — | 43 | happy, error | generated |
-| Trusted publishers | TrustedPublishers | — | 08, 42 | happy, empty | draft |
+| Trusted publishers | TrustedPublishers | — | 08, 42 | happy, empty | generated |
 
 ## Suggested slice order
 

@@ -1,14 +1,8 @@
 /** invitations: shapes and policy shared by every implementation of the model. */
+import type { Agreement, ImportedAgreement } from './agreement.js'
 import type { Amount, Counterparty, Instant, Result, Unit } from './types.js'
 
-export interface Agreement {
-	id: string
-	title: string
-	publisher: string
-	language: string
-	summary?: string
-	recommended?: boolean
-}
+export type { Agreement, ImportedAgreement } from './agreement.js'
 
 /** An invitation this party issued. No tally exists until someone responds. */
 export interface Invitation {
@@ -56,22 +50,15 @@ export interface Response {
 }
 
 /** What a screen can read and do about invitations. Both the mock and the engine implement it. */
-/** An agreement the party brought in from a link or QR code. */
-export interface ImportedAgreement extends Agreement {
-	/** Whether the domain the agreement names as its author lists it as its own. */
-	authorConfirmed: boolean
-	/** Where it was found; this device now looks there for documents too. */
-	source: string
-}
-
 export interface InvitationsModel {
 	listInvitations(): Promise<Result<Invitation[]>>
-	/** The agreements this party can offer: its sources' tally contracts and any it imported. */
+	/** The agreements this party can offer: its trusted publishers' tally contracts, and any it trusts alone. */
 	listAgreements(): Promise<Result<Agreement[]>>
 	/**
 	 * Bring in an agreement from a link to a published document (`https://<host>/ipfs/<cid>`, what
 	 * a contract's QR code carries): it is fetched with everything it includes, checked against its
-	 * CID, kept on this device, and offered from then on.
+	 * CID, and kept on this device. Nothing is trusted by importing it: its `standing` says who
+	 * stands behind it, and the party then decides (`publishers`).
 	 */
 	importAgreement(link: string): Promise<Result<ImportedAgreement>>
 	/**

@@ -14,6 +14,8 @@ dependsOn:
   - design/generated/mobile/foundation.md
   - design/stories/mobile/42-settings.md
   - design/generated/mobile/screens/Settings.md
+  - design/stories/mobile/08-publishers-i-trust.md
+  - design/generated/mobile/screens/TrustedPublishers.md
 depHashes: {}
 ---
 
@@ -66,3 +68,7 @@ both error states are reached by interaction rather than by a different world.
 - `npx tsc --noEmit` clean; `npx jest` 102 tests in 13 suites; `npm run lint` no errors.
 - Seven tests in `__tests__/settings.test.tsx`, one per acceptance criterion that is this screen's.
 - Captured on `emulator-5566`.
+
+## Contracts (2026-10-11)
+
+A row opens `TrustedPublishers` (story 08): whose agreements this party accepts without a warning.

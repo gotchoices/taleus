@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { ScrollView, Text, TextInput, View } from 'react-native'
 
-import { Action, Amount, Card, Empty, Failed, Loading, Row, unitNamesFor } from '../components'
+import { Action, Amount, Card, Empty, Failed, Loading, OpenableRow, PublisherNote, Row, unitNamesFor } from '../components'
 import { readOffer, respondToOffer, type Change, type Offer, type ProposedTerms } from '../data/offers'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
@@ -28,7 +28,7 @@ type Props = ScreenProps<'ReviewOffer'>
  * the notice period, nothing else. A screen that only showed the new terms would
  * make the reader diff two offers in their head.
  */
-export function ReviewOffer({ route }: Props): React.JSX.Element {
+export function ReviewOffer({ route, navigation }: Props): React.JSX.Element {
 	const styles = useStyles(make)
 	const { tallyId } = route.params
 	const { state, value, error, reload } = useLoad(useCallback(() => readOffer(tallyId), [tallyId]))
@@ -73,6 +73,8 @@ export function ReviewOffer({ route }: Props): React.JSX.Element {
 			setOutcome(result.value)
 		}
 	}
+	// Story 02 path E: nobody should be bound by text they cannot read.
+	const readable = value.agreement.readable !== false
 
 	return (
 		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -123,13 +125,29 @@ export function ReviewOffer({ route }: Props): React.JSX.Element {
 				<Text style={styles.caption}>{t('screens.review-offer.unit-fixed')}</Text>
 			</Card>
 
+			{/* What the terms are arguments to, and who stands behind it (stories 03, 08). */}
+			<Card title={t('screens.review-offer.agreement-title')}>
+				<Text style={styles.body}>{value.agreement.title}</Text>
+				<PublisherNote agreement={value.agreement} />
+				{readable ? (
+					<OpenableRow
+						onPress={() => navigation.navigate('Agreement', { agreementId: value.agreement.id, tallyId })}
+						accessibilityLabel={t('screens.review-offer.agreement-read')}
+					>
+						<Text style={styles.body}>{t('screens.review-offer.agreement-read')}</Text>
+					</OpenableRow>
+				) : (
+					<Text style={styles.warn}>{t('screens.review-offer.agreement-unreadable')}</Text>
+				)}
+			</Card>
+
 			{value.expires ? (
 				<Text style={styles.caption}>
 					{t('screens.review-offer.expires', { date: formatInstant(value.expires) })}
 				</Text>
 			) : null}
 
-			<Action label={t('screens.review-offer.accept')} onPress={() => void send('accept')} />
+			<Action label={t('screens.review-offer.accept')} onPress={readable ? () => void send('accept') : undefined} />
 
 			<Card
 				title={t('screens.review-offer.counter-title')}
@@ -239,6 +257,7 @@ const make = (tokens: Tokens) => ({
 	lead: { ...typography.title, color: tokens.textPrimary },
 	body: { ...typography.body, color: tokens.textPrimary },
 	caption: { ...typography.caption, color: tokens.textSecondary },
+	warn: { ...typography.caption, color: tokens.negative },
 	input: {
 		...typography.body,
 		color: tokens.textPrimary,

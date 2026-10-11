@@ -19,6 +19,7 @@ import { Settings } from '../screens/Settings'
 import { Cadre } from '../screens/Cadre'
 import { Devices } from '../screens/Devices'
 import { Notifications } from '../screens/Notifications'
+import { Agreement } from '../screens/Agreement'
 import { StandingInvitation } from '../screens/StandingInvitation'
 import { PayPartner } from '../screens/PayPartner'
 import { CloseTally } from '../screens/CloseTally'
@@ -28,6 +29,7 @@ import { Welcome } from '../screens/Welcome'
 import { Position } from '../screens/Position'
 import { TallyHistory } from '../screens/TallyHistory'
 import { TallyTerms } from '../screens/TallyTerms'
+import { TrustedPublishers } from '../screens/TrustedPublishers'
 import { TallyList } from '../screens/TallyList'
 import { TallyView } from '../screens/TallyView'
 import { t } from '../i18n'
@@ -128,6 +130,11 @@ function TalliesStack(): React.JSX.Element {
 				name="TallyTerms"
 				component={TallyTerms}
 				options={{ title: t('screens.tally-terms.title') }}
+			/>
+			<Tallies.Screen
+				name="Agreement"
+				component={Agreement}
+				options={{ title: t('screens.agreement.title') }}
 			/>
 			<Tallies.Screen
 				name="CreateInvitation"
@@ -239,6 +246,11 @@ function SettingsRoot(): React.JSX.Element {
 				name="Cadre"
 				component={Cadre}
 				options={{ title: t('screens.cadre.title') }}
+			/>
+			<SettingsStack.Screen
+				name="TrustedPublishers"
+				component={TrustedPublishers}
+				options={{ title: t('screens.publishers.title') }}
 			/>
 		</SettingsStack.Navigator>
 	)

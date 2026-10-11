@@ -1,6 +1,12 @@
 import { createLocalWorld } from '../engine/index.js'
 import { documentLink, MemoryDocumentCache, type Fetch } from './library.js'
+import type { Result } from '../types.js'
 import { testContract } from './test-contract.js'
+
+function must<T>(result: Result<T>): T {
+	if (!result.ok) throw new Error(`${result.error.kind}: ${result.error.message}`)
+	return result.value
+}
 
 /**
  * Bringing in an agreement from a link, as a contract's QR code or share link carries it. The
@@ -26,7 +32,7 @@ async function party(fetch: Fetch) {
 }
 
 describe('importing an agreement by link', () => {
-	it('fetches it with everything it includes, keeps it, and offers it from then on', async () => {
+	it('fetches it with everything it includes and keeps it -- trusting nothing', async () => {
 		const me = await party(host())
 		const imported = await me.invitations.importAgreement(LINK)
 		expect(imported).toEqual({
@@ -36,27 +42,51 @@ describe('importing an agreement by link', () => {
 				title: CONTRACT.title,
 				publisher: 'test.invalid',
 				language: 'en',
-				// test.invalid's catalog cannot be read, so nothing confirms who issued it.
-				authorConfirmed: false,
 				source: 'docs.test',
+				// test.invalid's catalog cannot be read, so nothing confirms who published it.
+				standing: { publisherConfirms: 'unknown', trust: 'none', recommendedBy: [], status: 'unknown' },
 			},
 		})
 		const offerable = await me.invitations.listAgreements()
-		expect(offerable.ok && offerable.value.map(a => a.id)).toEqual([AGREEMENT.cid])
+		expect(offerable.ok && offerable.value).toEqual([])
+	})
+
+	it('is offered once the party trusts the agreement', async () => {
+		const me = await party(host())
+		must(await me.invitations.importAgreement(LINK))
+		must(await me.publishers.trustAgreement(AGREEMENT.cid))
+		const offerable = must(await me.invitations.listAgreements())
+		expect(offerable.map(a => [a.id, a.standing?.trust])).toEqual([[AGREEMENT.cid, 'agreement']])
 	})
 
 	it('refuses an agreement it cannot read in full', async () => {
 		const me = await party(host([AGREEMENT]))
 		const imported = await me.invitations.importAgreement(LINK)
-		expect(imported.ok || imported.error.kind).toBe('not-found')
-		const offerable = await me.invitations.listAgreements()
-		expect(offerable.ok && offerable.value).toEqual([])
+		expect(imported.ok || imported.error.kind).toBe('agreement-unreadable')
 	})
 
 	it('refuses anything that is not a link to a published document', async () => {
 		const me = await party(host())
 		const imported = await me.invitations.importAgreement('http://docs.test/ipfs/nonsense')
 		expect(imported.ok || imported.error.kind).toBe('invalid')
+	})
+})
+
+describe('the publishers a party trusts', () => {
+	it('start with sereus.org, which cannot be removed', async () => {
+		const me = await party(host())
+		expect(must(await me.publishers.listTrusted())).toEqual([{ domain: 'sereus.org', builtIn: true }])
+		const removed = await me.publishers.untrustPublisher('sereus.org')
+		expect(removed.ok || removed.error.kind).toBe('built-in')
+	})
+
+	it('can be added by name and removed again', async () => {
+		const me = await party(host())
+		const added = must(await me.publishers.trustPublisher('Fair-N-Square.org '))
+		expect(added.map(p => p.domain)).toEqual(['sereus.org', 'fair-n-square.org'])
+		expect(must(await me.publishers.untrustPublisher('fair-n-square.org')).map(p => p.domain)).toEqual(['sereus.org'])
+		const nonsense = await me.publishers.trustPublisher('not a domain')
+		expect(nonsense.ok || nonsense.error.kind).toBe('invalid')
 	})
 })
 

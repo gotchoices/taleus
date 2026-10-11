@@ -18,7 +18,10 @@ import type { Rate } from '../rates.js'
 import type { Settings } from '../settings.js'
 import type { Amount, Unit } from '../types.js'
 import { notifyWorldChanged } from '../world.js'
-import { ContractLibrary, type DocumentCache, type Fetch } from '../contracts/library.js'
+import { BUILT_IN_PUBLISHER } from '../agreement.js'
+import type { AgreementContext } from '../contracts/agreements.js'
+import { ContractLibrary, platformFetch, type DocumentCache, type Fetch } from '../contracts/library.js'
+import { StandingChecker, type Trusted } from '../contracts/standing.js'
 import type { Envelope } from './envelope.js'
 
 export interface PartyIdentity {
@@ -67,12 +70,12 @@ export interface LocalState {
 	rates: Rate[]
 	deviceName: string
 	/**
-	 * Where this device looks for contract documents it does not hold, by domain. Starts with
-	 * sereus.org; a source is added when the party imports a contract published there.
+	 * The publishers this party trusts besides sereus.org, which is built in (story 08). Their tally
+	 * contracts are offered, and their documents looked for, without the party having to ask.
 	 */
-	documentSources: string[]
-	/** Agreements the party imported by link, by CID: offered whether or not a source lists them. */
-	importedAgreements: string[]
+	trustedPublishers: { domain: string; since: string }[]
+	/** Agreements the party trusts on their own, by CID: offered, and not warned about. */
+	trustedAgreements: string[]
 }
 
 /** One durable text value the host keeps: the same shape as cadre-core's `DurableSlot`. */
@@ -122,8 +125,8 @@ export function initialLocalState(): LocalState {
 		},
 		rates: [],
 		deviceName: 'This device',
-		documentSources: ['sereus.org'],
-		importedAgreements: [],
+		trustedPublishers: [],
+		trustedAgreements: [],
 	}
 }
 
@@ -162,13 +165,28 @@ export class Session {
 
 	/** The contracts this party's tallies are made under, and where their documents come from. */
 	readonly library: ContractLibrary
+	/** What an agreement is, from this party's point of view: its text, and who stands behind it. */
+	readonly agreements: AgreementContext
 
 	constructor(readonly options: SessionOptions) {
 		this.library = new ContractLibrary({
-			sources: () => this.local.documentSources,
+			sources: () => this.trusted().publishers,
 			cache: options.documents,
 			fetch: options.fetch,
 		})
+		this.agreements = {
+			library: this.library,
+			standing: new StandingChecker(options.fetch ?? platformFetch()),
+			trusted: () => this.trusted(),
+		}
+	}
+
+	/** What this party trusts: sereus.org, the publishers it added, and agreements it trusts alone. */
+	trusted(): Trusted {
+		return {
+			publishers: [BUILT_IN_PUBLISHER, ...this.local.trustedPublishers.map(p => p.domain)],
+			agreements: this.local.trustedAgreements,
+		}
 	}
 
 	now(): Date {

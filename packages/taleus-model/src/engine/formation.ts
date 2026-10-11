@@ -1,11 +1,11 @@
 /**
  * The party, and the invitations that make tallies: who this party is, and how a tally begins.
  */
-import { agreementOf, documentLink, offerableAgreements } from '../contracts/index.js'
+import { agreementOf, agreementToDecide, documentLink, offerableAgreements, publisherDomainOf } from '../contracts/index.js'
 import type { Ask, ImportedAgreement, InvitationsModel, Invitation, OpenInvitation } from '../invitations.js'
 import type { Party, PartyModel } from '../party.js'
 import type { Result } from '../types.js'
-import { decodeEnvelope, encodeEnvelope } from './envelope.js'
+import { decodeEnvelope, encodeEnvelope, type Envelope } from './envelope.js'
 import type { Session } from './session.js'
 import { failed, ok, refused, unsupported } from './translate.js'
 
@@ -77,13 +77,7 @@ export function invitationsModel(session: Session): InvitationsModel {
 		},
 
 		async listAgreements() {
-			const listed = await offerableAgreements(session.library, session.local.documentSources, session.options.fetch)
-			const imported = await Promise.all(
-				session.local.importedAgreements
-					.filter(cid => !listed.some(agreement => agreement.id === cid))
-					.map(cid => agreementOf(session.library, cid)),
-			)
-			return ok([...listed, ...imported])
+			return ok(await offerableAgreements(session.agreements))
 		},
 
 		async importAgreement(link) {
@@ -91,23 +85,20 @@ export function invitationsModel(session: Session): InvitationsModel {
 			if (!target) return failed<ImportedAgreement>('invalid', 'that is not a link to a published document')
 			const gathered = await session.library.gather(target.cid, undefined, [target.domain])
 			if (gathered.missing.length > 0) {
-				return failed<ImportedAgreement>('not-found', `the agreement cannot be read in full from ${target.domain}`)
+				return failed<ImportedAgreement>('agreement-unreadable', `the agreement cannot be read in full from ${target.domain}`)
 			}
-			const document = (await session.library.describe(target.cid))!
-			const local = session.local
-			if (!local.documentSources.includes(target.domain)) local.documentSources.push(target.domain)
-			if (!local.importedAgreements.includes(target.cid)) local.importedAgreements.push(target.cid)
-			session.changed()
-			return ok({
-				...(await agreementOf(session.library, target.cid)),
-				authorConfirmed: await session.library.authorConfirms(document, target.cid),
-				source: target.domain,
-			})
+			// Found and kept, nothing more: whether to trust it is the party's decision (story 08).
+			return ok({ ...(await agreementOf(session.agreements, target.cid, undefined, [target.domain])), source: target.domain })
 		},
 
 		async createInvitation(draft) {
 			const engine = session.engine
 			if (!engine || !session.identity) return failed('no-identity', 'create an identity before inviting anyone')
+			// Nobody can be asked to agree to text that cannot be read in full -- not even the inviter.
+			if ((await session.library.gather(draft.agreementId)).missing.length > 0) {
+				return failed('agreement-unreadable', `the agreement ${draft.agreementId} cannot be read in full`)
+			}
+			const agreementSource = publisherDomainOf(await agreementOf(session.agreements, draft.agreementId))
 			const t0 = Date.now(); console.warn('TMPDBG invite start')
 			const invited = await engine.invite({ as: 'stock', denomination: draft.unit.denom, certificate: session.certificate() })
 			console.warn(`TMPDBG invite done ${Date.now() - t0}ms`)
@@ -125,6 +116,7 @@ export function invitationsModel(session: Session): InvitationsModel {
 				creditLimit: draft.creditLimit,
 				noticeDays: draft.noticeDays,
 				agreementId: draft.agreementId,
+				...(agreementSource ? { agreementSource } : {}),
 				expires: new Date(created.getTime() + draft.goodForDays * DAY).toISOString(),
 				...(draft.note ? { note: draft.note } : {}),
 			}
@@ -154,7 +146,7 @@ export function invitationsModel(session: Session): InvitationsModel {
 				unit: envelope.unit,
 				theirCreditLimit: envelope.creditLimit,
 				theirNoticeDays: envelope.noticeDays,
-				agreement: await agreementOf(session.library, envelope.agreementId),
+				agreement: await agreementToDecide(session.agreements, envelope.agreementId, undefined, hintOf(envelope)),
 				expires: envelope.expires,
 				asks: ASKS,
 			})
@@ -173,6 +165,10 @@ export function invitationsModel(session: Session): InvitationsModel {
 			const engine = session.engine
 			if (!engine) return failed('no-identity', 'create an identity before accepting an invitation')
 			if (!response) return failed('terms', 'accepting needs the credit you will extend in return')
+			// Story 02 path E: nobody should be bound by text they cannot read.
+			if ((await session.library.gather(envelope.agreementId, undefined, hintOf(envelope))).missing.length > 0) {
+				return failed('agreement-unreadable', 'the agreement this invitation names cannot be read in full')
+			}
 			Object.assign(session.local.disclosed, response.disclose)
 			const ticket = {
 				ref: { id: envelope.ticket.ref, ...(envelope.ticket.address ? { address: envelope.ticket.address } : {}) },
@@ -207,3 +203,8 @@ export function invitationsModel(session: Session): InvitationsModel {
 /** Standing invitations need one invitation many can take up, which Sereus does not offer yet. */
 export const standingUnsupported = <T>(): Result<T> =>
 	unsupported('A standing invitation', 'feat-standing-invitation, feat-multi-use-tally-invitation')
+
+/** Where the inviter's agreement can be fetched before the invitee holds the tally that carries it. */
+function hintOf(envelope: Envelope): string[] {
+	return envelope.agreementSource ? [envelope.agreementSource] : []
+}

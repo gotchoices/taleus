@@ -23,6 +23,11 @@ export interface Envelope {
 	creditLimit: Amount
 	noticeDays: number
 	agreementId: string
+	/**
+	 * Where the agreement is published (its publisher's domain): the invitee reads it there before
+	 * deciding, since the tally that carries it is not theirs until they accept. A hint, not a trust.
+	 */
+	agreementSource?: string
 	expires: Instant
 	note?: string
 }

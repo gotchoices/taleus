@@ -8,6 +8,8 @@ export const listInvitations = (...args: Parameters<InvitationsModel['listInvita
 	getModel().invitations.listInvitations(...args)
 export const listAgreements = (...args: Parameters<InvitationsModel['listAgreements']>): ReturnType<InvitationsModel['listAgreements']> =>
 	getModel().invitations.listAgreements(...args)
+export const importAgreement = (...args: Parameters<InvitationsModel['importAgreement']>): ReturnType<InvitationsModel['importAgreement']> =>
+	getModel().invitations.importAgreement(...args)
 export const createInvitation = (...args: Parameters<InvitationsModel['createInvitation']>): ReturnType<InvitationsModel['createInvitation']> =>
 	getModel().invitations.createInvitation(...args)
 export const readInvitation = (...args: Parameters<InvitationsModel['readInvitation']>): ReturnType<InvitationsModel['readInvitation']> =>

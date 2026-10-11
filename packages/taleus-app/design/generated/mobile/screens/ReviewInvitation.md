@@ -17,6 +17,9 @@ dependsOn:
   - design/generated/mobile/screens/ReviewInvitation.md
   - mock/data/invitation.happy.json
   - mock/data/invitation.expired.json
+  - design/stories/mobile/08-publishers-i-trust.md
+  - design/stories/mobile/01-invite-a-partner.md
+  - design/generated/mobile/screens/Agreement.md
 depHashes: {}
 ---
 
@@ -57,8 +60,8 @@ the same screen answers a real invitation and a scenario link.
 Countering — changing the terms, which makes it the invitee's offer (path A) — is story 03 and
 `ReviewOffer`. The screen says so rather than offering a button.
 
-Reading the agreement in full (step 4) shows its title, publisher, language and a summary; the
-document itself belongs to `TallyTerms`. Step 2, a person without the app being told what Taleus is,
+Reading the agreement in full (step 4) opens `Agreement`; this screen shows its title, summary and
+`PublisherNote`. Step 2, a person without the app being told what Taleus is,
 is the web page in `taleus/web`, not this screen. Step 8 — the inviter told what was disclosed and
 proposed — is `Attention`'s and the notification work.
 
@@ -66,3 +69,16 @@ proposed — is `Attention`'s and the notification work.
 
 `npx tsc --noEmit` clean; `npx jest` covers terms-before-disclosure, needed vs offered, accept
 requiring a name, zero credit accepted untouched, refusal finality, and the expired screen.
+
+## Contracts (2026-10-11)
+
+- **Who stands behind it, before anything is asked.** The agreement card carries `PublisherNote`
+  (story 02 step 4, story 08) and opens `Agreement`.
+- **An agreement that cannot be read in full cannot be accepted** (story 02 path E). The model reads
+  it before accepting — from the invitation's `agreementSource` hint, since the tally that carries it
+  is not the invitee's yet — and marks `agreement.readable`. Accept is disabled with the reason;
+  refusing stays available. The model refuses such an accept as well.
+- **The trust choice is asked as the party accepts** (story 08 step 3): only for an agreement nobody
+  vouched for to them (`standing.trust === 'none'`), never when the claimed publisher does not stand
+  behind it (path B), and "trust the publisher" only when the publisher confirmed it. Neither is the
+  default; accepting never requires trusting. Applied after a successful accept.

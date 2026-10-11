@@ -196,8 +196,8 @@ needed. A tally whose contract cannot be read in full is a reason to decline it.
 - [x] Documents drafted, published, served by sereus.org; `@stroc/cli` installed (`yarn stroc`).
 - [x] **Stroc collections** (Stroc 0.3, catalog 1.1): `contracts/.stroc.yaml` lists the Courts and
   Arbitration agreements in `tally-contracts`; the model offers each source's current entries of it.
-- [ ] **Publish** the catalog with collections (`contracts/publish.sh`): until then the live catalog
-  is 1.0 and the app offers only agreements imported by link.
+- [x] **Published** the catalog with collections (catalog 1.1, 2026-10-10): the S7 lists Courts and
+  Arbitration from sereus.org.
 - [ ] **Upstream: `cid()` names dag-json** (gotchoices/Optimystic#33, open): the crypto plugin's
   `cid()` already builds CIDv1s and lacked only Stroc's codec. Once released, `Document`'s interim
   `CidFormat` becomes `check (Cid = cid(Json, 'dag-json'))`. Until then every reader verifies.
@@ -219,18 +219,20 @@ needed. A tally whose contract cannot be read in full is a reason to decline it.
     (`feat-offer-lifecycle`).
 - [x] **Phone spike** (S7, 2026-10-10): listing sereus.org's agreements 27 s cold, 9 s warm; composing
   the Courts agreement (11 sections) 4 s from the device cache. Stroc runs in the app as is.
-- [ ] **Native rendering** of the review screens from Stroc's layout model, with "issued by
-  <domain>" and "you have read this before".
+- [x] **Native rendering and the contract screens** (2026-10-11): `Agreement` (numbered sections from
+  Stroc's composition, included documents marked, unreadable stated) and `TrustedPublishers`;
+  `PublisherNote` on every agreement shown; contracts through `CreateInvitation` (trusted
+  publishers' agreements, import by link), `ReviewInvitation` (trust asked on accepting, unreadable
+  blocks accepting), `ReviewOffer`, `TallyTerms`, `Settings`. Model: trusted publishers (sereus.org
+  fixed) and agreements trusted alone, each agreement's standing from publishers' catalogs, the
+  invitation's `agreementSource` hint so an invitee can read the agreement before joining. Checked on
+  the S7; app tests 200 pass in mock mode.
 - [x] **Import by link** (model, `importAgreement`; S7 3 s, author confirmed): a
   `https://<host>/ipfs/<cid>` link is fetched with its includes, verified, its author checked, kept,
   and offered from then on; the host joins the device's sources. The QR scanner itself is a screen.
-- [ ] **Design surface** (drafted 2026-10-11, revised for trusted publishers, awaiting review):
-  stories 01, 02, 07 revised and a new 08 "Publishers I trust" (see `stories/mobile/STATUS.md`);
-  new `Agreement` and `TrustedPublishers` screens, `Scan` taking an agreement's code; the agreement
-  asks and the trust model in `specs/domain/interfaces.md`. The model then owes: the device's
-  sources becoming its trusted publishers (sereus.org fixed); trusting one agreement apart from its
-  publisher; per agreement, whether its publisher stands behind it, whether it is trusted, who
-  recommends it, and its catalog status; the composed document's structure for native rendering.
+- [x] **Design surface** (2026-10-11): stories 01, 02, 07 revised and 08 "Publishers I trust" added
+  (awaiting review in `stories/mobile/STATUS.md`); `Agreement` and `TrustedPublishers` in the
+  navigation and screen plan; the agreement asks and trust model in `specs/domain/interfaces.md`.
 
 ## Negotiation gaps (app design pass, `packages/taleus-app`)
 

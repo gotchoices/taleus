@@ -8,7 +8,7 @@
  * if its bytes hash to its CID, so no source has to be trusted. Whatever is found is kept, so a
  * party holds every contract it has seen.
  */
-import { AuthorChecker, type Composed, compose, HttpResolver, type Resolver } from '@stroc/compose'
+import { type Composed, compose, HttpResolver, type Resolver } from '@stroc/compose'
 import { verifyDocument, type StrocDocument, type StrocSection } from '@stroc/core'
 import type { StoredDocument, Tally } from 'taleus-core'
 import type { DurableText } from '../engine/session.js'
@@ -150,13 +150,6 @@ export class ContractLibrary {
 				return found ? encoder.encode(found.json) : undefined
 			},
 		}
-	}
-
-	/** Whether the domain `document` names as its author lists it, under `cid`, as its own. */
-	async authorConfirms(document: StrocDocument, cid: string): Promise<boolean> {
-		const fetch = this.options.fetch ?? platformFetch()
-		const check = await new AuthorChecker({ fetch: fetch as never }).check(document, cid)
-		return check.status === 'confirmed'
 	}
 
 	private async fromTally(cid: string, tally?: Tally): Promise<StoredDocument | undefined> {

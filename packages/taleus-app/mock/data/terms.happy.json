@@ -144,24 +144,54 @@
       ],
       "sections": [
         {
-          "heading": "What this is",
-          "body": "A record of value owed between two parties, kept by both. Each entry in it is signed by the party who gave the value. Neither party keeps the only copy, and neither can alter it alone."
+          "number": "1",
+          "title": "What this is",
+          "text": [
+            {
+              "text": "A record of value owed between two parties, kept by both. Each entry in it is signed by the party who gave the value. Neither party keeps the only copy, and neither can alter it alone."
+            }
+          ],
+          "sections": []
         },
         {
-          "heading": "What each may be owed",
-          "body": "Each party states a limit: the most they are willing to be owed by the other. A party may raise their own limit at any time, and it takes effect at once. A party may lower it, and the lower figure governs activity from the day it takes effect; value already outstanding stays under the limit it was advanced under."
+          "number": "2",
+          "title": "What each may be owed",
+          "text": [
+            {
+              "text": "Each party states a limit: the most they are willing to be owed by the other. A party may raise their own limit at any time, and it takes effect at once. A party may lower it, and the lower figure governs activity from the day it takes effect; value already outstanding stays under the limit it was advanced under."
+            }
+          ],
+          "sections": []
         },
         {
-          "heading": "Notice",
-          "body": "A reduction takes effect after the notice period each party stated, counted in days from the day it was made. Where nothing is outstanding, there is no runway to shorten and the reduction applies at once."
+          "number": "3",
+          "title": "Notice",
+          "text": [
+            {
+              "text": "A reduction takes effect after the notice period each party stated, counted in days from the day it was made. Where nothing is outstanding, there is no runway to shorten and the reduction applies at once."
+            }
+          ],
+          "sections": []
         },
         {
-          "heading": "Closing",
-          "body": "Either party may ask to close at any time, without the other agreeing. Closing stops new value from being added. What is owed does not go away, and closing does not forgive it."
+          "number": "4",
+          "title": "Closing",
+          "text": [
+            {
+              "text": "Either party may ask to close at any time, without the other agreeing. Closing stops new value from being added. What is owed does not go away, and closing does not forgive it."
+            }
+          ],
+          "sections": []
         },
         {
-          "heading": "Disputes",
-          "body": "The record is what both parties signed. A party who disagrees with an entry may say so on the tally; nothing is removed, and both statements stand."
+          "number": "5",
+          "title": "Disputes",
+          "text": [
+            {
+              "text": "The record is what both parties signed. A party who disagrees with an entry may say so on the tally; nothing is removed, and both statements stand."
+            }
+          ],
+          "sections": []
         }
       ]
     }

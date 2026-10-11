@@ -116,9 +116,10 @@ async function engineOn(node: CadreNode, options: { acceptOffers?: boolean; iden
 	let identity = options.identity
 	const engine = await createEngineModel({
 		store: cadreStoreProvider({ node, sApp: TALEUS_SAPP, pollMs: 0, disclosure: { purpose: 'tally' } }),
-		// Only the inviter holds the contract: the invitee has to read it from the tally.
+		// Only the inviter holds the contract. The invitee reads it from its publisher before
+		// accepting (the invitation's hint), and from the tally itself once seated.
 		documents: options.holdsContract ? CONTRACT.cache() : undefined,
-		fetch: offline,
+		fetch: options.holdsContract ? offline : CONTRACT.publisher,
 		acceptOffers: options.acceptOffers,
 		identity: options.identity,
 		onIdentityCreated: created => {
