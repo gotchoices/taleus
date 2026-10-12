@@ -274,7 +274,7 @@ export class Session {
 		if (!this.engine) return undefined
 		const cached = this.tallies.get(id)
 		if (cached) return cached
-		const known = (await this.engine.tallies()).some(t => t.ref.id === id)
+		const known = (await this.options.store.list()).some(ref => ref.id === id)
 		if (!known) return undefined
 		const opened = await this.engine.open({ id })
 		this.tallies.set(id, opened)

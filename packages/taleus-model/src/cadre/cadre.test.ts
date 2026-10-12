@@ -71,6 +71,11 @@ class Device {
 		this.strandNetworkState = new MemoryStrandNetworkStateStore(partyId)
 	}
 
+	/** Lose every block this device holds for scopes naming `id`, as a reinstall that kept its records would. */
+	forget(id: string): void {
+		for (const scope of [...this.storage.keys()]) if (scope.includes(id)) this.storage.delete(scope)
+	}
+
 	storageFor(scope: string): MemoryRawStorage {
 		let storage = this.storage.get(scope)
 		if (!storage) {
@@ -200,5 +205,39 @@ describe('a tally formed through the engine, on real strands', () => {
 
 		must(await me.model.entries.recordEntry(tallyId, { actId: 'act:2', amount: usd(500), memo: 'Refund' }))
 		await waitUntil('a new entry reaches the restarted invitee', async () => (await balanceOf(again)) === 1300)
+	}, LIFECYCLE_MS * 3)
+
+	it('answers at once for a tally whose only partner is gone before this machine holds it', async () => {
+		const tag = Date.now()
+		const inviterDevice = new Device(`taleus-gone-${tag}`)
+		const inviteeDevice = new Device(`taleus-left-${tag}`)
+		const inviter = await inviterDevice.start()
+		let invitee = await inviteeDevice.start(controlAddrs(inviter))
+		nodes.push(inviter, invitee)
+
+		const me = (await engineOn(inviter, { holdsContract: true })).engine
+		const first = await engineOn(invitee, { acceptOffers: true })
+		engines.push(me, first.engine)
+		const tallyId = await openTally(me, first.engine)
+
+		// The inviter is wiped for good; the invitee comes back over records that name the strand
+		// but without its blocks. The strand can never finish a first sync now.
+		const goneAddrs = controlAddrs(inviter)
+		await me.stop()
+		await inviter.stop()
+		await first.engine.stop()
+		await invitee.stop()
+		inviteeDevice.forget(tallyId)
+		invitee = await inviteeDevice.start(goneAddrs)
+		nodes.push(invitee)
+		const again = (await engineOn(invitee, { identity: first.identity() })).engine
+		engines.push(again)
+
+		const relaunched = invitee
+		await waitUntil('the node relaunches the strand, gated', async () => relaunched.getStrands().get(tallyId)?.status === 'syncing')
+		const started = Date.now()
+		expect(must(await again.model.tallies.listTallies())).toEqual([])
+		expect(must(await again.model.invitations.listInvitations())).toEqual([])
+		expect(Date.now() - started).toBeLessThan(CONVERGE_MS)
 	}, LIFECYCLE_MS * 3)
 })

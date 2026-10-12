@@ -683,6 +683,11 @@ export interface TallyStore {
 }
 
 export interface StoreProvider {
+	/**
+	 * The tallies this party can read now. A strand still waiting for its first sync is left out
+	 * until it can be read: one whose only other member is gone may wait forever, and a list
+	 * must not wait with it.
+	 */
 	list(): Promise<TallyRef[]>
 	open(ref: TallyRef): Promise<TallyStore>
 	/** Form a new strand, seat the creator, and return a store bound to it. */

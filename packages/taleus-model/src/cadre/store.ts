@@ -83,7 +83,8 @@ class CadreStoreProvider implements StoreProvider {
 	}
 
 	async list(): Promise<TallyRef[]> {
-		return [...this.options.node.getStrands().keys()].map(id => ({ id }))
+		const strands = [...this.options.node.getStrands().values()]
+		return strands.filter(strand => strand.database).map(strand => ({ id: strand.strandId }))
 	}
 
 	async open(ref: TallyRef): Promise<TallyStore> {

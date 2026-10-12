@@ -1213,12 +1213,14 @@ class TaleusEngine implements Taleus {
 		const subscriptions = new Map<string, Unsubscribe>()
 		this.listeners.set(listener, subscriptions)
 		let live = true
-		void (async () => {
-			for (const ref of await this.env.store.list()) {
-				if (!live) return
-				await this.subscribe(listener, subscriptions, ref)
-			}
-		})()
+		void this.env.store.list().then(
+			refs => {
+				for (const ref of refs) {
+					if (live) void this.subscribeLogged(listener, subscriptions, ref)
+				}
+			},
+			error => console.warn('taleus-core: listing tallies to watch failed:', error),
+		)
 		return () => {
 			live = false
 			this.listeners.delete(listener)
@@ -1231,6 +1233,19 @@ class TaleusEngine implements Taleus {
 	private async attach(ref: TallyRef): Promise<void> {
 		for (const [listener, subscriptions] of this.listeners) {
 			await this.subscribe(listener, subscriptions, ref)
+		}
+	}
+
+	/** `subscribe`, where one tally that cannot be opened is reported and never stops the rest. */
+	private async subscribeLogged(
+		listener: (change: Change) => void,
+		subscriptions: Map<string, Unsubscribe>,
+		ref: TallyRef,
+	): Promise<void> {
+		try {
+			await this.subscribe(listener, subscriptions, ref)
+		} catch (error) {
+			console.warn(`taleus-core: watching tally ${ref.id} failed:`, error)
 		}
 	}
 
