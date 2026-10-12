@@ -43,11 +43,12 @@ export const linking: LinkingOptions<TabParams & OnboardingParams> = {
 					CreateRequest: 'screen/CreateRequest/:tallyId',
 					RequestView: 'screen/RequestView/:requestId',
 					CloseTally: 'screen/CloseTally/:tallyId',
-					// Two ways in: the scenario/deep-link form, and the universal link
-					// a person is actually sent (`navigation.md` § Deep Links).
+					// Three ways in: the scenario/deep-link form, the universal link a
+					// person is actually sent, and `taleus://invite/<token>`, which the
+					// web page's "Open it" launches (`navigation.md` § Deep Links).
 					ReviewInvitation: {
 						path: 'screen/ReviewInvitation/:token',
-						alias: ['/taleus/invite/:token'],
+						alias: ['/taleus/invite/:token', 'invite/:token'],
 					},
 				},
 			},

@@ -2,7 +2,7 @@
  * The one place that defines Taleus's invitation link: `https://sereus.org/taleus/invite/#<token>`.
  *
  * With the app installed, the phone hands the link to the app and the server is never asked. Without
- * it, the browser loads the static page at `/taleus/invite/` (`web/invite.html`), which reads the
+ * it, the browser loads the static page at `/taleus/invite/` (`web/invite/index.html`), which reads the
  * token in the browser and offers the app.
  *
  * THE TOKEN GOES AFTER `#`. An invitation is a bearer credential -- it carries the secret to the open

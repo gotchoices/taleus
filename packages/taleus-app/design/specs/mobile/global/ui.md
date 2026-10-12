@@ -73,8 +73,9 @@ Cross-screen conventions, so thirty screens do not each invent one.
 - **Touch targets**: 44pt minimum (48dp on Android), whatever the text size.
 - **Tally states and waiting-on** appear as filled chips, not inline gray text — the *waiting on me*
   case is what a party opened the app to find.
-- **Icons** appear in four places and nowhere else: the tab bar (always with its label), the row
-  chevron, the direction of an amount, and state chips. An icon without a label must be one every
+- **Icons** appear in five places and nowhere else: the tab bar (always with its label), the row
+  chevron, the direction of an amount, state chips, and a large `add` in the upper right of a list
+  that can be added to (labelled for accessibility). An icon without a label must be one every
   user already knows.
 - **Accessibility** is not deferred: roles on anything actionable, selected state on the active tab,
   and an amount's direction in its label, not only in its color.

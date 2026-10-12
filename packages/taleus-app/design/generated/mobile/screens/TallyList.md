@@ -59,6 +59,13 @@ depHashes: {}
 - **States and *needs you* are chips, not grey text.** Invisible on a list of forty, which is exactly
   the case story 06 path A is about.
 
+## Starting another tally
+
+A large `+` (Ionicons `add`) in the header's upper right opens `CreateInvitation`, as well as the
+empty state's "Invite someone": the empty state was the only way in, so a party's second tally had
+none. In the header, not at the foot of the list, so it stays in reach however long the list grows.
+It is set from the screen (`navigation.setOptions`), which owns the navigation it uses.
+
 ## Not built here
 
 Sorting, filtering, and search (story 06); the cross-unit estimate, which belongs to `Position` and is

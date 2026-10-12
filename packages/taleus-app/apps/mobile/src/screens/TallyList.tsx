@@ -1,5 +1,6 @@
-import { useCallback } from 'react'
-import { FlatList, Text, View } from 'react-native'
+import Ionicons from '@react-native-vector-icons/ionicons'
+import { useCallback, useLayoutEffect } from 'react'
+import { FlatList, Pressable, Text, View } from 'react-native'
 
 import { Action, Amount, Chip, Empty, Failed, Loading, OpenableRow } from '../components'
 import { listTallies } from '../data/tallies'
@@ -7,7 +8,7 @@ import type { TallySummary } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
 import type { ScreenProps } from '../navigation/routes'
-import { useStyles, spacing, type as typography, type Tokens } from '../theme'
+import { useStyles, useTokens, spacing, type as typography, type Tokens } from '../theme'
 import { formatInstant } from '../util/date'
 
 type Props = ScreenProps<'TallyList'>
@@ -22,6 +23,13 @@ type Props = ScreenProps<'TallyList'>
 export function TallyList({ navigation }: Props): React.JSX.Element {
 	const styles = useStyles(make)
 	const { state, value, error, reload } = useLoad(useCallback(() => listTallies(), []))
+	const tokens = useTokens()
+
+	useLayoutEffect(() => {
+		navigation.setOptions({
+			headerRight: () => <AddTally color={tokens.accent} onPress={() => navigation.navigate('CreateInvitation')} />,
+		})
+	}, [navigation, tokens.accent])
 
 	if (state === 'loading') {
 		return <Loading />
@@ -38,7 +46,7 @@ export function TallyList({ navigation }: Props): React.JSX.Element {
 				body={t('screens.tally-list.empty-body')}
 			>
 				<Action
-					label={t('screens.tally-list.empty-invite')}
+					label={t('screens.tally-list.invite')}
 					onPress={() => navigation.navigate('CreateInvitation')}
 				/>
 				<Action label={t('screens.tally-list.empty-accept')} secondary />
@@ -59,6 +67,15 @@ export function TallyList({ navigation }: Props): React.JSX.Element {
 				)}
 			/>
 		</View>
+	)
+}
+
+/** Start another tally: in the header, so it is in reach however long the list is. */
+function AddTally({ color, onPress }: { color: string; onPress: () => void }): React.JSX.Element {
+	return (
+		<Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={t('screens.tally-list.invite')} hitSlop={8}>
+			<Ionicons name="add" size={32} color={color} />
+		</Pressable>
 	)
 }
 

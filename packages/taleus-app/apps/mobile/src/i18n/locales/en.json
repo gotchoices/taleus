@@ -2,7 +2,7 @@
   "screens.tally-list.title": "Tallies",
   "screens.tally-list.empty-title": "No tallies yet",
   "screens.tally-list.empty-body": "A tally is a running account between you and one other person. You need someone to keep one with.",
-  "screens.tally-list.empty-invite": "Invite someone",
+  "screens.tally-list.invite": "Invite someone",
   "screens.tally-list.empty-accept": "I have an invitation",
   "screens.tally-list.error-title": "Your tallies could not be read",
   "screens.tally-list.error-retry": "Try again",

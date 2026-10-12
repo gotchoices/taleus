@@ -17,7 +17,7 @@ set -eu
 #  2. The remote directory. appeus does not create it; the first rsync to a
 #     missing path fails.
 #  3. A guard on the destination. The publish is `rsync --delete`. Pointed at
-#     .../taleus it would delete index.html, invite.html, styles.css, images and
+#     .../taleus it would delete index.html, invite/, styles.css, images and
 #     the APK that web/publish.sh puts there.
 
 cd "$(dirname "$0")/.."
@@ -36,7 +36,7 @@ done
 # The destination must be a leaf of taleus's own, never the page root.
 case "${SCENARIOS_DEST##*:}" in
   */taleus) echo "Refusing: SCENARIOS_DEST is the taleus page root, and this publish deletes." >&2
-            echo "  It would remove index.html, invite.html, styles.css, images/ and the APK." >&2
+            echo "  It would remove index.html, invite/, styles.css, images/ and the APK." >&2
             echo "  Use a subdirectory, e.g. ${SCENARIOS_DEST}/preview" >&2
             exit 2 ;;
   */) echo "Refusing: SCENARIOS_DEST ends in a slash; give a directory path." >&2; exit 2 ;;

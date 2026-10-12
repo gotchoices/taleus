@@ -90,12 +90,12 @@ carries no counterparty field at all.
 |------|------|
 | `apps/mobile/src/data/inviteLink.ts` | The invitation link: build, read, and route the `#` form |
 | `apps/mobile/src/navigation/linking.ts` | Rewrites the `#` form to the path `ReviewInvitation` is routed by |
-| `web/invite.html` | Reads the token from the fragment when the app is not installed |
+| `web/invite/index.html` | Reads the token from the fragment when the app is not installed |
 
 - **Making says it is making.** Creating an invitation founds the tally's strand: a minute or more on
   a slow phone. The button reads "Making the invitation…" and a note says why.
 - **Handed over two ways, one link** (story 01 step 8, path D): a QR code of the link for someone
-  present, which their phone's own camera opens (the app if installed, `web/invite.html` if not), and
+  present, which their phone's own camera opens (the app if installed, `web/invite/index.html` if not), and
   the platform share sheet for someone apart. The link stays selectable; the share sheet offers Copy,
   so no clipboard module (and no native rebuild) was added. `react-native-qrcode-svg` draws through
   the `react-native-svg` the app already had; it is mocked in Jest, which has no asset registry.

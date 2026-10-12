@@ -1,9 +1,11 @@
+import { getStateFromPath } from '@react-navigation/native'
 import { fireEvent, waitFor } from '@testing-library/react-native'
 import { Share } from 'react-native'
 
 import { resetInvitations } from '../src/data/invitations'
 import { buildInviteLink, inviteToken, routableLink } from '../src/data/inviteLink'
 import { setVariant } from '../src/mock/variant'
+import { linking } from '../src/navigation/linking'
 import { CreateInvitation } from '../src/screens/CreateInvitation'
 import { renderScreen, screenProps } from '../testUtils'
 
@@ -37,6 +39,14 @@ describe('the invitation link', () => {
 		expect(inviteToken('https://example.com/taleus/invite/#x')).toBeUndefined()
 		expect(inviteToken('https://sereus.org/taleus/invite/')).toBeUndefined()
 	})
+})
+
+test('the web page\'s "Open it" link reaches the invitation', () => {
+	const state = getStateFromPath('invite/abc-123', linking.config)
+	const tallies = state?.routes[0]
+	expect(tallies?.name).toBe('Tallies')
+	const review = tallies?.state?.routes.at(-1)
+	expect(review).toMatchObject({ name: 'ReviewInvitation', params: { token: 'abc-123' } })
 })
 
 describe('handing an invitation over (story 01 step 8, path D)', () => {

@@ -60,6 +60,7 @@ stories in `design/stories/mobile/`; each area below names the stories it serves
   - `taleus://screen/<Route>` — scenario capture and internal links
   - `taleus://screen/<Route>?variant=happy|empty|error` — mock variant selection
   - `taleus://screen/<Route>?locale=<tag>` — locale override for capture
+  - `taleus://invite/<token>` → `ReviewInvitation` — what the invite web page's "Open it" launches
 - **Universal links**: `https://sereus.org/taleus/invite/#<token>` → `ReviewInvitation`. The token
   follows the `#` so it never reaches the server (an invitation is a bearer credential); links
   handed out earlier in the path form `/taleus/invite/<token>` still open

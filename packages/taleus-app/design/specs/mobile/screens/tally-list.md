@@ -15,6 +15,9 @@ the two places where what an agent would reasonably infer is wrong.
   combined, and the cross-unit estimate belongs to `Position`.
 - **A tally that has not begun trading is not given a balance.** An offer has no balance and is not
   "settled". Lead with the state and suppress the figure.
+- **Inviting someone stays one tap away with tallies listed.** The empty state's "Invite someone" is
+  not the only way in: a large `+` in the upper right starts another tally, wherever the list is
+  scrolled to -- not at the foot of a list that may be long.
 
 ## Notes
 

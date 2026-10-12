@@ -16,7 +16,7 @@ subdomain to provision). Three jobs, mirroring `chat/web`:
 | Path | What |
 |------|------|
 | `index.html`, `styles.css` | The landing page (indigo palette from `design/specs/mobile/global/ui.md`) |
-| `invite.html` | Fallback shown at `/taleus/invite/#<token>` when the app isn't installed |
+| `invite/index.html` | Fallback shown at `/taleus/invite/#<token>` when the app isn't installed; a plain static page, no rewrite |
 | `images/logo.svg` | App-icon composite (peach tile + mark). The mark is pasted from the canonical [`docs/images/logo4.svg`](../docs/images/logo4.svg) |
 | `.well-known/assetlinks.json` | Taleus's Android App-Links statement (merged into the apex on deploy) |
 | `.well-known/apple-app-site-association` | Taleus's iOS Universal-Links detail (merged into the apex on deploy) |
@@ -61,26 +61,13 @@ Fill in before it will verify:
 
 The app shares `https://sereus.org/taleus/invite/#<token>`: the token follows the `#`, so it never
 reaches the server or its access log (an invitation is a bearer credential), and `/taleus/invite/`
-itself is all the host serves. Links handed out earlier put the token in the path; the rewrite below
-keeps those working.
+itself is all the host serves -- `invite/index.html`, a plain static page, so no rewrite is needed
+(as `chat/invite/`). It reads the token in the browser.
 
-For the browser fallback, the host must rewrite `/taleus/invite/*` to
-`/taleus/invite.html` (which reads the token client-side). Example nginx:
-
-```nginx
-location /taleus/invite/ { try_files $uri /taleus/invite.html; }
-```
-
-Apache (`.htaccess` under the `taleus/` dir):
-
-```apache
-RewriteEngine On
-RewriteRule ^invite/.*$ /taleus/invite.html [L]
-```
-
-The "Already installed? Open it" button tries `taleus://invite/<token>`; the app's
-`linking.ts` does not map that path yet (`ReviewInvitation` is still to be generated), so
-until it does the button launches the app at its initial route.
+Its "Already installed? Open it" button launches the app with the invitation: on Android a Chrome
+`intent://invite/<token>#Intent;scheme=taleus;package=org.sereus.taleus;…` URL (a bare custom-scheme
+link is dropped by the browser) that falls back to this page; elsewhere `taleus://invite/<token>`.
+The app routes `taleus://invite/<token>` to `ReviewInvitation` (`src/navigation/linking.ts`).
 
 ## Preview locally
 
@@ -88,8 +75,7 @@ until it does the button launches the app at its initial route.
 ./server.sh          # http://localhost:8080/taleus/
 ```
 
-`http.server` does no rewriting, so preview the invite page directly at
-`/taleus/invite.html?token=DEMO`.
+Preview the invite page at `/taleus/invite/#DEMO`.
 
 ## Publish
 

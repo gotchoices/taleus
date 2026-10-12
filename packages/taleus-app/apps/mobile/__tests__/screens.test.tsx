@@ -64,6 +64,17 @@ test('every tally row says when it last moved', async () => {
 	expect(view.getAllByText(/Last activity/).length).toBe(6)
 })
 
+test('another tally can be started from the header, with tallies already listed', async () => {
+	const navigate = jest.fn()
+	const props = screenProps('TallyList', undefined, navigate)
+	const view = await renderScreen(<TallyList {...props} />)
+	await waitFor(() => expect(view.getByText('Sam Ortiz')).toBeTruthy())
+	const options = (props.navigation.setOptions as jest.Mock).mock.calls.at(-1)?.[0]
+	const add = await renderScreen(options.headerRight())
+	fireEvent.press(add.getByLabelText('Invite someone'))
+	expect(navigate).toHaveBeenCalledWith('CreateInvitation')
+})
+
 test('attention items are reachable and say how long they have waited', async () => {
 	const navigate = jest.fn()
 	const view = await renderScreen(
