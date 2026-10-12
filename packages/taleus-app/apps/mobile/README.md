@@ -142,3 +142,37 @@ To learn more about React Native, take a look at the following resources:
 - [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
 - [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
 - [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+
+## Releasing an APK
+
+A signed release build for side-loading, and the upload that puts it on
+`sereus.org/taleus/taleus.apk` (where [`web/index.html`](../../../../web/index.html) links it).
+Same shape as `ser/chat`: the keystore lives outside the repo (`*.keystore` is ignored) and the
+build reads it from the environment.
+
+```sh
+export STORE_FILE_TALEUS=/path/to/taleus.keystore   # keystore path; never in the repo
+export STORE_PASSWORD_TALEUS=...                     # not stored anywhere in the repo
+export KEY_ALIAS_TALEUS=org.sereus.taleus            # optional; this is the default
+
+yarn ship:apk        # bump versionCode, build, then publish — stops if the build fails
+```
+
+Or the pieces separately: `yarn build:android:apk` (fastlane `build_apk`, in `android/fastlane`),
+`yarn publish:apk` (`./publish`, scp as `PUBLISH_USER`, default root), `sh scripts/bump-version.sh`.
+`yarn build:android:aab` makes the Play Store bundle. `ship:apk` chains with `&&` on purpose: a
+failed build must not upload, or the previous APK stays on the server looking like the new one.
+Commit the `versionCode` bump with the release.
+
+**Once, before the first release build ships:** the release key's fingerprint has to be in
+[`web/.well-known/assetlinks.json`](../../../../web/.well-known/assetlinks.json), or
+`https://sereus.org/taleus/invite/*` links will open the browser instead of the app on release
+installs (App Links verify the installed APK's signing key; only the debug key is listed so far):
+
+```sh
+yarn release:fingerprint          # prints the SHA-256
+yarn release:fingerprint --write  # adds it to web/.well-known/assetlinks.json
+(cd ../../../../web && ./publish.sh)
+```
+
+A phone that has a debug build installed must uninstall it first; the two signatures differ.

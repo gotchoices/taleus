@@ -5,6 +5,11 @@
   "scripts": {
     "android": "sh ./scripts/android.sh",
     "android:emu": "sh ./scripts/android.sh --active-arch-only",
+    "build:android:apk": "cd android && bundle exec fastlane build_apk",
+    "build:android:aab": "cd android && bundle exec fastlane build_app_bundle",
+    "publish:apk": "./publish",
+    "ship:apk": "sh ./scripts/bump-version.sh && yarn build:android:apk && yarn publish:apk",
+    "release:fingerprint": "sh ./scripts/release-fingerprint.sh",
     "emulator": "sh -c '. ./env-defaults.sh && \"${ANDROID_HOME:-$HOME/Library/Android/sdk}/emulator/emulator\" -avd \"$AVD_NAME\" -port \"$EMULATOR_PORT\"'",
     "icons:android": "sh ./scripts/logo-gen-android.sh",
     "icons:ios": "sh ./scripts/logo-gen-ios.sh",

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Upload the signed release APK to the Taleus page on sereus.org (web/index.html links it as
+# /taleus/taleus.apk; web/publish.sh leaves it alone). Build it first: yarn build:android:apk.
+#   PUBLISH_USER=root ./publish [HOST]      (not $USER, which the shell sets to the local login)
+cd "$(dirname "$0")"
+APK=android/app/build/outputs/apk/release/app-release.apk
+HOST="${1:-gotchoices.org}"
+DEST="${PUBLISH_USER:-root}@${HOST}:/var/www/sereus.org/taleus/taleus.apk"
+[ -f "$APK" ] || { echo "ERROR: $APK not found; run yarn build:android:apk first." >&2; exit 1; }
+scp "$APK" "$DEST"
+echo "Published $(du -h "$APK" | cut -f1) to $DEST"

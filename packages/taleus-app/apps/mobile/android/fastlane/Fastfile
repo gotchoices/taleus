@@ -1,0 +1,97 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+# ---------------------------------------------------------------------------
+# Lanes (run from apps/mobile/android, e.g. `bundle exec fastlane build_apk`):
+#
+#   build_apk         Signed Release .apk for manual/side-load distribution
+#                     (this is what apps/mobile/publish uploads to sereus.org/taleus).
+#   build_app_bundle  Signed Release .aab for Play Store submission.
+#
+# Required environment variables (both lanes):
+#   STORE_FILE_TALEUS      path to your release keystore file
+#   STORE_PASSWORD_TALEUS  keystore (and key) password
+#   KEY_ALIAS_TALEUS       optional; defaults to org.sereus.taleus (see android/app/build.gradle)
+# ---------------------------------------------------------------------------
+
+default_platform(:android)
+
+platform :android do
+  desc "Build release APK"
+  lane :build_apk do
+    require_signing_env!
+
+    gradle(
+      task: "assembleRelease"
+    )
+
+    apk_path = lane_context[SharedValues::GRADLE_APK_OUTPUT_PATH] ||
+               File.expand_path("../app/build/outputs/apk/release/app-release.apk")
+
+    if File.exist?(apk_path)
+      UI.important("")
+      UI.important("📱 ANDROID APK CREATED SUCCESSFULLY 📱")
+      UI.important("------------------------------------------")
+      UI.important("APK File: #{apk_path}")
+      UI.important("Publish it with:  (from apps/mobile)  ./publish")
+      UI.important("------------------------------------------")
+    else
+      UI.error("Could not find APK file at expected location: #{apk_path}")
+    end
+  end
+
+  desc "Build app bundle for Play Store submission"
+  lane :build_app_bundle do
+    require_signing_env!
+
+    gradle(
+      task: "bundleRelease"
+    )
+
+    aab_path = lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH] ||
+               File.expand_path("../app/build/outputs/bundle/release/app-release.aab")
+
+    if File.exist?(aab_path)
+      UI.important("")
+      UI.important("📱 ANDROID APP BUNDLE CREATED SUCCESSFULLY 📱")
+      UI.important("------------------------------------------")
+      UI.important("AAB File: #{aab_path}")
+      UI.important("")
+      UI.important("Manual Upload Instructions:")
+      UI.important("1. Use Google Play Console: https://play.google.com/console/")
+      UI.important("2. Go to Your app > 'Production' (or desired track)")
+      UI.important("3. Create a new release and upload this bundle")
+      UI.important("------------------------------------------")
+    else
+      UI.error("Could not find AAB file at expected location: #{aab_path}")
+    end
+  end
+
+  # -------------------------------------------------------------------------
+  # Helpers
+  # -------------------------------------------------------------------------
+
+  def require_signing_env!
+    unless ENV["STORE_FILE_TALEUS"]
+      UI.error("STORE_FILE_TALEUS environment variable is not set")
+      UI.error("Set this to the path of your release keystore file")
+      raise "Missing STORE_FILE_TALEUS"
+    end
+
+    unless ENV["STORE_PASSWORD_TALEUS"]
+      UI.error("STORE_PASSWORD_TALEUS environment variable is not set")
+      raise "Missing STORE_PASSWORD_TALEUS"
+    end
+
+    unless File.exist?(ENV["STORE_FILE_TALEUS"])
+      UI.error("Keystore file not found at: #{ENV["STORE_FILE_TALEUS"]}")
+      raise "Keystore file not found"
+    end
+  end
+end

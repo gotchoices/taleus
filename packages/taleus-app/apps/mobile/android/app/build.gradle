@@ -92,15 +92,24 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            // Production keystore, supplied via per-app environment variables (the
+            // ser/chat and ser/health pattern; see the fastlane lanes in android/fastlane). Set:
+            //   STORE_FILE_TALEUS     path to the release keystore file
+            //   STORE_PASSWORD_TALEUS keystore (and key) password
+            //   KEY_ALIAS_TALEUS      optional; defaults to org.sereus.taleus
+            keyAlias System.getenv("KEY_ALIAS_TALEUS") ?: "org.sereus.taleus"
+            storeFile file(System.getenv("STORE_FILE_TALEUS") ?: "release.keystore")
+            storePassword System.getenv("STORE_PASSWORD_TALEUS") ?: "not_set"
+            keyPassword System.getenv("STORE_PASSWORD_TALEUS") ?: "not_set"
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
