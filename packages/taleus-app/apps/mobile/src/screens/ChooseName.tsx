@@ -52,7 +52,7 @@ export function ChooseName({ onDone }: Props & { onDone?: () => void }): React.J
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Card>
 				<Text style={styles.caption}>{t('screens.choose-name.identity-made')}</Text>
 				<Text style={styles.caption}>{t('screens.choose-name.on-this-device')}</Text>

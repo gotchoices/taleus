@@ -96,7 +96,7 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Text style={styles.lead}>
 				{t('screens.pay-partner.lead', { name: tally.counterparty.name })}
 			</Text>

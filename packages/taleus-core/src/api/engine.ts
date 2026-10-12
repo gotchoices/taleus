@@ -1,5 +1,5 @@
 import { sign as signBytes } from '../crypto/index.js'
-import { bytesToHex, hexToBytes, toText } from '../lift/digest.js'
+import { bytesToHex, fromText, toText } from '../lift/digest.js'
 import { newInvitation, newKey, sidFor, signText, type KeyPairText } from '../store/index.js'
 import type { RowWrite } from '../store/strand.js'
 import { publishCertificate } from '../tally/certificates.js'
@@ -1173,7 +1173,7 @@ class TaleusEngine implements Taleus {
 			])
 		})
 		if (!result.ok) return no(result.refusal)
-		const ticket = encodeTicket(ref, other(request.as), invitation, request.denomination)
+		const ticket = encodeTicket(ref, other(request.as), invitation)
 		return ok({ ticket, ref, invitedAs: other(request.as), createdAt: on })
 	}
 
@@ -1270,7 +1270,6 @@ interface DecodedTicket {
 	/** The seat the holder takes. */
 	role: Role
 	invitation: { publicKey: string; secretKey: Uint8Array }
-	denomination: string
 }
 
 /**
@@ -1281,14 +1280,10 @@ function encodeTicket(
 	ref: TallyRef,
 	role: Role,
 	invitation: { publicKey: string; secretKey: Uint8Array },
-	denomination: string,
 ): InvitationTicket {
-	const body = JSON.stringify({
-		role,
-		key: invitation.publicKey,
-		secret: bytesToHex(invitation.secretKey),
-		denomination,
-	})
+	// Base64url, like every key in the stack: a ticket is often handed over as a QR code, where
+	// every character costs.
+	const body = JSON.stringify({ role, key: invitation.publicKey, secret: toText(invitation.secretKey) })
 	return { ref, encoded: `taleus:invite:${body}` }
 }
 
@@ -1298,8 +1293,7 @@ function decodeTicket(ticket: InvitationTicket): DecodedTicket | undefined {
 		const body = JSON.parse(ticket.encoded.slice('taleus:invite:'.length)) as Record<string, string>
 		return {
 			role: body.role as Role,
-			invitation: { publicKey: body.key, secretKey: hexToBytes(body.secret) },
-			denomination: body.denomination,
+			invitation: { publicKey: body.key, secretKey: fromText(body.secret) },
 		}
 	} catch {
 		return undefined

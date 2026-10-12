@@ -30,7 +30,7 @@ test('an invitation names nobody — whoever accepts becomes the other party', a
 
 test('the private note is a memo, not a claim about who responds', async () => {
 	await createInvitation({
-		note: 'bike, lunch Tuesday',
+		note: 'Sam, the bike',
 		unit: { denom: 'iso4217:USD', scale: 2 },
 		creditLimit: { units: 50000 },
 		noticeDays: 14,
@@ -38,7 +38,7 @@ test('the private note is a memo, not a claim about who responds', async () => {
 		goodForDays: 1,
 	})
 	const list = await listInvitations()
-	expect(list.ok && list.value[0].note).toBe('bike, lunch Tuesday')
+	expect(list.ok && list.value[0].note).toBe('Sam, the bike')
 })
 
 test('an invitee sees the terms and the agreement before disclosing anything', async () => {

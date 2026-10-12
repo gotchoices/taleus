@@ -70,7 +70,7 @@ export function RequestView({ route, navigation }: Props): React.JSX.Element {
 	const part = request.state === 'part-answered'
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Text style={styles.lead}>
 				{t(`screens.request-view.${request.direction}`, { name: counterparty })}
 			</Text>

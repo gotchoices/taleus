@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Pressable, ScrollView, Share, Text, TextInput, useWindowDimensions, View } from 'react-native'
+import QRCode from 'react-native-qrcode-svg'
 
 import { Action, Amount, Card, Chip, Failed, Input as LabelledInput, Loading, OpenableRow, PublisherNote, Row } from '../components'
 import {
@@ -7,12 +8,12 @@ import {
 	importAgreement,
 	listAgreements,
 	listInvitations,
-	type Agreement,
 	type ImportedAgreement,
 	type Invitation,
 } from '../data/invitations'
+import { buildInviteLink } from '../data/inviteLink'
 import { trustAgreement, trustPublisher } from '../data/publishers'
-import type { Result, Unit } from '../data/types'
+import type { Unit } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
 import { divisorOf } from '../util/amount'
@@ -22,10 +23,6 @@ import { formatInstant } from '../util/date'
 
 type Props = ScreenProps<'CreateInvitation'>
 
-interface Page {
-	agreements: Agreement[]
-	invitations: Invitation[]
-}
 
 /** The units a party may denominate a new tally in (story 01 step 5). */
 const units: Unit[] = [
@@ -50,17 +47,10 @@ const goodFor = [
  */
 export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 	const styles = useStyles(make)
-	const load = useCallback(async (): Promise<Result<Page>> => {
-		const [agreements, invitations] = await Promise.all([listAgreements(), listInvitations()])
-		if (!agreements.ok) {
-			return agreements
-		}
-		return {
-			ok: true,
-			value: { agreements: agreements.value, invitations: invitations.ok ? invitations.value : [] },
-		}
-	}, [])
-	const { state, value, error, reload } = useLoad(load)
+	const { state, value: agreements, error, reload } = useLoad(useCallback(() => listAgreements(), []))
+	// Apart from the form: knowing whether each invitation was taken up means reading its tally,
+	// seconds apiece on a phone, and nothing on the form waits on it.
+	const outstanding = useLoad(useCallback(() => listInvitations(), []))
 
 	const [note, setNote] = useState('')
 	const [limit, setLimit] = useState('500')
@@ -69,6 +59,7 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 	const [agreementId, setAgreementId] = useState<string | undefined>()
 	const [days, setDays] = useState(1)
 	const [made, setMade] = useState<Invitation | undefined>()
+	const [making, setMaking] = useState(false)
 	const [failed, setFailed] = useState<string | undefined>()
 	const [link, setLink] = useState('')
 	const [found, setFound] = useState<ImportedAgreement | undefined>()
@@ -77,12 +68,13 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 	if (state === 'loading') {
 		return <Loading />
 	}
-	if (state === 'failed' || !value) {
+	if (state === 'failed' || !agreements) {
 		return <Failed title={t('screens.create-invitation.failed-title')} error={error} onRetry={reload} />
 	}
+	const invitations: Invitation[] = outstanding.value ?? []
 
-	const agreement = agreementId ?? value.agreements.find(a => a.recommended)?.id ?? value.agreements[0]?.id
-	const chosen = value.agreements.find(a => a.id === agreement)
+	const agreement = agreementId ?? agreements.find(a => a.recommended)?.id ?? agreements[0]?.id
+	const chosen = agreements.find(a => a.id === agreement)
 
 	// Story 01 path F: an agreement from a link -- what its code carries.
 	const look = async () => {
@@ -108,6 +100,7 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 
 	const share = async () => {
 		setFailed(undefined)
+		setMaking(true)
 		try {
 			const result = await createInvitation({
 				note: note.trim() || undefined,
@@ -122,33 +115,20 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 				return
 			}
 			setMade(result.value)
+			outstanding.reload()
 		} catch (thrown) {
 			setFailed(thrown instanceof Error ? thrown.message : String(thrown))
+		} finally {
+			setMaking(false)
 		}
 	}
 
 	if (made) {
-		return (
-			<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-				<Card
-					title={t('screens.create-invitation.made-title')}
-					footnote={t('screens.create-invitation.made-body')}
-				>
-					<Text style={styles.token} selectable>
-						{made.token}
-					</Text>
-					<Text style={styles.caption}>
-						{t('screens.create-invitation.expires', { date: formatInstant(made.expires) })}
-					</Text>
-					<Text style={styles.caption}>{t('screens.create-invitation.share-not-built')}</Text>
-				</Card>
-				<Action label={t('common.retry')} onPress={() => setMade(undefined)} secondary />
-			</ScrollView>
-		)
+		return <ShareInvitation invitation={made} onDone={() => setMade(undefined)} />
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Text style={styles.caption}>{t('screens.create-invitation.no-recipient')}</Text>
 
 			<Field label={t('screens.create-invitation.note-label')} note={t('screens.create-invitation.note-note')}>
@@ -179,9 +159,9 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 				label={t('screens.create-invitation.agreement-label')}
 				note={t('screens.create-invitation.agreement-note')}
 			>
-				{value.agreements.length > 0 ? (
+				{agreements.length > 0 ? (
 					<Choices
-						options={value.agreements.map(a => ({ key: a.id, label: a.title }))}
+						options={agreements.map(a => ({ key: a.id, label: a.title }))}
 						selected={agreement}
 						onSelect={setAgreementId}
 					/>
@@ -244,28 +224,94 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 			</Field>
 
 			{failed ? <Text style={styles.error}>{failed}</Text> : null}
-			<Action label={t('screens.create-invitation.share')} onPress={() => void share()} />
+			{/* Making one founds the tally's strand: seconds on a desktop, a minute or more on a
+			    slow phone. Said, so a slow step does not read as a dead button. */}
+			<Action
+				label={making ? t('screens.create-invitation.making') : t('screens.create-invitation.share')}
+				onPress={making ? undefined : () => void share()}
+			/>
+			{making ? <Text style={styles.caption}>{t('screens.create-invitation.making-note')}</Text> : null}
 
-			{value.invitations.length > 0 ? (
+			{outstanding.state === 'loading' ? (
 				<Card title={t('screens.create-invitation.outstanding-title')}>
-					{value.invitations.map(invitation => (
-						<Row
-							key={invitation.token}
-							label={invitation.note ?? invitation.token}
-							note={t('screens.create-invitation.expires', {
-								date: formatInstant(invitation.expires),
-							})}
-							value={
-								invitation.state === 'expired' ? (
-									<Chip label={t('screens.create-invitation.state-expired')} />
-								) : (
-									<Amount value={invitation.creditLimit} unit={invitation.unit} />
-								)
-							}
-						/>
-					))}
+					<Text style={styles.caption}>{t('screens.create-invitation.outstanding-loading')}</Text>
 				</Card>
 			) : null}
+			{invitations.length > 0 ? (
+				<Card title={t('screens.create-invitation.outstanding-title')}>
+					{invitations.map(invitation =>
+						invitation.state === 'outstanding' ? (
+							// Still good: it can be shared again (story 01).
+							<OpenableRow
+								key={invitation.token}
+								onPress={() => setMade(invitation)}
+								accessibilityLabel={t('screens.create-invitation.share-again', {
+									note: invitation.note ?? t('screens.create-invitation.unnoted'),
+								})}
+							>
+								<Row
+									label={invitation.note ?? t('screens.create-invitation.unnoted')}
+									note={t('screens.create-invitation.expires', { date: formatInstant(invitation.expires) })}
+									value={<Amount value={invitation.creditLimit} unit={invitation.unit} />}
+								/>
+							</OpenableRow>
+						) : (
+							<Row
+								key={invitation.token}
+								label={invitation.note ?? t('screens.create-invitation.unnoted')}
+								note={t('screens.create-invitation.expires', { date: formatInstant(invitation.expires) })}
+								value={
+									<Chip
+										label={
+											invitation.state === 'expired'
+												? t('screens.create-invitation.state-expired')
+												: t(`screens.create-invitation.state-${invitation.state}`)
+										}
+									/>
+								}
+							/>
+						),
+					)}
+				</Card>
+			) : null}
+		</ScrollView>
+	)
+}
+
+/**
+ * The invitation, ready to hand over (story 01 step 8, path D). In person, the other party points
+ * their phone's own camera at the code: the link opens Taleus if they have it, and a page offering
+ * it if they do not. Apart, the link goes by whatever the phone sends things with.
+ */
+function ShareInvitation({ invitation, onDone }: { invitation: Invitation; onDone(): void }): React.JSX.Element {
+	const styles = useStyles(make)
+	const { width } = useWindowDimensions()
+	const link = buildInviteLink(invitation.token)
+	const send = async () => {
+		await Share.share({ message: link, url: link, title: t('screens.create-invitation.send-title') })
+	}
+	return (
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+			<Card title={t('screens.create-invitation.made-title')} footnote={t('screens.create-invitation.made-body')}>
+				{invitation.note ? <Text style={styles.body}>{invitation.note}</Text> : null}
+				<Text style={styles.caption}>{t('screens.create-invitation.expires', { date: formatInstant(invitation.expires) })}</Text>
+			</Card>
+
+			<Card title={t('screens.create-invitation.in-person')} footnote={t('screens.create-invitation.in-person-note')}>
+				{/* Dark on white whatever the theme, with a quiet zone: what a camera needs. */}
+				<View style={styles.code} accessibilityLabel={t('screens.create-invitation.code-label')}>
+					<QRCode value={link} size={Math.min(width - spacing[3] * 6, 360)} ecl="L" quietZone={12} color="#000000" backgroundColor="#ffffff" />
+				</View>
+			</Card>
+
+			<Card title={t('screens.create-invitation.apart')} footnote={t('screens.create-invitation.apart-note')}>
+				<Action label={t('screens.create-invitation.send')} onPress={() => void send()} />
+				<Text style={styles.link} selectable numberOfLines={3}>
+					{link}
+				</Text>
+			</Card>
+
+			<Action label={t('screens.create-invitation.done')} onPress={onDone} secondary />
 		</ScrollView>
 	)
 }
@@ -346,7 +392,8 @@ const make = (tokens: Tokens) => ({
 	body: { ...typography.body, color: tokens.textPrimary },
 	caption: { ...typography.caption, color: tokens.textSecondary },
 	error: { ...typography.caption, color: tokens.negative },
-	token: { ...typography.body, color: tokens.textPrimary, fontVariant: ['tabular-nums' as const] },
+	link: { ...typography.small, color: tokens.textSecondary },
+	code: { alignItems: 'center' as const, backgroundColor: '#ffffff', borderRadius: spacing[1], padding: spacing[2] },
 	input: {
 		...typography.body,
 		color: tokens.textPrimary,

@@ -48,6 +48,7 @@ const config = {
 const STACK = /^(@serfab|@quereus|@optimystic|@libp2p|@chainsafe|@multiformats)\/|^libp2p$/;
 const APP_ORIGIN = path.resolve(__dirname, 'index.js');
 const APP_DIR = path.join(__dirname, path.sep);
+const ASSETS_REGISTRY_SHIM = path.resolve(__dirname, 'src/shims/assets-registry.js');
 
 function withOneStack(metroConfig) {
 	const next = metroConfig.resolver.resolveRequest;
@@ -58,6 +59,10 @@ function withOneStack(metroConfig) {
 		const scoped = STACK.test(moduleName) && fromOutside
 			? { ...context, originModulePath: APP_ORIGIN }
 			: context;
+		// React Native 0.87 no longer ships this package; see src/shims/assets-registry.js.
+		if (moduleName === '@react-native/assets-registry/registry') {
+			return { type: 'sourceFile', filePath: ASSETS_REGISTRY_SHIM };
+		}
 		return next ? next(scoped, moduleName, platform) : context.resolveRequest(scoped, moduleName, platform);
 	};
 	return metroConfig;

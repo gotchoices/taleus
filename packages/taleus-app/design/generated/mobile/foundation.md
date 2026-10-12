@@ -61,6 +61,11 @@ it is exactly the code twenty-five more screens will inherit.
 
 ## Decisions worth not re-litigating
 
+- **A tap goes through while the keyboard is up.** Every screen with a text field sets
+  `keyboardShouldPersistTaps="handled"` on its `ScrollView`. React Native's default spends the first
+  tap on dismissing the keyboard, so a party who typed and then pressed a button saw nothing happen
+  (found on `CreateInvitation`'s Share, 2026-10-12). A new form screen does the same.
+
 - **One load hook.** Five screens each had a copy, and three dropped `result.error` — losing the
   message and the adapter's word on whether retrying could help. `useLoad` owns it.
 - **Theme is context, not `useColorScheme()` per screen.** `global/ui.md` makes the theme selectable

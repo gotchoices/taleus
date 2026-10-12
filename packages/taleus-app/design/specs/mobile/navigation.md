@@ -60,7 +60,9 @@ stories in `design/stories/mobile/`; each area below names the stories it serves
   - `taleus://screen/<Route>` — scenario capture and internal links
   - `taleus://screen/<Route>?variant=happy|empty|error` — mock variant selection
   - `taleus://screen/<Route>?locale=<tag>` — locale override for capture
-- **Universal links**: `https://sereus.org/taleus/invite/<token>` → `ReviewInvitation`
+- **Universal links**: `https://sereus.org/taleus/invite/#<token>` → `ReviewInvitation`. The token
+  follows the `#` so it never reaches the server (an invitation is a bearer credential); links
+  handed out earlier in the path form `/taleus/invite/<token>` still open
   - The landing page is not claimed; only `/taleus/invite/*` opens the app
   - A token that has been redeemed, withdrawn, or is unrecognised lands on `ReviewInvitation` in its
     explained-failure state, never on a blank start

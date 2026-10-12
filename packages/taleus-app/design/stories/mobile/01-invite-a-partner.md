@@ -18,10 +18,10 @@ across the table and does not have the app. Jan does. Two-party story — Sam's 
 
 ## Sequence
 
-1. Jan starts a new tally. He is not asked who it is for — he is setting out terms, and whoever
-   accepts them becomes the other party. He can jot a private note to himself ("bike, lunch
-   Tuesday") to tell his outstanding invitations apart; it is his own memo, not a claim about who
-   will respond.
+1. Jan starts a new tally. He notes who he means it for — "Sam, the bike" — so he can tell his
+   outstanding invitations apart. It is his own memo: nobody else sees it, and it makes no claim
+   about who will respond. He is setting out terms, and whoever accepts them becomes the other
+   party.
 2. Jan is asked how much he is willing to be owed by whoever accepts. He thinks about the bike, adds
    some room, and says $500.
 3. He is asked how much notice he wants before he can require settlement. He says two weeks.
@@ -90,7 +90,8 @@ across the table and does not have the app. Jan does. Two-party story — Sam's 
 ## Acceptance Criteria
 
 - [ ] The inviter sets terms without naming the other party; whoever accepts becomes that party
-- [ ] The inviter may label an invitation privately, without that label asserting who will respond
+- [ ] The inviter may note privately who an invitation is meant for, without that note asserting
+      who will respond
 - [ ] The counterparty's identity comes only from what that party discloses when responding
 - [ ] The inviter sets their own credit limit and notice period, and is told these bind only them
 - [ ] The unit of account is chosen at invitation time, with the user warned it is permanent

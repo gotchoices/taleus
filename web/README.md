@@ -6,7 +6,7 @@ subdomain to provision). Three jobs, mirroring `chat/web`:
 
 1. **Learn** about Taleus and **download** the app (the landing page).
 2. **Handle invitation links** for people who don't have the app yet
-   (`/taleus/invite/<token>` → a "you're invited, get the app" page).
+   (`/taleus/invite/#<token>` → a "you're invited, get the app" page).
 3. **Contribute the deep-link association entries** so
    `https://sereus.org/taleus/invite/…` opens the app directly on phones that have it
    (Android App Links / iOS Universal Links).
@@ -16,7 +16,7 @@ subdomain to provision). Three jobs, mirroring `chat/web`:
 | Path | What |
 |------|------|
 | `index.html`, `styles.css` | The landing page (indigo palette from `design/specs/mobile/global/ui.md`) |
-| `invite.html` | Fallback shown at `/taleus/invite/<token>` when the app isn't installed |
+| `invite.html` | Fallback shown at `/taleus/invite/#<token>` when the app isn't installed |
 | `images/logo.svg` | App-icon composite (peach tile + mark). The mark is pasted from the canonical [`docs/images/logo4.svg`](../docs/images/logo4.svg) |
 | `.well-known/assetlinks.json` | Taleus's Android App-Links statement (merged into the apex on deploy) |
 | `.well-known/apple-app-site-association` | Taleus's iOS Universal-Links detail (merged into the apex on deploy) |
@@ -57,7 +57,12 @@ Fill in before it will verify:
   `ios/mobile/mobile.entitlements` (copy chat's) and the **Associated Domains** capability in
   Xcode when iOS universal links are wired.
 
-### `/taleus/invite/<token>` routing
+### `/taleus/invite/#<token>` routing
+
+The app shares `https://sereus.org/taleus/invite/#<token>`: the token follows the `#`, so it never
+reaches the server or its access log (an invitation is a bearer credential), and `/taleus/invite/`
+itself is all the host serves. Links handed out earlier put the token in the path; the rewrite below
+keeps those working.
 
 For the browser fallback, the host must rewrite `/taleus/invite/*` to
 `/taleus/invite.html` (which reads the token client-side). Example nginx:

@@ -50,10 +50,11 @@
   </footer>
 
   <script>
-    // The token is the last path segment of /invite/<token> (or a ?token= fallback).
+    // The token follows the `#` (/invite/#<token>): a fragment never reaches the server, and an
+    // invitation is a bearer credential. Links handed out earlier put it in the path, or a ?token=.
     (function () {
       var m = location.pathname.match(/\/invite\/([^\/?#]+)/);
-      var token = (m && m[1]) || new URLSearchParams(location.search).get('token') || '';
+      var token = location.hash.slice(1) || (m && m[1]) || new URLSearchParams(location.search).get('token') || '';
       if (token) {
         var el = document.getElementById('token');
         el.textContent = decodeURIComponent(token);

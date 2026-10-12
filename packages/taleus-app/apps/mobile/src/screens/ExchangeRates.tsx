@@ -96,7 +96,7 @@ export function ExchangeRates(): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Card>
 				<Text style={styles.caption}>{t('screens.rates.private')}</Text>
 				{/* Path C: a rate is the party's own valuation, and the app never

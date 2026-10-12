@@ -105,7 +105,7 @@ export function StandingInvitation({ navigation }: Props): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Card>
 				<Text style={styles.body}>{t('screens.standing.what')}</Text>
 				{/* Story 10 path E step 2. Saying it here is the point: a party who

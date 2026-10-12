@@ -5832,6 +5832,7 @@ __metadata:
     "@libp2p/circuit-relay-v2": "npm:^4.2.13"
     "@libp2p/crypto": "npm:^5.1.23"
     "@libp2p/websockets": "npm:^10.1.21"
+    "@multiformats/multiaddr": "npm:^13.0.3"
     "@optimystic/db-p2p": "npm:^1.12.1"
     "@serfab/cadre-core": "npm:^1.14.0"
     "@stroc/compose": "npm:^0.3.0"

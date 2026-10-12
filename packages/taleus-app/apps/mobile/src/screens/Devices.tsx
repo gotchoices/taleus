@@ -60,7 +60,7 @@ export function Devices(): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Card>
 				<Text style={styles.body}>{t('screens.devices.intro')}</Text>
 			</Card>

@@ -63,7 +63,7 @@ export function DisclosureView({ route }: Props): React.JSX.Element {
 	const absent = knownFields.filter(key => !receivedKeys.has(key) && !asked.has(key))
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Card title={t('screens.disclosure.i-told', { name })}>
 				{disclosure.sent.length === 0 ? (
 					<Text style={styles.caption}>{t('screens.disclosure.i-told-none')}</Text>

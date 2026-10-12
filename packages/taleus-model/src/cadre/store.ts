@@ -18,6 +18,7 @@
  */
 
 import { generateStrandMemberKey, StrandAwaitingFirstSyncError } from '@serfab/cadre-core'
+import { decodeStrandAddress, encodeStrandAddress } from './address.js'
 import type {
 	CadreNode,
 	PendingJoinStatus,
@@ -114,7 +115,7 @@ class CadreStoreProvider implements StoreProvider {
 			totalUses: 1,
 		})
 		console.warn('TMPDBG invitation published')
-		return { ref: { id: strandId, address: node.encodeInvitation(invitation) }, store: this.storeFor(instance) }
+		return { ref: { id: strandId, address: encodeStrandAddress(invitation) }, store: this.storeFor(instance) }
 	}
 
 	/**
@@ -130,7 +131,7 @@ class CadreStoreProvider implements StoreProvider {
 		}
 		const address = ticket.ref.address
 		if (!address) throw new Error(`the invitation to ${ticket.ref.id} carries no strand address to join it by`)
-		const status = await this.joined(await node.requestJoin(node.decodeInvitation(address), this.options.disclosure))
+		const status = await this.joined(await node.requestJoin(decodeStrandAddress(address, this.options.sApp.id), this.options.disclosure))
 		if (status.strandId !== ticket.ref.id) {
 			throw new Error(`the strand invitation admitted to ${status.strandId ?? 'nothing'}, not the tally ${ticket.ref.id}`)
 		}

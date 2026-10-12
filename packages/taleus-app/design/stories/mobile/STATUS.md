@@ -14,7 +14,8 @@ by who publishes them rather than by reading them:
 - **08 Publishers I trust** — new, drafted: the trusted publishers (sereus.org built in), trusting on
   accepting, recommendations shown as information, a claim that does not hold, look-alikes, a
   publisher withdrawing or replacing an agreement, removing a publisher, offline.
-- **01** step 6: the agreements offered are trusted publishers'. Path E 6.4: the agreement travels
+- **01** step 1: the private note says who the invitation is meant for. Step 6: the agreements
+  offered are trusted publishers'. Path E 6.4: the agreement travels
   with the tally. Path F: an agreement brought in by its code — use it alone, or trust its publisher.
 - **02** step 4: the publisher shown, trusted or not. Path E: an agreement that cannot be read in
   full cannot be accepted. Path F: a publisher Sam does not know.

@@ -55,7 +55,7 @@ export function TrustedPublishers(_props: Props): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Text style={styles.caption}>{t('screens.publishers.intro')}</Text>
 
 			<Card title={t('screens.publishers.list')} footnote={t('screens.publishers.kept-for-you')}>

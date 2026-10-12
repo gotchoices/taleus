@@ -1,6 +1,7 @@
 import { Linking } from 'react-native'
 import type { LinkingOptions } from '@react-navigation/native'
 
+import { routableLink } from '../data/inviteLink'
 import { setLocale } from '../i18n'
 import { setVariant, variantFromUrl } from '../mock/variant'
 import type { OnboardingParams, TabParams } from './routes'
@@ -9,7 +10,8 @@ import type { OnboardingParams, TabParams } from './routes'
  * Deep links and universal links, per `design/specs/mobile/navigation.md`.
  *
  * `taleus://screen/<Route>[/<id>]` is the internal and scenario-capture form;
- * `https://sereus.org/taleus/invite/<token>` is the universal link.
+ * `https://sereus.org/taleus/invite/#<token>` is the universal link (`data/inviteLink.ts`); the
+ * earlier path form `https://sereus.org/taleus/invite/<token>` still opens.
  *
  * `getInitialURL` and `subscribe` are overridden only so the non-navigation
  * parameters — `variant`, `locale` — are applied *before* a screen mounts and
@@ -83,9 +85,10 @@ export const linking: LinkingOptions<TabParams & OnboardingParams> = {
 	getInitialURL: applyLaunchParams,
 	subscribe(listener) {
 		const sub = Linking.addEventListener('url', ({ url }) => {
-			consume(url)
-			arriving?.(url)
-			listener(url)
+			const routable = routableLink(url)
+			consume(routable)
+			arriving?.(routable)
+			listener(routable)
 		})
 		return () => sub.remove()
 	},
@@ -104,7 +107,8 @@ let launched: string | null | undefined
 
 export async function applyLaunchParams(): Promise<string | null> {
 	if (launched === undefined) {
-		launched = consume((await Linking.getInitialURL()) ?? null)
+		const initial = await Linking.getInitialURL()
+		launched = consume(initial ? routableLink(initial) : null)
 	}
 	return launched
 }

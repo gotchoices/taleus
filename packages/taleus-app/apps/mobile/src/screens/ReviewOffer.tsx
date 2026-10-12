@@ -77,7 +77,7 @@ export function ReviewOffer({ route, navigation }: Props): React.JSX.Element {
 	const readable = value.agreement.readable !== false
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Text style={styles.lead}>{t('screens.review-offer.who', { name })}</Text>
 
 			{/* Step 3: exactly what changed, before the terms themselves. */}
@@ -195,7 +195,7 @@ function Superseded({ offer }: { offer: Offer }): React.JSX.Element {
 		return <Empty title={t('screens.review-offer.none-title')} />
 	}
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Text style={styles.lead}>{t('screens.review-offer.superseded-title')}</Text>
 			<Text style={styles.caption}>{t('screens.review-offer.superseded-body')}</Text>
 

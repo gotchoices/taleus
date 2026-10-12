@@ -77,7 +77,7 @@ export function Profile({ navigation }: Props): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Card title={t('screens.profile.held')} footnote={t('screens.profile.held-note')}>
 				{held.map(field =>
 					editing?.key === field.key ? (

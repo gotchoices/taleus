@@ -91,7 +91,7 @@ export function ReviewInvitation({ route, navigation }: Props): React.JSX.Elemen
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 			<Text style={styles.lead}>
 				{t('screens.review-invitation.who', { name: inviterName(value) })}
 			</Text>
