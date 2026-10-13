@@ -316,13 +316,10 @@ export class Session {
 		this.runs++
 		if (this.queued) return this.agentRun
 		this.queued = true
-		const t = Date.now()
 		this.agentRun = this.agentRun
 			.then(async () => {
 				this.queued = false
-				console.warn(`TMPDBG step ${this.runs} start`)
 				await this.step()
-				console.warn(`TMPDBG step done ${Date.now() - t}ms`)
 			})
 			.catch(error => {
 				console.warn('taleus-model agent:', error)

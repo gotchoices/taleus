@@ -240,4 +240,24 @@ describe('a tally formed through the engine, on real strands', () => {
 		expect(must(await again.model.invitations.listInvitations())).toEqual([])
 		expect(Date.now() - started).toBeLessThan(CONVERGE_MS)
 	}, LIFECYCLE_MS * 3)
+
+	it('reads a tally whose strand hibernated while the app was in the background', async () => {
+		const tag = Date.now()
+		const inviter = await new Device(`taleus-day-${tag}`).start()
+		const invitee = await new Device(`taleus-night-${tag}`).start(controlAddrs(inviter))
+		nodes.push(inviter, invitee)
+		const me = (await engineOn(inviter, { holdsContract: true })).engine
+		const them = (await engineOn(invitee, { acceptOffers: true })).engine
+		engines.push(me, them)
+		const tallyId = await openTally(me, them)
+
+		// What the phone kit does when the app goes to the background.
+		expect(await inviter.hibernateAll()).toContain(tallyId)
+
+		const started = Date.now()
+		const listed = must(await me.model.tallies.listTallies())
+		expect(listed.map(tally => tally.id)).toEqual([tallyId])
+		expect(listed[0].state).toBe('Open')
+		expect(Date.now() - started).toBeLessThan(CONVERGE_MS)
+	}, LIFECYCLE_MS * 3)
 })

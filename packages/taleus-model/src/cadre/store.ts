@@ -84,7 +84,7 @@ class CadreStoreProvider implements StoreProvider {
 
 	async list(): Promise<TallyRef[]> {
 		const strands = [...this.options.node.getStrands().values()]
-		return strands.filter(strand => strand.database).map(strand => ({ id: strand.strandId }))
+		return strands.filter(readable).map(strand => ({ id: strand.strandId }))
 	}
 
 	async open(ref: TallyRef): Promise<TallyStore> {
@@ -106,16 +106,13 @@ class CadreStoreProvider implements StoreProvider {
 			sAppConfig: sApp,
 		})
 		this.attaching.set(strandId, Promise.resolve(instance))
-		console.warn('TMPDBG founded; creating invitation')
 		const lifetimeMs = this.options.invitationLifetimeMs ?? 30 * DAY_MS
 		const invitation = await node.createOpenInvitation(sApp.id, lifetimeMs)
-		console.warn('TMPDBG invitation minted; publishing')
 		await node.publishFormationInvite(invitation.token, sApp.id, {
 			strandId,
 			expiresAtMs: Date.now() + lifetimeMs,
 			totalUses: 1,
 		})
-		console.warn('TMPDBG invitation published')
 		return { ref: { id: strandId, address: encodeStrandAddress(invitation) }, store: this.storeFor(instance) }
 	}
 
@@ -193,7 +190,7 @@ class CadreStoreProvider implements StoreProvider {
 		if (attaching) return attaching
 		const running = this.options.node.getStrands().get(id)
 		if (running?.database) return Promise.resolve(running)
-		if (running) return this.options.node.whenStrandWritable(id, { timeoutMs: this.options.firstSyncPatienceMs ?? 240_000 })
+		if (running) return awake(this.options.node, id, this.options.firstSyncPatienceMs ?? 240_000)
 		return new Promise<StrandInstance>(resolve => {
 			const waiters = this.awaited.get(id) ?? []
 			waiters.push(instance => resolve(instance))
@@ -262,7 +259,7 @@ class CadreTallyStore implements TallyStore {
 	private async db(): Promise<Database> {
 		const current = this.node.getStrands().get(this.strandId)?.database
 		if (current) return current.getDatabase()
-		const instance = await this.node.whenStrandWritable(this.strandId, { timeoutMs: this.patienceMs })
+		const instance = await awake(this.node, this.strandId, this.patienceMs)
 		if (!instance.database) throw new Error(`strand ${this.strandId} is not writable`)
 		return instance.database.getDatabase()
 	}
@@ -270,9 +267,7 @@ class CadreTallyStore implements TallyStore {
 	async query<T>(sql: string, params?: unknown[]): Promise<T[]> {
 		const db = await this.db()
 		const collected: T[] = []
-		const t = Date.now()
 		for await (const row of db.eval(sql, params as never)) collected.push(row as T)
-		const ms = Date.now() - t; if (ms > 500) console.warn(`TMPDBG slow query ${ms}ms: ${sql.slice(0, 80)}`)
 		return collected
 	}
 
@@ -297,9 +292,7 @@ class CadreTallyStore implements TallyStore {
 	private async applyOnce(writes: RowWrite[]): Promise<void> {
 		const db = await this.db()
 		const { sql, params } = transactionBatch(writes)
-		const t = Date.now(); console.warn(`TMPDBG apply ${writes.map(w => w.table).join(',')}`)
 		await db.exec(sql, params as never, { transaction: true })
-		console.warn(`TMPDBG apply done ${Date.now() - t}ms`)
 	}
 
 	/**
@@ -332,6 +325,24 @@ class CadreTallyStore implements TallyStore {
 	async close(): Promise<void> {
 		// The strand belongs to the node, which keeps running it; a handle holds nothing of its own.
 	}
+}
+
+/**
+ * A strand this party can read now: running with its database, or hibernating -- the node
+ * quiesces strands while the app is in the background, and one woken holds everything it held.
+ * A strand still on its first sync is left out (`StoreProvider.list`).
+ */
+function readable(strand: StrandInstance): boolean {
+	return Boolean(strand.database) || strand.status === 'hibernating'
+}
+
+/**
+ * The strand, writable: woken first if it is hibernating, since waiting does not wake one
+ * (`CadreNode.whenStrandWritable`), and a hibernated tally would otherwise wait out its patience.
+ */
+async function awake(node: CadreNode, strandId: string, timeoutMs: number): Promise<StrandInstance> {
+	if (node.getStrands().get(strandId)?.status === 'hibernating') await node.wakeStrand(strandId)
+	return node.whenStrandWritable(strandId, { timeoutMs })
 }
 
 function randomHex(bytes: number): string {

@@ -20,6 +20,10 @@ citations) is prepared separately for transmission to Nathan; this is the digest
 - [ ] **Upstream items we filed** (2026-10-05):
   - gotchoices/sereus#33 — native Ed25519 in `@serfab/cadre-rn` (`/polyfills/native-crypto`).
     **Shipped in 1.15**; the mobile app imports the kit's and dropped its own.
+  - gotchoices/sereus#47 (2026-10-13) — a strand table nobody has written costs a cohort round trip
+    on every read and cannot be read with the other member offline. On two phones over the relay it
+    made each agent step take minutes, so a tally never formed. Node repro in the issue; proposed fix:
+    the founder creates every app table's collection at founding.
   - gotchoices/Optimystic#30 — `quereus-plugin-crypto` has no native-crypto seam: its SQL `verify` runs
     pure-JS Ed25519 (408 ms of a 29 s invite on a Galaxy S7). Open.
   - gotchoices/Optimystic#31 — cohort-topic proof-of-work starved the phone's JS thread. **Fixed in
@@ -180,8 +184,7 @@ without the UI.
   uncaught "Database is closed".
 - [ ] An acceptance that outlives `joinPatienceMs`; reads failing while the counterparty is offline;
   half-committed seating; a signed tally sApp; verify on two phones (all in the ticket).
-- [ ] **Clean-up:** `TMPDBG` logs in `taleus-model` (`cadre/store.ts`, `engine/session.ts`,
-  `engine/formation.ts`); `USE_ENGINE`/`USE_CADRE` back to `false` in `apps/mobile/src/data/config.ts`;
+- [ ] **Clean-up:** `USE_ENGINE`/`USE_CADRE` back to `false` in `apps/mobile/src/data/config.ts`;
   `probe-*.tmp.mjs` at the root and `profile.tmp.cjs` in the app.
 
 ## Contracts (Stroc)

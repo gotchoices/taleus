@@ -99,9 +99,7 @@ export function invitationsModel(session: Session): InvitationsModel {
 				return failed('agreement-unreadable', `the agreement ${draft.agreementId} cannot be read in full`)
 			}
 			const agreementSource = publisherDomainOf(await agreementOf(session.agreements, draft.agreementId))
-			const t0 = Date.now(); console.warn('TMPDBG invite start')
 			const invited = await engine.invite({ as: 'stock', denomination: draft.unit.denom, certificate: session.certificate() })
-			console.warn(`TMPDBG invite done ${Date.now() - t0}ms`)
 			if (!invited.ok) return refused(invited.refusal)
 			const created = session.now()
 			const envelope = {
