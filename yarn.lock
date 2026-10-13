@@ -5901,6 +5901,7 @@ __metadata:
     "@libp2p/websockets": "npm:^10.1.21"
     "@multiformats/multiaddr": "npm:^13.0.3"
     "@optimystic/db-p2p": "npm:^1.13.0"
+    "@optimystic/db-p2p-storage-fs": "npm:^1.13.0"
     "@quereus/quereus": "npm:^4.20.2"
     "@serfab/cadre-core": "npm:^1.15.0"
     "@types/jest": "npm:30.0.0"

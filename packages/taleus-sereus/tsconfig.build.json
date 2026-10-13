@@ -3,6 +3,14 @@
 	"compilerOptions": {
 		"types": []
 	},
-	"include": ["src/**/*.ts"],
-	"exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/test-*.ts"]
+	"include": [
+		"src/**/*.ts"
+	],
+	"exclude": [
+		"node_modules",
+		"dist",
+		"src/**/*.test.ts",
+		"src/**/test-*.ts",
+		"src/node/**"
+	]
 }

@@ -129,8 +129,8 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
 - [ ] **A CLI client (`taleus-app/apps/cli`), as sereus chat has.** A second host over the same
   model: a counterparty for phone tests, a scripted scenario suite over a relay, a debugging tool,
   and the Node host `taleus-node` will reuse. Steps: (1) the Sereus binding as its own package --
-  **done**, `taleus-sereus`; (2) a Node host (file-backed keys and storage, relays) after chat's
-  `apps/cli`; (3) a `cli` appeus target with stories and a command spec; (4) CLI-vs-CLI formation
+  **done**, `taleus-sereus`; (2) a Node host -- **done**, `taleus-sereus/node` (a party's
+  node and slots kept in a folder; tested forming a tally between two and restarting one); (3) a `cli` appeus target with stories and a command spec; (4) CLI-vs-CLI formation
   scenario, then phone-vs-CLI to tell phone-side cost from the read path (#47).
 - [ ] **Run a cadre node for Taleus.** Not done: being prepared in a separate effort. The phone
   app's Mode C (below) runs a phone node through `@serfab/cadre-rn`; an always-on cadre node serving
