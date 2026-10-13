@@ -7,6 +7,7 @@
  */
 import { useEffect, useState } from 'react'
 import { StatusBar, View } from 'react-native'
+import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { Loading } from './src/components'
@@ -52,15 +53,18 @@ function ModelGate({ children }: { children: React.ReactNode }): React.JSX.Eleme
 function App(): React.JSX.Element {
 	return (
 		<SafeAreaProvider>
-			<ThemeProvider>
-				<ErrorBoundary>
-					<ModelGate>
-						<SessionProvider>
-							<Themed />
-						</SessionProvider>
-					</ModelGate>
-				</ErrorBoundary>
-			</ThemeProvider>
+			{/* Keyboard tracking for `FormScroll`, on iOS and on every Android version. */}
+			<KeyboardProvider>
+				<ThemeProvider>
+					<ErrorBoundary>
+						<ModelGate>
+							<SessionProvider>
+								<Themed />
+							</SessionProvider>
+						</ModelGate>
+					</ErrorBoundary>
+				</ThemeProvider>
+			</KeyboardProvider>
 		</SafeAreaProvider>
 	)
 }

@@ -6,7 +6,7 @@ module.exports = {
 	// These ship untranspiled ES modules / TypeScript; the preset's default
 	// ignore pattern excludes all of node_modules, so they have to be named.
 	transformIgnorePatterns: [
-		'node_modules/(?!(?:@?react-native|@react-navigation|@react-native-vector-icons|@formatjs)/)',
+		'node_modules/(?!(?:@?react-native|react-native-keyboard-controller|@react-navigation|@react-native-vector-icons|@formatjs)/)',
 	],
 	// The fixtures in `mock/data` carry fixed dates, written as if today were 7 September 2026
 	// -- an expiry "in 4 days", a reduction "not yet in force", a device "not carried in months".

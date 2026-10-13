@@ -64,17 +64,20 @@ it is exactly the code twenty-five more screens will inherit.
 - **Every screen with a text field scrolls in `FormScroll`** (`components/FormScroll.tsx`, `global/ui.md`
   "The on-screen keyboard"), never a bare `ScrollView`. React Native 0.87 draws edge-to-edge on
   every Android version, and an edge-to-edge window is never resized for the keyboard, so a low
-  field sat under it. `FormScroll` adds the keyboard's height below the content and scrolls the
-  focused field, measured in the window, to just above the keyboard. It also lets a tap through
-  while the keyboard is up: React Native's default spends it on dismissing the keyboard, so a party
-  who typed and pressed a button saw nothing happen (found on `CreateInvitation`'s Share,
-  2026-10-12).
-  - **Not react-native-keyboard-controller,** which sereus chat and health use: on the Galaxy S7
-    (Android 8) here it reported no keyboard at all, while React Native's own `Keyboard` events did
-    (2026-10-12). Chat already works around the library on that phone.
-  - **Not `scrollResponderScrollNativeHandleToKeyboard`:** it measures the field within the content
-    as though the scroll view began at the top of the screen, so below a header it stopped short by
-    the header's height.
+  field sat under it. `FormScroll` keeps the focused field above the keyboard and lets a tap through
+  while the keyboard is up (React Native's default spends it on dismissing the keyboard, so a party
+  who typed and pressed a button saw nothing happen: `CreateInvitation`'s Share, 2026-10-12).
+  - **react-native-keyboard-controller** does it on iOS and Android 11+, as in sereus chat and
+    health: its `KeyboardAwareScrollView`, `KeyboardProvider` at the root, Reanimated's worklet plugin
+    last in `babel.config.js`, and the library's own mock in tests. Verified on Android 16.
+  - **Below Android 11 it saw no keyboard at all** (Galaxy S7, Android 8, 2026-10-12): there it
+    rebuilds keyboard callbacks from window insets, which apparently never reach it in this app
+    (react-native-screens 4.27 and React Native 0.87 both install insets listeners; chat, on 0.82
+    and screens 4.19, does get events on that phone). Those phones get `ResizingScroll`, from React
+    Native's own `Keyboard` events: room below the content as tall as the keyboard, and the focused
+    field, measured in the window, scrolled to just above it. Verified on the S7. Not
+    `scrollResponderScrollNativeHandleToKeyboard`, which measures within the content as though the
+    scroll view began at the top of the screen and so stops short below a header.
 
 - **One load hook.** Five screens each had a copy, and three dropped `result.error` — losing the
   message and the adapter's word on whether retrying could help. `useLoad` owns it.

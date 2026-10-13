@@ -32,3 +32,6 @@ jest.mock('react-native-qrcode-svg', () => {
 	const { Text } = require('react-native')
 	return ({ value }) => require('react').createElement(Text, { testID: 'qr-code' }, value)
 })
+
+// Native keyboard tracking has no place in a test renderer; the library ships its own mock.
+jest.mock('react-native-keyboard-controller', () => require('react-native-keyboard-controller/jest'))
