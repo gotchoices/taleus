@@ -1,6 +1,7 @@
 export { Amount, amountText, directionOf, unitNamesFor } from './Amount'
 export { Action, Card, OpenableRow, Row } from './Card'
 export { ChitMark } from './ChitMark'
+export { CodeCamera } from './CodeCamera'
 export { Chip } from './Chip'
 export { ErrorBoundary } from './ErrorBoundary'
 export { FormScroll } from './FormScroll'

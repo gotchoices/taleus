@@ -22,6 +22,8 @@ export type TalliesParams = {
 	CreateInvitation: undefined
 	/** The universal-link landing: `https://sereus.org/taleus/invite/<token>`. */
 	ReviewInvitation: { token: string }
+	/** Open what someone handed over in person: a code to scan or a link to paste. */
+	Scan: undefined
 	ReviewOffer: { tallyId: string }
 	/**
 	 * `amount` and `answers` are how a request hands its figure over: story 22
@@ -91,6 +93,7 @@ export const tabForRoute: Record<RouteName, TabName> = {
 	Agreement: 'Tallies',
 	CreateInvitation: 'Tallies',
 	ReviewInvitation: 'Tallies',
+	Scan: 'Tallies',
 	ReviewOffer: 'Tallies',
 	PayPartner: 'Tallies',
 	CreateRequest: 'Tallies',
@@ -181,6 +184,7 @@ interface ScreenPropsByRoute {
 	Agreement: TalliesScreenProps<'Agreement'>
 	CreateInvitation: TalliesScreenProps<'CreateInvitation'>
 	ReviewInvitation: TalliesScreenProps<'ReviewInvitation'>
+	Scan: TalliesScreenProps<'Scan'>
 	ReviewOffer: TalliesScreenProps<'ReviewOffer'>
 	PayPartner: TalliesScreenProps<'PayPartner'>
 	CreateRequest: TalliesScreenProps<'CreateRequest'>

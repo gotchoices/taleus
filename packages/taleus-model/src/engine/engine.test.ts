@@ -58,8 +58,29 @@ describe('a tally made through the model, with a simulated counterparty', () => 
 			waitingOn: 'nobody',
 			balance: { units: 0, perspective: 'level' },
 		})
+		// Taken up, it has a counterparty to name and is no longer listed as an invitation.
+		expect(tally.invitation).toBeUndefined()
 		const invitations = must(await me.invitations.listInvitations())
 		expect(invitations[0].state).toBe('taken-up')
+	})
+
+	it('lists an invitation nobody has taken up by its note and when it was made', async () => {
+		const world = await createLocalWorld({ now: NOW, documents: CONTRACT.cache, fetch: offline })
+		const me = world.me.model
+		must(await me.party.createIdentity())
+		must(await me.party.setDisplayName('Jan'))
+		must(await me.invitations.createInvitation({
+			unit: USD,
+			creditLimit: usd(50000),
+			noticeDays: 30,
+			agreementId: CONTRACT.cid,
+			goodForDays: 7,
+			note: 'Sam, the bike',
+		}))
+		const [tally] = must(await me.tallies.listTallies())
+		expect(tally.state).toBe('Forming')
+		expect(tally.invitation).toEqual({ note: 'Sam, the bike' })
+		expect(tally.lastActivity).toBe(NOW().toISOString())
 	})
 
 	it('shows each side the credit it extends, in the tally’s own unit', async () => {

@@ -50,5 +50,7 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Taleus uses the camera only to read a code someone shows you.</string>
 </dict>
 </plist>

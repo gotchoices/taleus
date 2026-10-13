@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Reading a code someone shows the party (Scan). -->
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <!-- Cleartext on in every build type, not only debug: the relay and nodes are dialed at
          plain ws:// addresses, and React Native's release default refuses them (sereus #38).

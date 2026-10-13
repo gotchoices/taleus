@@ -39,6 +39,7 @@ export const linking: LinkingOptions<TabParams & OnboardingParams> = {
 					Agreement: 'screen/Agreement/:agreementId/:tallyId?',
 					CreateInvitation: 'screen/CreateInvitation',
 					ReviewOffer: 'screen/ReviewOffer/:tallyId',
+					Scan: 'screen/Scan',
 					PayPartner: 'screen/PayPartner/:tallyId',
 					CreateRequest: 'screen/CreateRequest/:tallyId',
 					RequestView: 'screen/RequestView/:requestId',

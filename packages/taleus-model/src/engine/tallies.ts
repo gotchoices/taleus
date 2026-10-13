@@ -8,7 +8,7 @@ import type { Offer, OffersModel } from '../offers.js'
 import type { TalliesModel } from '../tallies.js'
 import type { Terms, TallyDetail, TallyModel, TermsRecord } from '../tally.js'
 import type { TallySummary, Unit, WaitingOn } from '../types.js'
-import type { Session } from './session.js'
+import type { MadeInvitation, Session } from './session.js'
 import {
 	amount,
 	balanceOf,
@@ -72,13 +72,17 @@ function termsOf(terms: CreditTerms | undefined, unit: Unit, today: string): Ter
 	}
 }
 
-async function lastActivity(tally: Tally, view: TallyView): Promise<string> {
+/** When the tally last moved: its latest entry, else its creation, else when this party invited. */
+async function lastActivity(tally: Tally, view: TallyView, invited?: MadeInvitation): Promise<string> {
 	const latest = (await tally.history({ limit: 1 }))[0]
-	return instantOf(latest?.at ?? view.createdAt)
+	const at = latest?.at ?? view.createdAt
+	return at || !invited ? instantOf(at) : invited.created
 }
 
 export async function summaryOf(session: Session, tally: Tally, view: TallyView): Promise<TallySummary> {
 	const unit = session.unitOf(view)
+	const invited = session.local.madeInvitations.find(made => made.tallyId === view.ref.id)
+	const untaken = invited && !view.counterparty.sid ? invited : undefined
 	return {
 		id: view.ref.id,
 		counterparty: { sid: view.counterparty.sid, name: nameOf(view.counterparty.sid, view.counterparty.certificate) },
@@ -86,7 +90,8 @@ export async function summaryOf(session: Session, tally: Tally, view: TallyView)
 		balance: balanceOf(view.balances.settled.units, unit),
 		state: stateOf(view.state),
 		...situationOf(view, await tally.requests()),
-		lastActivity: await lastActivity(tally, view),
+		lastActivity: await lastActivity(tally, view, invited),
+		...(untaken ? { invitation: untaken.note ? { note: untaken.note } : {} } : {}),
 	}
 }
 

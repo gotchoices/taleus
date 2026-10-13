@@ -49,7 +49,7 @@ export function TallyList({ navigation }: Props): React.JSX.Element {
 					label={t('screens.tally-list.invite')}
 					onPress={() => navigation.navigate('CreateInvitation')}
 				/>
-				<Action label={t('screens.tally-list.empty-accept')} secondary />
+				<Action label={t('screens.tally-list.empty-accept')} onPress={() => navigation.navigate('Scan')} secondary />
 			</Empty>
 		)
 	}
@@ -85,15 +85,19 @@ function TallyRow({ tally, onOpen }: { tally: TallySummary; onOpen: () => void }
 	// findable and not mistaken for an open tally, so the state leads and the
 	// figure is suppressed until there is a tally to have one.
 	const traded = tally.state !== 'Offered' && tally.state !== 'Forming' && tally.state !== 'Expired'
+	// An invitation nobody has taken up has no counterparty yet: the party's own note names it.
+	const name = tally.invitation
+		? tally.invitation.note || t('screens.tally-list.invitation-unnamed')
+		: tally.counterparty.name
 
 	return (
 		<OpenableRow
 			onPress={onOpen}
-			accessibilityLabel={t('screens.tally-list.a11y-open', { name: tally.counterparty.name })}
+			accessibilityLabel={t('screens.tally-list.a11y-open', { name })}
 		>
 			<View style={styles.rowMain}>
 				<Text style={styles.rowName} numberOfLines={1}>
-					{tally.counterparty.name}
+					{name}
 				</Text>
 				{traded ? (
 					<Amount value={tally.balance} unit={tally.unit} perspective={tally.balance.perspective} />
@@ -102,7 +106,7 @@ function TallyRow({ tally, onOpen }: { tally: TallySummary; onOpen: () => void }
 			<View style={styles.rowMeta}>
 				{tally.waitingOn === 'me' ? <Chip label={t('screens.tally-list.waiting-on-me')} urgent /> : null}
 				{tally.state !== 'Open' ? (
-					<Chip label={t(`screens.tally-list.state-${tally.state.toLowerCase()}`)} />
+					<Chip label={tally.invitation ? t('screens.tally-list.state-invited') : t(`screens.tally-list.state-${tally.state.toLowerCase()}`)} />
 				) : null}
 				<Text style={styles.rowSubtle}>
 					{traded

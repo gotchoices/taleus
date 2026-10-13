@@ -66,6 +66,12 @@ empty state's "Invite someone": the empty state was the only way in, so a party'
 none. In the header, not at the foot of the list, so it stays in reach however long the list grows.
 It is set from the screen (`navigation.setOptions`), which owns the navigation it uses.
 
+## An invitation nobody has taken up
+
+It is listed like any forming tally, but has no counterparty to name: the row shows the party's own
+note ("Sam, the bike"), or "An invitation" without one, with the chip "Not yet accepted" and the date
+it was made (`TallySummary.invitation`). The empty state's "I have an invitation" opens `Scan`.
+
 ## Not built here
 
 Sorting, filtering, and search (story 06); the cross-unit estimate, which belongs to `Position` and is

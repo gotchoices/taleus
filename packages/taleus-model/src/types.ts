@@ -108,6 +108,11 @@ export interface TallySummary {
 	waitingOn: WaitingOn
 	waitingReason?: 'offer' | 'request' | 'closing'
 	lastActivity: Instant
+	/**
+	 * Set while the tally is this party's invitation nobody has taken up yet: there is no
+	 * counterparty to name, so the party's own note (who it is for) stands in.
+	 */
+	invitation?: { note?: string }
 }
 
 /** Anything an adapter could not answer, said plainly rather than thrown away. */

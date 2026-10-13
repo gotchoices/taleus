@@ -35,3 +35,21 @@ jest.mock('react-native-qrcode-svg', () => {
 
 // Native keyboard tracking has no place in a test renderer; the library ships its own mock.
 jest.mock('react-native-keyboard-controller', () => require('react-native-keyboard-controller/jest'))
+
+// The camera is native; a test drives the scanner by hand. `scan(value)` on the camera stub's
+// props reports one QR code to its reader, as the camera does when one comes into view.
+jest.mock('react-native-vision-camera', () => {
+	const { Text } = require('react-native')
+	return {
+		useCameraPermission: () => ({ hasPermission: true, canRequestPermission: false, requestPermission: jest.fn() }),
+		useCameraDevice: () => ({ id: 'back' }),
+		Camera: ({ outputs }) =>
+			require('react').createElement(Text, {
+				testID: 'code-scanner',
+				scan: value => outputs.forEach(output => output.onBarcodeScanned([{ rawValue: value }])),
+			}),
+	}
+})
+jest.mock('react-native-vision-camera-barcode-scanner', () => ({
+	useBarcodeScannerOutput: options => options,
+}))
