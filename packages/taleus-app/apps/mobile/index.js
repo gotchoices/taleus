@@ -19,9 +19,9 @@ import './src/i18n/intl';
 // the one that does. Before everything else, since stack modules read these
 // globals as they load. Then the development-build audit of what is missing.
 import '@serfab/cadre-rn/polyfills';
-// Native SHA digests and Ed25519 (react-native-quick-crypto), after the kit's polyfills:
-// see the file. Until the kit carries them (`feat-rn-kit-native-digest`).
-import './src/polyfills/native-crypto';
+// Native SHA digests and Ed25519 (react-native-quick-crypto): after the kit's polyfills and
+// before anything imports libp2p, which picks its Ed25519 once, when it loads.
+import '@serfab/cadre-rn/polyfills/native-crypto';
 import '@serfab/cadre-rn/boot-check';
 
 import { AppRegistry, I18nManager } from 'react-native';

@@ -22,7 +22,12 @@ import { createEngineModel } from 'taleus-model/engine'
 import { installDevBridge } from './dev-bridge'
 import { keychainSecureStore } from './keychain'
 
-const leveldb = { openFn: (name: string, create: boolean, errorIfExists: boolean) => new LevelDB(name, create, errorIfExists), WriteBatch: LevelDBWriteBatch }
+const leveldb = {
+	openFn: (name: string, create: boolean, errorIfExists: boolean) => new LevelDB(name, create, errorIfExists),
+	WriteBatch: LevelDBWriteBatch,
+	// The kit deletes a cadre's data with it, when the phone leaves or is removed from one.
+	destroy: (name: string) => LevelDB.destroyDB(name),
+}
 
 /**
  * The names this app's data is filed under. Each is a persistence contract: renaming one

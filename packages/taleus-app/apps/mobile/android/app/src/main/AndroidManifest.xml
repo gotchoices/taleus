@@ -2,6 +2,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Cleartext on in every build type, not only debug: the relay and nodes are dialed at
+         plain ws:// addresses, and React Native's release default refuses them (sereus #38).
+         Safe, because Noise encrypts and authenticates every libp2p connection. -->
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -9,7 +12,7 @@
       android:roundIcon="@mipmap/ic_launcher_round"
       android:allowBackup="false"
       android:theme="@style/AppTheme"
-      android:usesCleartextTraffic="${usesCleartextTraffic}"
+      android:usesCleartextTraffic="true"
       android:supportsRtl="true">
       <activity
         android:name=".MainActivity"

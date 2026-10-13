@@ -12,13 +12,14 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [ ] **Stack: on Sereus 1.12 / Optimystic 1.10.1 / Quereus 4.20.1 / FRET 1.0.1, one copy each;
-  upgrading to Sereus 1.14 / Optimystic 1.12.1.** `taleus-core` depends on `@quereus/quereus` and
+- [ ] **Stack: on Sereus 1.15 / Optimystic 1.13 / Quereus 4.20.2 / FRET 1.0.2, one copy each.**
+  1.15's control schema change means a party made on 1.14 must be recreated (test phones wiped
+  2026-10-12). `taleus-core` depends on `@quereus/quereus` and
   `@optimystic/quereus-plugin-crypto` directly; the prescribed-usage checklist the Sereus adapter must
   follow is in `packages/taleus-core/SPEC.md` § Where Sereus plugs in.
 - [ ] **Upstream items we filed** (2026-10-05):
-  - gotchoices/sereus#33 — native Ed25519 in `@serfab/cadre-rn` (`/polyfills/native-crypto`). Open.
-    When it ships, the mobile app drops its own `src/polyfills/native-crypto.js` for the kit's.
+  - gotchoices/sereus#33 — native Ed25519 in `@serfab/cadre-rn` (`/polyfills/native-crypto`).
+    **Shipped in 1.15**; the mobile app imports the kit's and dropped its own.
   - gotchoices/Optimystic#30 — `quereus-plugin-crypto` has no native-crypto seam: its SQL `verify` runs
     pure-JS Ed25519 (408 ms of a 29 s invite on a Galaxy S7). Open.
   - gotchoices/Optimystic#31 — cohort-topic proof-of-work starved the phone's JS thread. **Fixed in
