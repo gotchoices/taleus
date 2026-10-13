@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
-import { ScrollView, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 
-import { Action, Amount, Card, Failed, Input, Loading, OpenableRow, Options, Row } from '../components'
+import { Action, Amount, Card, Failed, FormScroll, Input, Loading, OpenableRow, Options, Row } from '../components'
 import { listAgreements, type Agreement } from '../data/invitations'
 import { readProfile, type Profile } from '../data/profile'
 import {
@@ -105,7 +105,7 @@ export function StandingInvitation({ navigation }: Props): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Card>
 				<Text style={styles.body}>{t('screens.standing.what')}</Text>
 				{/* Story 10 path E step 2. Saying it here is the point: a party who
@@ -138,7 +138,7 @@ export function StandingInvitation({ navigation }: Props): React.JSX.Element {
 					<Action label={t('screens.standing.publish')} onPress={begin} />
 				</Card>
 			)}
-		</ScrollView>
+		</FormScroll>
 	)
 }
 

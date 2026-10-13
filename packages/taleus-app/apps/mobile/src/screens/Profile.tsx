@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
-import { ScrollView, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 
-import { Action, Card, Failed, Input, Loading, OpenableRow, Options } from '../components'
+import { Action, Card, Failed, FormScroll, Input, Loading, OpenableRow, Options } from '../components'
 import {
 	authorizeCorrection,
 	setField,
@@ -77,7 +77,7 @@ export function Profile({ navigation }: Props): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Card title={t('screens.profile.held')} footnote={t('screens.profile.held-note')}>
 				{held.map(field =>
 					editing?.key === field.key ? (
@@ -173,7 +173,7 @@ export function Profile({ navigation }: Props): React.JSX.Element {
 					))
 				)}
 			</Card>
-		</ScrollView>
+		</FormScroll>
 	)
 }
 

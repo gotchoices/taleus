@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
-import { ScrollView, Text, TextInput, View } from 'react-native'
+import { Text, TextInput, View } from 'react-native'
 
-import { Action, Amount, Card, Empty, Failed, Loading, OpenableRow, PublisherNote, Row, unitNamesFor } from '../components'
+import { Action, Amount, Card, Empty, Failed, FormScroll, Loading, OpenableRow, PublisherNote, Row, unitNamesFor } from '../components'
 import { readOffer, respondToOffer, type Change, type Offer, type ProposedTerms } from '../data/offers'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
@@ -77,7 +77,7 @@ export function ReviewOffer({ route, navigation }: Props): React.JSX.Element {
 	const readable = value.agreement.readable !== false
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Text style={styles.lead}>{t('screens.review-offer.who', { name })}</Text>
 
 			{/* Step 3: exactly what changed, before the terms themselves. */}
@@ -179,7 +179,7 @@ export function ReviewOffer({ route, navigation }: Props): React.JSX.Element {
 					secondary
 				/>
 			</Card>
-		</ScrollView>
+		</FormScroll>
 	)
 }
 
@@ -195,7 +195,7 @@ function Superseded({ offer }: { offer: Offer }): React.JSX.Element {
 		return <Empty title={t('screens.review-offer.none-title')} />
 	}
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Text style={styles.lead}>{t('screens.review-offer.superseded-title')}</Text>
 			<Text style={styles.caption}>{t('screens.review-offer.superseded-body')}</Text>
 
@@ -222,7 +222,7 @@ function Superseded({ offer }: { offer: Offer }): React.JSX.Element {
 			</Card>
 
 			<Text style={styles.caption}>{t('screens.review-offer.superseded-onward')}</Text>
-		</ScrollView>
+		</FormScroll>
 	)
 }
 

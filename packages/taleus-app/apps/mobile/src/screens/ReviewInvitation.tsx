@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react'
-import { ScrollView, Text, TextInput, View } from 'react-native'
+import { Text, TextInput, View } from 'react-native'
 
-import { Action, Amount, Card, Empty, Failed, Loading, OpenableRow, Options, PublisherNote, Row, unitNamesFor } from '../components'
-import { readInvitation, respondToInvitation, type OpenInvitation } from '../data/invitations'
+import { Action, Amount, Card, Empty, Failed, FormScroll, Loading, OpenableRow, Options, PublisherNote, Row, unitNamesFor } from '../components'
+import { DEFAULT_NOTICE_DAYS, readInvitation, respondToInvitation, type OpenInvitation } from '../data/invitations'
 import { trustAgreement, trustPublisher } from '../data/publishers'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
@@ -32,7 +32,7 @@ export function ReviewInvitation({ route, navigation }: Props): React.JSX.Elemen
 
 	const [disclosed, setDisclosed] = useState<Record<string, string>>({})
 	const [limit, setLimit] = useState('0')
-	const [notice, setNotice] = useState('14')
+	const [notice, setNotice] = useState(String(DEFAULT_NOTICE_DAYS))
 	const [outcome, setOutcome] = useState<'accepted' | 'refused' | undefined>()
 	const [trust, setTrust] = useState<TrustChoice>('neither')
 	const [problem, setProblem] = useState<string | undefined>()
@@ -91,7 +91,7 @@ export function ReviewInvitation({ route, navigation }: Props): React.JSX.Elemen
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Text style={styles.lead}>
 				{t('screens.review-invitation.who', { name: inviterName(value) })}
 			</Text>
@@ -198,7 +198,7 @@ export function ReviewInvitation({ route, navigation }: Props): React.JSX.Elemen
 				<Text style={styles.caption}>{t('screens.review-invitation.name-needed')}</Text>
 			)}
 			<Action label={t('screens.review-invitation.refuse')} onPress={() => void respond('refuse')} secondary />
-		</ScrollView>
+		</FormScroll>
 	)
 }
 

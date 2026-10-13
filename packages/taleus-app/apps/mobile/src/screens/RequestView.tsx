@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
-import { ScrollView, Text, TextInput } from 'react-native'
+import { Text, TextInput } from 'react-native'
 
-import { Action, Amount, Card, Chip, Failed, Loading, Row, amountText } from '../components'
+import { Action, Amount, amountText, Card, Chip, Failed, FormScroll, Loading, Row } from '../components'
 import { declineRequest, readRequest, withdrawRequest, type PaymentRequest } from '../data/requests'
 import { readTally } from '../data/tally'
 import type { Result, Unit } from '../data/types'
@@ -70,7 +70,7 @@ export function RequestView({ route, navigation }: Props): React.JSX.Element {
 	const part = request.state === 'part-answered'
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Text style={styles.lead}>
 				{t(`screens.request-view.${request.direction}`, { name: counterparty })}
 			</Text>
@@ -170,7 +170,7 @@ export function RequestView({ route, navigation }: Props): React.JSX.Element {
 					secondary
 				/>
 			</Card>
-		</ScrollView>
+		</FormScroll>
 	)
 }
 

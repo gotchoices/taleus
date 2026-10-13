@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
-import { ScrollView, Text, TextInput, View } from 'react-native'
+import { Text, TextInput, View } from 'react-native'
 
-import { Action, Card, Empty, Failed, Loading } from '../components'
+import { Action, Card, Empty, Failed, FormScroll, Loading } from '../components'
 import { createRequest } from '../data/requests'
 import { readTally } from '../data/tally'
 import type { DataError } from '../data/types'
@@ -63,7 +63,7 @@ export function CreateRequest({ route }: Props): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Text style={styles.lead}>
 				{t('screens.create-request.lead', { name: value.counterparty.name })}
 			</Text>
@@ -100,7 +100,7 @@ export function CreateRequest({ route }: Props): React.JSX.Element {
 
 			{failure ? <Text style={styles.error}>{failure.message}</Text> : null}
 			<Action label={t('screens.create-request.send')} onPress={units ? () => void ask() : undefined} />
-		</ScrollView>
+		</FormScroll>
 	)
 }
 

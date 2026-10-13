@@ -37,6 +37,9 @@ Every tally is governed by an agreement both parties accept — chosen when the 
 agreements someone has published and stands behind. Terms (limits, notice) are arguments to it. A
 party can read it before accepting and can refuse it.
 
+Notice is offered at 30 days wherever a party sets it, inviting or accepting: the customary term for
+credit between people who trade. Either party changes it before agreeing.
+
 ## Requests
 
 A request for payment is not an offer and does not behave like one.

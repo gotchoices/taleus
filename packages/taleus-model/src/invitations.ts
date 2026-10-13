@@ -5,6 +5,9 @@ import type { Amount, Counterparty, Instant, Result, Unit } from './types.js'
 export type { Agreement, ImportedAgreement } from './agreement.js'
 
 /** An invitation this party issued. No tally exists until someone responds. */
+/** The notice offered wherever a party sets it, inviting or accepting (`specs/domain/rules.md`). */
+export const DEFAULT_NOTICE_DAYS = 30
+
 export interface Invitation {
 	token: string
 	/**

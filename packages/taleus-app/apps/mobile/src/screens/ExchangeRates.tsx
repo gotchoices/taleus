@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
-import { I18nManager, ScrollView, Text, View } from 'react-native'
+import { I18nManager, Text, View } from 'react-native'
 
-import { Action, Amount, Card, Chip, Failed, Input, Loading, Options, Row } from '../components'
+import { Action, Amount, Card, Chip, Failed, FormScroll, Input, Loading, Options, Row } from '../components'
 import {
 	clearRate,
 	isStale,
@@ -96,7 +96,7 @@ export function ExchangeRates(): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Card>
 				<Text style={styles.caption}>{t('screens.rates.private')}</Text>
 				{/* Path C: a rate is the party's own valuation, and the app never
@@ -150,7 +150,7 @@ export function ExchangeRates(): React.JSX.Element {
 			)}
 
 			<Converted page={value} />
-		</ScrollView>
+		</FormScroll>
 	)
 }
 

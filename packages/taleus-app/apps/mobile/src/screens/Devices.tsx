@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
-import { ScrollView, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 
-import { Action, Card, Chip, Failed, Input, Loading, Options } from '../components'
+import { Action, Card, Chip, Failed, FormScroll, Input, Loading, Options } from '../components'
 import {
 	addDevice,
 	hasAlwaysOn,
@@ -60,7 +60,7 @@ export function Devices(): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Card>
 				<Text style={styles.body}>{t('screens.devices.intro')}</Text>
 			</Card>
@@ -177,7 +177,7 @@ export function Devices(): React.JSX.Element {
 					secondary
 				/>
 			)}
-		</ScrollView>
+		</FormScroll>
 	)
 }
 

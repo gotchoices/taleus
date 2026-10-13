@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { ScrollView, Text, TextInput, View } from 'react-native'
+import { Text, TextInput, View } from 'react-native'
 
-import { Action, Card } from '../components'
+import { Action, Card, FormScroll } from '../components'
 import { setDisplayName } from '../data/party'
 import type { DataError } from '../data/types'
 import { t } from '../i18n'
@@ -52,7 +52,7 @@ export function ChooseName({ onDone }: Props & { onDone?: () => void }): React.J
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Card>
 				<Text style={styles.caption}>{t('screens.choose-name.identity-made')}</Text>
 				<Text style={styles.caption}>{t('screens.choose-name.on-this-device')}</Text>
@@ -87,7 +87,7 @@ export function ChooseName({ onDone }: Props & { onDone?: () => void }): React.J
 				onPress={trimmed && !busy ? () => void save() : undefined}
 			/>
 			{trimmed ? null : <Text style={styles.caption}>{t('screens.choose-name.needed')}</Text>}
-		</ScrollView>
+		</FormScroll>
 	)
 }
 

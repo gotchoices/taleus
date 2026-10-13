@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react'
-import { Pressable, ScrollView, Share, Text, TextInput, useWindowDimensions, View } from 'react-native'
+import { Pressable, Share, Text, TextInput, useWindowDimensions, View } from 'react-native'
 import QRCode from 'react-native-qrcode-svg'
 
-import { Action, Amount, Card, Chip, Failed, Input as LabelledInput, Loading, OpenableRow, PublisherNote, Row } from '../components'
+import { Action, Amount, Card, Chip, Failed, FormScroll, Input as LabelledInput, Loading, OpenableRow, PublisherNote, Row } from '../components'
 import {
+	DEFAULT_NOTICE_DAYS,
 	createInvitation,
 	importAgreement,
 	listAgreements,
@@ -54,7 +55,7 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 
 	const [note, setNote] = useState('')
 	const [limit, setLimit] = useState('500')
-	const [notice, setNotice] = useState('14')
+	const [notice, setNotice] = useState(String(DEFAULT_NOTICE_DAYS))
 	const [unit, setUnit] = useState(units[0])
 	const [agreementId, setAgreementId] = useState<string | undefined>()
 	const [days, setDays] = useState(1)
@@ -128,7 +129,7 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Text style={styles.caption}>{t('screens.create-invitation.no-recipient')}</Text>
 
 			<Field label={t('screens.create-invitation.note-label')} note={t('screens.create-invitation.note-note')}>
@@ -274,7 +275,7 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 					)}
 				</Card>
 			) : null}
-		</ScrollView>
+		</FormScroll>
 	)
 }
 
@@ -291,7 +292,7 @@ function ShareInvitation({ invitation, onDone }: { invitation: Invitation; onDon
 		await Share.share({ message: link, url: link, title: t('screens.create-invitation.send-title') })
 	}
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Card title={t('screens.create-invitation.made-title')} footnote={t('screens.create-invitation.made-body')}>
 				{invitation.note ? <Text style={styles.body}>{invitation.note}</Text> : null}
 				<Text style={styles.caption}>{t('screens.create-invitation.expires', { date: formatInstant(invitation.expires) })}</Text>
@@ -312,7 +313,7 @@ function ShareInvitation({ invitation, onDone }: { invitation: Invitation; onDon
 			</Card>
 
 			<Action label={t('screens.create-invitation.done')} onPress={onDone} secondary />
-		</ScrollView>
+		</FormScroll>
 	)
 }
 

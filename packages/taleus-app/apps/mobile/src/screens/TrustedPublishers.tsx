@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
-import { ScrollView, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 
-import { Action, Card, Failed, Input, Loading, Row } from '../components'
+import { Action, Card, Failed, FormScroll, Input, Loading, Row } from '../components'
 import { listTrusted, trustPublisher, untrustPublisher, type TrustedPublisher } from '../data/publishers'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
@@ -55,7 +55,7 @@ export function TrustedPublishers(_props: Props): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Text style={styles.caption}>{t('screens.publishers.intro')}</Text>
 
 			<Card title={t('screens.publishers.list')} footnote={t('screens.publishers.kept-for-you')}>
@@ -84,7 +84,7 @@ export function TrustedPublishers(_props: Props): React.JSX.Element {
 				{problem ? <Text style={styles.error}>{problem}</Text> : null}
 				<Action label={t('screens.publishers.add-do')} onPress={name.trim() ? () => void add() : undefined} />
 			</Card>
-		</ScrollView>
+		</FormScroll>
 	)
 }
 

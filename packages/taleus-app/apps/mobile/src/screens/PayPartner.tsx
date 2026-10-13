@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
-import { ScrollView, Text, TextInput, View } from 'react-native'
+import { Text, TextInput, View } from 'react-native'
 
-import { Action, Amount, Card, Empty, Failed, Loading, Row, amountText } from '../components'
+import { Action, Amount, amountText, Card, Empty, Failed, FormScroll, Loading, Row } from '../components'
 import { previewEntry, recordEntry, type Preview } from '../data/entries'
 import { readTally, type TallyDetail } from '../data/tally'
 import type { DataError } from '../data/types'
@@ -96,7 +96,7 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 	}
 
 	return (
-		<ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+		<FormScroll style={styles.screen} contentContainerStyle={styles.content}>
 			<Text style={styles.lead}>
 				{t('screens.pay-partner.lead', { name: tally.counterparty.name })}
 			</Text>
@@ -170,7 +170,7 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 			{/* Live whenever there is an amount: past the limit is a warning, not a wall. */}
 			<Action label={t('screens.pay-partner.sign')} onPress={units ? () => void sign() : undefined} />
 			{units ? null : <Text style={styles.caption}>{t('screens.pay-partner.amount-needed')}</Text>}
-		</ScrollView>
+		</FormScroll>
 	)
 }
 

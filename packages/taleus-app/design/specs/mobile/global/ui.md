@@ -71,6 +71,10 @@ Cross-screen conventions, so thirty screens do not each invent one.
 - **Anything tappable looks tappable**: a pressed state always; a trailing chevron on a row that
   opens something. Nothing that is not tappable wears either.
 - **Touch targets**: 44pt minimum (48dp on Android), whatever the text size.
+- **The on-screen keyboard** never makes a screen with a text field unusable: the field being typed
+  into stays visible (the view scrolls rather than being covered), a tap on a control while the
+  keyboard is up acts on the control rather than only dismissing the keyboard, and nothing needed
+  to finish sits under the keyboard. On every Android version, edge-to-edge included.
 - **Tally states and waiting-on** appear as filled chips, not inline gray text — the *waiting on me*
   case is what a party opened the app to find.
 - **Icons** appear in five places and nowhere else: the tab bar (always with its label), the row
