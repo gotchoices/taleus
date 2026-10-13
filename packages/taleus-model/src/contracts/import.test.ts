@@ -1,7 +1,7 @@
 import { createLocalWorld } from '../engine/index.js'
 import { documentLink, MemoryDocumentCache, type Fetch } from './library.js'
 import type { Result } from '../types.js'
-import { testContract } from './test-contract.js'
+import { testContract } from '../testing/index.js'
 
 function must<T>(result: Result<T>): T {
 	if (!result.ok) throw new Error(`${result.error.kind}: ${result.error.message}`)

@@ -1,0 +1,53 @@
+{
+	"name": "taleus-sereus",
+	"version": "0.1.0",
+	"description": "Taleus on Sereus: each tally a closed two-party Sereus strand, behind taleus-core's StoreProvider. Platform-neutral; every host (phone, CLI, web, taleus-node) hands it a running cadre node.",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+		"lint": "eslint ./src"
+	},
+	"dependencies": {
+		"@multiformats/multiaddr": "^13.0.3"
+	},
+	"devDependencies": {
+		"@eslint/js": "10.0.1",
+		"@libp2p/circuit-relay-v2": "^4.2.13",
+		"@libp2p/crypto": "^5.1.23",
+		"@libp2p/websockets": "^10.1.21",
+		"@optimystic/db-p2p": "^1.13.0",
+		"@quereus/quereus": "^4.20.2",
+		"@serfab/cadre-core": "^1.15.0",
+		"@types/jest": "30.0.0",
+		"@types/node": "26.1.1",
+		"cross-env": "7.0.3",
+		"eslint": "10.7.0",
+		"globals": "17.7.0",
+		"jest": "30.4.2",
+		"taleus-core": "workspace:^",
+		"taleus-model": "workspace:^",
+		"ts-jest": "29.4.11",
+		"typescript": "6.0.3",
+		"typescript-eslint": "8.63.0"
+	},
+	"peerDependencies": {
+		"@serfab/cadre-core": "^1.15.0",
+		"taleus-core": "^0.1.0"
+	}
+}

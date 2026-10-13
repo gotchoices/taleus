@@ -86,7 +86,7 @@ module keeps its in-process suite against doubles until direct chits work on a r
   runs today. Two parties go from invitation to close through the API alone. It surfaced a defect
   no row-level test could: a `TallyContract` could not be completed by two parties who do not share
   a key (fixed — see that package's `test/STATUS.md` § 0).
-- [x] **A store over real strands.** `taleus-model/cadre`'s `cadreStoreProvider` founds a tally strand,
+- [x] **A store over real strands.** `taleus-sereus`'s `cadreStoreProvider` founds a tally strand,
   invites, joins, seats and trades between two cadre-core nodes in Node, across a restart
   (`cadre.test.ts`). Details and what remains: `tickets/blocked/feat-engine-cadre-mode.md`.
 - [ ] Migrate the row-level suite up per `test/STATUS.md` § Roadmap step 4.
@@ -126,6 +126,12 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   with a simulated counterparty for one-device use -- and one contract suite run against both. The
   app's data layer forwards to it, so screens see no backend at all. Wiring engine mode into the app
   is next -- `feat-engine-run-modes` § Progress.
+- [ ] **A CLI client (`taleus-app/apps/cli`), as sereus chat has.** A second host over the same
+  model: a counterparty for phone tests, a scripted scenario suite over a relay, a debugging tool,
+  and the Node host `taleus-node` will reuse. Steps: (1) the Sereus binding as its own package --
+  **done**, `taleus-sereus`; (2) a Node host (file-backed keys and storage, relays) after chat's
+  `apps/cli`; (3) a `cli` appeus target with stories and a command spec; (4) CLI-vs-CLI formation
+  scenario, then phone-vs-CLI to tell phone-side cost from the read path (#47).
 - [ ] **Run a cadre node for Taleus.** Not done: being prepared in a separate effort. The phone
   app's Mode C (below) runs a phone node through `@serfab/cadre-rn`; an always-on cadre node serving
   a party's tallies (and `taleus-node`, `feat-taleus-node-service`) is the part still to come.

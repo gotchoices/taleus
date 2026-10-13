@@ -20,9 +20,9 @@ import {
 	MemoryTrustedOwnerStore,
 } from '@serfab/cadre-core'
 
-import { offline, testContract } from '../contracts/test-contract.js'
-import { createEngineModel, type EngineModel, type PartyIdentity } from '../engine/index.js'
-import type { Result } from '../types.js'
+import type { Result } from 'taleus-model'
+import { createEngineModel, type EngineModel, type PartyIdentity } from 'taleus-model/engine'
+import { offline, testContract } from 'taleus-model/testing'
 import { taleusSApp } from './sapp.js'
 import { cadreStoreProvider } from './store.js'
 
@@ -234,7 +234,7 @@ describe('a tally formed through the engine, on real strands', () => {
 		engines.push(again)
 
 		const relaunched = invitee
-		await waitUntil('the node relaunches the strand, gated', async () => relaunched.getStrands().get(tallyId)?.status === 'syncing')
+		await waitUntil('the node relaunches the strand, gated', () => Promise.resolve(relaunched.getStrands().get(tallyId)?.status === 'syncing'))
 		const started = Date.now()
 		expect(must(await again.model.tallies.listTallies())).toEqual([])
 		expect(must(await again.model.invitations.listInvitations())).toEqual([])

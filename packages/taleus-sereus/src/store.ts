@@ -75,16 +75,16 @@ class CadreStoreProvider implements StoreProvider {
 		// Subscribe, then drain what was offered before this store existed: a strand offered
 		// between the two is attached once either way.
 		options.node.on('strand:discovered', ({ strand }) => {
-			void this.attach(strand).catch(err => console.warn(`taleus-model/cadre: attaching ${strand.Id} failed:`, err))
+			void this.attach(strand).catch(err => console.warn(`taleus-sereus: attaching ${strand.Id} failed:`, err))
 		})
 		for (const strand of options.node.getDiscoveredStrands().values()) {
-			void this.attach(strand).catch(err => console.warn(`taleus-model/cadre: attaching ${strand.Id} failed:`, err))
+			void this.attach(strand).catch(err => console.warn(`taleus-sereus: attaching ${strand.Id} failed:`, err))
 		}
 	}
 
-	async list(): Promise<TallyRef[]> {
+	list(): Promise<TallyRef[]> {
 		const strands = [...this.options.node.getStrands().values()]
-		return strands.filter(readable).map(strand => ({ id: strand.strandId }))
+		return Promise.resolve(strands.filter(readable).map(strand => ({ id: strand.strandId })))
 	}
 
 	async open(ref: TallyRef): Promise<TallyStore> {
@@ -283,7 +283,7 @@ class CadreTallyStore implements TallyStore {
 				return await this.applyOnce(writes)
 			} catch (error) {
 				if (!lackedSuperMajority(error) || attempt >= WRITE_ATTEMPTS) throw error
-				console.warn(`taleus-model/cadre: write attempt ${attempt} lacked a super-majority; retrying`)
+				console.warn(`taleus-sereus: write attempt ${attempt} lacked a super-majority; retrying`)
 				await new Promise<void>(resolve => setTimeout(() => resolve(), WRITE_RETRY_MS))
 			}
 		}

@@ -15,7 +15,7 @@ import { kvStoreSlot, secureStoreSlot } from '@serfab/cadre-rn/node-local'
 import { buildNoiseCrypto, DEFAULT_NOISE_CRYPTO_MODE } from '@serfab/cadre-rn/noise-crypto'
 import { createPhoneNode, type PhoneNodeOptions } from '@serfab/cadre-rn/phone-node'
 import type { TaleusModel } from 'taleus-model'
-import { cadreStoreProvider, taleusSApp } from 'taleus-model/cadre'
+import { cadreStoreProvider, taleusSApp } from 'taleus-sereus'
 import { slotDocumentCache } from 'taleus-model/contracts'
 import { createEngineModel } from 'taleus-model/engine'
 

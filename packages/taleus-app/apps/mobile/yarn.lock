@@ -8458,6 +8458,7 @@ __metadata:
     react-test-renderer: "npm:19.2.3"
     rn-leveldb: "npm:^3.11.1"
     taleus-model: "link:../../../taleus-model"
+    taleus-sereus: "link:../../../taleus-sereus"
     test-renderer: "npm:^1.0.0"
     typescript: "npm:^6.0.3"
   languageName: unknown
@@ -10578,6 +10579,12 @@ __metadata:
 "taleus-model@link:../../../taleus-model::locator=mobile%40workspace%3A.":
   version: 0.0.0-use.local
   resolution: "taleus-model@link:../../../taleus-model::locator=mobile%40workspace%3A."
+  languageName: node
+  linkType: soft
+
+"taleus-sereus@link:../../../taleus-sereus::locator=mobile%40workspace%3A.":
+  version: 0.0.0-use.local
+  resolution: "taleus-sereus@link:../../../taleus-sereus::locator=mobile%40workspace%3A."
   languageName: node
   linkType: soft
 

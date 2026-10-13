@@ -5827,17 +5827,11 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"taleus-model@workspace:packages/taleus-model":
+"taleus-model@workspace:^, taleus-model@workspace:packages/taleus-model":
   version: 0.0.0-use.local
   resolution: "taleus-model@workspace:packages/taleus-model"
   dependencies:
     "@eslint/js": "npm:10.0.1"
-    "@libp2p/circuit-relay-v2": "npm:^4.2.13"
-    "@libp2p/crypto": "npm:^5.1.23"
-    "@libp2p/websockets": "npm:^10.1.21"
-    "@multiformats/multiaddr": "npm:^13.0.3"
-    "@optimystic/db-p2p": "npm:^1.13.0"
-    "@serfab/cadre-core": "npm:^1.15.0"
     "@stroc/compose": "npm:^0.3.0"
     "@stroc/core": "npm:^0.3.0"
     "@types/jest": "npm:30.0.0"
@@ -5852,11 +5846,8 @@ __metadata:
     typescript: "npm:6.0.3"
     typescript-eslint: "npm:8.63.0"
   peerDependencies:
-    "@serfab/cadre-core": ^1.15.0
     taleus-core: ^0.1.0
   peerDependenciesMeta:
-    "@serfab/cadre-core":
-      optional: true
     taleus-core:
       optional: true
   languageName: unknown
@@ -5897,6 +5888,35 @@ __metadata:
     typescript-eslint: "npm:8.63.0"
   bin:
     taleus-node: ./dist/cli.js
+  languageName: unknown
+  linkType: soft
+
+"taleus-sereus@workspace:packages/taleus-sereus":
+  version: 0.0.0-use.local
+  resolution: "taleus-sereus@workspace:packages/taleus-sereus"
+  dependencies:
+    "@eslint/js": "npm:10.0.1"
+    "@libp2p/circuit-relay-v2": "npm:^4.2.13"
+    "@libp2p/crypto": "npm:^5.1.23"
+    "@libp2p/websockets": "npm:^10.1.21"
+    "@multiformats/multiaddr": "npm:^13.0.3"
+    "@optimystic/db-p2p": "npm:^1.13.0"
+    "@quereus/quereus": "npm:^4.20.2"
+    "@serfab/cadre-core": "npm:^1.15.0"
+    "@types/jest": "npm:30.0.0"
+    "@types/node": "npm:26.1.1"
+    cross-env: "npm:7.0.3"
+    eslint: "npm:10.7.0"
+    globals: "npm:17.7.0"
+    jest: "npm:30.4.2"
+    taleus-core: "workspace:^"
+    taleus-model: "workspace:^"
+    ts-jest: "npm:29.4.11"
+    typescript: "npm:6.0.3"
+    typescript-eslint: "npm:8.63.0"
+  peerDependencies:
+    "@serfab/cadre-core": ^1.15.0
+    taleus-core: ^0.1.0
   languageName: unknown
   linkType: soft
 

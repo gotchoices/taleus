@@ -7,7 +7,7 @@
  * engine stop drifting apart.
  */
 import { createLocalWorld } from './engine/index.js'
-import { offline, testContract } from './contracts/test-contract.js'
+import { offline, testContract } from './testing/index.js'
 import { createMockModel } from './mock/index.js'
 import type { TaleusModel } from './model.js'
 import { diskFixtures, tallySchema } from './test-fixtures.js'

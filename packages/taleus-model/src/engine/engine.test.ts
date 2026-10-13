@@ -4,7 +4,7 @@ import { MemoryFabric } from 'taleus-core'
 import tallySchema from 'taleus-core/schema-text/draft1'
 
 import { createEngineModel, createLocalWorld, type DurableText } from './index.js'
-import { offline, testContract } from '../contracts/test-contract.js'
+import { offline, testContract } from '../testing/index.js'
 
 const CONTRACT = await testContract()
 

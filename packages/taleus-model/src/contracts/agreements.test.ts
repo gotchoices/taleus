@@ -3,7 +3,7 @@ import { BUILT_IN_PUBLISHER } from '../agreement.js'
 import { agreementOf, offerableAgreements, TALLY_CONTRACTS, type AgreementContext } from './agreements.js'
 import { ContractLibrary, type Fetch } from './library.js'
 import { StandingChecker, type Trusted } from './standing.js'
-import { testContract } from './test-contract.js'
+import { testContract } from '../testing/index.js'
 
 /**
  * What a party is told about an agreement (story 08): offered when its publisher is trusted, and

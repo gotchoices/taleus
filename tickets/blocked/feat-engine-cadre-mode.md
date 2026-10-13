@@ -27,7 +27,7 @@ code, so the six Taleus-registered scalars (`DayNumber`, `ValidDate`, `ValidDeno
 
 ## Done (Node, against cadre-core 1.11)
 
-- **`cadreStoreProvider`** (`taleus-model/cadre`): `create` founds a closed strand and publishes a
+- **`cadreStoreProvider`** (`taleus-sereus`): `create` founds a closed strand and publishes a
   single-use invitation, carried as `TallyRef.address`; `join` redeems it (`formStrand`) and attaches
   the strand, treating a slow first sync as progress; writes go through `exec(…, { transaction: true })`
   via `taleus-core/host`'s `transactionBatch`, which the in-memory store now uses too.

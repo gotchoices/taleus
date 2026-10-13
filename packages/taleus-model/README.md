@@ -67,15 +67,9 @@ What engine mode adds beyond translation:
   host puts in its secure store; the next `createEngineModel` comes back as the same party. A
   kept identity it cannot read stops the start rather than minting a second one.
 
-**On real strands.** `taleus-model/cadre` exports `cadreStoreProvider({ node, sApp })`, a
-taleus-core `StoreProvider` over a running Sereus `CadreNode` (built on a phone by
-`@serfab/cadre-rn`'s `createPhoneNode`). Each tally is a closed two-party strand with the Taleus sApp.
-`create` founds it and mints a single-use strand invitation, which travels in the ticket's
-`ref.address`; `join` asks to join with it (`requestJoin`, which the party keeps retrying until the
-inviter's side answers) and waits for the strand. Every strand reaches the store as
-`strand:discovered` and is attached once, so a restarted node gets its tallies back. Its test runs two nodes
-over loopback, opens a tally with no polling (the counterparty's commits wake the agent), and
-restarts the invitee's node, which gets the tally back.
+**On real strands.** The store a host hands the engine for real strands is `taleus-sereus`'s
+`cadreStoreProvider`; this package does not depend on Sereus at all. `taleus-model/testing` exports
+the test contract (`testContract`, `offline`) for other packages' tests.
 
 What the core does not support yet comes back as `{ kind: 'unsupported' }` naming its ticket:
 countering an offer, withdrawing a close, withdrawing or part-paying a request, one payment answering

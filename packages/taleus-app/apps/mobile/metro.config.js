@@ -9,8 +9,8 @@ const { withCadreMetro } = require('@serfab/cadre-rn/metro');
  * `mock/data` is a symlink to the appeus project's shared `mock/data`, so Metro
  * has to watch the project root to resolve fixtures through it.
  *
- * `taleus-model` is a linked package (`file:` in package.json, so a symlink in
- * node_modules) that lives outside this project, so Metro watches it too. It
+ * `taleus-model` and `taleus-sereus` are linked packages (`link:` in package.json, so symlinks
+ * in node_modules) that live outside this project, so Metro watches them too. It
  * ships built ESM in its `dist/`; rebuild it (`yarn model:build`, or `tsc
  * --watch` in the package) and Metro picks the change up. In engine mode it
  * imports `taleus-core`, another workspace package, whose own dependencies
@@ -23,6 +23,7 @@ const config = {
 	watchFolders: [
 		path.resolve(__dirname, '../..'),
 		path.resolve(__dirname, '../../../taleus-model'),
+		path.resolve(__dirname, '../../../taleus-sereus'),
 		path.resolve(__dirname, '../../../taleus-core'),
 		path.resolve(__dirname, '../../../../node_modules'),
 	],
@@ -38,7 +39,7 @@ const config = {
 /**
  * The Sereus stack, resolved from this app's node_modules whoever imports it.
  *
- * `taleus-model` and `taleus-core` are linked from the workspace, so Metro resolves their
+ * `taleus-model`, `taleus-sereus` and `taleus-core` are linked from the workspace, so Metro resolves their
  * imports from the repository's node_modules, which holds its own copy of the stack for their
  * Node tests. Two copies of cadre-core, Quereus or libp2p in one bundle break `instanceof`
  * checks and libp2p itself (sereus 1.10: an embedder must resolve a single

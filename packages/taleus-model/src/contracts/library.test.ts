@@ -1,5 +1,5 @@
 import { ContractLibrary, MemoryDocumentCache, type Fetch } from './library.js'
-import { offline, testContract } from './test-contract.js'
+import { offline, testContract } from '../testing/index.js'
 
 /**
  * The library's one guarantee: a document is used only if its bytes are the document its CID

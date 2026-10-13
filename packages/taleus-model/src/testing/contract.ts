@@ -1,10 +1,11 @@
 /**
  * A two-document contract for tests: an agreement that includes one clause, as real Stroc
- * documents, seeded into a device cache so nothing has to be fetched. Excluded from the build.
+ * documents, seeded into a device cache so nothing has to be fetched. Published as
+ * `taleus-model/testing` for other packages' tests (the Sereus binding's, the CLI's scenarios).
  */
 import { documentCid, fromPlain } from '@stroc/core'
 import type { StoredDocument } from 'taleus-core'
-import { MemoryDocumentCache, type Fetch } from './library.js'
+import { MemoryDocumentCache, type Fetch, type FetchResponse } from '../contracts/library.js'
 
 export interface TestContract {
 	/** The agreement's CID: what an invitation names and a tally signs. */
@@ -50,7 +51,7 @@ export async function testContract(author = 'test.invalid'): Promise<TestContrac
 		publisher: async url => {
 			const prefix = `https://${author}/ipfs/`
 			const document = url.startsWith(prefix) ? documents.find(d => url.slice(prefix.length).startsWith(d.cid)) : undefined
-			return document ? new Response(document.json) : new Response('not found', { status: 404 })
+			return document ? served(document.json) : served('not found', 404)
 		},
 		cache: () => {
 			const cache = new MemoryDocumentCache()
@@ -61,6 +62,17 @@ export async function testContract(author = 'test.invalid'): Promise<TestContrac
 }
 
 /** A `fetch` for tests that must not reach the network: every request fails. */
+/** What a web server answers with, in the shape the library reads -- no `Response` global needed. */
+function served(body: string, status = 200): FetchResponse {
+	const bytes = new TextEncoder().encode(body)
+	return {
+		ok: status >= 200 && status < 300,
+		status,
+		json: async () => JSON.parse(body) as unknown,
+		arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+	}
+}
+
 export const offline: Fetch = async url => {
 	throw new Error(`offline: ${url}`)
 }

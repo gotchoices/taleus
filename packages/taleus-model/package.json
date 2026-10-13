@@ -86,13 +86,13 @@
 			"types": "./dist/engine/index.d.ts",
 			"default": "./dist/engine/index.js"
 		},
-		"./cadre": {
-			"types": "./dist/cadre/index.d.ts",
-			"default": "./dist/cadre/index.js"
-		},
 		"./contracts": {
 			"types": "./dist/contracts/index.d.ts",
 			"default": "./dist/contracts/index.js"
+		},
+		"./testing": {
+			"types": "./dist/testing/index.d.ts",
+			"default": "./dist/testing/index.js"
 		}
 	},
 	"engines": {
@@ -104,18 +104,12 @@
 		"lint": "eslint ./src"
 	},
 	"dependencies": {
-		"@multiformats/multiaddr": "^13.0.3",
 		"@stroc/compose": "^0.3.0",
 		"@stroc/core": "^0.3.0",
 		"multiformats": "^14.0.5"
 	},
 	"devDependencies": {
 		"@eslint/js": "10.0.1",
-		"@libp2p/circuit-relay-v2": "^4.2.13",
-		"@libp2p/crypto": "^5.1.23",
-		"@libp2p/websockets": "^10.1.21",
-		"@optimystic/db-p2p": "^1.13.0",
-		"@serfab/cadre-core": "^1.15.0",
 		"@types/jest": "30.0.0",
 		"@types/node": "26.1.1",
 		"cross-env": "7.0.3",
@@ -128,13 +122,9 @@
 		"typescript-eslint": "8.63.0"
 	},
 	"peerDependencies": {
-		"@serfab/cadre-core": "^1.15.0",
 		"taleus-core": "^0.1.0"
 	},
 	"peerDependenciesMeta": {
-		"@serfab/cadre-core": {
-			"optional": true
-		},
 		"taleus-core": {
 			"optional": true
 		}

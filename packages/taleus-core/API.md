@@ -5,7 +5,7 @@
 several parties' replicas in one process. `src/api/engine.test.ts` carries two parties from an
 invitation through payment, requests, credit revision, key rotation and close — 18 tests, all
 through the API, none of them naming a table. The Sereus-backed `StoreProvider` is
-`taleus-model/cadre` (`cadreStoreProvider`): each tally a closed two-party strand on a running
+`taleus-sereus` (`cadreStoreProvider`): each tally a closed two-party strand on a running
 `CadreNode`. A host implementing a store uses `taleus-core/host` (the transaction batch, the schema's
 table list, the table watcher), so every store writes and watches the same way.
 
@@ -254,7 +254,7 @@ must(await janTally.pay({ amount: usd(30000) }))
   member's own replica, and the engine maps the tables a commit touched to a `ChangeKind`. That is
   the whole mechanism. In memory it delivers the counterparty's acts because every replica commits
   in process. On a Sereus strand it delivers them because Optimystic reports a replicated commit
-  through Quereus's `notifyExternalChange`; `taleus-model/cadre`'s test opens a tally between two
+  through Quereus's `notifyExternalChange`; `taleus-sereus`'s test opens a tally between two
   nodes with no polling at all. The cadre store adds a slow backstop poll (10 s) in case a commit
   ever arrives without a watch.
 - **`TallyState` is computed here**, because the schema does not materialize a negotiation state

@@ -20,7 +20,7 @@
     "publish:scenarios": "sh ./scripts/publish-scenarios.sh",
     "start": "yarn model:build && sh -c '. ./env-defaults.sh && react-native start --port \"$METRO_PORT\"'",
     "test": "yarn model:build && jest",
-    "model:build": "yarn --cwd ../../../taleus-core build && yarn --cwd ../../../taleus-model build"
+    "model:build": "yarn --cwd ../../../taleus-core build && yarn --cwd ../../../taleus-model build && yarn --cwd ../../../taleus-sereus build"
   },
   "dependencies": {
     "@craftzdog/react-native-buffer": "^6.1.2",
@@ -61,7 +61,8 @@
     "react-native-vision-camera-barcode-scanner": "^5.2.3",
     "react-native-worklets": "0.13.0",
     "rn-leveldb": "^3.11.1",
-    "taleus-model": "link:../../../taleus-model"
+    "taleus-model": "link:../../../taleus-model",
+    "taleus-sereus": "link:../../../taleus-sereus"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
