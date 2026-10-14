@@ -167,7 +167,16 @@ const wait: Command = {
 		const deadline = Date.now() + seconds * 1000
 		const started = Date.now()
 		for (;;) {
-			const list = await session.tallies()
+			let list: TallySummary[]
+			try {
+				list = await session.tallies()
+			} catch (error) {
+				// A moment's unreachable store is what waiting rides out; anything else ends the wait.
+				if (!(error instanceof CliFailure && error.code === EXIT.retryable) || Date.now() >= deadline) throw error
+				session.out.note(`wait: ${error.message}; still waiting`)
+				await new Promise(resolve => setTimeout(resolve, 2000))
+				continue
+			}
 			const candidates = only === undefined ? list : [await session.tally(only)]
 			const reached = candidates.find(tally => tallyRow(tally).state === state)
 			if (reached) {

@@ -140,7 +140,13 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   file writes, 216 fsyncs); on a RAM disk 3.3 s / 7.8 s / 0.4 s. That is a macOS cost: there an
   fsync'd file write takes ~40 ms; on Linux ext4 (saturn) 1.9 ms, and a three-row commit 66-168 ms
   against 22-50 ms in memory. So profile on Linux or a RAM disk. Filed as an enhancement, with
-  Sereus Chat's matching findings and the platform durability question: gotchoices/Optimystic#37. Still to look into: what remains of the accept
+  Sereus Chat's matching findings and the platform durability question: gotchoices/Optimystic#37.
+  Phone-shaped profiling (`--busy 0.7 --latency 20:serial`, 2026-10-14): a busy CPU alone does the same
+  work slower; with the frame cap the stack thrashes (fixed deadlines fire, retries and re-asked reads
+  pile onto the slow link). Node repro drafted for sereus (`strand-workload-on-a-phone-link`: ops fail
+  and sides diverge while both are up). Taleus side: the model now returns `store-unavailable`
+  (retryable) instead of throwing (`engine/unavailable.ts`); a tally's view reads its tables
+  concurrently (`TallyEngine.read`). Still to look into: what remains of the accept
   (7.8 s, mostly busy; about 15,000 debug lines for one join), then phone-vs-CLI.
 - [ ] **Run a cadre node for Taleus.** Not done: being prepared in a separate effort. The phone
   app's Mode C (below) runs a phone node through `@serfab/cadre-rn`; an always-on cadre node serving

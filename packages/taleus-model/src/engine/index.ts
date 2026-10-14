@@ -17,6 +17,7 @@ import { localAreas } from './local.js'
 import { publishersModel } from './publishers.js'
 import { Session, type PartyIdentity, type SessionOptions } from './session.js'
 import { offersModel, talliesModel, tallyModel } from './tallies.js'
+import { guarded } from './unavailable.js'
 
 export type { DurableText, PartyIdentity, SessionOptions, SessionStorage } from './session.js'
 
@@ -37,21 +38,22 @@ export async function createEngineModel(options: SessionOptions): Promise<Engine
 	if (identity) await session.start(identity)
 	const local = localAreas(session)
 	const model: TaleusModel = {
-		party: partyModel(session),
-		invitations: invitationsModel(session),
-		offers: offersModel(session),
-		tallies: talliesModel(session),
-		tally: tallyModel(session),
-		entries: entriesModel(session),
-		requests: requestsModel(session),
-		attention: attentionModel(session),
-		position: positionModel(session, () => local.displayUnit()),
+		// The namespaces that read the tallies' stores: an unreachable store is a retryable failure.
+		party: guarded(partyModel(session)),
+		invitations: guarded(invitationsModel(session)),
+		offers: guarded(offersModel(session)),
+		tallies: guarded(talliesModel(session)),
+		tally: guarded(tallyModel(session)),
+		entries: guarded(entriesModel(session)),
+		requests: guarded(requestsModel(session)),
+		attention: guarded(attentionModel(session)),
+		position: guarded(positionModel(session, () => local.displayUnit())),
 		settings: local.settings,
 		notifications: local.notifications,
 		rates: local.rates,
 		devices: local.devices,
 		profile: local.profile,
-		publishers: publishersModel(session),
+		publishers: guarded(publishersModel(session)),
 		standing: local.standing,
 	}
 	return {
