@@ -9,6 +9,9 @@
  * `--debug ''` turns the stack's debug output off, for timings the logging does not inflate.
  * `--cpu-prof` writes each party's V8 CPU profile to `cpu-<party>/` (`summarize-cpu.ts` reads it).
  * `--count-fsync` logs every fsync (`count-fsync.mjs`), as `fsync:file` / `fsync:dir` lines.
+ * `--busy <fraction>` keeps each party's event loop that busy (`busy-loop.mjs`): a phone-shaped CPU.
+ * `--latency <ms>[:serial]` holds each outbound WebSocket frame that long (`ws-latency.mjs`).
+ * `--no-reactivity` runs both parties without push wakes (the CLI's diagnostic switch).
  *
  * Default: loopback (`--listen`), one run per party, no relay -- so nothing but the stack is
  * measured. With `--relay`, both parties use that relay, as phones do.
@@ -27,6 +30,9 @@ const { values } = parseArgs({
 		timeout: { type: 'string' },
 		'cpu-prof': { type: 'boolean' },
 		'count-fsync': { type: 'boolean' },
+		busy: { type: 'string' },
+		latency: { type: 'string' },
+		'no-reactivity': { type: 'boolean' },
 	},
 })
 const out = resolve(values.out ?? `profile-${new Date().toISOString().replace(/[:.]/g, '-')}`)
@@ -53,7 +59,7 @@ async function mark(party: string, text: string): Promise<void> {
 
 /** Global options every run of a party gets: its home, and how it is reached. */
 function reach(): string[] {
-	return values.relay ? [] : ['--listen']
+	return [...(values.relay ? [] : ['--listen']), ...(values['no-reactivity'] ? ['--no-reactivity'] : [])]
 }
 
 /** Run one party's commands to completion, quietly (setup). */
@@ -73,10 +79,13 @@ function scripted(party: string, commands: string): { child: ChildProcess; done:
 	const profiling = [
 		...(values['cpu-prof'] ? ['--cpu-prof', `--cpu-prof-dir=${join(out, `cpu-${party}`)}`] : []),
 		...(values['count-fsync'] ? ['--import', resolve(import.meta.dirname, 'count-fsync.mjs')] : []),
+		...(values.busy ? ['--import', resolve(import.meta.dirname, 'busy-loop.mjs')] : []),
+		...(values.latency ? ['--import', resolve(import.meta.dirname, 'ws-latency.mjs')] : []),
 	]
+	const [latencyMs, latencyMode] = (values.latency ?? '').split(':')
 	const child = spawn(process.execPath, [...profiling, MAIN, '--home', home, '-p', party, ...reach(), '-v', '-c', commands], {
 		stdio: ['ignore', 'pipe', 'pipe'],
-		env: { ...process.env, DEBUG: debug, DEBUG_COLORS: '0' },
+		env: { ...process.env, DEBUG: debug, DEBUG_COLORS: '0', ...(values.busy ? { TALEUS_BUSY: values.busy } : {}), ...(latencyMs ? { TALEUS_WS_DELAY_MS: latencyMs, TALEUS_WS_MODE: latencyMode ?? 'pipelined' } : {}) },
 	})
 	const log = join(out, `${party}.log`)
 	const lines = (stream: NodeJS.ReadableStream, onLine: (line: string) => void) => {

@@ -199,31 +199,42 @@ class TallyEngine implements Tally {
 
 	/* ── reading ─────────────────────────────────────────────────────────── */
 
+	/**
+	 * The whole view, its parts read concurrently: on a replicated store a read can wait on the other
+	 * member, and a dozen waits taken in turn are a dozen times one.
+	 */
 	async read(): Promise<TallyView> {
-		const core = await this.core()
-		const { code, scale } = await this.denomination()
+		const [core, { code, scale }] = await Promise.all([this.core(), this.denomination()])
 		const mySid = this.env.sid
 		const theirSid = core ? (core.StockSid === mySid ? core.FoilSid : core.StockSid) : ''
+		const [state, myCertificate, theirCertificate, balances, myTerms, theirTerms, myTrading, theirTrading, contract, offer, close] =
+			await Promise.all([
+				this.state(),
+				this.certificateOf(mySid),
+				theirSid ? this.certificateOf(theirSid) : undefined,
+				this.balances(),
+				this.termsOf(mySid, code),
+				theirSid ? this.termsOf(theirSid, code) : undefined,
+				this.tradingOf(mySid, code),
+				theirSid ? this.tradingOf(theirSid, code) : undefined,
+				this.contractView(),
+				this.offerView(),
+				this.closeView(),
+			])
 		return {
 			ref: this.ref,
 			role: this.role,
-			state: await this.state(),
+			state,
 			denomination: code,
 			denominationScale: scale,
-			me: identity(mySid, await this.certificateOf(mySid)),
-			counterparty: identity(theirSid, theirSid ? await this.certificateOf(theirSid) : undefined),
-			balances: await this.balances(),
-			terms: {
-				mine: await this.termsOf(mySid, code),
-				theirs: theirSid ? await this.termsOf(theirSid, code) : undefined,
-			},
-			trading: {
-				mine: await this.tradingOf(mySid, code),
-				theirs: theirSid ? await this.tradingOf(theirSid, code) : undefined,
-			},
-			...(await this.contractView()),
-			...(await this.offerView()),
-			...(await this.closeView()),
+			me: identity(mySid, myCertificate),
+			counterparty: identity(theirSid, theirCertificate),
+			balances,
+			terms: { mine: myTerms, theirs: theirTerms },
+			trading: { mine: myTrading, theirs: theirTrading },
+			...contract,
+			...offer,
+			...close,
 			createdAt: core?.CreatedAt ?? '',
 		}
 	}

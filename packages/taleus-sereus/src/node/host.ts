@@ -34,6 +34,11 @@ export interface NodeHostOptions {
 	extraRelays?: readonly string[]
 	/** Listen addresses for this run; `loopbackListenAddress` gives the party's own. */
 	listen?: readonly string[]
+	/**
+	 * Push a counterparty's commits to this node as they happen (Optimystic's cohort-topic), rather
+	 * than leaving it to the store's poll. On by default; off only to measure what it costs.
+	 */
+	reactivity?: boolean
 }
 
 /** Start the party's node: built over its folder, started, and enrolled as its own owner. */
@@ -44,7 +49,7 @@ export async function startPartyNode(options: NodeHostOptions): Promise<CadreNod
 	return node
 }
 
-async function nodeConfig({ dirs, config, sAppId, extraRelays = [], listen = [] }: NodeHostOptions): Promise<CadreNodeConfig> {
+async function nodeConfig({ dirs, config, sAppId, extraRelays = [], listen = [], reactivity = true }: NodeHostOptions): Promise<CadreNodeConfig> {
 	const { partyId } = config
 	return {
 		keyStore: new FileKeyStore(dirs.keys),
@@ -65,7 +70,7 @@ async function nodeConfig({ dirs, config, sAppId, extraRelays = [], listen = [] 
 		hibernation: { enabled: false },
 		// The tally sApp is unsigned until Taleus signs it at release (`taleusSApp`).
 		requireSignedSchemas: false,
-		strandReactivity: { enabled: true },
+		strandReactivity: { enabled: reactivity },
 		trustedOwners: { store: await FileTrustedOwnerStore.open(dirs.node, partyId) },
 		bootstrapPeers: { store: await FileBootstrapPeerStore.open(dirs.node, partyId) },
 		enrolledMachines: { store: await FileEnrolledMachineStore.open(dirs.node, partyId) },

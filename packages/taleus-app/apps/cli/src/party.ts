@@ -32,6 +32,8 @@ export interface PartyOptions {
 	extraRelays: readonly string[]
 	/** Listen addresses for this run. */
 	listen: readonly string[]
+	/** Push wakes for the partner's commits (diagnostic switch; on by default). */
+	reactivity: boolean
 }
 
 export function runningParty(options: PartyOptions): RunningParty {
@@ -40,7 +42,7 @@ export function runningParty(options: PartyOptions): RunningParty {
 	let engine: EngineModel | undefined
 
 	async function start(): Promise<void> {
-		node = await startPartyNode({ dirs, config, sAppId: SAPP.id, extraRelays: options.extraRelays, listen: options.listen })
+		node = await startPartyNode({ dirs, config, sAppId: SAPP.id, extraRelays: options.extraRelays, listen: options.listen, reactivity: options.reactivity })
 		engine = await createEngineModel({
 			store: cadreStoreProvider({ node, sApp: SAPP, disclosure: { purpose: 'tally' } }),
 			storage: { state: fileSlot(dirs, 'session'), identity: fileSlot(dirs, 'identity') },
