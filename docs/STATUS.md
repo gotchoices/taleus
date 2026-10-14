@@ -12,7 +12,10 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [ ] **Stack: on Sereus 1.15 / Optimystic 1.13 / Quereus 4.20.2 / FRET 1.0.2, one copy each.**
+- [ ] **Stack: on Sereus 1.15 / Optimystic 1.14 / Quereus 4.20.2 / FRET 1.0.2, one copy each.**
+  Optimystic 1.14 needs no new Sereus (1.15 asks for ^1.13; `yarn up -R '@optimystic/*'` dedupes).
+  On a loopback accept it cut consensus traffic about 4x (block promise requests 208 -> 68, block
+  commits served 612 -> 128); reads are unchanged (#47).
   1.15's control schema change means a party made on 1.14 must be recreated (test phones wiped
   2026-10-12). `taleus-core` depends on `@quereus/quereus` and
   `@optimystic/quereus-plugin-crypto` directly; the prescribed-usage checklist the Sereus adapter must
@@ -20,6 +23,12 @@ citations) is prepared separately for transmission to Nathan; this is the digest
 - [ ] **Upstream items we filed** (2026-10-05):
   - gotchoices/sereus#33 — native Ed25519 in `@serfab/cadre-rn` (`/polyfills/native-crypto`).
     **Shipped in 1.15**; the mobile app imports the kit's and dropped its own.
+  - gotchoices/sereus#48 (2026-10-14) -- on a phone-shaped link an app's steady work fails and the
+    sides diverge while both members are up; fixed deadlines turn a slow link into congestion
+    collapse. Node repro (`strand-workload-on-a-phone-link`).
+  - gotchoices/Optimystic#37 (2026-10-14) -- file storage fsyncs every block file separately
+    (enhancement: OS-dependent cost; WAL or per-commit flush; the platform durability question).
+  - gotchoices/Optimystic#33 (our PR, `cid()` dag-json codec) -- open, no review yet.
   - gotchoices/sereus#47 (2026-10-13) — a strand table nobody has written costs a cohort round trip
     on every read and cannot be read with the other member offline. On two phones over the relay it
     made each agent step take minutes, so a tally never formed. Node repro in the issue; proposed fix:
