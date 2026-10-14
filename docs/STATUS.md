@@ -130,8 +130,12 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   model: a counterparty for phone tests, a scripted scenario suite over a relay, a debugging tool,
   and the Node host `taleus-node` will reuse. Steps: (1) the Sereus binding as its own package --
   **done**, `taleus-sereus`; (2) a Node host -- **done**, `taleus-sereus/node` (a party's
-  node and slots kept in a folder; tested forming a tally between two and restarting one); (3) a `cli` appeus target with stories and a command spec; (4) CLI-vs-CLI formation
-  scenario, then phone-vs-CLI to tell phone-side cost from the read path (#47).
+  node and slots kept in a folder; tested forming a tally between two and restarting one); (3) a `cli` appeus target -- **done**:
+  stories `design/stories/cli/`, spec `design/specs/cli/commands.md`, `apps/cli` (runs as TypeScript
+  on Node 24, no build); (4) scenarios. First CLI-vs-CLI run over relay.sereus.org (2026-10-13):
+  invite 18 s, accept 32 s, the offer within 90 s, open about 90 s after accepting it, a payment
+  recorded -- far faster than the phones. A party alone cannot list its tallies (a never-written
+  table, #47). Next: a scripted scenario, then phone-vs-CLI.
 - [ ] **Run a cadre node for Taleus.** Not done: being prepared in a separate effort. The phone
   app's Mode C (below) runs a phone node through `@serfab/cadre-rn`; an always-on cadre node serving
   a party's tallies (and `taleus-node`, `feat-taleus-node-service`) is the part still to come.

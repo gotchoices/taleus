@@ -11,6 +11,7 @@
 import { createServer, type AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2'
+import { multiaddr } from '@multiformats/multiaddr'
 import { webSockets } from '@libp2p/websockets'
 import { FileRawStorage } from '@optimystic/db-p2p-storage-fs'
 import { CadreNode, DEFAULT_IDENTITY_KEY_ID, type CadreNodeConfig, type DurableSlot } from '@serfab/cadre-core'
@@ -123,4 +124,28 @@ function freePort(): Promise<number> {
 export function fileSlot(dirs: PartyDirs, name: string, key?: string): DurableSlot {
 	const file = join(dirs.slots, key === undefined ? name : `${name}--${encodeURIComponent(key)}`)
 	return { load: () => readText(file), save: (text: string) => writeTextAtomic(file, text) }
+}
+
+/**
+ * The peer id that answers at `address`: what a relay given without its `/p2p/` part is pinned to.
+ * Trusts the first answer, so a caller says how the id was learned.
+ */
+export async function peerAt(node: CadreNode, address: string, timeoutMs = 15_000): Promise<string> {
+	const control = node.getControlNode()
+	if (!control) throw new Error('the node is not running')
+	const connection = await control.dial(multiaddr(address), { signal: AbortSignal.timeout(timeoutMs) })
+	return connection.remotePeer.toString()
+}
+
+/**
+ * Every strand this party holds -- founded (`CadreControl.Strand`) or joined from another party
+ * (`CadreControl.JoinedStrand`) -- by id: what a restarted node will launch. The node offers them
+ * from its watcher's first poll, which runs a moment after `start()` resolves, so a caller that must
+ * not act before its strands are back (a one-shot CLI command) waits for these ids.
+ */
+export async function heldStrandIds(node: CadreNode): Promise<string[]> {
+	const control = node.getControlDatabase()
+	if (!control) return []
+	const [founded, joined] = await Promise.all([control.queryStrands(), control.queryJoinedStrands()])
+	return [...new Set([...founded, ...joined].map(row => row.Id))]
 }

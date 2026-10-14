@@ -3,5 +3,5 @@
  * CLI, a scenario test or `taleus-node` hands the engine. Node-only; the package root stays
  * platform-neutral.
  */
-export { DATA_FORMAT, lockParty, openParty, partyDirs, saveConfig, type PartyConfig, type PartyDirs } from './home.js'
-export { fileSlot, loopbackListenAddress, startPartyNode, type NodeHostOptions } from './host.js'
+export { DATA_FORMAT, lockParty, openParty, partyDirs, readText, saveConfig, writeTextAtomic, type PartyConfig, type PartyDirs } from './home.js'
+export { fileSlot, heldStrandIds, loopbackListenAddress, peerAt, startPartyNode, type NodeHostOptions } from './host.js'
