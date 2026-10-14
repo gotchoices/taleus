@@ -31,3 +31,19 @@ spans runs (and to be reachable from a phone).
 
 With no always-on node, a tally makes progress only while both parties are up: keep a party online
 with `idle [<seconds>]`, or run its commands in one process (`-c "accept … --yes; idle 90; offer 1 accept"`).
+
+## Profiling the stack
+
+`scripts/` runs a whole formation between two CLI parties and says where the time went:
+
+```sh
+node scripts/profile-formation.ts --out /tmp/prof                 # debug logs on, loopback
+node scripts/profile-formation.ts --out /tmp/prof --debug '' --cpu-prof --count-fsync
+node scripts/analyze-profile.ts /tmp/prof sam 30.9 71.7           # busiest namespaces, longest silences
+node scripts/summarize-cpu.ts /tmp/prof/cpu-jan/*.cpuprofile --from 0.8 --to 16.3
+```
+
+Each party is its own process (its own event loop, as two phones). `marks.jsonl` times every step the
+CLI reports; `<party>.log` holds the stack's debug lines (`DEBUG=sereus:*,optimystic:*` by default,
+FRET included). `--relay <addr>` runs it over a relay instead of loopback. Run it on a RAM disk
+(`--out /Volumes/<ramdisk>/…`) to take the disk out of the measurement.

@@ -1,0 +1,132 @@
+/**
+ * Profile a tally's whole formation between two CLI parties: invite, accept, the inviter's terms,
+ * accepting them, open, one payment. Each party is its own `taleus` process, so each has its own
+ * event loop, as two phones do. The stack's debug output is captured per party with timestamps,
+ * and every step the CLI reports is marked, so `analyze-profile.ts` can say where the time went.
+ *
+ *   node scripts/profile-formation.ts [--relay <addr>] [--out <dir>] [--debug <namespaces>] [--cpu-prof]
+ *
+ * `--debug ''` turns the stack's debug output off, for timings the logging does not inflate.
+ * `--cpu-prof` writes each party's V8 CPU profile to `cpu-<party>/` (`summarize-cpu.ts` reads it).
+ * `--count-fsync` logs every fsync (`count-fsync.mjs`), as `fsync:file` / `fsync:dir` lines.
+ *
+ * Default: loopback (`--listen`), one run per party, no relay -- so nothing but the stack is
+ * measured. With `--relay`, both parties use that relay, as phones do.
+ */
+import { spawn, type ChildProcess } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
+import { mkdir, rm, writeFile, appendFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import { parseArgs } from 'node:util'
+
+const { values } = parseArgs({
+	options: {
+		relay: { type: 'string' },
+		out: { type: 'string' },
+		debug: { type: 'string' },
+		timeout: { type: 'string' },
+		'cpu-prof': { type: 'boolean' },
+		'count-fsync': { type: 'boolean' },
+	},
+})
+const out = resolve(values.out ?? `profile-${new Date().toISOString().replace(/[:.]/g, '-')}`)
+const debug = values.debug ?? 'sereus:*,optimystic:*'
+const timeout = Number(values.timeout ?? 600)
+const MAIN = resolve(import.meta.dirname, '../src/main.ts')
+const home = join(out, 'home')
+const link = join(out, 'link')
+const marksFile = join(out, 'marks.jsonl')
+const t0 = Date.now()
+
+interface Mark {
+	t: number
+	at: string
+	party: string
+	text: string
+}
+
+async function mark(party: string, text: string): Promise<void> {
+	const entry: Mark = { t: Date.now() - t0, at: new Date().toISOString(), party, text }
+	process.stdout.write(`${(entry.t / 1000).toFixed(1).padStart(7)} s  ${party.padEnd(4)} ${text}\n`)
+	await appendFile(marksFile, `${JSON.stringify(entry)}\n`)
+}
+
+/** Global options every run of a party gets: its home, and how it is reached. */
+function reach(): string[] {
+	return values.relay ? [] : ['--listen']
+}
+
+/** Run one party's commands to completion, quietly (setup). */
+function setup(party: string, commands: string): Promise<void> {
+	return new Promise((done, fail) => {
+		const child = spawn(process.execPath, [MAIN, '--home', home, '-p', party, ...reach(), '-c', commands], { stdio: ['ignore', 'ignore', 'inherit'] })
+		child.on('exit', code => (code === 0 ? done() : fail(new Error(`${party} setup exited ${code}`))))
+	})
+}
+
+/**
+ * Start one party's scripted run with the stack's debug output on. Its stderr -- the CLI's notes and
+ * the stack's timestamped debug lines -- goes to `<party>.log`; every CLI line (stdout data, and
+ * stderr notes that are not debug lines) is also marked.
+ */
+function scripted(party: string, commands: string): { child: ChildProcess; done: Promise<number> } {
+	const profiling = [
+		...(values['cpu-prof'] ? ['--cpu-prof', `--cpu-prof-dir=${join(out, `cpu-${party}`)}`] : []),
+		...(values['count-fsync'] ? ['--import', resolve(import.meta.dirname, 'count-fsync.mjs')] : []),
+	]
+	const child = spawn(process.execPath, [...profiling, MAIN, '--home', home, '-p', party, ...reach(), '-v', '-c', commands], {
+		stdio: ['ignore', 'pipe', 'pipe'],
+		env: { ...process.env, DEBUG: debug, DEBUG_COLORS: '0' },
+	})
+	const log = join(out, `${party}.log`)
+	const lines = (stream: NodeJS.ReadableStream, onLine: (line: string) => void) => {
+		let rest = ''
+		stream.on('data', (chunk: Buffer) => {
+			const text = rest + chunk.toString('utf8')
+			const parts = text.split('\n')
+			rest = parts.pop() ?? ''
+			for (const line of parts) onLine(line)
+		})
+	}
+	lines(child.stdout!, line => void mark(party, `out: ${line.slice(0, 140)}`))
+	lines(child.stderr!, line => {
+		void appendFile(log, `${line}\n`)
+		// Debug lines start with an ISO timestamp; the CLI's own notes do not.
+		if (!/^\d{4}-\d\d-\d\dT/.test(line) && !line.startsWith(' ')) void mark(party, `note: ${line.slice(0, 140)}`)
+	})
+	const done = new Promise<number>(resolveDone => child.on('exit', code => resolveDone(code ?? -1)))
+	return { child, done }
+}
+
+async function main(): Promise<void> {
+	await rm(out, { recursive: true, force: true })
+	await mkdir(out, { recursive: true })
+	await mark('run', `out ${out}; ${values.relay ? `relay ${values.relay}` : 'loopback'}; DEBUG=${debug}`)
+
+	await setup('jan', `party name Jan${values.relay ? `; relay add ${values.relay}` : ''}`)
+	await setup('sam', `party name Sam${values.relay ? `; relay add ${values.relay}` : ''}`)
+	await mark('run', 'parties ready')
+
+	// The inviter stays up until the tally is open and the payment has had time to arrive.
+	const jan = scripted('jan', `invite --limit 500 --note profile -o ${link}; wait Open --timeout ${timeout}; idle 30; history 1`)
+	while (!existsSync(link) || !readFileSync(link, 'utf8').trim()) {
+		await new Promise(resolveWait => setTimeout(resolveWait, 250))
+	}
+	await mark('run', 'link written')
+	const sam = scripted('sam', [
+		`accept ${readFileSync(link, 'utf8').trim()} --yes`,
+		`wait Offered --timeout ${timeout}`,
+		'offer 1 accept',
+		`wait Open --timeout ${timeout}`,
+		'pay 1 1.00 probe',
+		'idle 30',
+	].join('; '))
+	const [samCode, janCode] = await Promise.all([sam.done, jan.done])
+	await mark('run', `done: jan exit ${janCode}, sam exit ${samCode}`)
+	await writeFile(join(out, 'summary.json'), JSON.stringify({ relay: values.relay ?? null, debug, janCode, samCode, ms: Date.now() - t0 }, null, 2))
+}
+
+main().catch(error => {
+	process.stderr.write(`profile: ${error instanceof Error ? error.stack : String(error)}\n`)
+	process.exit(1)
+})

@@ -3,7 +3,7 @@ import { onWorldChanged, type TallySummary } from 'taleus-model'
 
 import { formatAmount } from '../amount.ts'
 import type { Row } from '../output.ts'
-import { titleOf } from '../session.ts'
+import { CliFailure, EXIT, titleOf } from '../session.ts'
 import { need, text, usage, type Command } from './command.ts'
 
 const TALLY_COLUMNS = ['row', 'id', 'counterparty', 'balance', 'perspective', 'state', 'waitingOn', 'lastActivity'] as const
@@ -144,4 +144,43 @@ export function untilAborted(signal: AbortSignal): Promise<void> {
 	})
 }
 
-export const tallyCommands = [tallies, tally, history, attention, watch]
+const STATES = ['Invited', 'Forming', 'Offered', 'Open', 'Closing', 'Closed', 'Expired'] as const
+
+const wait: Command = {
+	name: 'wait',
+	summary: 'Wait until a tally reaches a state (for scripts): wait Open',
+	usage: `<${STATES.join('|')}> [--tally <tally>] [--timeout <seconds>]`,
+	options: { tally: { type: 'string' }, timeout: { type: 'string' } },
+	async run(session, args, values) {
+		const state = usage(wait, () => {
+			const wanted = need(wait, args, 0, 'state')
+			const found = STATES.find(known => known.toLowerCase() === wanted.toLowerCase())
+			if (!found) throw new Error(`states are ${STATES.join(', ')}`)
+			return found
+		})
+		const seconds = usage(wait, () => {
+			const n = Number(text(values, 'timeout') ?? 600)
+			if (!Number.isFinite(n) || n <= 0) throw new Error('--timeout takes seconds')
+			return n
+		})
+		const only = text(values, 'tally')
+		const deadline = Date.now() + seconds * 1000
+		const started = Date.now()
+		for (;;) {
+			const list = await session.tallies()
+			const candidates = only === undefined ? list : [await session.tally(only)]
+			const reached = candidates.find(tally => tallyRow(tally).state === state)
+			if (reached) {
+				await session.rememberTallies(list.map(tally => tally.id))
+				session.out.note(`${state} after ${((Date.now() - started) / 1000).toFixed(1)} s`)
+				session.out.rows(TALLY_COLUMNS, [tallyRow(reached, list.indexOf(reached) + 1)])
+				return
+			}
+			if (Date.now() >= deadline) throw new CliFailure(`wait: no tally reached ${state} in ${seconds} s`, EXIT.retryable)
+			if (session.signal.aborted) throw new CliFailure('wait: interrupted', EXIT.interrupted)
+			await new Promise(resolve => setTimeout(resolve, 1000))
+		}
+	},
+}
+
+export const tallyCommands = [tallies, tally, history, attention, watch, wait]

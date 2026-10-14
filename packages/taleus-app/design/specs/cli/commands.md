@@ -146,6 +146,12 @@ What waits on this party: `row  kind  tally  counterparty  amount  waitingOn  wa
 Follows: each time anything changes, prints the tallies that changed as `tallies` does (row empty),
 until Ctrl-C.
 
+### `wait <state> [--tally <tally>] [--timeout <seconds>]`
+For scripts: waits (default 600 s) until a tally -- the one named, else any -- shows `state`
+(`Invited`, `Forming`, `Offered`, `Open`, …), then prints its row as `tallies` does and remembers
+the listing, so `offer 1` and `pay 1` that follow name it. Says how long it took on stderr. Times out
+with exit 3.
+
 ### `strands`
 Diagnostics: each tally's strand on this node: `row  tally  status  connections`.
 

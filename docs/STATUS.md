@@ -135,7 +135,12 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   on Node 24, no build); (4) scenarios. First CLI-vs-CLI run over relay.sereus.org (2026-10-13):
   invite 18 s, accept 32 s, the offer within 90 s, open about 90 s after accepting it, a payment
   recorded -- far faster than the phones. A party alone cannot list its tallies (a never-written
-  table, #47). Next: a scripted scenario, then phone-vs-CLI.
+  table, #47). Profiling (`apps/cli/scripts/`, 2026-10-13), loopback: invite 15.5 s, accept
+  45.4 s, a payment 7.6 s -- about 80% of it fsync in Optimystic's file storage (one payment: 108
+  file writes, 216 fsyncs); on a RAM disk 3.3 s / 7.8 s / 0.4 s. That is a macOS cost: there an
+  fsync'd file write takes ~40 ms; on Linux ext4 (saturn) 1.9 ms, and a three-row commit 66-168 ms
+  against 22-50 ms in memory. So profile on Linux or a RAM disk; not filed as a production issue. Still to look into: what remains of the accept
+  (7.8 s, mostly busy; about 15,000 debug lines for one join), then phone-vs-CLI.
 - [ ] **Run a cadre node for Taleus.** Not done: being prepared in a separate effort. The phone
   app's Mode C (below) runs a phone node through `@serfab/cadre-rn`; an always-on cadre node serving
   a party's tallies (and `taleus-node`, `feat-taleus-node-service`) is the part still to come.
