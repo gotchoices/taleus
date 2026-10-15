@@ -16,13 +16,21 @@
  * `src/data/`, which forward to one `TaleusModel` (package `taleus-model`), and
  * this file is the only code that chooses it. See
  * `design/specs/domain/interfaces.md` § Run modes.
+ *
+ * Tests always run Mode A: their screens assert on the fixtures. Jest sets
+ * `NODE_ENV` to `test`; an app build never does.
  */
 import { createMockModel, onWorldChanged, type MockControls, type TaleusModel } from 'taleus-model'
 
 import { fixtureSource } from './fixtures'
 import { bumpGeneration } from './generation'
 
-export const USE_ENGINE = true
+/** Jest's environment; React Native's own types do not declare `process`. */
+declare const process: { env: { NODE_ENV?: string } }
+
+const TESTING = process.env.NODE_ENV === 'test'
+
+export const USE_ENGINE = !TESTING && true
 export const USE_CADRE = true
 
 /** True when adapters should serve fixtures rather than engine state. */

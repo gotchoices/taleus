@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react-native'
+import { act, renderHook, waitFor } from '@testing-library/react-native'
 
 import { getGeneration } from '../src/data/generation'
 import { useLoad } from '../src/hooks/useLoad'
@@ -50,4 +50,36 @@ test('a reload keeps the previous value, so callers can tell it from a first loa
 	// navigator stay mounted instead of hiding behind a spinner.
 	expect(result.current.value).toBe('first')
 	await waitFor(() => expect(load).toHaveBeenCalledTimes(2))
+})
+
+test('changes during a read make one more read after it, never a second at once', async () => {
+	// The bug this guards: every commit bumps the generation, and on a slow phone a read takes
+	// longer than commits take to arrive, so each bump started another read alongside the last.
+	let inFlight = 0
+	let most = 0
+	const finishers: (() => void)[] = []
+	const load = jest.fn(() => {
+		inFlight += 1
+		most = Math.max(most, inFlight)
+		return new Promise<{ ok: true; value: number }>(resolve => {
+			finishers.push(() => {
+				inFlight -= 1
+				resolve({ ok: true, value: load.mock.calls.length })
+			})
+		})
+	})
+	const { result } = await renderHook(() => useLoad(load))
+	await waitFor(() => expect(load).toHaveBeenCalledTimes(1))
+
+	for (const variant of ['empty', 'error', 'happy', 'empty']) {
+		await act(async () => setVariant(variant))
+	}
+	expect(load).toHaveBeenCalledTimes(1)
+
+	finishers.shift()?.()
+	await waitFor(() => expect(load).toHaveBeenCalledTimes(2))
+	finishers.shift()?.()
+	await waitFor(() => expect(result.current.state).toBe('ready'))
+	expect(load).toHaveBeenCalledTimes(2)
+	expect(most).toBe(1)
 })

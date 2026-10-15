@@ -34,6 +34,8 @@ export interface PartyOptions {
 	listen: readonly string[]
 	/** Push wakes for the partner's commits (diagnostic switch; on by default). */
 	reactivity: boolean
+	/** The store's backstop poll, in seconds (0: none); unset, the store's default. */
+	pollSeconds?: number
 }
 
 export function runningParty(options: PartyOptions): RunningParty {
@@ -44,7 +46,12 @@ export function runningParty(options: PartyOptions): RunningParty {
 	async function start(): Promise<void> {
 		node = await startPartyNode({ dirs, config, sAppId: SAPP.id, extraRelays: options.extraRelays, listen: options.listen, reactivity: options.reactivity })
 		engine = await createEngineModel({
-			store: cadreStoreProvider({ node, sApp: SAPP, disclosure: { purpose: 'tally' } }),
+			store: cadreStoreProvider({
+				node,
+				sApp: SAPP,
+				disclosure: { purpose: 'tally' },
+				...(options.pollSeconds === undefined ? {} : { pollMs: options.pollSeconds * 1000 }),
+			}),
 			storage: { state: fileSlot(dirs, 'session'), identity: fileSlot(dirs, 'identity') },
 			// Every contract document this party has seen, one file each.
 			documents: slotDocumentCache(cid => fileSlot(dirs, 'document', cid)),

@@ -12,8 +12,10 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [ ] **Stack: on Sereus 1.15 / Optimystic 1.14 / Quereus 4.20.2 / FRET 1.0.2, one copy each.**
-  Optimystic 1.14 needs no new Sereus (1.15 asks for ^1.13; `yarn up -R '@optimystic/*'` dedupes).
+- [ ] **Stack: on Sereus 1.15 / Optimystic 1.15 / Quereus 4.20.2 / FRET 1.1.0, one copy each.**
+  Optimystic 1.14 and 1.15 need no new Sereus (1.15 asks for ^1.13; `yarn up -R '@optimystic/*' p2p-fret`
+  dedupes). 1.15 only requires FRET 1.1.0 (idle maintenance backs off to a pass a minute, peer list
+  no longer re-read each pass, slow-relay peers reconnect) and passes the node's dial timeout through.
   On a loopback accept it cut consensus traffic about 4x (block promise requests 208 -> 68, block
   commits served 612 -> 128); reads are unchanged (#47).
   1.15's control schema change means a party made on 1.14 must be recreated (test phones wiped
@@ -25,14 +27,15 @@ citations) is prepared separately for transmission to Nathan; this is the digest
     **Shipped in 1.15**; the mobile app imports the kit's and dropped its own.
   - gotchoices/sereus#48 (2026-10-14) -- on a phone-shaped link an app's steady work fails and the
     sides diverge while both members are up; fixed deadlines turn a slow link into congestion
-    collapse. Node repro (`strand-workload-on-a-phone-link`).
+    collapse. Node repro (`strand-workload-on-a-phone-link`). Commented 2026-10-14: still on 1.14.
   - gotchoices/Optimystic#37 (2026-10-14) -- file storage fsyncs every block file separately
     (enhancement: OS-dependent cost; WAL or per-commit flush; the platform durability question).
   - gotchoices/Optimystic#33 (our PR, `cid()` dag-json codec) -- open, no review yet.
   - gotchoices/sereus#47 (2026-10-13) — a strand table nobody has written costs a cohort round trip
     on every read and cannot be read with the other member offline. On two phones over the relay it
     made each agent step take minutes, so a tally never formed. Node repro in the issue; proposed fix:
-    the founder creates every app table's collection at founding.
+    the founder creates every app table's collection at founding. Commented 2026-10-14: the offline
+    half needs link latency (loopback now reads locally).
   - gotchoices/Optimystic#30 — `quereus-plugin-crypto` has no native-crypto seam: its SQL `verify` runs
     pure-JS Ed25519 (408 ms of a 29 s invite on a Galaxy S7). Open.
   - gotchoices/Optimystic#31 — cohort-topic proof-of-work starved the phone's JS thread. **Fixed in
@@ -155,8 +158,59 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   pile onto the slow link). Node repro drafted for sereus (`strand-workload-on-a-phone-link`: ops fail
   and sides diverge while both are up). Taleus side: the model now returns `store-unavailable`
   (retryable) instead of throwing (`engine/unavailable.ts`); a tally's view reads its tables
-  concurrently (`TallyEngine.read`). Still to look into: what remains of the accept
-  (7.8 s, mostly busy; about 15,000 debug lines for one join), then phone-vs-CLI.
+  concurrently (`TallyEngine.read`).
+  Phone-vs-CLI on Optimystic 1.14 (S7 dev build vs CLI over relay.sereus.org, 2026-10-14): invite
+  31 s (was 42), accept 337 s (was 195), and the phone never offered in 20 min. The app sat at
+  150-190% CPU with ~1 GB resident (770 MB native heap) and the phone swapped; its tally list never
+  answered. With the CLI gone it dropped to ~47% CPU, memory unchanged. The same flow on two Node
+  parties under the phone arm (`profile-formation --memory`) keeps heap at 80-160 MB, flat -- so the
+  growth is the phone's (Hermes, RN or the dev build), not the stack's. Next: a Hermes heap snapshot
+  during formation, or a release build.
+  Optimystic 1.13 vs 1.14 on #48's phone arm (two runs each): seated ~100 s either way; 1.13 failed
+  its first round (156-224 s), then the strand nodes disconnected and later rounds ran locally;
+  1.14 kept the link longer and failed more rounds (250 s / 586 s, cohort-silent 47 / 97). Not fixed
+  by 1.14; no clear regression either.
+  The `InvitationSignatureValid` refusal (seen once, under the phone arm): a CHECK whose subquery
+  reads an unreachable block fails as `BlockUnavailableError`, retryable, not as a violation (repro
+  `strand-check-on-unavailable-read`, passes). What remains is a stale read: the invitee's `Foil`
+  CHECK finding no `Stock` row after first sync. Not reproduced: `strand-joiner-reads-when-writable`
+  (the same shape, 3 loopback and 3 phone-arm runs) sees the row and passes every time. Dropped.
+  #47's offline failure now passes on loopback (9 of 9 runs; the founder answers locally) and still
+  fails on the 100 ms link; its scenario's loopback `it.fails` needs that link.
+  Screens read one at a time (2026-10-14): `useLoad` had started a new read on every commit
+  notification, even with one in flight, so on a slow phone reads piled up (a test saw 5 at once);
+  now asks during a read become one read after it. The mobile tests had been failing since Mode C
+  was switched on (170 of 213 read "model not started"); tests now always run Mode A.
+  Release build on the S7 (Hermes bytecode, arm64, the `useLoad` fix), accepting a CLI party's
+  invitation over relay.sereus.org: onboarding 70 s, the review screen up at once, accept 533 s;
+  the terms screen never finished loading in 27 min. CPU 140-220% throughout; memory 260 MB idle,
+  then climbing about 9 MB a minute to 498 MB (the dev build had reached ~1 GB). Node parties doing
+  the same work stay flat. Maestro flows and the driver for this run are not kept in the repo yet.
+  No leak, on a closer look (dev build with the `useLoad` fix, Hermes heap snapshots and stats over
+  Metro's inspector, 25 min of formation): the JS heap stays 20-50 MB live; Android's native heap
+  rose 521 -> 615 MB under load and fell back to 520-545 MB. The earlier ~1 GB was before the fix
+  (reads piling up); the release run's climb was `top`'s resident size, which counts mapped bytecode
+  and library pages as they are touched. CPU is the problem: a 60 s profile of the stuck phone is
+  transport and peer bookkeeping, not app code -- young GC 8%, base58 multiaddr / peer-id string
+  conversions ~10% plus peer-store `localeCompare` 6%, base64 for every WebSocket frame ~3%, a
+  native cipher object per frame ~5% (as Sereus Chat found; sereus#45). FRET 1.1.0 targets the
+  peer-list churn.
+  **Phone-CLI works on Optimystic 1.15 / FRET 1.1 (2026-10-14, S7 dev build, relay.sereus.org):**
+  the phone invited (30 s), the CLI accepted (2 min 47 s), the phone's offer reached the CLI 3 min
+  later, Open at once; the CLI paid $1 and the phone showed it. The first tally ever formed with a
+  phone in it. Still slow: listing the one tally took 208-272 s, and the phone runs at 170-190% CPU
+  while the open tally is idle (about 40% once the CLI leaves; the CLI's poll is not the cause).
+  Native memory rose 515 -> 720 MB over 23 min in this run (the run before fell back once) --
+  unresolved. The CLI under the phone arm still collapses on 1.15 (#48). Where the CPU goes, in
+  Node (`--count-peerstore`, `--poll 0`, `--idle`): (1) Optimystic's `findCluster` reads the libp2p
+  peer store for every candidate on every call (`getPeerStore*ByPeer`, no cache) -- 1,100-2,700
+  loads per party in a 20 s loopback formation -- and libp2p merges into the peer store on every
+  stream opened or accepted (~1,200-3,000 per party; Optimystic opens a stream per request); on a
+  phone each load re-parses every multiaddr and each merge re-sorts protocols and multiaddrs by
+  string, ~15% of the S7's CPU. (2) An idle party polls its own control database -- Sereus's strand
+  watcher every 5 s and a heavier pass every 30 s -- each read through Optimystic's full coordinator,
+  cluster and read-repair path though the cadre has one node: ~225 reads a minute, idle. Both to
+  file upstream (not yet).
 - [ ] **Run a cadre node for Taleus.** Not done: being prepared in a separate effort. The phone
   app's Mode C (below) runs a phone node through `@serfab/cadre-rn`; an always-on cadre node serving
   a party's tallies (and `taleus-node`, `feat-taleus-node-service`) is the part still to come.

@@ -37,6 +37,8 @@ interface Globals {
 	waitSeconds: number
 	verbose: boolean
 	reactivity: boolean
+	/** The store's backstop poll, in seconds; 0 turns it off (diagnostic). Unset: the store's default. */
+	pollSeconds?: number
 	script?: string
 	help: boolean
 	version: boolean
@@ -56,6 +58,7 @@ const USAGE = `usage: taleus [options] [command [args] [\\; command ...]]
   -c <commands>          run these ";"-separated commands
   -v, --verbose          the stack's log lines on stderr
       --no-reactivity    diagnostic: no push wakes for the partner's commits (poll only)
+      --poll <seconds>   diagnostic: the backstop poll's interval (0: none; default 10)
   -h, --help · --version
 
 With no command: an interactive prompt, or commands from stdin. "help" lists commands.`
@@ -80,6 +83,7 @@ export function parseGlobals(argv: readonly string[]): Globals {
 		else if (a === '-c') g.script = value(a)
 		else if (a === '-v' || a === '--verbose') g.verbose = true
 		else if (a === '--no-reactivity') g.reactivity = false
+		else if (a === '--poll') g.pollSeconds = Number(value(a))
 		else if (a === '-h' || a === '--help') g.help = true
 		else if (a === '--version') g.version = true
 		else if (a === '--') {
@@ -129,7 +133,7 @@ async function main(argv: readonly string[]): Promise<number> {
 	await lockParty(dirs)
 	const out = createOutput({ json: g.json, header: g.header })
 	const listen = await Promise.all(g.listen.map(async addr => (addr === LOOPBACK ? loopbackListenAddress(dirs, config) : addr)))
-	const party = runningParty({ dirs, config, extraRelays: g.relays, listen, reactivity: g.reactivity })
+	const party = runningParty({ dirs, config, extraRelays: g.relays, listen, reactivity: g.reactivity, pollSeconds: g.pollSeconds })
 	out.note(`taleus ${VERSION} · party ${dirs.name}${created ? ' (new)' : ''} · starting…`)
 
 	let abort = new AbortController()

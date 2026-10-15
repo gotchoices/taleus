@@ -12,6 +12,10 @@
  * `--busy <fraction>` keeps each party's event loop that busy (`busy-loop.mjs`): a phone-shaped CPU.
  * `--latency <ms>[:serial]` holds each outbound WebSocket frame that long (`ws-latency.mjs`).
  * `--no-reactivity` runs both parties without push wakes (the CLI's diagnostic switch).
+ * `--memory` logs each party's memory every 5 s (`sample-memory.mjs`), as `mem` lines.
+ * `--poll <seconds>` passes the CLI's backstop-poll switch to both parties (0: none).
+ * `--idle <seconds>` how long both parties stay up after the payment (default 30): the idle tally's cost.
+ * `--count-peerstore` prints each party's libp2p peer-store operations by caller at exit (`count-peerstore.mjs`).
  *
  * Default: loopback (`--listen`), one run per party, no relay -- so nothing but the stack is
  * measured. With `--relay`, both parties use that relay, as phones do.
@@ -33,11 +37,16 @@ const { values } = parseArgs({
 		busy: { type: 'string' },
 		latency: { type: 'string' },
 		'no-reactivity': { type: 'boolean' },
+		memory: { type: 'boolean' },
+		'count-peerstore': { type: 'boolean' },
+		idle: { type: 'string' },
+		poll: { type: 'string' },
 	},
 })
 const out = resolve(values.out ?? `profile-${new Date().toISOString().replace(/[:.]/g, '-')}`)
 const debug = values.debug ?? 'sereus:*,optimystic:*'
 const timeout = Number(values.timeout ?? 600)
+const idle = Number(values.idle ?? 30)
 const MAIN = resolve(import.meta.dirname, '../src/main.ts')
 const home = join(out, 'home')
 const link = join(out, 'link')
@@ -59,7 +68,11 @@ async function mark(party: string, text: string): Promise<void> {
 
 /** Global options every run of a party gets: its home, and how it is reached. */
 function reach(): string[] {
-	return [...(values.relay ? [] : ['--listen']), ...(values['no-reactivity'] ? ['--no-reactivity'] : [])]
+	return [
+		...(values.relay ? [] : ['--listen']),
+		...(values['no-reactivity'] ? ['--no-reactivity'] : []),
+		...(values.poll === undefined ? [] : ['--poll', values.poll]),
+	]
 }
 
 /** Run one party's commands to completion, quietly (setup). */
@@ -81,6 +94,8 @@ function scripted(party: string, commands: string): { child: ChildProcess; done:
 		...(values['count-fsync'] ? ['--import', resolve(import.meta.dirname, 'count-fsync.mjs')] : []),
 		...(values.busy ? ['--import', resolve(import.meta.dirname, 'busy-loop.mjs')] : []),
 		...(values.latency ? ['--import', resolve(import.meta.dirname, 'ws-latency.mjs')] : []),
+		...(values.memory ? ['--import', resolve(import.meta.dirname, 'sample-memory.mjs')] : []),
+		...(values['count-peerstore'] ? ['--import', resolve(import.meta.dirname, 'count-peerstore.mjs')] : []),
 	]
 	const [latencyMs, latencyMode] = (values.latency ?? '').split(':')
 	const child = spawn(process.execPath, [...profiling, MAIN, '--home', home, '-p', party, ...reach(), '-v', '-c', commands], {
@@ -117,7 +132,7 @@ async function main(): Promise<void> {
 	await mark('run', 'parties ready')
 
 	// The inviter stays up until the tally is open and the payment has had time to arrive.
-	const jan = scripted('jan', `invite --limit 500 --note profile -o ${link}; wait Open --timeout ${timeout}; idle 30; history 1`)
+	const jan = scripted('jan', `invite --limit 500 --note profile -o ${link}; wait Open --timeout ${timeout}; idle ${idle}; history 1`)
 	while (!existsSync(link) || !readFileSync(link, 'utf8').trim()) {
 		await new Promise(resolveWait => setTimeout(resolveWait, 250))
 	}
@@ -128,7 +143,7 @@ async function main(): Promise<void> {
 		'offer 1 accept',
 		`wait Open --timeout ${timeout}`,
 		'pay 1 1.00 probe',
-		'idle 30',
+		`idle ${idle}`,
 	].join('; '))
 	const [samCode, janCode] = await Promise.all([sam.done, jan.done])
 	await mark('run', `done: jan exit ${janCode}, sam exit ${samCode}`)

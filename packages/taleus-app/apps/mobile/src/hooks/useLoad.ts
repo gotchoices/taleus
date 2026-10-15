@@ -29,6 +29,11 @@ export function useLoad<T>(load: () => Promise<Result<T>>): Loaded<T> {
 	const [value, setValue] = useState<T | undefined>()
 	const [error, setError] = useState<DataError | undefined>()
 	const live = useRef(true)
+	// The latest `load`, so a re-read asked for during a run reads what the screen now wants.
+	const latest = useRef(load)
+	latest.current = load
+	const running = useRef<Promise<void> | undefined>(undefined)
+	const again = useRef(false)
 
 	useEffect(() => {
 		live.current = true
@@ -37,11 +42,11 @@ export function useLoad<T>(load: () => Promise<Result<T>>): Loaded<T> {
 		}
 	}, [])
 
-	const run = useCallback(async () => {
+	const once = useCallback(async () => {
 		setState('loading')
 		setError(undefined)
 		try {
-			const result = await load()
+			const result = await latest.current()
 			if (!live.current) {
 				return
 			}
@@ -63,7 +68,31 @@ export function useLoad<T>(load: () => Promise<Result<T>>): Loaded<T> {
 			})
 			setState('failed')
 		}
-	}, [load])
+	}, [])
+
+	/**
+	 * One read at a time. Every commit, the other party's included, asks every mounted screen to
+	 * re-read; on a slow phone a read takes longer than commits take to arrive, so starting one per
+	 * ask piles reads onto the store without bound. Asks during a read become one more read after it.
+	 */
+	const run = useCallback((): Promise<void> => {
+		if (running.current) {
+			again.current = true
+			return running.current
+		}
+		const reading = (async () => {
+			try {
+				do {
+					again.current = false
+					await once()
+				} while (again.current && live.current)
+			} finally {
+				running.current = undefined
+			}
+		})()
+		running.current = reading
+		return reading
+	}, [once])
 
 	// Re-read when the world changes under us — a deep link switching the mock
 	// variant does not remount a screen that is already showing.
@@ -71,7 +100,7 @@ export function useLoad<T>(load: () => Promise<Result<T>>): Loaded<T> {
 
 	useEffect(() => {
 		void run()
-	}, [run, generation])
+	}, [run, load, generation])
 
 	return { state, value, error, reload: () => void run() }
 }
