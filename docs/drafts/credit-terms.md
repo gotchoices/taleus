@@ -59,15 +59,15 @@ is where that generality either exists or does not.
 
 ## Open questions (the design pass)
 
-- **How much to machine-enforce.** Options span "structured but inert data the credit gate ignores" →
-  "the gate computes an accruing limit from rate/period/grace at chit date." The current `WithinCreditLimits`
-  gate is deterministic and chit-date-keyed; an interest-accruing limit must stay deterministic (no `now()`
-  in the CHECK — see the volatility caveats already in the schema).
+- **How much to machine-enforce.** The credit limit gates nothing (chits are accepted when duly signed;
+  docs/architecture.md § Ledger Operation), so rich terms are data the agents and screens read: an
+  accruing limit computed from rate/period/grace for display and warnings. Anything computed in the
+  schema must stay deterministic (no `now()` — see the volatility caveats already in the schema).
 - **Accrual mechanism.** MyCHIPs accrued via periodic chits. Taleus could (a) emit periodic interest chits
-  (explicit, auditable, but who signs them?), or (b) compute an accrued balance in a **view** and gate
+  (explicit, auditable, but who signs them?), or (b) compute an accrued balance in a **view** and warn
   against it, or (c) leave accrual entirely to the contract/app. Decide before touching the schema.
 - **Interaction with lift economics.** A tally under an amortization schedule or a vesting lock is not
-  freely liftable; `LiftLading` and the reserved-credit gates must respect maturity/liquidity. See
+  freely liftable; `LiftLading` (agent policy) must respect maturity/liquidity. See
   [trading-variables.md](../trading-variables.md).
 - **Structured schema vs. typed JSON.** A normalized set of columns (rate, period, grace, …) vs. a
   validated structured `Args`. Normalized is more enforceable; JSON is more open-ended for

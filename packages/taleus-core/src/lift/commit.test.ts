@@ -20,7 +20,6 @@ import type { LiftPlan } from './terms.js'
 
 const DATE = '2026-07-13'
 const EXPIRY = '2026-07-20'
-const BIG = 1_000_000_000n
 
 /** A monotonic string clock for deterministic journal `Updated` timestamps. */
 function clock(): () => string {
@@ -33,8 +32,6 @@ interface EdgeSpec {
 	cid: string
 	issuer: 'S' | 'F'
 	units: bigint
-	stockLimit?: bigint
-	foilLimit?: bigint
 }
 
 /** Build a route: one `InMemoryTally` per edge, the owned edges, the ChipNet record, and the referee cid map. */
@@ -44,7 +41,7 @@ function buildRoute(refKey: string, specs: EdgeSpec[], signer = identity().signe
 	const owned: OwnedEdge[] = []
 	const recordEdges: RecordEdge[] = []
 	for (const s of specs) {
-		const tally = new InMemoryTally(s.cid, s.stockLimit ?? BIG, s.foilLimit ?? BIG)
+		const tally = new InMemoryTally(s.cid)
 		cids.set(s.liftId, s.cid)
 		strands.set(s.liftId, tally)
 		owned.push({ liftId: s.liftId, strand: tally, issuer: s.issuer, units: s.units, date: DATE, expiry: EXPIRY })
@@ -166,17 +163,18 @@ describe('mutual exclusion & replay', () => {
 	})
 })
 
-describe('reserved-credit gate', () => {
-	it('two concurrent pledges on one edge respect the reserved gate', async () => {
+describe('concurrent pledges', () => {
+	it('two pledges on one edge both land, reserving their sum (no credit gate)', async () => {
 		const { key } = referee()
 		const signer = identity().signer
-		const tally = new InMemoryTally('cid-x', 500n, 500n)
+		const tally = new InMemoryTally('cid-x')
 		const e1: OwnedEdge = { liftId: 'La', strand: tally, issuer: 'F', units: 300n, date: DATE, expiry: EXPIRY }
 		const e2: OwnedEdge = { liftId: 'Lb', strand: tally, issuer: 'F', units: 300n, date: DATE, expiry: EXPIRY }
 
-		await pledgeEdge(e1, key, signer) // reserved 300 ≤ 500 ✓
-		await expect(pledgeEdge(e2, key, signer)).rejects.toThrow(/WithinReservedCredit/) // 600 > 500 ✗
-		expect(tally.reservedBalance()).toBe(300n) // the rejected pledge did not land
+		await pledgeEdge(e1, key, signer)
+		await pledgeEdge(e2, key, signer)
+		expect(tally.reservedBalance()).toBe(600n)
+		expect(tally.settledBalance()).toBe(0n)
 	})
 })
 

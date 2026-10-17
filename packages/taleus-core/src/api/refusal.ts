@@ -5,7 +5,7 @@ import type { Refusal, RefusalCode, Result } from './types.js'
  * what it said.
  *
  * Quereus reports a failed write by naming the constraint: `CHECK constraint failed:
- * WithinCreditLimits`. That name is the most useful diagnostic in the system, and the
+ * SignerAuthorized`. That name is the most useful diagnostic in the system, and the
  * row-level suite asserts on it. So a `Refusal` carries **both**: a stable `code` to branch
  * on, and the raw `constraint` for anyone who needs to know exactly which rule fired.
  *
@@ -15,9 +15,7 @@ import type { Refusal, RefusalCode, Result } from './types.js'
  */
 
 const BY_CONSTRAINT: Record<string, RefusalCode> = {
-	WithinCreditLimits: 'credit-limit',
-	WithinReservedCredit: 'credit-limit',
-	ClosingReducesBalance: 'closing',
+	NotClosed: 'closed',
 	ClosingReducesReserved: 'closing',
 	SignerAuthorized: 'not-authorized',
 	StockSignerAuthorized: 'not-authorized',
@@ -87,7 +85,7 @@ const BY_UNIQUE: Record<string, RefusalCode> = {
 	'Ledger (InvoiceId)': 'request-mismatch',
 }
 
-/** `CHECK constraint failed: WithinCreditLimits` → `WithinCreditLimits`. */
+/** `CHECK constraint failed: SignerAuthorized` → `SignerAuthorized`. */
 function constraintIn(text: string): string | undefined {
 	const unique = /UNIQUE constraint failed:\s*([A-Za-z0-9_]+(?:\s+PK|\s*\([^)]*\)|\.[A-Za-z0-9_]+)?)/.exec(text)
 	if (unique) return unique[1].replace(/\s+/g, ' ')

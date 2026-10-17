@@ -160,8 +160,7 @@ interface StoredPledge {
 
 /**
  * One tally strand's lift state, reproducing the schema's lift gates in-memory
- * (schema/draft1.qsql): the reserved-credit gate (`PendingLift.WithinReservedCredit`),
- * single-finalize + finalize-after-void exclusion (`Ledger.LiftFinalize`), void-after-
+ * (schema/draft1.qsql): single-finalize + finalize-after-void exclusion (`Ledger.LiftFinalize`), void-after-
  * finalize exclusion (`LiftVoid.NotFinalized`), the referee-signature checks
  * (`LiftFinalize` / `RefereeVoidValid`), and the settled-balance chain (`BalanceCorrect`).
  * The AUTHORITATIVE gate is Quereus; this is agent-layer behavioral parity while no runner
@@ -177,10 +176,6 @@ export class InMemoryTally implements EdgeStrand {
 
 	constructor(
 		readonly cid: string,
-		/** Stock-granted limit: how far the reserved stock-perspective balance may RISE. */
-		private readonly stockLimit: bigint,
-		/** Foil-granted limit: how far it may FALL (−foilLimit). */
-		private readonly foilLimit: bigint,
 		initialSettled = 0n,
 	) {
 		this.settled = initialSettled
@@ -213,12 +208,6 @@ export class InMemoryTally implements EdgeStrand {
 	pledge(row: PledgeRow): Promise<void> {
 		if (this.pledges.has(row.liftId)) {
 			return fail(`PendingLift PK collision: duplicate LiftId ${row.liftId}`)
-		}
-		// WithinReservedCredit: the prospective reserved balance (this pledge included) must sit
-		// within both grantors' limits, else the pledge would over-commit reserved capacity.
-		const prospective = this.reservedBalance() + InMemoryTally.delta(row)
-		if (prospective > this.stockLimit || prospective < -this.foilLimit) {
-			return fail(`WithinReservedCredit: reserved ${prospective} outside [${-this.foilLimit}, ${this.stockLimit}] for LiftId ${row.liftId}`)
 		}
 		this.pledges.set(row.liftId, { row, finalized: false, voided: false })
 		return Promise.resolve()

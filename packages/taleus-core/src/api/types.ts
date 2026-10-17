@@ -96,10 +96,10 @@ export interface Refusal {
 }
 
 export type RefusalCode =
-	/** The act would take the balance past a credit limit, settled or projected. */
-	| 'credit-limit'
-	/** The tally is closing, and this act would move the balance away from zero. */
+	/** The tally is closing, and this lift pledge would move the balance away from zero. */
 	| 'closing'
+	/** The tally is closed: it reached zero after a close request, and accepts nothing more. */
+	| 'closed'
 	/** The signing key is not authorized to act for that party. */
 	| 'not-authorized'
 	/** A signature did not verify over the content it covers. */

@@ -28,61 +28,48 @@ have each replica reach a different verdict on the same row, and the strand woul
 time-dependent in a gate therefore has to come from a value **in the row**, which means a value the
 signer chose.
 
-That is not a limitation working around the design — it *is* the design. It just means the gates
-inherit whatever honesty the asserted date has.
+That is not a limitation working around the design — it *is* the design. It just means anything
+keyed to a date inherits whatever honesty the asserted date has.
 
 ## Who can lie, and what it buys them
 
 A direct chit is issued — and signed — by the party whose position it **worsens**. Issuing raises
 what you owe or lowers what you are owed. That is why chits need no countersignature: nobody needs
-protection from a stranger making themselves poorer.
+protection from a stranger making themselves poorer. And it is why no chit is refused for its amount:
+a credit limit says what the other party will extend for goods or services, enforced by their
+declining to deliver ([architecture.md § Ledger Operation](architecture.md#ledger-operation)).
 
-What the issuer *does* consume is the credit the **other** party granted. `Ledger.WithinCreditLimits`
-picks the grantor's limit from the highest-revision `CreditTerms` row whose `EffectiveDate` is on or
-before **the chit's own signed date**. So the date the issuer chooses selects which credit epoch
-governs. That is the whole attack surface.
+So a chit's date selects nothing in the schema. What a false date can damage is the **record**, and
+the counterparty's decisions that rest on it.
 
 ### Backdating
 
-The real one. A grantor reduces a limit; the reduction takes effect after the notice period the
-grantor previously agreed to (`CreditTerms.EffectiveDateValid`). Once it is in force, an issuer can
-still date a chit *before* it and have the gate apply the older, larger limit.
+A chit dated in the past misstates when the debt arose: a statement for a period, the order a reader
+sees history in, and — when rich credit terms land ([`drafts/credit-terms.md`](drafts/credit-terms.md))
+— interest, which makes dates directly monetary. It can also blur which credit terms were in force
+when the creditor delivered against it. Two things bound it.
 
-The loss is genuine: the grantor is owed more than they now consent to risk, and cannot un-owe it.
-Two things bound it.
-
-- **Date monotonicity.** A chit may not be dated before the chit preceding it in the chain
-  (`Ledger.DateMonotonic`). Deterministic, costs nothing, and it means any activity on the tally
-  re-anchors the floor. On an active tally the reachable window is the gap since the last chit.
+- **Date order.** A chit may not be dated before the chit preceding it in the chain
+  (`Ledger.DateMonotonic`). Deterministic, costs nothing, and any activity on the tally re-anchors
+  the floor. On an active tally the reachable window is the gap since the last chit; on a dormant
+  one it is the time since it last moved.
 - **The counterparty's own clock, at receipt.** A node that receives a chit dated far from its own
-  clock can refuse to accept it before acting on it — before shipping goods, before extending
-  further credit. This is the layer where "the other party objects" actually happens, and it happens
-  in real time, not in a dispute afterwards. It is agent policy, not a schema constraint, because
-  only the agent has a clock it trusts.
-
-The residual exposure, stated honestly: **a dormant tally.** If two parties have not transacted in a
-year, monotonicity permits a chit dated a year back, and the grantor's reduction in the meantime can
-be stepped around. The designed protection there is the notice period itself — a grantor reducing a
-limit on a dormant tally should expect the old limit to remain reachable until the tally moves — plus
-the receiving agent's clock check.
+  clock can decline to act on it — before shipping goods, before extending further credit. This is
+  the layer where "the other party objects" actually happens, and it happens in real time, not in a
+  dispute afterwards. It is agent policy, not a schema constraint, because only the agent has a
+  clock it trusts.
 
 ### Postdating
 
-Much weaker, and mostly self-harm. A future date selects a future credit epoch, and future epochs
-are *more restrictive* by construction: permissive changes take effect immediately, so they are
-already in force, while restrictive ones are the only kind that sit in the future. The one exception
-is a grantor who voluntarily files a permissive increase with a future effective date; a grantor who
-does not want that reached early should not file it early.
-
-What postdating does damage is the **record**: balances as of a date, history ordering as a reader
-sees it, and — when rich credit terms land ([`drafts/credit-terms.md`](drafts/credit-terms.md)) —
-interest and amortization, which make dates directly monetary. The receiving agent should bound
-future dates against its own clock for the same reason it bounds past ones.
+Mostly self-harm, and the same kind of harm to the record: balances as of a date and history
+ordering as a reader sees it. A postdated chit also raises the floor `DateMonotonic` sets for the
+next one. The receiving agent should bound future dates against its own clock for the same reason it
+bounds past ones.
 
 ## What this means for the schema
 
-- Gates key off `New.Date`, never a clock. Already true.
-- `Ledger.DateMonotonic` bounds how far back a chit may reach.
+- Constraints key off `New.Date`, never a clock. Already true.
+- `Ledger.DateMonotonic` keeps the chain in date order.
 - Dates are `YYYY-MM-DD` text, checked with `IsISODate`, and compared as text, which is calendar
   order. Date arithmetic inside a constraint adds a `timespan` (`Date + timespan('P21D')`), which is
   deterministic; `julianday()` and `date()` are not, because they accept `'now'`. Only Quereus
@@ -95,8 +82,7 @@ future dates against its own clock for the same reason it bounds past ones.
 
 Clock policy belongs to whoever has a clock. A receiving node should:
 
-- reject a chit dated meaningfully in the future, and one dated implausibly far in the past, before
-  acting on it;
+- decline to act on a chit dated meaningfully in the future, or implausibly far in the past;
 - record when it *received* a chit, separately from when the chit says it was made — the two are
   different facts and only one of them is signed;
 - treat a date it accepted as a date it can no longer dispute cheaply.

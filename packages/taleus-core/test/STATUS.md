@@ -16,9 +16,11 @@ next session can pick up without re-deriving the reasoning.
 ### Step 1 — direct chits, at the schema level *(complete)*
 
 §§ 1–9 below are done: substrate, identity and keys, formation, negotiation, credit terms, direct
-chits, invoices, close, reading. 240 tests over 20 suites. The credit gate is the heart of the
-system and the row-level harness was the right tool for it — an API does not yet exist, and
-building one over an unexercised gate would have baked in whatever was wrong with it. Five schema
+chits, invoices, close, reading. 240 tests over 20 suites. The row-level harness was the right
+tool for the schema's rules — an API did not yet exist, and building one over unexercised
+constraints would have baked in whatever was wrong with them. (The credit and closing gates this
+step tested were later removed: chits are accepted when duly signed — docs/architecture.md § Ledger
+Operation.) Five schema
 defects and a handful of open questions came out of it; they are all in § 0.
 
 ### Step 2 — the Sereus seam
@@ -198,10 +200,10 @@ Things the tests turned up that are design questions rather than test failures.
   own column, so the predicate was `Number = Number - 1` — never true. The lookup always returned
   nothing, `Coalesce` made it `0`, and **every chit's `Balance` had to equal its own delta**. The
   consequences compound: `PerspectiveBalance` reads the latest row's `Balance`, so it reported the
-  last chit's amount rather than the tally balance; and `WithinCreditLimits` gates against that, so
-  **the credit limit was per-chit, not cumulative — any limit could be exceeded by issuing enough
-  small chits.** **Fixed**: `where L.Number = New.Number - 1`. The closing gate three constraints
-  below already spelled it correctly, which is what makes this a typo rather than a design choice.
+  last chit's amount rather than the tally balance; and the credit gate of the time read that, so
+  **the credit limit was per-chit, not cumulative.** **Fixed**: `where L.Number = New.Number - 1`.
+  The closing gate of the time already spelled it correctly, which is what made this a typo rather
+  than a design choice.
 - **`Ledger.ValidIssuer` referenced a column that does not exist**, making the table uninsertable
   exactly as `TallyContract` was. The schema's own comment flagged it as a draft placeholder from
   when the ledger stored the issuer's Sid rather than an `'S'`/`'F'` side code, left for separate
@@ -230,23 +232,12 @@ Things the tests turned up that are design questions rather than test failures.
   and aging instead of expiry. So these tests are a faithful record of the current schema, not an
   endorsement of it, and the ones on exactness and expiry are the ones that will change when that
   ticket lands. Noted here so a later failure reads as intended, not as a regression.
-- **The credit gate can mask `InvoiceLink`.** A refusal test asserting a specific constraint has to
-  make sure the earlier gates pass first: a requester-issued chit answering its own invoice fails
-  `WithinCreditLimits` before `InvoiceLink` is reached whenever the counterparty granted no credit.
-  Not a schema defect — a note about how to write these tests, since the first draft of that one
-  passed for the wrong reason.
 
 - **A zero balance reads as negative zero on the foil side.** `PerspectiveBalance` computes
   `Balance * -1` for the foil, and `0 * -1` is `-0` in JavaScript; it comes back through Quereus as
   one. Harmless in arithmetic, in `===`, and in JSON (`-0` serializes as `0`), but `Object.is(b, 0)`
   is false for it and so is a naive deep-equality comparison — which is how it was found. Not worth
   a schema change; a display or API layer should normalize (`b + 0`) rather than assume.
-- **Close and invoice tests both hit the credit gate first.** Twice now a refusal test asserting a
-  specific constraint passed for the wrong reason because `WithinCreditLimits` (or, once a pledge is
-  open, `WithinReservedCredit` on the *Ledger*) answered before the constraint under test. The
-  fixture's default `samGrants: 0` is the cause: Jan cannot issue at all. Pass `samGrants` whenever
-  a test needs the stock side to issue and the gate under test is not the credit gate.
-
 - **`Ledger.SignerKey` and `Signature` were NOT NULL, so a lift finalize could never be inserted.**
   Both columns are documented "null for a finalize", and `KindColumnsConsistent` *requires* them
   null when `Kind = 'lift'` — but neither carried the `null` marker the schema uses elsewhere
@@ -260,8 +251,8 @@ Things the tests turned up that are design questions rather than test failures.
   exempt from the credit gates by design) and the outgoing one void, and the settled balance lands
   past the limit the counterparty granted. `ReservedBalance` is one signed number and both reserved
   gates read it; a credit limit needs the one-sided worst case per direction instead. Filed as
-  `feat-schema-directional-reserve`. Not the deferred-CHECK isolation question — this fails in
-  order, with nothing racing.
+  `feat-schema-directional-reserve`. *Superseded:* the reserved gates were removed (nothing gates on
+  credit); netting still makes `LiftLading` over-advertise, which is agent policy.
 
 - **A `TallyContract` could not be completed by two separate parties.** The row carries both
   signatures over one digest and needs both at insert, but nothing in the schema carried the
@@ -330,8 +321,8 @@ Things the tests turned up that are design questions rather than test failures.
   2. **A descending read does not ride the primary key.** `order by X desc limit 1` -- the idiom
      this schema uses everywhere for "the latest" -- scans and sorts unless an index declares that
      order. `Ledger (Number desc)` took the current-balance read from 27 ms (empty) / 67 ms (360
-     chits) to 25 / 17 -- i.e. flat -- and a chit insert, which consults it twice through the
-     credit gates, from 241 ms to 105 ms at that depth.
+     chits) to 25 / 17 -- i.e. flat -- and a chit insert, which then consulted it twice through
+     credit gates since removed, from 241 ms to 105 ms at that depth.
   3. Non-key columns on the unbounded table: `Ledger.InvoiceId` (`InvoiceLink` counts on every
      direct chit; `InvoiceState` joins per invoice), `Ledger (LiftId, Kind)` (`LiftFinalize` and
      `OpenPendingLift`, the latter feeding `ReservedBalance`), `Ledger.Date` (reporting ranges --
@@ -346,8 +337,8 @@ Things the tests turned up that are design questions rather than test failures.
     desc limit 1` plans as an ordered index walk (planner cost 501); `select x from t TV order by
     TV.r desc limit 1` plans as a full `Sort` over a primary-key scan (cost 20933). One `Alias`
     node, nothing else -- no `WHERE`, no subquery, no correlation needed. Every latest-revision
-    resolver in this schema is aliased, including the six `CreditTerms` lookups inside `Ledger`'s
-    credit gates that run on every chit insert.
+    resolver in this schema is aliased, including the `CreditTerms` and `TradingVariable`
+    resolvers.
     **Decision: keep the aliases and wait for the upstream fix.** De-aliasing does recover it
     (a `LiftLading` read over a 240-revision journal, 100 ms -> 61 ms) and was tried and reverted:
     contorting the schema around a planner bug costs more in readability than it buys, and the
@@ -520,14 +511,10 @@ Things the tests turned up that are design questions rather than test failures.
 - [x] `Balance` chains: it accumulates, both parties read the same running total, and a balance
       equal to the chit's own delta is refused
 - [x] Wrong arithmetic is refused in either direction
-- [x] The credit gate admits a chit inside the grantor's effective limit and refuses one past it
-- [x] The gate is **cumulative, not per chit** — the consequence of the chain bug above
-- [x] Each side binds separately: a party that granted nothing may be owed nothing
-- [x] With no terms published, nothing may be owed
+- [x] No credit gate: a chit inside the limit, past it, into credit never extended, and with no
+      terms published at all is accepted when duly signed
 - [x] `DateMonotonic`: a chit dated before its predecessor is refused; the same day is fine
       *(`docs/timestamps.md`)*
-- [x] The date selects the credit epoch — a chit dated before a restrictive cut takes effect gets
-      the old limit, one dated after gets the new one
 - [x] A chit's `Id` is inside its signed digest, so it cannot be assigned by the store
 - [x] **FINDING** — the digest names the issuer under an alias saying recipient; see § 0
 - [x] Every act is validated independently by both parties' engines *(the harness does this for
@@ -537,7 +524,7 @@ Things the tests turned up that are design questions rather than test failures.
 ## 7. Invoices
 
 `src/tally/invoices.ts` + `invoices.test.ts` (24 tests). Jan (stock) invoices Sam (foil); Sam issues
-the answering chit, which is the one that has to fit inside the credit Jan granted. See the § 0
+the answering chit. See the § 0
 finding on `feat-invoice-lifecycle` before changing any of this.
 
 - [x] An invoice is signed by the party asking to be paid — `SignerAuthorized` resolves the key
@@ -557,8 +544,7 @@ finding on `feat-invoice-lifecycle` before changing any of this.
       `declined > expired`; `paid > declined` is unreachable in-process (each excludes the other at
       insert) and exists only for the concurrent case, same shape as `NotLastKey` above
 - [x] A late payment of an expired invoice succeeds and reads as `paid`
-- [x] An invoice may exceed current capacity; only the answering chit is credit-gated
-      (`WithinCreditLimits`)
+- [x] An invoice may exceed the payer's credit, and so may the chit answering it
 - [x] `OpenInvoice` lists the open ones and nothing else
 
 Expiry leans on `Today()`, the schema's one volatile function. The tests pin it with a date that has
@@ -566,31 +552,26 @@ already passed and always will have, rather than by faking a clock.
 
 ## 8. Close
 
-`src/tally/close.ts` + `close.test.ts` (13 tests). The claim under test is that a *unilateral*
-close is safe, which rests on closing freezing balance growth while always permitting reduction.
+`src/tally/close.ts` + `close.test.ts`. A close request is unilateral and irreversible. Closing
+gates lift pledges toward zero but never a direct chit, so it cannot trap the counterparty; closed
+is terminal.
 
 - [x] Either party may file a `CloseRequest` at any time, without the other agreeing; both may
       file, each once (the primary key), and both replicas read `closing` immediately
 - [x] `SignerAuthorized` and `SignatureValid` gate it the same way as `Invoice` / `InvoiceDecline`
-- [x] While closing, a chit that moves the balance toward zero is admitted — from a positive
-      balance and from a negative one, so whichever party holds value can always collect it
-- [x] While closing, a chit that moves it away from zero is refused (`ClosingReducesBalance`)
-- [x] A sign-flip overshoot is refused — `+30000 → -5000` reduces the number but mints new credit
-      in the other direction, which is what the same-sign form exists to stop
-- [x] The lift half of the safety argument: a pledge that reduces the *reserved* balance is
-      admitted, one that grows it is refused (`ClosingReducesReserved`) — so the counterparty can
-      lift the value out as well as be paid down
+- [x] While closing, chits are accepted either way: toward zero, away from it, and past it
+- [x] While closing, a lift pledge toward zero is admitted (value can be lifted out); one that
+      grows the reserved balance, or overshoots past zero, is refused (`ClosingReducesReserved`)
 - [x] `CloseState` reads `open` with no request, `closing` with one, `closed` once settled at zero
       with no open pledge; a settled zero with a pledge still open stays `closing` (the
       load-bearing clause — otherwise a later finalize would bump a "closed" tally off zero)
-- [x] A settled close is terminal *(`debt-tally-close-no-reopen`)* — at a prior balance of zero
-      both arms of `ClosingReducesBalance` are false, so every further direct chit is rejected with
-      no separate constraint
-- [x] Withdrawing credit is **not** a close: it is restrictive, so it owes the counterparty its
-      `CallDays` of notice before it binds, it is reversible, and `CloseState` stays `open`
+- [x] Closed is terminal (`NotClosed`, reading `TallyClosed` before the transaction): the chit
+      that reaches zero lands, and every chit, pledge, request and terms revision after it is
+      refused; a close filed at a zero balance closes at once
+- [x] Withdrawing credit is **not** a close: it refuses no chit either, and `CloseState` stays
+      `open`
 
-The pledge rows here are built by hand in the test — `src/tally/` has no lift surface yet (§ 10),
-and these exercise a *close* gate rather than starting one.
+The pledge rows here are built by hand in the test — `src/tally/` has no lift surface yet (§ 10).
 
 ## 9. Reading
 

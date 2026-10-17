@@ -38,8 +38,10 @@ terms (positive = value the **stock** party, Party S, has accumulated; F sees th
         Client/Foil variables       │       Vendor/Stock variables
 ```
 
-S's credit limit caps how far the balance may **rise** (F's debt to S); F's limit caps how far it may
-**fall** (S's debt to F). They are mirror images — you cannot collapse them into one set without losing
+S's variables govern how far lifts may **raise** the balance (F's debt to S); F's govern how far they
+may **lower** it (S's debt to F). The credit limits sit on the same line as each party's promise of how
+much it will extend for goods or services, but they bound nothing a lift does. The two sets are mirror
+images — you cannot collapse them into one set without losing
 the direction each party is protecting.
 
 > **Reframing from MyCHIPs.** In MyCHIPs the *meaning* of a variable flipped depending on whether you
@@ -53,8 +55,7 @@ A lift direction is named by its **receiver** — the party whose perspective ba
 counterparty releases the same value (perspective balances are negations of each other). `LiftLading`
 computes, per direction:
 
-- **`FreeUnits`** — receiver accumulation up to its `Target`, no fee. Additionally capped by the credit
-  the **receiver** granted the counterparty (`min(Bound, receiver's CreditLimit)`).
+- **`FreeUnits`** — receiver accumulation up to its `Target`, no fee.
 - **`RewardedUnits`** — further accumulation up to `Bound`, charged at the **receiver's** `Reward`.
 - **`Clutch`** — the **releasing** counterparty's charge, applied to the whole moved amount.
 
@@ -62,13 +63,15 @@ So a single lift touches **both** parties' variables at once: the receiver's `Re
 releaser's `Clutch`. Fees compose along a route as `NewRate = PriorRate + MyRate × (1 − PriorRate)`, and
 across a denomination boundary the conversion multiplies alongside (see [denominations.md](denominations.md)).
 
-## Advisory view vs. hard gate
+## Policy, not a gate
 
-`LiftLading` is a **view** — advisory capacity the agent reads to size and price a lift. It is *not* the
-enforcement point. The hard schema gate on a lift pledge is the **credit limit** (`WithinReservedCredit`
-on `PendingLift`), not the trading variables. Conformance of a pledge to the issuer's trading variables
-is **agent-enforced**: a `PendingLift` is self-signed by the issuer, so a party only ever commits what
-its **own** agent signs, and TV interpretation (reward/clutch pricing, route economics) is too rich for a
+`LiftLading` is a **view** — capacity the agent reads to size and price a lift. Nothing in the schema
+enforces it, nor the credit limit: a `PendingLift` pledge, like a direct chit, is accepted when duly
+signed by its issuer ([architecture.md § Ledger Operation](architecture.md#ledger-operation)). The one
+schema rule on a pledge is the tally's state: while it is closing a pledge may only move the balance
+toward zero, and once it is closed nothing is accepted ([§ Tally close](architecture.md#tally-close)). Conformance
+of a pledge to the issuer's trading variables is **agent-enforced**: a party only ever commits what its
+**own** agent signs, and TV interpretation (reward/clutch pricing, route economics) is too rich for a
 CHECK constraint. See the good-faith timing rule in [Contract governance](tally-lifecycle.md#contract-governance):
 a lift chit valid under the variables in force **when it was signed** stays valid even if the party
 records new variables microseconds later; the new policy binds only later lifts.

@@ -8,11 +8,11 @@ import { TODAY, balanceOf, trading } from './test-harness.js'
 /**
  * Winding a tally down.
  *
- * The claim under test is that a unilateral close is safe. It rests on two halves: closing
- * freezes balance *growth* in both directions, and it always permits balance *reduction* --
- * direct chits here, and lift pledges too, so a party holding value can either be paid down or
- * lift it out. `closed` is reached only at an actual settled zero with nothing still pending,
- * which is what stops a close from being a way to trap the counterparty.
+ * A close request is a signed, irreversible statement of intent: either party, alone, moves the
+ * tally to `closing`. Closing refuses no direct chit -- a party's own promise, duly signed, is
+ * accepted either way (docs/architecture.md § Tally close) -- but a lift pledge only toward zero. At an actual settled zero
+ * with nothing still pending the tally is `closed`, which is terminal: it accepts no further
+ * activity at all.
  *
  * The two-party setup lives in `./test-harness.ts`.
  */
@@ -91,19 +91,16 @@ describe('filing a close', () => {
 		])
 		await expect(stateOf(tally, sam)).resolves.toEqual({ State: 'open' })
 
-		// Inside the notice period the old limit still governs, so Sam may still draw on it.
+		// Neither the notice period nor the new limit refuses a chit: a limit says what Jan will
+		// extend for goods or services, and Sam may still promise more.
 		await tally.propose([chit({ number: 2, units: 1000, balance: 31000 })])
-		// After it, growth is frozen -- by the limit, not by a close.
-		await expect(
-			tally.refuses([chit({ number: 3, units: 1, date: AFTER_NOTICE, balance: 31001 })]),
-		).resolves.toMatch(/WithinCreditLimits/)
-		// And the balance stays payable throughout.
-		await tally.propose([chit({ number: 3, issuer: 'S', units: 31000, balance: 0 })])
+		await tally.propose([chit({ number: 3, units: 1, date: AFTER_NOTICE, balance: 31001 })])
+		await tally.propose([chit({ number: 4, issuer: 'S', units: 31001, date: AFTER_NOTICE, balance: 0 })])
 		await expect(stateOf(tally, sam)).resolves.toEqual({ State: 'open' })
 	})
 })
 
-describe('the closing gate on direct chits', () => {
+describe('direct chits while closing', () => {
 	it('admits a chit that moves a positive balance toward zero', async () => {
 		const { jan, sam, tally, chit, close } = await trading()
 		await tally.propose([chit({ number: 1, units: 30000, balance: 30000 })])
@@ -115,46 +112,27 @@ describe('the closing gate on direct chits', () => {
 		}
 	})
 
-	it('refuses a chit that moves it further away', async () => {
-		const { tally, chit, close } = await trading()
+	it('admits a chit that moves it further away', async () => {
+		const { jan, tally, chit, close } = await trading()
 		await tally.propose([chit({ number: 1, units: 30000, balance: 30000 })])
 		await tally.propose([close('S')])
-		await expect(
-			tally.refuses([chit({ number: 2, units: 5000, balance: 35000 })]),
-		).resolves.toMatch(/ClosingReducesBalance/)
+		await tally.propose([chit({ number: 2, units: 5000, balance: 35000 })])
+		await expect(balanceOf(tally, jan)).resolves.toEqual({ Balance: 35000 })
+		await expect(stateOf(tally, jan)).resolves.toEqual({ State: 'closing' })
 	})
 
-	it('refuses a sign-flip overshoot', async () => {
-		// +30000 -> -5000 reduces the number but mints 5000 of new credit in the other
-		// direction, which is exactly what closing is meant to stop. Hence the same-sign form:
-		// a positive balance may only land in [0, prior).
-		const { tally, chit, close } = await trading({ samGrants: 50000 })
+	it('admits a chit that carries the balance past zero', async () => {
+		const { jan, tally, chit, close } = await trading()
 		await tally.propose([chit({ number: 1, units: 30000, balance: 30000 })])
 		await tally.propose([close('S')])
-		await expect(
-			tally.refuses([chit({ number: 2, issuer: 'S', units: 35000, balance: -5000 })]),
-		).resolves.toMatch(/ClosingReducesBalance/)
+		await tally.propose([chit({ number: 2, issuer: 'S', units: 35000, balance: -5000 })])
+		await expect(balanceOf(tally, jan)).resolves.toEqual({ Balance: -5000 })
 	})
 
-	it('works the same way when the balance is negative', async () => {
-		// The gate is symmetric: whoever holds value can always collect it, regardless of which
-		// side asked to close.
-		const { tally, chit, close } = await trading({ samGrants: 50000 })
-		await tally.propose([chit({ number: 1, issuer: 'S', units: 20000, balance: -20000 })])
-		await tally.propose([close('F')])
-		await tally.propose([chit({ number: 2, units: 8000, balance: -12000 })])
-		await expect(
-			tally.refuses([chit({ number: 3, issuer: 'S', units: 5000, balance: -17000 })]),
-		).resolves.toMatch(/ClosingReducesBalance/)
-	})
-
-	it('reaches closed at an actual settled zero, and stays there', async () => {
-		// At a prior balance of zero both arms of the gate are false, so every further direct
-		// chit is rejected. "No ledger inserts once closed" needs no constraint of its own --
-		// `debt-tally-close-no-reopen`'s terminality falls out of the same predicate.
-		// Sam grants credit here only so that `WithinCreditLimits` is not the gate that answers
-		// the final chit -- the point is that the *closing* gate rejects it.
-		const { jan, sam, tally, chit, close } = await trading({ samGrants: 50000 })
+	it('reads closed at an actual settled zero, and refuses every chit after it', async () => {
+		// The chit that brings a closing tally to zero lands; closed is terminal, so nothing after it
+		// does -- not even a duly signed chit (TallyClosed reads the state before the transaction).
+		const { jan, sam, tally, chit, close } = await trading()
 		await tally.propose([chit({ number: 1, units: 30000, balance: 30000 })])
 		await tally.propose([close('S')])
 		await tally.propose([chit({ number: 2, issuer: 'S', units: 30000, balance: 0 })])
@@ -164,14 +142,46 @@ describe('the closing gate on direct chits', () => {
 		}
 		await expect(
 			tally.refuses([chit({ number: 3, issuer: 'S', units: 1, balance: -1 })]),
-		).resolves.toMatch(/ClosingReducesBalance/)
+		).resolves.toMatch(/NotClosed/)
+		await expect(
+			tally.refuses([chit({ number: 3, issuer: 'F', units: 1, balance: 1 })]),
+		).resolves.toMatch(/NotClosed/)
+	})
+
+	it('closes at once when the balance is already zero', async () => {
+		const { jan, tally, chit, close } = await trading()
+		await tally.propose([close('F')])
+		await expect(stateOf(tally, jan)).resolves.toEqual({ State: 'closed' })
+		await expect(
+			tally.refuses([chit({ number: 1, units: 100, balance: 100 })]),
+		).resolves.toMatch(/NotClosed/)
+	})
+
+	it('refuses requests and terms once closed', async () => {
+		const { jan, tally, cid, invoice, close } = await trading()
+		await tally.propose([close('S')])
+		await expect(tally.refuses([invoice({ id: 'inv:late', units: 100 })])).resolves.toMatch(/NotClosed/)
+		await expect(
+			tally.refuses([
+				publishCreditTerms({
+					sid: jan.sid,
+					tallyCid: cid,
+					revision: 2,
+					creditLimit: 90000,
+					callDays: 21,
+					date: TODAY,
+					effectiveDate: TODAY,
+					signer: jan.keys[0],
+				}),
+			]),
+		).resolves.toMatch(/NotClosed/)
 	})
 })
 
 /**
  * The lift half of the close story. `src/tally/` does not carry a lift surface yet (test/STATUS.md
  * § 10 keeps lifts stubbed), so the pledge row is built here by hand -- the minimum needed to
- * exercise a *close* gate, not the start of a lift API.
+ * exercise closing, not the start of a lift API.
  */
 function pledge(
 	cid: string,
@@ -197,7 +207,7 @@ function pledge(
 	}
 }
 
-describe('the closing gate on lift pledges', () => {
+describe('lift pledges while closing (gated toward zero)', () => {
 	it('lets the value be lifted out rather than paid down', async () => {
 		// This is the other half of why a unilateral close cannot trap anyone: Sam does not
 		// need Jan to pay him, he can route the value away through the graph.
@@ -211,8 +221,8 @@ describe('the closing gate on lift pledges', () => {
 		})
 	})
 
-	it('refuses a pledge that grows the reserved balance', async () => {
-		const { sam, tally, cid, chit, close } = await trading()
+	it('refuses a pledge that grows the reserved balance -- lifts, unlike chits, are gated', async () => {
+		const { tally, cid, chit, close, sam } = await trading()
 		await tally.propose([chit({ number: 1, units: 30000, balance: 30000 })])
 		await tally.propose([close('S')])
 		await expect(
@@ -220,12 +230,19 @@ describe('the closing gate on lift pledges', () => {
 		).resolves.toMatch(/ClosingReducesReserved/)
 	})
 
+	it('refuses a pledge that overshoots past zero', async () => {
+		const { tally, cid, chit, close, jan } = await trading()
+		await tally.propose([chit({ number: 1, units: 30000, balance: 30000 })])
+		await tally.propose([close('S')])
+		await expect(
+			tally.refuses([pledge(cid, { liftId: 'lift:1', issuer: 'S', units: 35000, signer: jan })]),
+		).resolves.toMatch(/ClosingReducesReserved/)
+	})
+
 	it('holds a settled zero at closing while a pledge is still open', async () => {
 		// The load-bearing clause in `CloseState`: without the open-pledge test, this tally
 		// would read `closed` and then a later finalize would bump it off zero.
-		// Sam grants credit because the settling chit is gated on the *reserved* balance too,
-		// and Jan's open pledge leaves that at -10000 once the ledger reaches zero.
-		const { jan, tally, cid, chit, close } = await trading({ samGrants: 50000 })
+		const { jan, tally, cid, chit, close } = await trading()
 		await tally.propose([chit({ number: 1, units: 30000, balance: 30000 })])
 		await tally.propose([close('S')])
 		await tally.propose([pledge(cid, { liftId: 'lift:1', issuer: 'S', units: 10000, signer: jan })])
@@ -233,5 +250,13 @@ describe('the closing gate on lift pledges', () => {
 
 		await expect(balanceOf(tally, jan)).resolves.toEqual({ Balance: 0 })
 		await expect(stateOf(tally, jan)).resolves.toEqual({ State: 'closing' })
+	})
+
+	it('refuses a pledge once closed', async () => {
+		const { sam, tally, cid, close } = await trading()
+		await tally.propose([close('S')])
+		await expect(
+			tally.refuses([pledge(cid, { liftId: 'lift:late', issuer: 'F', units: 100, signer: sam })]),
+		).resolves.toMatch(/NotClosed/)
 	})
 })

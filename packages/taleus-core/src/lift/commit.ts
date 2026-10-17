@@ -5,8 +5,8 @@
  * pledge / finalize / void rows the tally schema (schema/draft1.qsql) enforces:
  *
  *   - **Pledge** — for each edge THIS party owns, an issuer-signed `PendingLift` row.
- *     It RESERVES capacity (schema `WithinReservedCredit`) but does not move the settled
- *     balance; it settles only on referee commit, or is released on void.
+ *     It reserves capacity (counted in `ReservedBalance` and `LiftLading`) but does not move the
+ *     settled balance; it settles only on referee commit, or is released on void.
  *   - **Settle (commit)** — on ChipNet consensus, copy the referee's per-edge signature
  *     into a finalize `Ledger` row (`Kind='lift'`); the schema's `LiftFinalize` verifies
  *     it locally against the pledge, moving the reserved delta into the settled balance.
@@ -149,9 +149,10 @@ function ownedTerms(edge: OwnedEdge, refereeKey: string): LiftEdgeTerms {
 
 /**
  * Write the issuer-signed `PendingLift` pledge for one owned edge. The issuer signs the
- * lift-terms digest with its own authorized key; the schema's `WithinReservedCredit` gate
- * reserves capacity (or rejects if it would over-commit — the pledge insert throws, which
- * the caller treats as a failed promise, never a stranded pledge).
+ * lift-terms digest with its own authorized key. The schema has no credit gate; how much to
+ * pledge is the agent's trading-variable policy. A pledge insert that fails (a bad signature,
+ * an unavailable store) throws, which the caller treats as a failed promise, never a
+ * stranded pledge.
  */
 export async function pledgeEdge(edge: OwnedEdge, refereeKey: string, signer: EdgeSigner): Promise<void> {
 	const terms = ownedTerms(edge, refereeKey)
@@ -384,7 +385,7 @@ export class LiftCommit {
 	 * or `aborted`/`timedout`.
 	 */
 	async commit(plan: LiftPlan, record: LiftRecord, owned: OwnedEdge[]): Promise<CommitOutcome> {
-		// Pledge every owned edge. A pledge that the reserved-credit gate rejects throws here,
+		// Pledge every owned edge. A pledge whose insert fails throws here,
 		// BEFORE consensus — so a route that cannot be fully pledged is abandoned, never left
 		// with a stranded reservation (the pre-promise-void invariant on the local side).
 		for (const edge of owned) {

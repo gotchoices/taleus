@@ -64,7 +64,9 @@ Open points carried by reviewed stories, each tracked as a ticket:
   party write to such a tally at all is open (`feat-engine-tally-api`).
 - ~~Whether a declined invitation is visible to the inviter~~ — **resolved**: offers can be refused
   outright and the refusal reaches the offerer (story 02). See `tmp/nate-feedback.md`.
-- Whether over-limit pledges warn rather than block — `feat-manual-chit-credit-gate` (story 20).
+- ~~Whether over-limit pledges warn rather than block~~ — **resolved**: they warn; no pledge is
+  refused for its amount; closing gates only lifts, and a closed tally accepts nothing
+  (docs/architecture.md § Ledger Operation, § Tally close).
 - Whether a party can record while the counterparty is unreachable — `feat-engine-tally-api`
   (story 20).
 

@@ -94,11 +94,8 @@ describe('answering an invoice', () => {
 
 	it('refuses a chit issued by the requester’s own side', async () => {
 		// Jan asked to be paid; a Jan-issued chit answering it would *lower* the balance he is
-		// owed. The direction is wrong, not merely the amount. Sam grants credit here only so
-		// that the chit clears `WithinCreditLimits` and `InvoiceLink` is the constraint left
-		// to fire -- with the default grant of zero, Jan cannot issue at all and the credit
-		// gate answers first.
-		const { tally, invoice, chit } = await trading({ samGrants: 50000 })
+		// owed. The direction is wrong, not merely the amount.
+		const { tally, invoice, chit } = await trading()
 		await tally.propose([invoice({ id: 'inv:1', units: 12000 })])
 		await expect(
 			tally.refuses([
@@ -148,12 +145,11 @@ describe('answering an invoice', () => {
 		).resolves.toEqual({ Balance: 5000 })
 	})
 
-	it('credit-gates the answering chit even though the invoice was not gated', async () => {
-		const { tally, invoice, chit } = await trading()
+	it('accepts an answering chit past the payer’s credit, as any chit', async () => {
+		const { jan, tally, invoice, chit } = await trading()
 		await tally.propose([invoice({ id: 'inv:big', units: 90000 })])
-		await expect(
-			tally.refuses([chit({ number: 1, units: 90000, balance: 90000, invoiceId: 'inv:big' })]),
-		).resolves.toMatch(/WithinCreditLimits/)
+		await tally.propose([chit({ number: 1, units: 90000, balance: 90000, invoiceId: 'inv:big' })])
+		await expect(stateOf(tally, jan, 'inv:big')).resolves.toEqual({ State: 'paid' })
 	})
 })
 

@@ -39,7 +39,7 @@ describe('refusals that arrive wrapped, as they do on a real strand', () => {
 	const wrapped = (inner: string) => new Error('commit failed', { cause: new Error(inner) })
 
 	it('finds the constraint on the cause chain', () => {
-		expect(refusalFrom(wrapped('CHECK constraint failed: WithinCreditLimits')).code).toBe('credit-limit')
+		expect(refusalFrom(wrapped('CHECK constraint failed: SignerAuthorized')).code).toBe('not-authorized')
 	})
 
 	it('treats a wrapped refusal as a refusal, not a fault', async () => {

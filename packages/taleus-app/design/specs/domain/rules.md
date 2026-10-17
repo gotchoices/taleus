@@ -29,7 +29,9 @@ match and either may be zero. Zero credit is not a closed tally.
 A limit says what a party agreed to be owed. It does not stop the other party pledging more: a
 pledge is the pledger's own promise, and the party holding it has given up nothing. Both sides are
 warned when a pledge goes beyond the limit — the one making it, and the one deciding whether to
-hand over goods for it. Lifts are a different matter: those stay inside the limits.
+hand over goods for it. Lifts are governed by each party's lift settings (trading variables), not by
+the limits. A close request is irreversible: the tally winds down, accepting chits either way but
+lifts only toward zero, and once it reaches zero it is closed for good — nothing more is recorded.
 
 ## Agreements
 

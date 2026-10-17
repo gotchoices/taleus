@@ -11,12 +11,12 @@ cannot — get **wedged**.
 |---|---|---|
 | **Forming** | Strand exists; parties seating / negotiating; no bilaterally-signed contract yet | Derivable (no fully-signed `TallyContract`) |
 | **Open** | Contract signed by both parties; ledger active | Derivable (highest fully-signed `TallyContract`) |
-| **Closing** | A `CloseRequest` row exists; new credit frozen, only balance-reducing activity accepted | Yes — `CloseState = 'closing'` |
-| **Closed** | Settled balance zero with no pending lift; terminal | Yes — `CloseState = 'closed'` |
+| **Closing** | A `CloseRequest` row exists (irreversible); direct chits accepted either way, lift pledges only toward zero | Yes — `CloseState = 'closing'` |
+| **Closed** | Settled balance zero with no pending lift; terminal — no further activity | Yes — `CloseState = 'closed'` |
 | **Void** | Formation abandoned before a signed contract | Derivable (app-level) |
 
-Only Closing/Closed are materialized today (the `CloseRequest` table, the `CloseState` view, and the two
-closing gates). Forming / Open / Void are **derivable** from the proposal/contract tables but not yet
+Only Closing/Closed are materialized today (the `CloseRequest` table, the `CloseState` and `TallyClosed`
+views, and the closing and closed gates — [architecture.md § Tally close](architecture.md#tally-close)). Forming / Open / Void are **derivable** from the proposal/contract tables but not yet
 exposed as a view — a `TallyState` view is a natural, modest addition.
 
 ## The negotiation dance (preserve it)
@@ -104,10 +104,10 @@ deferred).
   [`feat-lift-healing`](../tickets/backlog/feat-lift-healing.md).
 - **B2 — malicious counterparty unilateral rekey** (total-loss recovery): inherent to a two-party
   human-trust root, documented, out of scope by design. Disputable.
-- **B3 — backdated chit** to dodge a credit-limit reduction: a bare pledge is harmless, but backdating
-  defeats the notice period and, via lift capacity, can pull value from third parties on
-  soon-to-be-withdrawn credit. Disputable (the signed date is visible to both). →
-  [`debt-credit-gate-chit-date-backdating`](../tickets/backlog/debt-credit-gate-chit-date-backdating.md).
+- **B3 — backdated chit**: misstates when a debt arose (statements, and interest once rich terms land).
+  Nothing in the schema keys a limit to the date, so it buys no credit. Bounded by `DateMonotonic` and
+  the receiving agent's clock; disputable (the signed date is visible to both). See
+  [timestamps.md](timestamps.md).
 
 ### C. Liveness-only — temporary, platform-level, self-healing
 

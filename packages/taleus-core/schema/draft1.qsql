@@ -442,6 +442,7 @@ table TradingVariable (
         New.SignerKey,
         'ed25519'
     )),
+    constraint NotClosed check on insert (not exists (select 1 from TallyClosed)),  -- closed is terminal (TallyClosed)
     constraint InsertOnly check on delete, update (0)
 ) with tags ("optimystic.network_watch" = true);
 
@@ -508,6 +509,7 @@ table CreditTerms (
                      + timespan('P' || (select CallDays from committed.CreditTerms CT where CT.Sid = New.Sid and CT.Revision = New.Revision - 1) || 'D')
             end)
     ),
+    constraint NotClosed check on insert (not exists (select 1 from TallyClosed)),  -- closed is terminal (TallyClosed)
     constraint InsertOnly check on delete, update (0)
 ) with tags ("optimystic.network_watch" = true);
 
@@ -571,6 +573,7 @@ table InvoiceDecline (
     -- Cannot decline an invoice already answered by a chit. Mirror of Ledger.InvoiceLink's
     -- not-declined guard; both are commit-time subqueries with the SAME isolation caveat noted there.
     constraint NotPaid check on insert (not exists (select 1 from Ledger L where L.InvoiceId = New.InvoiceId)),
+    constraint NotClosed check on insert (not exists (select 1 from TallyClosed)),  -- closed is terminal (TallyClosed)
     constraint InsertOnly check on delete, update (0)
 ) with tags ("optimystic.network_watch" = true);
 
@@ -627,105 +630,26 @@ table Ledger (
     -- `Number = Number - 1` against the subquery's own column -- never true, so the lookup
     -- always returned nothing, Coalesce made it 0, and every chit's Balance had to equal its
     -- OWN delta. The chain did not chain: PerspectiveBalance read the last chit's amount
-    -- rather than the tally balance, and WithinCreditLimits gated against that, making the
-    -- credit limit per-chit instead of cumulative -- so any limit could be exceeded by
-    -- issuing enough small chits. The closing gate below already spelled it `New.Number - 1`.
+    -- rather than the tally balance.
     constraint BalanceCorrect check on insert (
         Coalesce((select L.Balance from Ledger L where L.Number = New.Number - 1), 0)
             + (New.Units * case when New.Issuer = 'F' then 1 else -1 end) = New.Balance
     ),
-    -- Time bound (docs/timestamps.md). A chit may not be dated before the chit preceding it in the
-    -- chain. Deterministic -- it compares two signed values already in the strand, never a clock --
-    -- and it is what stops an issuer reaching back past a restrictive credit reduction to select an
-    -- older, larger limit. Any activity on the tally re-anchors the floor, so the reachable window
-    -- is the gap since the last chit; a long-dormant tally is the case this does not cover, and the
-    -- receiving agent's own clock is the check there.
+    -- Time order (docs/timestamps.md). A chit may not be dated before the chit preceding it in the
+    -- chain, so the ledger reads in date order and a statement for a period is a contiguous run of
+    -- chits. Deterministic -- it compares two signed values already in the strand, never a clock.
     constraint DateMonotonic check on insert (
         New.Date >= Coalesce(
             (select Date from committed.Ledger L where L.Number = New.Number - 1),
             New.Date)
     ),
-    -- Credit gate. The prospective (stock-perspective) Balance must sit within the credit each
-    -- party extended, effective as of THIS chit's own signed Date -- deterministic, no now().
-    -- Stock-granted limit caps how far Balance may RISE (foil's debt to stock); foil-granted limit
-    -- caps how far it may FALL (stock's debt to foil). Effective limit for a grantor = CreditLimit
-    -- of the highest-Revision CreditTerms row whose EffectiveDate <= chit Date; absent any row -> 0
-    -- (MyCHIPs zero-credit default -- a party must publish a CreditTerms revision before the first
-    -- nonzero chit can move against it). Picking max-Revision among effective rows is correct even
-    -- when a future-dated restrictive revision and a later immediate permissive revision coexist:
-    -- the permissive one, once effective, has the higher revision and supersedes.
-    -- This gate sees only SETTLED value. Pending lift chits are NO LONGER "in Balance by construction":
-    -- a pledge reserves capacity in the separate ReservedBalance view and does not enter this settled
-    -- chain until it FINALIZES -- concurrent pending lifts are gated separately by WithinReservedCredit
-    -- (below, and on PendingLift). A referee-committed FINALIZE (Kind='lift') is EXEMPT from this gate
-    -- (decision 3): once the referee has committed, the finalize row must always settle, or a per-strand
-    -- credit check could reject a finalize the other strands accept -- breaking cross-strand atomicity.
-    -- The pledge was already reserved-gated at insert; the referee commit is authoritative. This can push
-    -- the settled Balance past the nominal limit (soft-limit NOTE) -- accepted: a committed lift is binding.
-    -- NOTE: the gate keys off the issuer-signed New.Date, and chits are unilateral (issuer-signed
-    -- only -- this CHECK is the SOLE schema enforcement, no counterparty countersignature). So the
-    -- gate inherits whatever honesty the date has. Backdating past a restrictive reduction would
-    -- select an older, larger limit; DateMonotonic (below) bounds how far back a chit may reach, and
-    -- the receiving agent's clock check bounds the rest. A dormant tally is the residual exposure.
-    -- Reasoned through in docs/timestamps.md; see also backlog/debt-credit-gate-chit-date-backdating.
-    constraint WithinCreditLimits check on insert (
-        New.Kind = 'lift'
-        or (
-            Balance <= coalesce((
-                select CT.CreditLimit from CreditTerms CT
-                where CT.Sid = (select StockSid from TallyCore)
-                  and CT.EffectiveDate <= New.Date
-                order by CT.Revision desc limit 1), 0)
-            and Balance >= -coalesce((
-                select CT.CreditLimit from CreditTerms CT
-                where CT.Sid = (select FoilSid from TallyCore)
-                  and CT.EffectiveDate <= New.Date
-                order by CT.Revision desc limit 1), 0)
-        )
-    ),
-    -- Reserved-credit gate (Kind='direct' only): the prospective RESERVED balance -- settled Balance (this
-    -- chit included, it is the latest Ledger row) + every open pending-lift delta -- must also sit within
-    -- both parties' limits as of New.Date, so a direct chit cannot consume capacity an open pledge reserved.
-    -- ReservedBalance is read with a plain ref, so the buffered new row is already in its settled term. Same
-    -- limit lookup as WithinCreditLimits. Kind='lift' is exempt (the finalize is authoritative, see above).
-    constraint WithinReservedCredit check on insert (
-        New.Kind = 'lift'
-        or (
-            (select Balance from ReservedBalance) <= coalesce((
-                select CT.CreditLimit from CreditTerms CT
-                where CT.Sid = (select StockSid from TallyCore)
-                  and CT.EffectiveDate <= New.Date
-                order by CT.Revision desc limit 1), 0)
-            and (select Balance from ReservedBalance) >= -coalesce((
-                select CT.CreditLimit from CreditTerms CT
-                where CT.Sid = (select FoilSid from TallyCore)
-                  and CT.EffectiveDate <= New.Date
-                order by CT.Revision desc limit 1), 0)
-        )
-    ),
-    -- Closing gate (feat-schema-tally-close): while any CloseRequest is filed, a new DIRECT chit may only
-    -- move the settled balance TOWARD zero -- no new credit in either direction. Finalized lifts (Kind='lift')
-    -- are EXEMPT, same reasoning as WithinCreditLimits / WithinReservedCredit: a referee-committed finalize
-    -- must always settle or cross-strand atomicity breaks; the pledge was gated when made. P = prior settled
-    -- balance (matching BalanceCorrect's reference form), B = New.Balance. Same-sign / bounded form, no abs()
-    -- (Quereus scalar-abs availability unconfirmed): reduce a positive balance toward 0, or a negative one
-    -- toward 0, and forbid a sign-flip overshoot (a chit flipping +30 -> -5 would mint new opposite-direction
-    -- credit). At P = 0 both arms are false => every insert rejected, which is exactly the Closed "no further
-    -- ledger inserts" rule -- no separate constraint. Inlined per use.
-    -- NOTE: commit-time deferred CHECK reading `exists (select 1 from CloseRequest)` -- a balance-growing chit
-    -- whose transaction read-snapshot predates the close-request commit could slip through under snapshot-only
-    -- validation. SAME open isolation question already flagged for PartyKeyRevocation.NotLastKey
-    -- (schema/draft1.qsql:137-146) and Ledger.InvoiceLink / LiftFinalize; not re-solved here.
-    constraint ClosingReducesBalance check on insert (
-        New.Kind = 'lift'                                                               -- finalize exempt (atomicity)
-        or not exists (select 1 from CloseRequest)                                      -- not Closing -> unrestricted
-        or (Coalesce((select Balance from Ledger where Number = New.Number - 1), 0) > 0 -- reduce positive toward 0
-            and New.Balance >= 0
-            and New.Balance < Coalesce((select Balance from Ledger where Number = New.Number - 1), 0))
-        or (Coalesce((select Balance from Ledger where Number = New.Number - 1), 0) < 0 -- reduce negative toward 0
-            and New.Balance <= 0
-            and New.Balance > Coalesce((select Balance from Ledger where Number = New.Number - 1), 0))
-    ),
+    -- No credit or closing gate (docs/architecture.md § Ledger Operation). A chit is the issuer's own
+    -- promise, like a cheque: duly signed by the party whose position it worsens, it is accepted at any
+    -- time, for any amount, over any credit limit, in either direction while the tally is closing (only
+    -- a CLOSED tally refuses it: NotClosed below; closing gates lift pledges, see PendingLift). A credit limit
+    -- says how much a party will extend in exchange for goods or services; the receiving party enforces
+    -- it by declining to deliver, not by refusing the record. Lifts are governed by trading variables
+    -- in the agents, not by the schema.
     -- REMOVED: `ValidIssuer` referenced an `IssuerSid` column that does not exist -- a draft
     -- placeholder from when the ledger stored the issuer's Sid rather than a side code. It could
     -- never be evaluated (`Column not found: IssuerSid`), so the table was uninsertable, and it had
@@ -774,8 +698,7 @@ table Ledger (
     -- One finalize per lift is the unique index `LedgerByLift`, not this CHECK: a direct chit's LiftId is
     -- null, so the index admits any number of those and exactly one row per lift -- race-safe, where the
     -- self-count it replaces was not. See the InvoiceLink note.
-    -- Kind='lift' is EXEMPT from both credit gates above (decision 3): a referee-committed finalize must
-    -- always settle. Isolation caveat on the cross-table NotVoided clause: see the InvoiceLink note.
+    -- Isolation caveat on the cross-table NotVoided clause: see the InvoiceLink note.
     constraint LiftFinalize check on insert (
         New.Kind = 'direct'
         or (
@@ -812,6 +735,7 @@ table Ledger (
             and New.LiftId is not null and New.RefereeSignature is not null
             and New.SignerKey is null and New.Signature is null and New.InvoiceId is null)
     ),
+    constraint NotClosed check on insert (not exists (select 1 from TallyClosed)),  -- closed is terminal (TallyClosed)
     constraint InsertOnly check on delete, update (0)
 ) with tags ("optimystic.network_watch" = true);
 
@@ -835,7 +759,7 @@ table PendingLift (
     RefereeKey text,       -- agreed referee's public key; every resolution signature verifies against THIS key
     Issuer text check (Issuer in ('S','F')),  -- side pledging value on this edge (foil +Units, stock -Units, per BalanceCorrect)
     Units integer check (Units > 0),           -- edge amount in THIS tally's denomination (per the committed route's rates)
-    Date text check ((IsISODate(Date) and length(Date) = 10)),         -- pledge timestamp; the date the reserved-credit gate keys off
+    Date text check ((IsISODate(Date) and length(Date) = 10)),         -- pledge timestamp
     Expiry text check ((IsISODate(Expiry) and length(Expiry) = 10)),     -- advisory staleness bound + signed term; NOT a per-strand finalize gate (decision 2)
     SignerKey text,        -- authorized PartyKey of the issuing party
     Signature text,        -- issuer signs digest(Cid, LiftId, RefereeKey, Issuer, Units, Date, Expiry)
@@ -859,34 +783,17 @@ table PendingLift (
         'ed25519'
     )),
     constraint ExpiryValid check on insert (Expiry >= Date),
-    -- Reserved-credit gate: the prospective RESERVED balance (settled + all open pending, INCLUDING this new
-    -- pledge -- a plain ref to ReservedBalance already buffers it in) must sit within both parties' limits as
-    -- of New.Date. Same limit lookup as Ledger.WithinCreditLimits (highest-Revision CreditTerms row whose
-    -- EffectiveDate <= New.Date, per grantor; absent -> 0). This is the reserved-capacity gate that stops
-    -- concurrent lifts from collectively over-committing. Soft under concurrency -- see the isolation NOTE
-    -- shared with Ledger.LiftFinalize / PartyKeyRevocation.NotLastKey; a committed finalize is never re-gated.
-    constraint WithinReservedCredit check on insert (
-        (select Balance from ReservedBalance) <= coalesce((
-            select CT.CreditLimit from CreditTerms CT
-            where CT.Sid = (select StockSid from TallyCore)
-              and CT.EffectiveDate <= New.Date
-            order by CT.Revision desc limit 1), 0)
-        and (select Balance from ReservedBalance) >= -coalesce((
-            select CT.CreditLimit from CreditTerms CT
-            where CT.Sid = (select FoilSid from TallyCore)
-              and CT.EffectiveDate <= New.Date
-            order by CT.Revision desc limit 1), 0)
-    ),
-    -- Closing gate (feat-schema-tally-close): while any CloseRequest is filed, a new pledge may only move the
-    -- RESERVED balance TOWARD zero -- mirrors putting the direct-chit gate on settled, the pledge gate on
-    -- reserved (same split as the two credit gates). ReservedBalance read with a plain ref already includes
-    -- this new pledge, so NR = reserved WITH this pledge, D = New.Units * (F:+1, S:-1) = this pledge's delta,
-    -- PR = NR - D = prior reserved. Same-sign / bounded form, no abs(). No finalize exemption applies (a
-    -- PendingLift insert is always a fresh pledge, never a finalize; LiftVoid needs no gate -- a void only
-    -- releases reservation). NR / D / PR inlined per use.
+    constraint NotClosed check on insert (not exists (select 1 from TallyClosed)),  -- closed is terminal (TallyClosed)
+    -- No credit gate: a pledge is a conditional chit, accepted when duly signed (see Ledger). Whether to
+    -- pledge, and how much, is the issuer agent's trading-variable policy.
+    -- Closing gate: while any CloseRequest is filed, a new pledge may only move the RESERVED balance TOWARD
+    -- zero. Lifts are automated, so a closing tally must not be drawn into one that grows it; a direct
+    -- chit, a party's own promise, is not gated (see Ledger). ReservedBalance read with a plain ref already
+    -- includes this new pledge, so NR = reserved WITH this pledge, D = New.Units * (F:+1, S:-1) = this
+    -- pledge's delta, PR = NR - D = prior reserved. Same-sign / bounded form, no abs(): reduce a positive
+    -- reserved balance toward 0, or a negative one toward 0, and forbid a sign-flip overshoot.
     -- NOTE: commit-time deferred CHECK reading `exists (select 1 from CloseRequest)` -- SAME open isolation
-    -- question already flagged for PartyKeyRevocation.NotLastKey (schema/draft1.qsql:137-146) and the
-    -- WithinReservedCredit gate above; not re-solved here.
+    -- question already flagged for PartyKeyRevocation.NotLastKey; not re-solved here.
     constraint ClosingReducesReserved check on insert (
         not exists (select 1 from CloseRequest)
         or ((select Balance from ReservedBalance) - (New.Units * case when New.Issuer = 'F' then 1 else -1 end) > 0  -- PR > 0
@@ -1027,6 +934,7 @@ table Invoice (
         New.ExpiryDate is null
         or ((IsISODate(New.ExpiryDate) and length(New.ExpiryDate) = 10) and New.ExpiryDate >= New.Date)
     ),
+    constraint NotClosed check on insert (not exists (select 1 from TallyClosed)),  -- closed is terminal (TallyClosed)
     constraint InsertOnly check on delete, update (0)
 ) with tags ("optimystic.network_watch" = true);
 
@@ -1045,8 +953,8 @@ table Invoice (
 --      idiom this schema uses everywhere to resolve "the latest" -- scans and sorts unless an
 --      index declares that order explicitly. Measured: reading the current balance cost 27ms at
 --      an empty ledger and 67ms at 360 chits; with `Ledger (Number desc)` it is 25ms and 17ms,
---      i.e. flat. A chit insert, which consults that read twice through the credit gates, went
---      from 241ms to 106ms at the same depth. Every `order by ... desc limit 1` below therefore
+--      i.e. flat. A chit insert, which then consulted that read twice through credit gates since
+--      removed, went from 241ms to 106ms at the same depth. Every `order by ... desc limit 1` below therefore
 --      has a matching descending index, and a new one must come with its own.
 --
 -- What is left after those two rules is lookups on **non-key columns of tables that grow without
@@ -1060,8 +968,8 @@ table Invoice (
 -- "at most one" is stated here as an index wherever it can be, and never as a count.
 
 -- The latest settled balance: `PerspectiveBalance`, `ReservedBalance` and `CloseState` all read
--- `order by Number desc limit 1`, and the reserved-credit gate consults it on every chit and
--- every pledge. The single highest-value index in the schema.
+-- `order by Number desc limit 1`, and `BalanceCorrect` reads the prior row on every chit. The
+-- single highest-value index in the schema.
 index LedgerLatest on Ledger (Number desc);
 
 -- A chit's own identity, and the reason a retried payment is not a second payment. `Id` is minted
@@ -1077,8 +985,8 @@ unique index LedgerById on Ledger (Id);
 unique index LedgerByInvoice on Ledger (InvoiceId);
 
 -- One finalize per lift. `LiftId` is null on every direct chit, so this admits those freely and one
--- row per lift. Also serves `OpenPendingLift`'s anti-join, which feeds `ReservedBalance`, which the
--- reserved-credit gate reads on every chit and every pledge.
+-- row per lift. Also serves `OpenPendingLift`'s anti-join, which feeds `ReservedBalance` and
+-- `LiftLading`.
 unique index LedgerByLift on Ledger (LiftId);
 
 -- Reporting. The application layer asks for a date range -- a statement, a reconciliation, a
@@ -1092,8 +1000,8 @@ index LedgerByDate on Ledger (Date);
 -- access and a Sort defeats sort-absorption via index ordering. `select x from t order by r desc
 -- limit 1` plans as an ordered index walk (planner cost 501); `select x from t TV order by TV.r
 -- desc limit 1` plans as a full Sort over a primary-key scan (cost 20933) -- one `Alias` node,
--- nothing else. Every latest-revision resolver here is aliased, including the six CreditTerms
--- lookups inside Ledger's credit gates that run on every chit insert.
+-- nothing else. Every latest-revision resolver here is aliased, including the CreditTerms and
+-- TradingVariable resolvers.
 --
 -- Dropping the aliases does recover it (measured: a LiftLading read over a 240-revision journal,
 -- 100ms -> 61ms), and we are DELIBERATELY NOT DOING THAT. Un-aliased SQL is harder to read, and
@@ -1104,7 +1012,7 @@ index LedgerByDate on Ledger (Date);
 -- The unilateral revisioned journals. Each resolves "latest for this party" by `order by
 -- Revision desc limit 1` within a Sid, so the PK prefix gives the Sid and the descending half
 -- has to be declared. These are insert-only and grow for the life of the tally -- `CreditTerms`
--- is read by BOTH credit gates on every chit, and `TradingVariable` twice per `LiftLading`.
+-- is read by `CurrentCreditLimit`, and `TradingVariable` twice per `LiftLading`.
 index CreditTermsLatest on CreditTerms (Sid, Revision desc);
 index TradingVariableLatest on TradingVariable (Sid, Revision desc);
 index PartyCertificateLatest on PartyCertificate (PartySid, Revision desc);
@@ -1166,13 +1074,13 @@ view CurrentTradingVariable as
     from (select StockSid as Sid from TallyCore union select FoilSid as Sid from TallyCore) P;
 
 -- Effective (latest-effective-revision) credit limit each party grants, as of now.
--- Advisory only -- fuels LiftLading capacity advertisement; the hard safety gate is the
--- deterministic, chit-dated Ledger.WithinCreditLimits below. Effective limit = CreditLimit of
--- the highest-Revision CreditTerms row whose EffectiveDate <= now; absent any row -> 0.
+-- What each party has said it will extend in exchange for goods or services, for agents and
+-- screens to compare a balance against. Nothing in the schema enforces it (see Ledger). Effective
+-- limit = CreditLimit of the highest-Revision CreditTerms row whose EffectiveDate <= now; absent
+-- any row -> 0.
 -- NOTE: date('now') is VOLATILE -- fine in a plain view; NOT allowed in a
 -- MATERIALIZED view (Quereus hard-rejects volatile there). If a future runner rejects
--- volatile-in-view, fall back to computing the effective revision in the lift agent
--- (application) and keep the deterministic chit-dated Ledger gate as the safety boundary.
+-- volatile-in-view, compute the effective revision in the agent instead.
 view CurrentCreditLimit as
     select P.Sid,
         coalesce((select CT.CreditLimit from CreditTerms CT
@@ -1190,7 +1098,7 @@ view CurrentCreditLimit as
 -- chain when it FINALIZES. LiftLading advertises free capacity from the RESERVED views, so open pending
 -- lifts shrink advertised capacity without moving the signed balance -- this realizes the former "fold in
 -- pending lift chits" plan item (the pending-aware view is ReservedPerspectiveBalance, not this one). Open
--- invoices are likewise advisory-only (OpenInvoice), not folded into this Balance or the hard credit gate.
+-- invoices are likewise advisory-only (OpenInvoice), not folded into this Balance.
 view PerspectiveBalance as
     select P.Sid,
         coalesce((select Balance from Ledger order by Number desc limit 1), 0)
@@ -1211,10 +1119,10 @@ view OpenPendingLift as
 --   'open'    -- no CloseRequest row filed. Does NOT distinguish Forming / Open / Void: those depend on
 --                contract/formation state the schema does not materialize today (out of scope).
 --   'closing' -- a CloseRequest row exists but the tally is not yet a stable zero.
---   'closed'  -- terminal, stable: the SETTLED balance (raw Ledger.Balance, latest row) is zero AND no
---                pending lift is still open. The open-pledge test is load-bearing -- without it a still-open
---                pledge could later finalize and bump a "closed" tally back off zero, so 'closed' would not
---                be stable. Reads settled Ledger.Balance (not reserved) so a finalize can never unsettle it.
+--   'closed'  -- terminal: the SETTLED balance (raw Ledger.Balance, latest row) is zero AND no pending lift
+--                is still open. Once closed, the tally accepts no further activity (TallyClosed, below). The
+--                open-pledge test keeps an open pledge from reading as closed, so a later finalize can
+--                never land on a closed tally.
 view CloseState as
     select case
         when not exists (select 1 from CloseRequest) then 'open'
@@ -1224,12 +1132,26 @@ view CloseState as
     end as State
     from TallyCore;   -- single row
 
+-- Whether the tally was already closed BEFORE the current transaction: a close request filed, the settled
+-- balance at zero, and no pending lift open -- CloseState's 'closed', read from committed.* so the row
+-- being inserted is excluded. Closed is terminal: every table that carries the tally's activity refuses
+-- an insert while this has a row (constraint NotClosed). Reading the pre-transaction state is what lets
+-- the chit that brings a closing tally to zero land, while refusing everything after it. A close request
+-- itself is irreversible (CloseRequest is insert-only, with no withdrawal), so closing always ends here.
+view TallyClosed as
+    select 1 as Closed
+    from TallyCore
+    where exists (select 1 from committed.CloseRequest)
+      and coalesce((select L.Balance from committed.Ledger L order by L.Number desc limit 1), 0) = 0
+      and not exists (
+          select 1 from committed.PendingLift PL
+          where not exists (select 1 from committed.Ledger L where L.LiftId = PL.LiftId and L.Kind = 'lift')
+            and not exists (select 1 from committed.LiftVoid V where V.LiftId = PL.LiftId));
+
 -- Reserved balance = settled signed balance + every OPEN pending-lift delta, stock-perspective (same sign
 -- convention as raw Ledger.Balance: foil-issued +Units, stock-issued -Units, matching BalanceCorrect).
--- Single row (TallyCore is one row). New PendingLift pledges and new direct chits gate against THIS via
--- WithinReservedCredit so concurrent lifts cannot collectively over-commit; LiftLading advertises net of it.
--- Because the gate reads this with a plain (buffered+committed) ref, the row being inserted is already
--- reflected -- see WithinReservedCredit on PendingLift and Ledger.
+-- Single row (TallyCore is one row). LiftLading advertises net of it, so concurrent lifts do not
+-- advertise the same room twice.
 view ReservedBalance as
     select
         coalesce((select Balance from Ledger order by Number desc limit 1), 0)
@@ -1254,11 +1176,9 @@ view ReservedPerspectiveBalance as
 --   Reward/Clutch: per-unit fee ratios (ppm); Clutch is the releasing counterparty's
 --                  charge and applies to the whole moved amount
 -- Fee ratios compose along a lift route as NewRate = PriorRate + MyRate * (1 - PriorRate).
--- Receiver accumulation is additionally capped by the credit the RECEIVER granted the
--- counterparty: a lift raises the receiver's perspective balance (the counterparty's debt to
--- the receiver), bounded by CurrentCreditLimit. Cap = min(Bound, receiver's effective
--- CreditLimit); Balance + moved <= Cap. Advisory only -- the hard safety gate is the
--- deterministic, chit-dated Ledger.WithinCreditLimits / WithinReservedCredit.
+-- Capacity comes from the trading variables alone (docs/trading-variables.md): Bound is the most the
+-- receiver will accumulate through lifts. The credit limit is a promise about trade, not a lift
+-- bound, and the schema enforces neither -- this view is what agents read to size and price a lift.
 -- Balance here is the RESERVED perspective balance (settled + open pending lifts), so an open pledge
 -- already subtracts from advertised free capacity -- concurrent lifts do not double-advertise the same room.
 -- NOTE (pre-existing, unrelated to lift chits): the FreeUnits/RewardedUnits math below uses SCALAR 2-arg
@@ -1271,13 +1191,12 @@ view LiftLading as
         RV.Sid as ReceiverSid,
         -- Greatest/Least are host scalars: SQL has no two-argument min/max (SQLite's are an
         -- extension, and Quereus treats min/max as aggregates only). See src/store/functions.ts.
-        Greatest(0, Least(RV.Target, Least(RV.Bound, CCL.CreditLimit)) - PB.Balance) as FreeUnits,
-        Greatest(0, Least(RV.Bound, CCL.CreditLimit) - Greatest(PB.Balance, RV.Target)) as RewardedUnits,
+        Greatest(0, Least(RV.Target, RV.Bound) - PB.Balance) as FreeUnits,
+        Greatest(0, RV.Bound - Greatest(PB.Balance, RV.Target)) as RewardedUnits,
         RV.Reward,
         CV.Clutch
     from CurrentTradingVariable RV
         join ReservedPerspectiveBalance PB on PB.Sid = RV.Sid
-        join CurrentCreditLimit CCL on CCL.Sid = RV.Sid
         join CurrentTradingVariable CV on CV.Sid <> RV.Sid;
 
 -- Invoice state, derived from the tables (never stored). Precedence paid > declined > expired > open.
@@ -1297,7 +1216,7 @@ view InvoiceState as
     from Invoice I;
 
 -- Open (unanswered, undeclined, unexpired) invoices -- advisory signal of upcoming balance movement
--- for the lift agent / credit-check application layer. NOT folded into LiftLading or WithinCreditLimits.
+-- for the lift agent and the screens. NOT folded into LiftLading.
 view OpenInvoice as
     select Id, Requester, Units, Date, ExpiryDate from InvoiceState where State = 'open';
 

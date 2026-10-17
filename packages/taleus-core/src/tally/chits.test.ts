@@ -1,10 +1,9 @@
 import { digest, signText } from '../store/index.js'
 import { chitDelta, issueChit } from './chits.js'
-import { publishCreditTerms } from './negotiation.js'
 import { TODAY, balanceOf, trading } from './test-harness.js'
 
 /**
- * Direct chits: the ledger, the balance chain, and the credit gate.
+ * Direct chits: the ledger and the balance chain. There is no credit gate (see 'no credit gate').
  *
  * The one convention to hold on to: a chit is signed by the party it makes **worse off**.
  * Issuing raises what you owe or lowers what you are owed, which is why no countersignature
@@ -29,8 +28,7 @@ describe('the balance chain', () => {
 	it('rejects a balance that is only the chit’s own delta', async () => {
 		// This is the bug `BalanceCorrect` had: `where Number = Number - 1` compared the
 		// subquery's own column to itself, matched nothing, and made every chit's Balance its
-		// own delta. The chain did not chain -- and the credit gate, which reads it, became
-		// per-chit rather than cumulative.
+		// own delta. The chain did not chain.
 		const { tally, chit } = await trading()
 		await tally.propose([chit({ number: 1, issuer: 'F', units: 18000, balance: 18000 })])
 		await expect(
@@ -60,7 +58,10 @@ describe('the balance chain', () => {
 	})
 })
 
-describe('the credit gate', () => {
+describe('no credit gate', () => {
+	// A chit is the issuer's promise, like a cheque: accepted when duly signed, for any amount.
+	// The credit limit says what the other party will extend for goods or services; it is
+	// enforced by their declining to deliver, never by refusing the record.
 	it('admits a chit inside the limit the other party granted', async () => {
 		const { tally, chit } = await trading()
 		await expect(
@@ -68,36 +69,25 @@ describe('the credit gate', () => {
 		).resolves.toBeUndefined()
 	})
 
-	it('refuses one that would carry the balance past it', async () => {
-		const { tally, chit } = await trading()
-		await expect(
-			tally.refuses([chit({ number: 1, issuer: 'F', units: 50001, balance: 50001 })]),
-		).resolves.toMatch(/WithinCreditLimits/)
+	it('admits one that carries the balance past it', async () => {
+		const { jan, tally, chit } = await trading()
+		await tally.propose([chit({ number: 1, issuer: 'F', units: 50001, balance: 50001 })])
+		await expect(balanceOf(tally, jan)).resolves.toEqual({ Balance: 50001 })
 	})
 
-	it('is cumulative, not per chit', async () => {
-		// The consequence of the chain bug: with the balance frozen at each chit's own delta,
-		// a party could pass any limit by issuing enough small chits.
+	it('admits a promise into credit the other side never extended', async () => {
 		const { tally, chit } = await trading()
-		await tally.propose([chit({ number: 1, issuer: 'F', units: 30000, balance: 30000 })])
+		// Sam granted nothing; Jan may still promise to pay him.
 		await expect(
-			tally.refuses([chit({ number: 2, issuer: 'F', units: 30000, balance: 60000 })]),
-		).resolves.toMatch(/WithinCreditLimits/)
+			tally.propose([chit({ number: 1, issuer: 'S', units: 1, balance: -1 })]),
+		).resolves.toBeUndefined()
 	})
 
-	it('binds each side separately: Sam granted nothing, so Jan may owe nothing', async () => {
-		const { tally, chit } = await trading()
-		// Jan issuing drives the balance negative -- into credit Sam has not extended.
-		await expect(
-			tally.refuses([chit({ number: 1, issuer: 'S', units: 1, balance: -1 })]),
-		).resolves.toMatch(/WithinCreditLimits/)
-	})
-
-	it('with no terms published at all, nothing may be owed', async () => {
+	it('admits chits with no terms published at all', async () => {
 		const { tally, chit } = await trading({ janGrants: 0, samGrants: 0 })
 		await expect(
-			tally.refuses([chit({ number: 1, issuer: 'F', units: 1, balance: 1 })]),
-		).resolves.toMatch(/WithinCreditLimits/)
+			tally.propose([chit({ number: 1, issuer: 'F', units: 1, balance: 1 })]),
+		).resolves.toBeUndefined()
 	})
 })
 
@@ -153,9 +143,8 @@ describe('who may issue a chit', () => {
 
 describe('the date a chit asserts', () => {
 	it('may not reach back before the chit before it', async () => {
-		// docs/timestamps.md: the issuer asserts and signs the date, and the credit gate reads
-		// the limit effective as of it. DateMonotonic is what bounds how far back that reach
-		// goes -- on an active tally, to the gap since the last chit.
+		// docs/timestamps.md: the issuer asserts and signs the date. DateMonotonic keeps the
+		// chain in date order, so a chit cannot be slotted in before the one preceding it.
 		const { tally, cid, sam } = await trading()
 		const at = (number: number, date: string, balance: number) =>
 			issueChit({
@@ -174,43 +163,6 @@ describe('the date a chit asserts', () => {
 		await expect(tally.refuses([at(2, '2026-03-01', 2000)])).resolves.toMatch(/DateMonotonic/)
 		// The same day is fine; several chits a day is ordinary.
 		await expect(tally.propose([at(2, '2026-03-02', 2000)])).resolves.toBeUndefined()
-	})
-
-	it('selects the credit epoch, which is why reaching back matters', async () => {
-		const { jan, sam, tally, cid } = await trading()
-		// Jan cuts his limit to 20000, effective after the 21 days he promised.
-		await tally.propose([
-			publishCreditTerms({
-				sid: jan.sid,
-				tallyCid: cid,
-				revision: 2,
-				creditLimit: 20000,
-				callDays: 21,
-				date: '2026-04-01',
-				effectiveDate: '2026-04-22',
-				signer: jan.keys[0],
-			}),
-		])
-		const at = (number: number, date: string, units: number, balance: number) =>
-			issueChit({
-				tallyCid: cid,
-				number,
-				contractNumber: 1,
-				id: `chit:${number}`,
-				issuer: 'F',
-				units,
-				date,
-				balance,
-				signer: sam.keys[0],
-				issuerSid: sam.sid,
-			})
-
-		// Before the cut bites, the old limit governs.
-		await expect(tally.propose([at(1, '2026-04-21', 40000, 40000)])).resolves.toBeUndefined()
-		// After it, the new one does.
-		await expect(tally.refuses([at(2, '2026-04-22', 1, 40001)])).resolves.toMatch(
-			/WithinCreditLimits/,
-		)
 	})
 })
 

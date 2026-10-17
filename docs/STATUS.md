@@ -12,7 +12,11 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [ ] **Stack: on Sereus 1.15 / Optimystic 1.15 / Quereus 4.20.2 / FRET 1.1.0, one copy each.**
+- [ ] **Stack: on Sereus 1.16 / Optimystic 1.15 / Quereus 4.20.2 / FRET 1.1.0, one copy each.**
+  Sereus 1.16 (2026-10-15) is the Optimystic 1.15 bump plus a `dialTimeout` check; no control schema
+  change, so no recreate. The next Sereus release with the owner-key work changes the control schema
+  once more (recreate); after it, versioned migrations (sereus#46). `@babel/runtime` must be
+  ^7.29.2 (older helpers hang Quereus's lock under Hermes; sereus#8).
   Optimystic 1.14 and 1.15 need no new Sereus (1.15 asks for ^1.13; `yarn up -R '@optimystic/*' p2p-fret`
   dedupes). 1.15 only requires FRET 1.1.0 (idle maintenance backs off to a pass a minute, peer list
   no longer re-read each pass, slow-relay peers reconnect) and passes the node's dial timeout through.
@@ -28,13 +32,25 @@ citations) is prepared separately for transmission to Nathan; this is the digest
   - gotchoices/sereus#48 (2026-10-14) -- on a phone-shaped link an app's steady work fails and the
     sides diverge while both members are up; fixed deadlines turn a slow link into congestion
     collapse. Node repro (`strand-workload-on-a-phone-link`). Commented 2026-10-14: still on 1.14.
+    Maintainer (2026-10-15): fixed deadlines identified (5 s cohort-topic/FRET RPC, signatures,
+    authorization; 10 s read-repair; libp2p ping; unbounded coordinator retry); #47 first, then
+    filed upstream; asked for a rerun on 1.16. Rerun posted 2026-10-16: on 1.16 one run kept the
+    strand nodes connected (a first), the other did not; with the link up, 8 and 6 of 8 rounds
+    failed (1.13: 1), deadline events 2-5x; never converged.
+  - gotchoices/Optimystic#40 (2026-10-15) -- peer-store churn: `findCluster` reads every candidate's
+    record per call and libp2p merges on every stream (one per request); ~15% of the S7's JS thread.
+    Node repro (`strand-peer-store-churn`).
+  - gotchoices/sereus#50 (2026-10-15) -- an idle cadre reads its own control database ~78 times a
+    minute (5 s strand-watcher poll and others), each through Optimystic's full read path. Node repro
+    (`cadre-idle-reads`).
   - gotchoices/Optimystic#37 (2026-10-14) -- file storage fsyncs every block file separately
     (enhancement: OS-dependent cost; WAL or per-commit flush; the platform durability question).
   - gotchoices/Optimystic#33 (our PR, `cid()` dag-json codec) -- open, no review yet.
   - gotchoices/sereus#47 (2026-10-13) — a strand table nobody has written costs a cohort round trip
     on every read and cannot be read with the other member offline. On two phones over the relay it
     made each agent step take minutes, so a tally never formed. Node repro in the issue; proposed fix:
-    the founder creates every app table's collection at founding. Commented 2026-10-14: the offline
+    the founder creates every app table's collection at founding. Maintainer (2026-10-15): accepted --
+    the founder will create a collection for every declared app and strand table; not shipped. Commented 2026-10-14: the offline
     half needs link latency (loopback now reads locally).
   - gotchoices/Optimystic#30 — `quereus-plugin-crypto` has no native-crypto seam: its SQL `verify` runs
     pure-JS Ed25519 (408 ms of a 29 s invite on a Galaxy S7). Open.
@@ -209,8 +225,8 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   phone each load re-parses every multiaddr and each merge re-sorts protocols and multiaddrs by
   string, ~15% of the S7's CPU. (2) An idle party polls its own control database -- Sereus's strand
   watcher every 5 s and a heavier pass every 30 s -- each read through Optimystic's full coordinator,
-  cluster and read-repair path though the cadre has one node: ~225 reads a minute, idle. Both to
-  file upstream (not yet).
+  cluster and read-repair path though the cadre has one node: ~225 reads a minute, idle. Filed:
+  Optimystic#40 and sereus#50.
 - [ ] **Run a cadre node for Taleus.** Not done: being prepared in a separate effort. The phone
   app's Mode C (below) runs a phone node through `@serfab/cadre-rn`; an always-on cadre node serving
   a party's tallies (and `taleus-node`, `feat-taleus-node-service`) is the part still to come.

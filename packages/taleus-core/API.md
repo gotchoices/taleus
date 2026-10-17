@@ -223,7 +223,8 @@ must(await janTally.offerContract({ contractCid: 'cid:standard-tally-v1',
                                     denomination: 'iso4217:USD', denominationScale: 2 }))
 must(await samTally.acceptContract())        // state: 'open'
 
-// Value moves. A party may always give, so this clears the counterparty's gate by construction.
+// Value moves. A chit is never refused for its amount: a credit limit says what the other party will
+// extend for goods or services, not what may be promised.
 must(await samTally.pay({ amount: usd(12000), memo: 'March hours' }))
 ;(await janTally.balances()).settled         // +12000 — Jan is owed
 ;(await samTally.balances()).settled         // -12000 — the same fact, his side of it
@@ -231,15 +232,17 @@ must(await samTally.pay({ amount: usd(12000), memo: 'March hours' }))
 // Asking is not the same as being paid.
 const asked = must(await janTally.requestPayment({ amount: usd(8000) }))
 const paid = await samTally.pay({ amount: usd(8000), answers: asked.id })
-if (!paid.ok && paid.refusal.code === 'credit-limit') {
-  // The request was legitimate; the payer is out of room. `refusal.constraint` says which
-  // gate — 'WithinCreditLimits' — for anyone who needs to know exactly.
+if (!paid.ok) {
+  // A refusal names its rule: `refusal.code` to branch on, `refusal.constraint` for the exact
+  // schema rule (e.g. 'InvoiceLink' for a payment that does not answer the request it names).
 }
 
-// Winding down: unilateral, and it cannot trap the counterparty.
-must(await janTally.requestClose())          // growth frozen both ways, reduction permitted
+// Winding down: unilateral and irreversible. Closing gates lifts toward zero, never a chit, so it
+// cannot trap the counterparty; the party owed may close it with a chit for the balance.
+must(await janTally.requestClose())
 must(await janTally.pay({ amount: usd(30000) }))
-;(await samTally.read()).state               // 'closed', at an actual settled zero
+;(await samTally.read()).state               // 'closed', at an actual settled zero -- terminal
+;(await samTally.pay({ amount: usd(1) })).ok  // false: refusal.code 'closed'
 ```
 
 ## What is still open

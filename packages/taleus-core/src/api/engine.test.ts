@@ -246,17 +246,25 @@ describe('paying', () => {
 		expect((await samTally.balances()).settled).toEqual(usd(-12000))
 	})
 
+	it('pays past the credit the other party granted -- a chit is never refused for its amount', async () => {
+		const world = await twoParties()
+		const { janTally, samTally } = await opened(world)
+		must(await samTally.pay({ amount: usd(60000) }))
+		expect((await janTally.balances()).settled).toEqual(usd(60000))
+	})
+
 	it('reports a refusal in the engine’s own words', async () => {
 		const world = await twoParties()
-		const { samTally } = await opened(world)
-		const tooMuch = await samTally.pay({ amount: usd(60000) })
+		const { janTally } = await opened(world)
+		const asked = must(await janTally.requestPayment({ amount: usd(8000) }))
+		const own = await janTally.declinePayment(asked.id)
 
-		expect(tooMuch.ok).toBe(false)
-		if (tooMuch.ok) return
-		expect(tooMuch.refusal.code).toBe('credit-limit')
+		expect(own.ok).toBe(false)
+		if (own.ok) return
+		expect(own.refusal.code).toBe('not-authorized')
 		// The constraint name survives the trip up. Losing it would make the suite weaker here
 		// than it is at row level, which is the one thing the API must not do.
-		expect(tooMuch.refusal.constraint).toBe('WithinCreditLimits')
+		expect(own.refusal.constraint).toBe('DeclinerIsPayer')
 	})
 
 	it('records history from the reader’s perspective', async () => {
@@ -324,14 +332,14 @@ describe('asking to be paid', () => {
 		expect((await janTally.requests())[0]?.state).toBe('declined')
 	})
 
-	it('may ask for more than the payer can currently pay', async () => {
+	it('may ask for more than the payer’s credit, and be paid it', async () => {
 		const world = await twoParties()
 		const { janTally, samTally } = await opened(world)
 		const asked = must(await janTally.requestPayment({ amount: usd(90000) }))
 		expect((await janTally.requests())[0]?.state).toBe('open')
 
-		const cannot = await samTally.pay({ amount: usd(90000), answers: asked.id })
-		expect(cannot.ok ? '' : cannot.refusal.code).toBe('credit-limit')
+		must(await samTally.pay({ amount: usd(90000), answers: asked.id }))
+		expect((await janTally.requests())[0]?.state).toBe('paid')
 	})
 })
 
@@ -428,15 +436,15 @@ describe('lift policy', () => {
 		expect(fromSam).toEqual(toJan)
 	})
 
-	it('is capped by the credit actually granted, not only by the bound', async () => {
-		// Jan's bound is 90000 but Sam only granted him nothing, and Jan's own limit of 50000
-		// is what caps accumulation toward him.
+	it('is governed by the trading variables, not by the credit limit', async () => {
+		// Jan lets Sam owe 50000 for goods and services, but will accumulate up to 90000 through
+		// lifts: the target and bound are what a lift reads (docs/trading-variables.md).
 		const world = await twoParties()
 		const { janTally } = await opened(world)
 		must(await janTally.setTradingPolicy({ target: usd(90000), bound: usd(90000) }))
 
 		const toJan = (await janTally.lifts.capacity()).toMe
-		expect(toJan.free).toEqual(usd(50000))
+		expect(toJan.free).toEqual(usd(90000))
 	})
 
 	it('trades at zero for a party that has published nothing', async () => {
@@ -448,20 +456,23 @@ describe('lift policy', () => {
 })
 
 describe('winding down', () => {
-	it('freezes growth, permits payment down, and reaches closed at zero', async () => {
+	it('accepts payments either way while closing, reads closed at zero, and then accepts nothing', async () => {
 		const world = await twoParties()
 		const { janTally, samTally } = await opened(world)
 		must(await samTally.pay({ amount: usd(30000) }))
 		must(await janTally.requestClose())
 
 		expect((await samTally.read()).state).toBe('closing')
-		const growth = await samTally.pay({ amount: usd(1000) })
-		expect(growth.ok ? '' : growth.refusal.code).toBe('closing')
+		must(await samTally.pay({ amount: usd(1000) }))
 
-		must(await janTally.pay({ amount: usd(30000) }))
+		// Jan, who is owed, closes it by issuing a chit for the outstanding balance.
+		must(await janTally.pay({ amount: usd(31000) }))
 		for (const tally of [janTally, samTally]) {
 			expect((await tally.read()).state).toBe('closed')
 		}
+		// Closed is terminal: nothing more is accepted, not even a duly signed chit.
+		const late = await samTally.pay({ amount: usd(100) })
+		expect(late.ok ? '' : late.refusal.code).toBe('closed')
 	})
 })
 
