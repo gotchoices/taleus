@@ -12,7 +12,7 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [ ] **Stack: on Sereus 1.17 / Optimystic 1.15 / Quereus 4.20.2 / FRET 1.1.0, one copy each.**
+- [ ] **Stack: on Sereus 1.17 / Optimystic 1.15 / Quereus 4.20.3 / FRET 1.1.0, one copy each.**
   Sereus 1.17 (2026-10-18): the founder commits every declared table's collection (#47), workload
   fixes from #48's counts, owner keys independent of machine identity (`taleus-sereus/node`
   `enrollOwner`: the key in its own key-store slot, enrolled, wired with `useOwnerSigner`), versioned
@@ -49,6 +49,13 @@ citations) is prepared separately for transmission to Nathan; this is the digest
     filed upstream; asked for a rerun on 1.16. Rerun posted 2026-10-16: on 1.16 one run kept the
     strand nodes connected (a first), the other did not; with the link up, 8 and 6 of 8 rounds
     failed (1.13: 1), deadline events 2-5x; never converged.
+  - gotchoices/Optimystic#42 (2026-10-19) -- a write pays 4 `cluster` requests per index (4(k+1) for k
+    indexes; a Ledger payment 24) though one commit's trees are one batch; a partial index costs rows
+    it excludes. Suggests carrying one commit's trees together per member per phase, deriving
+    non-unique indexes locally, and honouring partial predicates. Repro `strand-index-write-cost`.
+  - gotchoices/Optimystic#41 (2026-10-19) -- `FileRawStorage.listBlockIds` never lists a block id with a
+    `/` (every collection header), so Sereus's join backfill skips them on file storage; fixing the
+    listing halves formation at a 176 ms round trip (probe 14 s -> 1.7 s). Plain-Node repro in the issue.
   - gotchoices/Optimystic#40 (2026-10-15) -- peer-store churn: `findCluster` reads every candidate's
     record per call and libp2p merges on every stream (one per request); ~15% of the S7's JS thread.
     Node repro (`strand-peer-store-churn`).
@@ -185,6 +192,30 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   measured. A loopback relay with libp2p's default connection limits (2 min, 128 KiB) fails to form
   at all (the relayed connection is limited, and the join is never answered); Sereus relays forward
   without limit (`cadre-core` `relay-server.ts`). Added for it: `close`, `decline`, `pay --answers`.
+  Tools (2026-10-19): `startLocalRelay({ delayMs })` (a delaying proxy in front of the relay:
+  each party's link holds every byte that long each way; `TALEUS_SCENARIO_DELAY_MS`,
+  `profile-formation --local-relay <ms>`), `--count-requests` (every remote Optimystic request;
+  `scripts/analyze-requests.ts` per act), `--preload`. Findings on 1.17, 44 ms each way:
+  forming spends its time in the joiner's first-sync probe (14 s, latency-bound) because
+  Optimystic's file storage never lists a named block (`listBlockIds` yields only top-level
+  directories, and `default/app/<Table>` is stored nested), so Sereus's join backfill skips every
+  collection header (offered 80 of 120 blocks); listing them (`scripts/list-nested-blocks.mjs`,
+  diagnostic) cuts the probe to 1.7 s and invite-to-Open from 43.7 s to 23.7 s. Memory storage
+  lists them, so Sereus's memory-backed tests do not see it. Also: Optimystic's under-replication
+  drain re-pushes blocks the backfill just delivered, one block per request (36 of 64). A payment
+  costs 24 cluster requests (Ledger's indexes each a collection), about 7 round trips. Filed the
+  listing bug as Optimystic#41.
+  A payment, per collection (2026-10-19, 44 ms each way): each of the Ledger's 6 collections (the
+  table and its 5 indexes) runs its own pend and commit, 2 requests each, all to the other member:
+  24 requests, concurrent, so the payment takes ~1.7 s (about 7 round trips) either way. Without
+  `LedgerByDate` (reporting only) it is 20 requests and the same 1.7 s: an index costs traffic, not
+  time. Partial unique indexes (`where InvoiceId is not null`) pass every core test but save nothing:
+  Optimystic's module still runs consensus on a partial index's collection for a row its predicate
+  excludes. Filed as Optimystic#42 (with the per-index series 4, 8, ... 24). Schema left as it was. One run
+  of three back-to-back payments (not reproduced since) made 96 `cancel` requests and re-sent
+  commits on the third (7.5 s) -- watch for it.
+  Waiting for the offer after accepting: 9.2 s -> 3.0 s with #41's listing fixed, so it was mostly
+  the joiner fetching table headers, not Taleus's agent timing.
   First CLI-vs-CLI run over relay.sereus.org (2026-10-13):
   invite 18 s, accept 32 s, the offer within 90 s, open about 90 s after accepting it, a payment
   recorded -- far faster than the phones. A party alone cannot list its tallies (a never-written

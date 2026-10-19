@@ -2757,8 +2757,8 @@ __metadata:
   linkType: hard
 
 "@quereus/quereus@npm:^4.20.1":
-  version: 4.20.2
-  resolution: "@quereus/quereus@npm:4.20.2"
+  version: 4.20.3
+  resolution: "@quereus/quereus@npm:4.20.3"
   dependencies:
     debug: "npm:^4.4.3"
     fast-json-patch: "npm:^3.1.1"
@@ -2766,7 +2766,7 @@ __metadata:
     moat-maker: "npm:^2.2.0"
     temporal-polyfill: "npm:^0.3.0"
     uint8arrays: "npm:^6.1.1"
-  checksum: 10c0/a246d4382f32bd741d3b2600fea51d842b44b4d0519e56dd0c293041a921972bb40f493a5a2c1f73ca1c3d8117ff33256135f5d9bf9b0f92c968260b2e775486
+  checksum: 10c0/caf2e4d6ba31dff29fa45fa1d6c48cf7f1702971e27ce9d95db5445f712c5293a46ca937135b7f6a5c8a281c444234765b0fb516ec69d29f3570f3ef509cc8b5
   languageName: node
   linkType: hard
 

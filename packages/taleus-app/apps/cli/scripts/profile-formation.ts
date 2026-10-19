@@ -19,6 +19,8 @@
  *   `analyze-requests.ts` reads them).
  * `--local-relay [<delayMs>]` runs both parties through a loopback relay of its own, every byte held
  *   `delayMs` each way on each party's link (`taleus-sereus/node` `startLocalRelay`).
+ * `--pays <n>` makes n payments rather than one (each one Sam's chit to Jan).
+ * `--preload <file>` loads one more module into each party first (`node --import`), e.g. a diagnostic patch.
  * `--count-peerstore` prints each party's libp2p peer-store operations by caller at exit (`count-peerstore.mjs`).
  *
  * Default: loopback (`--listen`), one run per party, no relay -- so nothing but the stack is
@@ -36,6 +38,8 @@ const { values } = parseArgs({
 		relay: { type: 'string' },
 		'local-relay': { type: 'string' },
 		'count-requests': { type: 'boolean' },
+		preload: { type: 'string' },
+		pays: { type: 'string' },
 		out: { type: 'string' },
 		debug: { type: 'string' },
 		timeout: { type: 'string' },
@@ -107,6 +111,7 @@ function scripted(party: string, commands: string): { child: ChildProcess; done:
 		...(values.memory ? ['--import', resolve(import.meta.dirname, 'sample-memory.mjs')] : []),
 		...(values['count-peerstore'] ? ['--import', resolve(import.meta.dirname, 'count-peerstore.mjs')] : []),
 		...(values['count-requests'] ? ['--import', resolve(import.meta.dirname, 'count-requests.mjs')] : []),
+		...(values.preload ? ['--import', resolve(values.preload)] : []),
 	]
 	const [latencyMs, latencyMode] = (values.latency ?? '').split(':')
 	const child = spawn(process.execPath, [...profiling, MAIN, '--home', home, '-p', party, ...reach(), '-v', '-c', commands], {
@@ -161,6 +166,7 @@ async function main(): Promise<void> {
 		'offer 1 accept',
 		`wait Open --timeout ${timeout}`,
 		'pay 1 1.00 probe',
+		...(values.pays ? Array.from({ length: Number(values.pays) - 1 }, (_, i) => `pay 1 1.00 probe-${i + 2}`) : []),
 		`idle ${idle}`,
 	].join('; '))
 	const [samCode, janCode] = await Promise.all([sam.done, jan.done])
