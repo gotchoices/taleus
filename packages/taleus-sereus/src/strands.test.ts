@@ -23,6 +23,7 @@ import {
 import type { Result } from 'taleus-model'
 import { createEngineModel, type EngineModel, type PartyIdentity } from 'taleus-model/engine'
 import { offline, testContract } from 'taleus-model/testing'
+import { enrollOwner } from './node/host.js'
 import { taleusSApp } from './sapp.js'
 import { cadreStoreProvider } from './store.js'
 
@@ -105,9 +106,7 @@ class Device {
 			strandReactivity: { enabled: true },
 		})
 		await node.start()
-		const { privateKeyB64, publicKeyB64 } = node.getIdentityOwnerKey()
-		await node.getControlDatabase()!.ensureOwnerKey(publicKeyB64)
-		await node.initializeSeedBootstrap(privateKeyB64)
+		await enrollOwner(node, this.keyStore)
 		return node
 	}
 }

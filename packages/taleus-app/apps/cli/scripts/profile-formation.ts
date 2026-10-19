@@ -15,6 +15,10 @@
  * `--memory` logs each party's memory every 5 s (`sample-memory.mjs`), as `mem` lines.
  * `--poll <seconds>` passes the CLI's backstop-poll switch to both parties (0: none).
  * `--idle <seconds>` how long both parties stay up after the payment (default 30): the idle tally's cost.
+ * `--count-requests` logs every remote Optimystic request to `requests-<party>.jsonl` (`count-requests.mjs`;
+ *   `analyze-requests.ts` reads them).
+ * `--local-relay [<delayMs>]` runs both parties through a loopback relay of its own, every byte held
+ *   `delayMs` each way on each party's link (`taleus-sereus/node` `startLocalRelay`).
  * `--count-peerstore` prints each party's libp2p peer-store operations by caller at exit (`count-peerstore.mjs`).
  *
  * Default: loopback (`--listen`), one run per party, no relay -- so nothing but the stack is
@@ -25,10 +29,13 @@ import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, rm, writeFile, appendFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
+import { startLocalRelay, type LocalRelay } from 'taleus-sereus/node'
 
 const { values } = parseArgs({
 	options: {
 		relay: { type: 'string' },
+		'local-relay': { type: 'string' },
+		'count-requests': { type: 'boolean' },
 		out: { type: 'string' },
 		debug: { type: 'string' },
 		timeout: { type: 'string' },
@@ -52,6 +59,9 @@ const home = join(out, 'home')
 const link = join(out, 'link')
 const marksFile = join(out, 'marks.jsonl')
 const t0 = Date.now()
+/** The relay both parties use: `--relay`, or the local one `--local-relay` starts. */
+let relay: string | undefined = values.relay
+let localRelay: LocalRelay | undefined
 
 interface Mark {
 	t: number
@@ -69,7 +79,7 @@ async function mark(party: string, text: string): Promise<void> {
 /** Global options every run of a party gets: its home, and how it is reached. */
 function reach(): string[] {
 	return [
-		...(values.relay ? [] : ['--listen']),
+		...(relay ? [] : ['--listen']),
 		...(values['no-reactivity'] ? ['--no-reactivity'] : []),
 		...(values.poll === undefined ? [] : ['--poll', values.poll]),
 	]
@@ -96,11 +106,12 @@ function scripted(party: string, commands: string): { child: ChildProcess; done:
 		...(values.latency ? ['--import', resolve(import.meta.dirname, 'ws-latency.mjs')] : []),
 		...(values.memory ? ['--import', resolve(import.meta.dirname, 'sample-memory.mjs')] : []),
 		...(values['count-peerstore'] ? ['--import', resolve(import.meta.dirname, 'count-peerstore.mjs')] : []),
+		...(values['count-requests'] ? ['--import', resolve(import.meta.dirname, 'count-requests.mjs')] : []),
 	]
 	const [latencyMs, latencyMode] = (values.latency ?? '').split(':')
 	const child = spawn(process.execPath, [...profiling, MAIN, '--home', home, '-p', party, ...reach(), '-v', '-c', commands], {
 		stdio: ['ignore', 'pipe', 'pipe'],
-		env: { ...process.env, DEBUG: debug, DEBUG_COLORS: '0', ...(values.busy ? { TALEUS_BUSY: values.busy } : {}), ...(latencyMs ? { TALEUS_WS_DELAY_MS: latencyMs, TALEUS_WS_MODE: latencyMode ?? 'pipelined' } : {}) },
+		env: { ...process.env, DEBUG: debug, DEBUG_COLORS: '0', ...(values['count-requests'] ? { TALEUS_REQUEST_LOG: join(out, `requests-${party}.jsonl`) } : {}), ...(values.busy ? { TALEUS_BUSY: values.busy } : {}), ...(latencyMs ? { TALEUS_WS_DELAY_MS: latencyMs, TALEUS_WS_MODE: latencyMode ?? 'pipelined' } : {}) },
 	})
 	const log = join(out, `${party}.log`)
 	const lines = (stream: NodeJS.ReadableStream, onLine: (line: string) => void) => {
@@ -125,15 +136,22 @@ function scripted(party: string, commands: string): { child: ChildProcess; done:
 async function main(): Promise<void> {
 	await rm(out, { recursive: true, force: true })
 	await mkdir(out, { recursive: true })
-	await mark('run', `out ${out}; ${values.relay ? `relay ${values.relay}` : 'loopback'}; DEBUG=${debug}`)
+	if (values['local-relay'] !== undefined) {
+		localRelay = await startLocalRelay({ delayMs: Number(values['local-relay'] || 0) })
+		relay = localRelay.address
+	}
+	await mark('run', `out ${out}; ${relay ? `relay ${relay}` : 'loopback'}${values['local-relay'] ? ` (local, ${values['local-relay']} ms each way)` : ''}; DEBUG=${debug}`)
 
-	await setup('jan', `party name Jan${values.relay ? `; relay add ${values.relay}` : ''}`)
-	await setup('sam', `party name Sam${values.relay ? `; relay add ${values.relay}` : ''}`)
+	await setup('jan', `party name Jan${relay ? `; relay add ${relay}` : ''}`)
+	await setup('sam', `party name Sam${relay ? `; relay add ${relay}` : ''}`)
 	await mark('run', 'parties ready')
 
 	// The inviter stays up until the tally is open and the payment has had time to arrive.
 	const jan = scripted('jan', `invite --limit 500 --note profile -o ${link}; wait Open --timeout ${timeout}; idle ${idle}; history 1`)
+	let janExited = false
+	void jan.done.then(() => (janExited = true))
 	while (!existsSync(link) || !readFileSync(link, 'utf8').trim()) {
+		if (janExited) throw new Error(`jan exited before writing the invitation link; see ${join(out, 'jan.log')}`)
 		await new Promise(resolveWait => setTimeout(resolveWait, 250))
 	}
 	await mark('run', 'link written')
@@ -147,7 +165,8 @@ async function main(): Promise<void> {
 	].join('; '))
 	const [samCode, janCode] = await Promise.all([sam.done, jan.done])
 	await mark('run', `done: jan exit ${janCode}, sam exit ${samCode}`)
-	await writeFile(join(out, 'summary.json'), JSON.stringify({ relay: values.relay ?? null, debug, janCode, samCode, ms: Date.now() - t0 }, null, 2))
+	await writeFile(join(out, 'summary.json'), JSON.stringify({ relay: relay ?? null, localRelayDelayMs: values['local-relay'] ?? null, debug, janCode, samCode, ms: Date.now() - t0 }, null, 2))
+	await localRelay?.stop()
 }
 
 main().catch(error => {

@@ -43,6 +43,7 @@ through a relay: a loopback one of its own by default, so a restarted party is f
 yarn scenarios                                           # loopback relay; ~35 s on a RAM disk
 TALEUS_SCENARIO_HOME=/Volumes/ram yarn scenarios         # party folders there (macOS fsync is slow)
 TALEUS_SCENARIO_RELAY=<multiaddr> yarn scenarios         # through another relay, e.g. relay.sereus.org
+TALEUS_SCENARIO_DELAY_MS=44 yarn scenarios               # local relay, 44 ms each way per link (176 ms round trip)
 ```
 
 Run it after any stack upgrade: it is the quickest way to tell a release that works from one that

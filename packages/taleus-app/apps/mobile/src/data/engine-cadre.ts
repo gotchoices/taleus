@@ -11,7 +11,7 @@ import { AppState } from 'react-native'
 import { LevelDB, LevelDBWriteBatch } from 'rn-leveldb'
 import { LevelDBKVStore, openOptimysticRNDb } from '@optimystic/db-p2p-storage-rn'
 import { createBackgroundRunner, phoneNodeLifecycle } from '@serfab/cadre-rn/lifecycle'
-import { kvStoreSlot, secureStoreSlot } from '@serfab/cadre-rn/node-local'
+import { kvStoreSlot, secureStoreSlot, type KvStoreApi } from '@serfab/cadre-rn/node-local'
 import { buildNoiseCrypto, DEFAULT_NOISE_CRYPTO_MODE } from '@serfab/cadre-rn/noise-crypto'
 import { createPhoneNode, type PhoneNodeOptions } from '@serfab/cadre-rn/phone-node'
 import type { TaleusModel } from 'taleus-model'
@@ -77,7 +77,7 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 	const node = await phone.start(options)
 	createBackgroundRunner({ ...phoneNodeLifecycle(phone), appState: AppState }).start()
 
-	const session = new LevelDBKVStore(openOptimysticRNDb({ ...leveldb, name: SESSION_DB }), 'taleus:session:')
+	const session = flushable(new LevelDBKVStore(openOptimysticRNDb({ ...leveldb, name: SESSION_DB }), 'taleus:session:'))
 	const engine = await createEngineModel({
 		// Reactivity carries a counterparty's commits, so the backstop poll only catches a missed
 		// watch. At the default 10 s it kept the S7's agent busy about a quarter of the time.
@@ -122,4 +122,17 @@ function randomId(): string {
 	const bytes = new Uint8Array(8)
 	crypto.getRandomValues(bytes)
 	return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * The session store as cadre-rn 1.17's `kvStoreSlot` takes it, which asks for `flush`. Optimystic
+ * 1.15's `LevelDBKVStore` has none: each write goes to rn-leveldb at once, so there is nothing to flush.
+ * NOTE: drop this once `@optimystic/db-p2p-storage-rn` ships `flush` (on its main, unreleased).
+ */
+function flushable(store: LevelDBKVStore): KvStoreApi {
+	return {
+		get: key => store.get(key),
+		set: (key, value) => store.set(key, value),
+		flush: () => Promise.resolve(),
+	}
 }

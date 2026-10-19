@@ -54,7 +54,11 @@ export async function startWorld(): Promise<World> {
 	const home = await mkdtemp(join(process.env.TALEUS_SCENARIO_HOME ?? tmpdir(), 'taleus-scenario-'))
 	const shared = process.env.TALEUS_SCENARIO_RELAY
 	// TALEUS_SCENARIO_RELAY_LIMITS=default: the local relay caps connections as a stock public relay does.
-	const local: LocalRelay | undefined = shared ? undefined : await startLocalRelay({ defaultLimits: process.env.TALEUS_SCENARIO_RELAY_LIMITS === 'default' })
+	// TALEUS_SCENARIO_DELAY_MS: each party's link to it holds every byte that long each way.
+	const local: LocalRelay | undefined = shared ? undefined : await startLocalRelay({
+		defaultLimits: process.env.TALEUS_SCENARIO_RELAY_LIMITS === 'default',
+		delayMs: Number(process.env.TALEUS_SCENARIO_DELAY_MS ?? 0),
+	})
 	const relay = shared ?? local!.address
 	const parties: ScenarioParty[] = []
 	return {

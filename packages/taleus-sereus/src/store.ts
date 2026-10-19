@@ -31,9 +31,29 @@ import type { Database } from '@quereus/quereus'
 import type { InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe } from 'taleus-core'
 import { tablesIn, transactionBatch, watchTables, type RowWrite } from 'taleus-core/host'
 
+/**
+ * What the store asks of the app's running node: these methods of `CadreNode`, and nothing else.
+ * Named rather than the whole class, so a host on a neighbouring cadre-core release -- a class
+ * type never matches across two copies of a package -- can still hand its node in.
+ */
+export type StrandNode = Pick<
+	CadreNode,
+	| 'addStrand'
+	| 'createOpenInvitation'
+	| 'foundStrand'
+	| 'getDiscoveredStrands'
+	| 'getStrands'
+	| 'off'
+	| 'on'
+	| 'publishFormationInvite'
+	| 'requestJoin'
+	| 'wakeStrand'
+	| 'whenStrandWritable'
+>
+
 export interface CadreStoreOptions {
 	/** The app's running node. */
-	node: CadreNode
+	node: StrandNode
 	/** The Taleus sApp: the tally schema, and the id and version it is published under. */
 	sApp: SAppConfig
 	/** What this party discloses to an inviter when it redeems an invitation. */
@@ -202,7 +222,7 @@ class CadreStoreProvider implements StoreProvider {
 	 * `addStrand`, then keep waiting when the first sync outlasts its budget:
 	 * `StrandAwaitingFirstSyncError` leaves the strand launched and syncing.
 	 */
-	private async attachWhenWritable(config: Parameters<CadreNode['addStrand']>[0]): Promise<StrandInstance> {
+	private async attachWhenWritable(config: Parameters<StrandNode['addStrand']>[0]): Promise<StrandInstance> {
 		const patience = { timeoutMs: this.options.firstSyncPatienceMs ?? 240_000 }
 		try {
 			const instance = await this.options.node.addStrand(config)
@@ -248,7 +268,7 @@ const WRITE_RETRY_MS = 3_000
  */
 class CadreTallyStore implements TallyStore {
 	constructor(
-		private readonly node: CadreNode,
+		private readonly node: StrandNode,
 		private readonly strandId: string,
 		private readonly tables: readonly string[],
 		private readonly pollMs: number,
@@ -340,7 +360,7 @@ function readable(strand: StrandInstance): boolean {
  * The strand, writable: woken first if it is hibernating, since waiting does not wake one
  * (`CadreNode.whenStrandWritable`), and a hibernated tally would otherwise wait out its patience.
  */
-async function awake(node: CadreNode, strandId: string, timeoutMs: number): Promise<StrandInstance> {
+async function awake(node: StrandNode, strandId: string, timeoutMs: number): Promise<StrandInstance> {
 	if (node.getStrands().get(strandId)?.status === 'hibernating') await node.wakeStrand(strandId)
 	return node.whenStrandWritable(strandId, { timeoutMs })
 }

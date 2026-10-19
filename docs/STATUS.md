@@ -12,10 +12,22 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [ ] **Stack: on Sereus 1.16 / Optimystic 1.15 / Quereus 4.20.2 / FRET 1.1.0, one copy each.**
-  Sereus 1.16 (2026-10-15) is the Optimystic 1.15 bump plus a `dialTimeout` check; no control schema
-  change, so no recreate. The next Sereus release with the owner-key work changes the control schema
-  once more (recreate); after it, versioned migrations (sereus#46). `@babel/runtime` must be
+- [ ] **Stack: on Sereus 1.17 / Optimystic 1.15 / Quereus 4.20.2 / FRET 1.1.0, one copy each.**
+  Sereus 1.17 (2026-10-18): the founder commits every declared table's collection (#47), workload
+  fixes from #48's counts, owner keys independent of machine identity (`taleus-sereus/node`
+  `enrollOwner`: the key in its own key-store slot, enrolled, wired with `useOwnerSigner`), versioned
+  control-schema migrations; control stores from 1.16 or earlier must be recreated. Scenarios
+  (loopback relay, RAM disk): 26 s, forming 14 s (1.16: 34 s / 19 s); at a 176 ms round trip 70 s,
+  forming 47 s, a payment 1.9 s (1.16: 129 s / 66 s / 9 s).
+  **Phone blocked on an Optimystic release:** cadre-rn 1.17's edge node calls `flush()` (and
+  `close()`) on its node-local `LevelDBKVStore`, which only Optimystic's unreleased main has;
+  published `db-p2p-storage-rn` 1.15.0 lacks it, and cadre-rn still asks for `^1.15.0`. The app
+  type-checks and its tests pass (our own session store is wrapped, `flushable` in
+  `engine-cadre.ts`), but on a device the kit's first node-local save would fail. Not a bug to file:
+  Optimystic's main has `flush` and `close`, and cadre-rn's `^1.15.0` takes the next release. Then
+  drop `flushable`.
+  `taleus-sereus`'s store takes a `StrandNode` (the node methods it uses) rather than the class.
+  `@babel/runtime` must be
   ^7.29.2 (older helpers hang Quereus's lock under Hermes; sereus#8).
   Optimystic 1.14 and 1.15 need no new Sereus (1.15 asks for ^1.13; `yarn up -R '@optimystic/*' p2p-fret`
   dedupes). 1.15 only requires FRET 1.1.0 (idle maintenance backs off to a pass a minute, peer list

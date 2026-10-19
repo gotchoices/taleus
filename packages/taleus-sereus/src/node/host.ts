@@ -14,7 +14,7 @@ import { circuitRelayTransport } from '@libp2p/circuit-relay-v2'
 import { multiaddr } from '@multiformats/multiaddr'
 import { webSockets } from '@libp2p/websockets'
 import { FileRawStorage } from '@optimystic/db-p2p-storage-fs'
-import { CadreNode, DEFAULT_IDENTITY_KEY_ID, type CadreNodeConfig, type DurableSlot } from '@serfab/cadre-core'
+import { CadreNode, createOwnerKey, DEFAULT_IDENTITY_KEY_ID, loadOwnerSigner, type CadreNodeConfig, type DurableSlot, type KeyStore } from '@serfab/cadre-core'
 import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file'
 import { FileEnrolledMachineStore } from '@serfab/cadre-core/enrolled-machine-store-file'
 import { FileKeyStore } from '@serfab/cadre-core/key-store-file'
@@ -24,6 +24,8 @@ import { readText, saveConfig, writeTextAtomic, type PartyConfig, type PartyDirs
 
 /** Owner genesis is bounded, as the phone kit bounds it: a start must not hang on it. */
 const OWNER_GENESIS_MS = 60_000
+/** The founding owner row's label: this machine. */
+const OWNER_KEY_LABEL = 'node'
 
 export interface NodeHostOptions {
 	dirs: PartyDirs
@@ -43,16 +45,17 @@ export interface NodeHostOptions {
 
 /** Start the party's node: built over its folder, started, and enrolled as its own owner. */
 export async function startPartyNode(options: NodeHostOptions): Promise<CadreNode> {
-	const node = new CadreNode(await nodeConfig(options))
+	const keyStore = new FileKeyStore(options.dirs.keys)
+	const node = new CadreNode(await nodeConfig(options, keyStore))
 	await node.start()
-	await ownerGenesis(node)
+	await bounded(enrollOwner(node, keyStore))
 	return node
 }
 
-async function nodeConfig({ dirs, config, sAppId, extraRelays = [], listen = [], reactivity = true }: NodeHostOptions): Promise<CadreNodeConfig> {
+async function nodeConfig({ dirs, config, sAppId, extraRelays = [], listen = [], reactivity = true }: NodeHostOptions, keyStore: KeyStore): Promise<CadreNodeConfig> {
 	const { partyId } = config
 	return {
-		keyStore: new FileKeyStore(dirs.keys),
+		keyStore,
 		identityKeyId: DEFAULT_IDENTITY_KEY_ID,
 		controlNetwork: { partyId, bootstrapNodes: [] },
 		profile: 'transaction',
@@ -79,22 +82,37 @@ async function nodeConfig({ dirs, config, sAppId, extraRelays = [], listen = [],
 }
 
 /**
- * Enroll the node as its own party's owner, as the phone kit does on every start (idempotent):
- * a node must be an owner to found strands and publish invitations.
+ * Enroll the node as its own party's owner on every start (idempotent), as Sereus's edge node does:
+ * a node must be an owner to found strands and publish invitations. The owner key has its own slot
+ * in the party's key store, created once and never derived from the node's identity. A party that
+ * already lists an owner wires this node's key only if it is one of them.
  */
-async function ownerGenesis(node: CadreNode): Promise<void> {
-	const key = node.getIdentityOwnerKey()
-	const genesis = (async () => {
-		await node.getControlDatabase()!.ensureOwnerKey(key.publicKeyB64)
-		await node.initializeSeedBootstrap(key.privateKeyB64)
-	})()
+export async function enrollOwner(node: CadreNode, keyStore: KeyStore): Promise<void> {
+	const control = node.getControlDatabase()
+	if (!control) throw new Error('control database unavailable after start; cannot enroll the owner')
+	const held = await loadOwnerSigner(keyStore)
+	if (await control.hasOwnerKey()) {
+		if (held) await node.wireOwnKeyIfOwner(held)
+		return
+	}
+	const founding = held ?? (await createOwnerKey(keyStore))
+	if (!(await control.ensureOwnerKey(founding.publicKey, OWNER_KEY_LABEL))) {
+		// Another owner row landed between the two reads: wire this key only if it is listed.
+		await node.wireOwnKeyIfOwner(founding)
+		return
+	}
+	await node.useOwnerSigner(founding)
+}
+
+/** Owner genesis, bounded: a control write against an unresponsive member can hold for minutes. */
+async function bounded(work: Promise<void>): Promise<void> {
 	let timer: NodeJS.Timeout | undefined
 	const late = new Promise<never>((_, reject) => {
 		timer = setTimeout(() => reject(new Error(`owner genesis did not finish in ${OWNER_GENESIS_MS} ms`)), OWNER_GENESIS_MS)
 		timer.unref()
 	})
 	try {
-		await Promise.race([genesis, late])
+		await Promise.race([work, late])
 	} finally {
 		clearTimeout(timer)
 	}
