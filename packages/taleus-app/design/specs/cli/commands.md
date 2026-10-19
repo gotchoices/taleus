@@ -133,11 +133,21 @@ Shows the terms proposed on a tally (key/value: `waitingOn`, `myLimit`, `myNotic
 ### `history <tally> [-n <count>]`
 Entries oldest first, default the last 20: `row  id  date  issuer  amount  balanceAfter  memo`.
 
-### `pay <tally> <amount> [<memo...>]`
-Records value given to the partner. Prints the entry as `history` does.
+### `pay <tally> <amount> [--answers <request>] [<memo...>]`
+Records value given to the partner. Never refused for its amount: a credit limit is what the partner
+will extend, not what may be promised. `--answers` names the request it pays in full. Prints the
+entry as `history` does.
 
 ### `request <tally> <amount> [<memo...>]` · `requests [<tally>]`
 Asks the partner to pay, or lists requests: `row  id  tally  direction  amount  stillAsked  state  memo`.
+A request is named by its `id`, or by its `row` in `requests` with no tally given.
+
+### `decline <request> [<why...>]`
+Declines a request to pay: nothing moves, and the requester sees it `refused`. Prints `id  state`.
+
+### `close <tally>`
+Asks to close a tally: irreversible. The tally is `Closing` until its balance reaches zero, then
+`Closed`, which accepts nothing more. Prints `id  state`.
 
 ### `attention`
 What waits on this party: `row  kind  tally  counterparty  amount  waitingOn  waitingDays`.
@@ -168,5 +178,5 @@ party online with it.
 
 ## Not yet
 
-Countering an offer, closing a tally, lifts, rates, disclosure and devices: the phone has them;
-they fit the same patterns when wanted.
+Countering an offer, lifts, rates, disclosure and devices: the phone has them; they fit the same
+patterns when wanted.

@@ -131,8 +131,9 @@ module keeps its in-process suite against doubles until direct chits work on a r
 - [x] **Contract-governance principle** — captured in `docs/tally-lifecycle.md § Contract governance`
   (direct chits grantor-authorized anytime; lift chits per signed trading variables; good-faith timing).
 - [x] **Lift-chit ↔ trading-variable conformance is agent-enforced, not schema-gated** — documented in
-  `docs/trading-variables.md` (pledge is self-signed; `LiftLading` is advisory; hard gate is the credit
-  limit). Confirm-no-schema-guard stands as the resolved position; revisit only if a concrete attack appears.
+  `docs/trading-variables.md` (pledge is self-signed; `LiftLading` is advisory). No credit gate either
+  (2026-10-16): chits and pledges are accepted when duly signed; closing gates only lift pledges, toward
+  zero; a closed tally accepts nothing (`docs/architecture.md` § Ledger Operation, § Tally close).
 
 ## Apps (planned)
 
@@ -160,7 +161,12 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   **done**, `taleus-sereus`; (2) a Node host -- **done**, `taleus-sereus/node` (a party's
   node and slots kept in a folder; tested forming a tally between two and restarting one); (3) a `cli` appeus target -- **done**:
   stories `design/stories/cli/`, spec `design/specs/cli/commands.md`, `apps/cli` (runs as TypeScript
-  on Node 24, no build); (4) scenarios. First CLI-vs-CLI run over relay.sereus.org (2026-10-13):
+  on Node 24, no build); (4) scenarios -- **done** (2026-10-18): `apps/cli/scenarios/`, two parties
+  driven through the CLI's commands over a loopback relay (`taleus-sereus/node` `startLocalRelay`):
+  form, pay, pay past the limit, answer and decline requests, restart, close; `yarn scenarios`,
+  34 s on a RAM disk (2 min on the Mac's disk); through relay.sereus.org 6 min 17 s, of which forming
+  4 min 32 s (19 s through a loopback relay). Added for it: `close`, `decline`, `pay --answers`.
+  First CLI-vs-CLI run over relay.sereus.org (2026-10-13):
   invite 18 s, accept 32 s, the offer within 90 s, open about 90 s after accepting it, a payment
   recorded -- far faster than the phones. A party alone cannot list its tallies (a never-written
   table, #47). Profiling (`apps/cli/scripts/`, 2026-10-13), loopback: invite 15.5 s, accept

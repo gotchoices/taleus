@@ -8,7 +8,7 @@ import type { TaleusModel } from 'taleus-model'
 import { slotDocumentCache } from 'taleus-model/contracts'
 import { createEngineModel, type EngineModel } from 'taleus-model/engine'
 import { cadreStoreProvider, taleusSApp } from 'taleus-sereus'
-import { fileSlot, saveConfig, startPartyNode, type PartyConfig, type PartyDirs } from 'taleus-sereus/node'
+import { fileSlot, heldStrandIds, saveConfig, startPartyNode, type PartyConfig, type PartyDirs } from 'taleus-sereus/node'
 
 const SAPP = taleusSApp()
 
@@ -86,4 +86,22 @@ export function runningParty(options: PartyOptions): RunningParty {
 		},
 		stop,
 	}
+}
+
+/**
+ * Give a started party a bounded time to get going before it is asked anything -- its relay
+ * reservation (when it has relays), and every strand it holds launched and past starting, so
+ * `tallies` finds them: a restarted node offers its strands from a poll that runs a moment after it
+ * starts (`heldStrandIds`).
+ */
+export async function settle(party: RunningParty, ms: number): Promise<void> {
+	const deadline = Date.now() + ms
+	const held = await heldStrandIds(party.node)
+	const busy = () => {
+		const node = party.node
+		if (party.config.relays.length && node.getRelayReservationState()?.status !== 'reserved') return true
+		const launched = node.getStrands()
+		return held.some(id => !launched.has(id) || launched.get(id)?.status === 'starting')
+	}
+	while (Date.now() < deadline && busy()) await new Promise(resolve => setTimeout(resolve, 500))
 }

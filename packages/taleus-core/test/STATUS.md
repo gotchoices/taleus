@@ -497,7 +497,7 @@ Things the tests turned up that are design questions rather than test failures.
 - [x] A restrictive change must wait out the notice period *already agreed* — one day short is
       refused
 - [x] Shortening the notice period is itself restrictive, so it waits like any reduction
-- [ ] Absent any `CreditTerms` row the effective limit is zero, so the first nonzero chit fails
+- [ ] Absent any `CreditTerms` row the effective limit (`CurrentCreditLimit`) reads zero
 - [ ] A future-dated restrictive revision and a later immediate permissive one coexist correctly
 
 ## 6. Direct chits

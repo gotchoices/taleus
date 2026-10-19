@@ -14,12 +14,12 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createInterface, type Interface } from 'node:readline'
 import { format } from 'node:util'
-import { heldStrandIds, lockParty, loopbackListenAddress, openParty, partyDirs } from 'taleus-sereus/node'
+import { lockParty, loopbackListenAddress, openParty, partyDirs } from 'taleus-sereus/node'
 
 import { commandNames, runCommands } from './commands/index.ts'
 import { splitArgv, splitLine } from './lex.ts'
 import { createOutput } from './output.ts'
-import { runningParty } from './party.ts'
+import { runningParty, settle } from './party.ts'
 import { createSession, EXIT, type Session } from './session.ts'
 
 const VERSION = '0.1.0'
@@ -168,7 +168,7 @@ async function main(argv: readonly string[]): Promise<number> {
 				else void shutdown(session, EXIT.interrupted)
 			})
 			await ready.catch(() => undefined)
-			await settle(session, g.waitSeconds * 1000)
+			await settle(session.party, g.waitSeconds * 1000)
 			const script = commands.length ? commands : splitLine(await readAll())
 			code = await runCommands(session, script)
 		}
@@ -176,24 +176,6 @@ async function main(argv: readonly string[]): Promise<number> {
 		rl?.close()
 	}
 	return shutdown(session, code)
-}
-
-/**
- * One-shot: give the node a bounded time to get going before the commands run -- its relay
- * reservation (when it has relays), and every strand the party holds launched and past starting,
- * so `tallies` finds them: a restarted node offers its strands from a poll that runs a moment after
- * it starts (`heldStrandIds`).
- */
-async function settle(session: Session, ms: number): Promise<void> {
-	const deadline = Date.now() + ms
-	const held = await heldStrandIds(session.party.node)
-	const busy = () => {
-		const node = session.party.node
-		if (session.party.config.relays.length && node.getRelayReservationState()?.status !== 'reserved') return true
-		const launched = node.getStrands()
-		return held.some(id => !launched.has(id) || launched.get(id)?.status === 'starting')
-	}
-	while (Date.now() < deadline && busy()) await new Promise(resolve => setTimeout(resolve, 500))
 }
 
 async function shutdown(session: Session, code: number): Promise<number> {

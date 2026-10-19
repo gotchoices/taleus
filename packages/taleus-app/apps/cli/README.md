@@ -32,6 +32,22 @@ spans runs (and to be reachable from a phone).
 With no always-on node, a tally makes progress only while both parties are up: keep a party online
 with `idle [<seconds>]`, or run its commands in one process (`-c "accept … --yes; idle 90; offer 1 accept"`).
 
+## Scenarios
+
+`scenarios/` drives two parties, Jan and Sam, through a tally's life with the CLI's own commands:
+formed, paid (past the credit limit too), a request answered and one declined, a restart, closed.
+Each party is a real one -- its folder, its cadre node -- run in one process, reaching the other
+through a relay: a loopback one of its own by default, so a restarted party is found again.
+
+```sh
+yarn scenarios                                           # loopback relay; ~35 s on a RAM disk
+TALEUS_SCENARIO_HOME=/Volumes/ram yarn scenarios         # party folders there (macOS fsync is slow)
+TALEUS_SCENARIO_RELAY=<multiaddr> yarn scenarios         # through another relay, e.g. relay.sereus.org
+```
+
+Run it after any stack upgrade: it is the quickest way to tell a release that works from one that
+does not, before a phone is involved.
+
 ## Profiling the stack
 
 `scripts/` runs a whole formation between two CLI parties and says where the time went:

@@ -28,10 +28,14 @@
 		"lint": "eslint ./src"
 	},
 	"dependencies": {
+		"@chainsafe/libp2p-noise": "^17.0.0",
+		"@chainsafe/libp2p-yamux": "^8.0.1",
 		"@libp2p/circuit-relay-v2": "^4.2.13",
+		"@libp2p/identify": "^4.1.14",
 		"@libp2p/websockets": "^10.1.21",
 		"@multiformats/multiaddr": "^13.0.3",
-		"@optimystic/db-p2p-storage-fs": "^1.15.0"
+		"@optimystic/db-p2p-storage-fs": "^1.15.0",
+		"libp2p": "^3.3.11"
 	},
 	"devDependencies": {
 		"@eslint/js": "10.0.1",

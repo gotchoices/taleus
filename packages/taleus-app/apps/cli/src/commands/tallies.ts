@@ -1,4 +1,4 @@
-/** Reading tallies: `tallies`, `tally`, `history`, `attention`, `watch`. */
+/** Tallies: `tallies`, `tally`, `history`, `attention`, `watch`, `wait`, `close`. */
 import { onWorldChanged, type TallySummary } from 'taleus-model'
 
 import { formatAmount } from '../amount.ts'
@@ -192,4 +192,15 @@ const wait: Command = {
 	},
 }
 
-export const tallyCommands = [tallies, tally, history, attention, watch, wait]
+const close: Command = {
+	name: 'close',
+	summary: 'Ask to close a tally: irreversible; it closes when its balance reaches zero',
+	usage: '<tally>',
+	async run(session, args) {
+		const { id } = await session.tally(need(close, args, 0, 'tally'))
+		const detail = session.unwrap(await session.party.model.tally.requestClose(id))
+		session.out.rows(['id', 'state'], [{ id: detail.id, state: detail.state }])
+	},
+}
+
+export const tallyCommands = [tallies, tally, history, attention, watch, wait, close]

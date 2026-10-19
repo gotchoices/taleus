@@ -13,7 +13,8 @@
 	"scripts": {
 		"start": "node src/main.ts",
 		"typecheck": "tsc --noEmit",
-		"test": "node --test 'src/**/*.test.ts'"
+		"test": "node --test 'src/**/*.test.ts'",
+		"scenarios": "node --test --test-concurrency=1 'scenarios/**/*.scenario.ts'"
 	},
 	"dependencies": {
 		"taleus-core": "link:../../../taleus-core",
