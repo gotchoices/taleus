@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { ScrollView, Text } from 'react-native'
 
 import { Action, Amount, Card, Failed, Loading, Row, amountText } from '../components'
-import { readTally, requestClose, withdrawClose, type TallyDetail } from '../data/tally'
+import { readTally, requestClose, type TallyDetail } from '../data/tally'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
 import { divisorOf } from '../util/amount'
@@ -165,18 +165,6 @@ export function CloseTally({ route, navigation }: Props): React.JSX.Element {
 				<Text style={styles.caption}>{t('screens.close-tally.writeoff-declined')}</Text>
 			) : null}
 
-			{closing.requestedBy !== 'them' ? (
-				<Card footnote={t('screens.close-tally.withdraw-note')}>
-					<Action
-						label={t('screens.close-tally.withdraw')}
-						onPress={() => void withdrawClose(tallyId).then(reload)}
-						secondary
-					/>
-					{closing.requestedBy === 'both' ? (
-						<Text style={styles.caption}>{t('screens.close-tally.withdraw-blocked')}</Text>
-					) : null}
-				</Card>
-			) : null}
 		</ScrollView>
 	)
 }

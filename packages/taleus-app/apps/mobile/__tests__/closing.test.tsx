@@ -1,7 +1,7 @@
 import { fireEvent, waitFor } from '@testing-library/react-native'
 
 import { recordEntry, resetEntries } from '../src/data/entries'
-import { readTally, requestClose, resetCloses, withdrawClose } from '../src/data/tally'
+import { readTally, requestClose, resetCloses } from '../src/data/tally'
 import { setVariant } from '../src/mock/variant'
 import { CloseTally } from '../src/screens/CloseTally'
 import { renderScreen, screenProps } from '../testUtils'
@@ -32,22 +32,6 @@ test('either party may ask, and a second request changes nothing', async () => {
 	expect(both.ok && both.value.closing?.requestedBy).toBe('both')
 	// Still closing, not more closed.
 	expect(both.ok && both.value.state).toBe('Closing')
-})
-
-test('a party can withdraw their own request; it stays closing while theirs stands', async () => {
-	setVariant('closing')
-	await requestClose('tally:sam-bike')
-	const after = await withdrawClose('tally:sam-bike')
-	expect(after.ok && after.value.closing?.requestedBy).toBe('them')
-	expect(after.ok && after.value.state).toBe('Closing')
-})
-
-test('withdrawing the only request reopens the tally on the terms it always had', async () => {
-	const asked = await requestClose('tally:mara-shop')
-	expect(asked.ok && asked.value.state).toBe('Closing')
-	const back = await withdrawClose('tally:mara-shop')
-	expect(back.ok && back.value.closing).toBeUndefined()
-	expect(back.ok && back.value.state).toBe('Open')
 })
 
 test('a closing tally takes what settles it and refuses what does not', async () => {

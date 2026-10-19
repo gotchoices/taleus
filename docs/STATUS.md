@@ -165,7 +165,14 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   driven through the CLI's commands over a loopback relay (`taleus-sereus/node` `startLocalRelay`):
   form, pay, pay past the limit, answer and decline requests, restart, close; `yarn scenarios`,
   34 s on a RAM disk (2 min on the Mac's disk); through relay.sereus.org 6 min 17 s, of which forming
-  4 min 32 s (19 s through a loopback relay). Added for it: `close`, `decline`, `pay --answers`.
+  4 min 32 s (19 s through a loopback relay). With the loopback relay and added latency
+  (`scripts/ws-latency.mjs`): 88 ms party-to-party round trip, 1 min 13 s (forming 37 s, acts 3-10 s);
+  176 ms (about relay.sereus.org's, ping 81 ms), 2 min 9 s (forming 66 s, acts 4-18 s). Forming grows
+  about linearly with the round trip: some 270 sequential round trips. Latency accounts for about a
+  quarter of the public relay's 272 s forming; the rest is the public relay or the path to it, not
+  measured. A loopback relay with libp2p's default connection limits (2 min, 128 KiB) fails to form
+  at all (the relayed connection is limited, and the join is never answered); Sereus relays forward
+  without limit (`cadre-core` `relay-server.ts`). Added for it: `close`, `decline`, `pay --answers`.
   First CLI-vs-CLI run over relay.sereus.org (2026-10-13):
   invite 18 s, accept 32 s, the offer within 90 s, open about 90 s after accepting it, a payment
   recorded -- far faster than the phones. A party alone cannot list its tallies (a never-written

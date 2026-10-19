@@ -53,7 +53,8 @@ export async function startWorld(): Promise<World> {
 	// Party folders: under TALEUS_SCENARIO_HOME when set (a RAM disk spares macOS's per-write fsync).
 	const home = await mkdtemp(join(process.env.TALEUS_SCENARIO_HOME ?? tmpdir(), 'taleus-scenario-'))
 	const shared = process.env.TALEUS_SCENARIO_RELAY
-	const local: LocalRelay | undefined = shared ? undefined : await startLocalRelay()
+	// TALEUS_SCENARIO_RELAY_LIMITS=default: the local relay caps connections as a stock public relay does.
+	const local: LocalRelay | undefined = shared ? undefined : await startLocalRelay({ defaultLimits: process.env.TALEUS_SCENARIO_RELAY_LIMITS === 'default' })
 	const relay = shared ?? local!.address
 	const parties: ScenarioParty[] = []
 	return {

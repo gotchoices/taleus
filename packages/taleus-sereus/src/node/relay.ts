@@ -16,8 +16,19 @@ export interface LocalRelay {
 	stop(): Promise<void>
 }
 
-/** Start a relay listening on loopback (`port` 0: any free port). */
-export async function startLocalRelay(port = 0): Promise<LocalRelay> {
+export interface LocalRelayOptions {
+	/** Port to listen on; 0 (the default) takes any free one. */
+	port?: number
+	/**
+	 * Apply libp2p's default per-connection limits (2 minutes, 128 KiB), as a stock public relay
+	 * does. Off by default, so a relayed connection lasts as long as the parties need it.
+	 */
+	defaultLimits?: boolean
+}
+
+/** Start a relay listening on loopback. */
+export async function startLocalRelay(options: LocalRelayOptions = {}): Promise<LocalRelay> {
+	const { port = 0, defaultLimits = false } = options
 	const node = await createLibp2p({
 		addresses: { listen: [`/ip4/127.0.0.1/tcp/${port}/ws`] },
 		transports: [webSockets()],
@@ -26,7 +37,7 @@ export async function startLocalRelay(port = 0): Promise<LocalRelay> {
 		connectionGater: { denyDialMultiaddr: () => false },
 		services: {
 			identify: identify(),
-			relay: circuitRelayServer({ reservations: { applyDefaultLimit: false } }),
+			relay: circuitRelayServer({ reservations: { applyDefaultLimit: defaultLimits } }),
 		},
 	})
 	const address = node.getMultiaddrs().map(addr => addr.toString()).find(addr => addr.includes('/ws'))

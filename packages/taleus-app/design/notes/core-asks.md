@@ -74,7 +74,7 @@ Grouped as the app uses them. Names are placeholders; the shape of the answer is
 | request terms only they can grant | a request, not a proposal — binds nobody | 03 |
 | record value given | optionally answering one or more requests | 20, 22 |
 | request payment | ask, withdraw; ages rather than expiring | 21 |
-| close | request, withdraw the request | 05 |
+| close | request (not reversible) | 05 |
 | set trading settings | signed; standing permission for automated settling | 31 |
 | set exchange rates | private; directional; may follow a published source | 41 |
 | manage devices | list, add, retire — never the last one | 12, 13 |

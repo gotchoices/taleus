@@ -176,9 +176,6 @@ export function tallyModel(session: Session): TallyModel {
 			return detail(tallyId)
 		},
 
-		async withdrawClose() {
-			return unsupported('Withdrawing a close', 'debt-tally-close-no-reopen')
-		},
 	}
 }
 

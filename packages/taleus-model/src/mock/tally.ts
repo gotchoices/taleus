@@ -125,25 +125,6 @@ export async function requestClose(tallyId: string): Promise<Result<TallyDetail>
 	return readTally(tallyId)
 }
 
-/**
- * Path E: a party may withdraw their own request while the tally is still
- * closing. It stays closing while the other party's request stands.
- */
-export async function withdrawClose(tallyId: string): Promise<Result<TallyDetail>> {
-	const current = await readTally(tallyId)
-	if (!current.ok) {
-		return current
-	}
-	const already = current.value.closing
-	closes = {
-		...closes,
-		[tallyId]: already && already.requestedBy === 'both'
-			? { ...already, requestedBy: 'them' }
-			: null,
-	}
-	return readTally(tallyId)
-}
-
 export function resetCloses(): void {
 	closes = {}
 }

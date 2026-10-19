@@ -5,4 +5,4 @@
  */
 export { DATA_FORMAT, lockParty, openParty, partyDirs, readText, saveConfig, writeTextAtomic, type PartyConfig, type PartyDirs } from './home.js'
 export { fileSlot, heldStrandIds, loopbackListenAddress, peerAt, startPartyNode, type NodeHostOptions } from './host.js'
-export { startLocalRelay, type LocalRelay } from './relay.js'
+export { startLocalRelay, type LocalRelay, type LocalRelayOptions } from './relay.js'

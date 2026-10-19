@@ -39,13 +39,13 @@ Both parties see the same tally, each from their own side. Where their views dif
 ### Alternative Path B: Sam wants out
 7.1. Sam decides this was a mistake before anything happens on the tally.
 7.2. He asks to close it. The balance is zero, so it closes. Jan does not have to agree.
-7.3. Had something been owed, the tally would stay visible as closing until it settled, and neither
-     of them could add to it in the meantime.
+7.3. Had something been owed, the tally would stay visible as closing until it settled, with lifts
+     through it only moving the balance toward zero.
 7.4. Closing is not a countdown he has to wait out. The notice they agreed governs how long a debt
      may be carried, not whether he may stop trading — with nothing owed, there is nothing to wait
      for.
-7.5. While it is still closing, he can change his mind and withdraw the request. Once it has closed,
-     it is closed: trading with Jan again means a new tally, and this one stays readable as history.
+7.5. A close request is not reversible, and once the tally has closed it is closed: trading with Jan
+     again means a new tally, and this one stays readable as history.
 
 ### Alternative Path C: the counterparty is unreachable
 2.1. Nothing of Jan's is reachable just now. Sam can still see the tally and its terms — this is his
@@ -63,7 +63,6 @@ Both parties see the same tally, each from their own side. Where their views dif
 - [ ] Where units differ across tallies, cross-unit totals are marked estimates and never replace the
       per-unit figures
 - [ ] Either party may ask to close; with a zero balance it closes, whatever notice period was agreed
-- [ ] A close request can be withdrawn while the tally is still closing
 - [ ] A closed tally is terminal; trading again means a new tally, and the closed one remains readable without the other's agreement
 - [ ] A tally remains readable when the counterparty is unreachable, with pending work described as
       pending

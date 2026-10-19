@@ -17,7 +17,7 @@ stories in `design/stories/mobile/`; each area below names the stories it serves
     - `TallyTerms` — terms in force, previous terms, the governing agreement (07)
       - `Agreement` — the governing agreement itself, read in full (07)
     - `TradingSettings` — what may accumulate here and at what price (31)
-    - `CloseTally` — request, withdraw, settle, or watch it age (05)
+    - `CloseTally` — request, settle, or watch it age (05)
   - `CreateInvitation` — terms, unit, agreement, then share (01)
     - `Agreement` — read an agreement before offering it (01 path E)
   - `ReviewInvitation` — the invitee's side; also the universal-link landing (02)

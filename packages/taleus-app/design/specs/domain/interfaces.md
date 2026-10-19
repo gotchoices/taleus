@@ -69,7 +69,7 @@ rewired when it differs.
 | offer terms | propose, counter, accept, refuse — each a signed act | 01, 02, 03 |
 | record value | give value on a tally, optionally answering one or more requests | 20, 22 |
 | request value | ask, withdraw, see ageing | 21 |
-| close | request, withdraw the request, see why it has not completed | 05 |
+| close | request (not reversible), see why it has not completed | 05 |
 | reach someone | can value reach this payee, how much, at what cost, right now | 30 |
 
 Two properties every ask carries, because the stories depend on them: an act either happened or did

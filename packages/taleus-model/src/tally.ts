@@ -135,13 +135,8 @@ export interface TallyModel {
 	 */
 	readAgreement(agreementId: string, tallyId?: string): Promise<Result<AgreementDocument>>
 	/**
-	 * Story 05 step 1: either party may ask, without the other's agreement. A second
-	 * request changes nothing (path F) — one was already enough.
+	 * Story 05 step 1: either party may ask, without the other's agreement, and it cannot be
+	 * undone. A second request changes nothing (path F) — one was already enough.
 	 */
 	requestClose(tallyId: string): Promise<Result<TallyDetail>>
-	/**
-	 * Path E: a party may withdraw their own request while the tally is still
-	 * closing. It stays closing while the other party's request stands.
-	 */
-	withdrawClose(tallyId: string): Promise<Result<TallyDetail>>
 }

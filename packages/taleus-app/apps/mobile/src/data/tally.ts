@@ -12,8 +12,6 @@ export const readAgreement = (...args: Parameters<TallyModel['readAgreement']>):
 	getModel().tally.readAgreement(...args)
 export const requestClose = (...args: Parameters<TallyModel['requestClose']>): ReturnType<TallyModel['requestClose']> =>
 	getModel().tally.requestClose(...args)
-export const withdrawClose = (...args: Parameters<TallyModel['withdrawClose']>): ReturnType<TallyModel['withdrawClose']> =>
-	getModel().tally.withdrawClose(...args)
 
 /** Forget this namespace's mock writes. Tests and scenario capture only. */
 export function resetCloses(): void {

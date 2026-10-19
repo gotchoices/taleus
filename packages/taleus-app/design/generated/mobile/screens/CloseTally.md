@@ -53,9 +53,10 @@ story asks for in as many words.
 other value given, and lands in the history like any other entry. There is no special "forgive"
 operation, because there is no special act.
 
-**Both requests, one close** (path F). A second request changes nothing; withdrawing while the other
-party's request stands leaves it closing. `requestClose` and `withdrawClose` move between
-`me`/`them`/`both` rather than treating the flag as a boolean.
+**Both requests, one close** (path F). A second request changes nothing. `requestClose` moves between
+`me`/`them`/`both` rather than treating the flag as a boolean. A request is not reversible, so the
+screen offers no way back (story 05, revised 2026-10-18: the closing rules and wording here still
+follow the earlier story and are stale until regenerated).
 
 ## Not built here
 
