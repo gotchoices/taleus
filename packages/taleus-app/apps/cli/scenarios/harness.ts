@@ -21,6 +21,9 @@ import { createOutput } from '../src/output.ts'
 import { runningParty, settle, type RunningParty } from '../src/party.ts'
 import { createSession, EXIT, type Session } from '../src/session.ts'
 
+/** `TALEUS_SCENARIO_TRACE=1`: each command's time, and how many polls a wait took, on stderr. */
+const TRACE = process.env.TALEUS_SCENARIO_TRACE === '1'
+
 /** How long a party gets to settle after starting (relay reservation, strands launched). */
 const SETTLE_MS = 60_000
 
@@ -105,7 +108,9 @@ async function startParty(home: string, name: string, relay: string): Promise<Sc
 	async function run(line: string): Promise<Ran> {
 		if (!running) throw new Error(`${name} is not running`)
 		running.captured.reset()
+		const started = Date.now()
 		const code = await runCommands(running.session, splitLine(line))
+		if (TRACE) process.stderr.write(`[trace] ${name} ${line.slice(0, 40)}: ${Date.now() - started} ms\n`)
 		return { code, rows: running.captured.rows(), notes: running.captured.notes() }
 	}
 
@@ -118,11 +123,17 @@ async function startParty(home: string, name: string, relay: string): Promise<Sc
 			return ran.rows
 		},
 		async until(line, test, timeoutMs = 120_000) {
-			const deadline = Date.now() + timeoutMs
+			const started = Date.now()
+			const deadline = started + timeoutMs
 			let last: Ran | undefined
+			let polls = 0
 			while (Date.now() < deadline) {
 				last = await run(line)
-				if (last.code === EXIT.ok && test(last.rows)) return last.rows
+				polls++
+				if (last.code === EXIT.ok && test(last.rows)) {
+					if (TRACE) process.stderr.write(`[trace] ${name} until ${line}: ${Date.now() - started} ms, ${polls} polls\n`)
+					return last.rows
+				}
 				await new Promise(resolve => setTimeout(resolve, 1000))
 			}
 			throw new Error(`${name}: \`${line}\` did not reach the expected state in ${timeoutMs} ms; last: ${JSON.stringify(last)}`)

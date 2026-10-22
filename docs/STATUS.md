@@ -12,20 +12,25 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [ ] **Stack: on Sereus 1.17 / Optimystic 1.15 / Quereus 4.20.3 / FRET 1.1.0, one copy each.**
+- [ ] **Stack: on Sereus 1.17 / Optimystic 1.17 / Quereus 4.20.3 / FRET 1.2.1, one copy each.**
   Sereus 1.17 (2026-10-18): the founder commits every declared table's collection (#47), workload
   fixes from #48's counts, owner keys independent of machine identity (`taleus-sereus/node`
   `enrollOwner`: the key in its own key-store slot, enrolled, wired with `useOwnerSigner`), versioned
-  control-schema migrations; control stores from 1.16 or earlier must be recreated. Scenarios
-  (loopback relay, RAM disk): 26 s, forming 14 s (1.16: 34 s / 19 s); at a 176 ms round trip 70 s,
-  forming 47 s, a payment 1.9 s (1.16: 129 s / 66 s / 9 s).
-  **Phone blocked on an Optimystic release:** cadre-rn 1.17's edge node calls `flush()` (and
-  `close()`) on its node-local `LevelDBKVStore`, which only Optimystic's unreleased main has;
-  published `db-p2p-storage-rn` 1.15.0 lacks it, and cadre-rn still asks for `^1.15.0`. The app
-  type-checks and its tests pass (our own session store is wrapped, `flushable` in
-  `engine-cadre.ts`), but on a device the kit's first node-local save would fail. Not a bug to file:
-  Optimystic's main has `flush` and `close`, and cadre-rn's `^1.15.0` takes the next release. Then
-  drop `flushable`.
+  control-schema migrations; control stores from 1.16 or earlier must be recreated.
+  Optimystic 1.16/1.17 (2026-10-20): #41 fixed (nested `listBlockIds`), retries wait a back-off
+  scaled by the declared link round trip (#48), WAL file store (#37), a missing block fetched once
+  (#39), read checks batched per member (#43), #42 groundwork (`pendMany`/`commitMany`, not yet
+  active); 1.17 requires FRET 1.2.1. storage-rn now has `flush`/`close`, so cadre-rn 1.17 runs on
+  the phone kit (our `flushable` wrapper dropped). Scenarios (loopback relay, RAM disk): ~30 s,
+  forming 13 s; at 44 ms each way 60 s, forming 34 s (1.15: 75 s / 47 s).
+  **Regression, not yet filed:** a remote `repo` `cancel` always reads as a failure --
+  `CoordinatorRepo.cancel` returns `void`, `RepoService` sends `JSON.stringify(undefined)` (an
+  empty frame), the client's `JSON.parse('')` throws `Unexpected end of JSON input` -- so the batch
+  is retried on another coordinator after the back-off, whose base is Sereus's declared round trip
+  (`DECLARED_LINK_ROUND_TRIP_MS` 3500). Any write whose pend comes back stale (cancel, then retry)
+  now pays 3.5 s: the scenario's closing chit takes 4.5-5 s (1.15: well under 1 s). Unfixed on
+  Optimystic main. Also seen there: the writer pends against a stale Ledger revision (rev 2, block
+  at 6) though it has already read the counterparty's newer rows (cf. Optimystic#18).
   `taleus-sereus`'s store takes a `StrandNode` (the node methods it uses) rather than the class.
   `@babel/runtime` must be
   ^7.29.2 (older helpers hang Quereus's lock under Hermes; sereus#8).
@@ -53,15 +58,20 @@ citations) is prepared separately for transmission to Nathan; this is the digest
     indexes; a Ledger payment 24) though one commit's trees are one batch; a partial index costs rows
     it excludes. Suggests carrying one commit's trees together per member per phase, deriving
     non-unique indexes locally, and honouring partial predicates. Repro `strand-index-write-cost`.
+    Maintainer: groundwork shipped in 1.17 (not active; held on a mixed-version decision); the
+    partial-index bug split into its own issue.
   - gotchoices/Optimystic#41 (2026-10-19) -- `FileRawStorage.listBlockIds` never lists a block id with a
     `/` (every collection header), so Sereus's join backfill skips them on file storage; fixing the
     listing halves formation at a 176 ms round trip (probe 14 s -> 1.7 s). Plain-Node repro in the issue.
+    **Fixed in 1.16.** Maintainer asked for the drain's one-block-per-request re-push (of blocks the
+    backfill just delivered) as its own issue: re-measure on 1.17, then file.
   - gotchoices/Optimystic#40 (2026-10-15) -- peer-store churn: `findCluster` reads every candidate's
     record per call and libp2p merges on every stream (one per request); ~15% of the S7's JS thread.
     Node repro (`strand-peer-store-churn`).
   - gotchoices/sereus#50 (2026-10-15) -- an idle cadre reads its own control database ~78 times a
     minute (5 s strand-watcher poll and others), each through Optimystic's full read path. Node repro
-    (`cadre-idle-reads`).
+    (`cadre-idle-reads`). Maintainer: reproduced; pollers to become event-driven (`db.watch`);
+    idle reads mostly the control reconcile pass (46%) and the strand watcher (31%).
   - gotchoices/Optimystic#37 (2026-10-14) -- file storage fsyncs every block file separately
     (enhancement: OS-dependent cost; WAL or per-commit flush; the platform durability question).
   - gotchoices/Optimystic#33 (our PR, `cid()` dag-json codec) -- open, no review yet.
