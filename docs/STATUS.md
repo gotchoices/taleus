@@ -12,25 +12,33 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [ ] **Stack: on Sereus 1.17 / Optimystic 1.17 / Quereus 4.20.3 / FRET 1.2.1, one copy each.**
-  Sereus 1.17 (2026-10-18): the founder commits every declared table's collection (#47), workload
-  fixes from #48's counts, owner keys independent of machine identity (`taleus-sereus/node`
-  `enrollOwner`: the key in its own key-store slot, enrolled, wired with `useOwnerSigner`), versioned
-  control-schema migrations; control stores from 1.16 or earlier must be recreated.
-  Optimystic 1.16/1.17 (2026-10-20): #41 fixed (nested `listBlockIds`), retries wait a back-off
-  scaled by the declared link round trip (#48), WAL file store (#37), a missing block fetched once
-  (#39), read checks batched per member (#43), #42 groundwork (`pendMany`/`commitMany`, not yet
-  active); 1.17 requires FRET 1.2.1. storage-rn now has `flush`/`close`, so cadre-rn 1.17 runs on
-  the phone kit (our `flushable` wrapper dropped). Scenarios (loopback relay, RAM disk): ~30 s,
-  forming 13 s; at 44 ms each way 60 s, forming 34 s (1.15: 75 s / 47 s).
-  **Regression, not yet filed:** a remote `repo` `cancel` always reads as a failure --
-  `CoordinatorRepo.cancel` returns `void`, `RepoService` sends `JSON.stringify(undefined)` (an
-  empty frame), the client's `JSON.parse('')` throws `Unexpected end of JSON input` -- so the batch
-  is retried on another coordinator after the back-off, whose base is Sereus's declared round trip
-  (`DECLARED_LINK_ROUND_TRIP_MS` 3500). Any write whose pend comes back stale (cancel, then retry)
-  now pays 3.5 s: the scenario's closing chit takes 4.5-5 s (1.15: well under 1 s). Unfixed on
-  Optimystic main. Also seen there: the writer pends against a stale Ledger revision (rev 2, block
-  at 6) though it has already read the counterparty's newer rows (cf. Optimystic#18).
+- [ ] **Stack: on Sereus 1.18 / Optimystic 1.18 / Quereus 4.20.3 / FRET 1.2.1, one copy each.**
+  Sereus 1.18 (2026-10-22): sereus#50 shipped -- the watcher, reconcile, pending-join and revocation
+  pollers run on table changes with slow backstops; an idle two-party strand sends nothing; the join
+  catch-up sends each block once and reports it with Optimystic 1.18's `reportBlockHeld`, so the
+  drain's duplicate re-push is gone (the issue #41's maintainer asked for is moot); control stores
+  from 1.17 migrate in place. No Taleus code changes needed. Scenarios: 34-61 s (noisy, 2 runs).
+  Profiled at 44 ms each way (`profile-formation --local-relay 44 --count-requests`), against 1.15:
+  accept 28.1 s -> 12.0 s (379 requests in 23 rounds -> 157 in 5), waiting for terms 11.2 s -> 7.0 s,
+  duplicate block pushes 68 -> 2.
+  **Optimystic#47 (filed 2026-10-22): a wake comes before the index it announces.** A replicated
+  commit applies one collection at a time; the table's wakes `db.watch`, its index lands ~0.3 s later
+  and wakes nothing. The inviter reads the invitee's terms with `where Sid = ?` (index
+  `CreditTermsLatest`), sees nothing new, and sleeps until the next poll or the 30 s tick: with
+  Taleus's poll off, waiting for terms takes 15-16 s every run (poll 10 s: 2-11 s). Pushes themselves
+  arrive. Repro `strand-watch-wakes-before-index` (Sereus 1.18 harness, `../sereus-wt-118`): 6 of 6
+  wakes miss the row through the index; settled, the index finds all 6. Keep the 10 s poll until fixed.
+  **Optimystic#48 (filed 2026-10-22): idle cost of the reactivity tick.** With polling off an idle
+  party still sends one `sync` read check per watched table (18) every 30 s (20 s edge):
+  `ReactivityCollectionWatch.tick` reads each tail and the held-block consult crosses to the other
+  member; per-collection timers defeat #43's batching. Their own `armTick` NOTE asks for this. Taleus's
+  10 s backstop poll is about twice that; lengthen it once #47 is fixed.
+  **Optimystic#46 (filed 2026-10-22):** a remote `cancel` that succeeds reads as a failure
+  (`void` reply sent as an empty frame; client `JSON.parse('')` throws), so the batch is retried after
+  the back-off, whose base is Sereus's declared round trip (3500 ms). Any write whose pend is stale
+  pays 3.5 s: the scenario's closing chit takes 4.5-6.6 s on 1.17/1.18. Plain-Node repro in the
+  issue. Also seen: the writer pends against a stale Ledger revision (rev 2, block at 6) though it
+  has already read the counterparty's newer rows (cf. Optimystic#18).
   `taleus-sereus`'s store takes a `StrandNode` (the node methods it uses) rather than the class.
   `@babel/runtime` must be
   ^7.29.2 (older helpers hang Quereus's lock under Hermes; sereus#8).
@@ -63,15 +71,16 @@ citations) is prepared separately for transmission to Nathan; this is the digest
   - gotchoices/Optimystic#41 (2026-10-19) -- `FileRawStorage.listBlockIds` never lists a block id with a
     `/` (every collection header), so Sereus's join backfill skips them on file storage; fixing the
     listing halves formation at a 176 ms round trip (probe 14 s -> 1.7 s). Plain-Node repro in the issue.
-    **Fixed in 1.16.** Maintainer asked for the drain's one-block-per-request re-push (of blocks the
-    backfill just delivered) as its own issue: re-measure on 1.17, then file.
+    **Fixed in 1.16.** The drain's duplicate re-push the maintainer asked about is fixed in
+    Optimystic/Sereus 1.18 (`reportBlockHeld`), from Sereus's own measurement.
   - gotchoices/Optimystic#40 (2026-10-15) -- peer-store churn: `findCluster` reads every candidate's
     record per call and libp2p merges on every stream (one per request); ~15% of the S7's JS thread.
     Node repro (`strand-peer-store-churn`).
   - gotchoices/sereus#50 (2026-10-15) -- an idle cadre reads its own control database ~78 times a
     minute (5 s strand-watcher poll and others), each through Optimystic's full read path. Node repro
     (`cadre-idle-reads`). Maintainer: reproduced; pollers to become event-driven (`db.watch`);
-    idle reads mostly the control reconcile pass (46%) and the strand watcher (31%).
+    idle reads mostly the control reconcile pass (46%) and the strand watcher (31%). **Shipped in
+    Sereus 1.18** (issue still open): re-measure idle reads on the phone.
   - gotchoices/Optimystic#37 (2026-10-14) -- file storage fsyncs every block file separately
     (enhancement: OS-dependent cost; WAL or per-commit flush; the platform durability question).
   - gotchoices/Optimystic#33 (our PR, `cid()` dag-json codec) -- open, no review yet.
