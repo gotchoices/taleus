@@ -81,6 +81,10 @@ function methods(model: TaleusModel, diagnostics: () => unknown, query: StrandQu
 				}),
 			)
 		},
+		/** Accept the terms offered on a tally. */
+		async answerOffer(tallyId: string) {
+			return value(await model.offers.respondToOffer(tallyId, 'accept'))
+		},
 		/** A raw read of one tally's strand database, bypassing the model and its shared reads. */
 		async sql(strandId: string, text: string) {
 			return query(strandId, text)

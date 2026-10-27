@@ -12,33 +12,48 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [ ] **Stack: on Sereus 1.18 / Optimystic 1.18 / Quereus 4.20.3 / FRET 1.2.1, one copy each.**
-  Sereus 1.18 (2026-10-22): sereus#50 shipped -- the watcher, reconcile, pending-join and revocation
-  pollers run on table changes with slow backstops; an idle two-party strand sends nothing; the join
-  catch-up sends each block once and reports it with Optimystic 1.18's `reportBlockHeld`, so the
-  drain's duplicate re-push is gone (the issue #41's maintainer asked for is moot); control stores
-  from 1.17 migrate in place. No Taleus code changes needed. Scenarios: 34-61 s (noisy, 2 runs).
-  Profiled at 44 ms each way (`profile-formation --local-relay 44 --count-requests`), against 1.15:
-  accept 28.1 s -> 12.0 s (379 requests in 23 rounds -> 157 in 5), waiting for terms 11.2 s -> 7.0 s,
-  duplicate block pushes 68 -> 2.
-  **Optimystic#47 (filed 2026-10-22): a wake comes before the index it announces.** A replicated
-  commit applies one collection at a time; the table's wakes `db.watch`, its index lands ~0.3 s later
-  and wakes nothing. The inviter reads the invitee's terms with `where Sid = ?` (index
-  `CreditTermsLatest`), sees nothing new, and sleeps until the next poll or the 30 s tick: with
-  Taleus's poll off, waiting for terms takes 15-16 s every run (poll 10 s: 2-11 s). Pushes themselves
-  arrive. Repro `strand-watch-wakes-before-index` (Sereus 1.18 harness, `../sereus-wt-118`): 6 of 6
-  wakes miss the row through the index; settled, the index finds all 6. Keep the 10 s poll until fixed.
-  **Optimystic#48 (filed 2026-10-22): idle cost of the reactivity tick.** With polling off an idle
-  party still sends one `sync` read check per watched table (18) every 30 s (20 s edge):
-  `ReactivityCollectionWatch.tick` reads each tail and the held-block consult crosses to the other
-  member; per-collection timers defeat #43's batching. Their own `armTick` NOTE asks for this. Taleus's
-  10 s backstop poll is about twice that; lengthen it once #47 is fixed.
-  **Optimystic#46 (filed 2026-10-22):** a remote `cancel` that succeeds reads as a failure
-  (`void` reply sent as an empty frame; client `JSON.parse('')` throws), so the batch is retried after
-  the back-off, whose base is Sereus's declared round trip (3500 ms). Any write whose pend is stale
-  pays 3.5 s: the scenario's closing chit takes 4.5-6.6 s on 1.17/1.18. Plain-Node repro in the
-  issue. Also seen: the writer pends against a stale Ledger revision (rev 2, block at 6) though it
-  has already read the counterparty's newer rows (cf. Optimystic#18).
+- [ ] **Stack: on Sereus 1.19 / Optimystic 1.19 / Quereus 4.21.0 / FRET 1.2.1, one copy each.**
+  Sereus/Optimystic 1.19 (2026-10-26): one commit's tables, indexes and `unique` columns go to each
+  member together (Optimystic#42 active: 3 `cluster` requests per insert at any index count, measured
+  by the chat side); a remote `cancel` reply is read as done (Optimystic#46 fixed); a read's
+  background checks share one request per 32 blocks. Every machine of a party, and the parties of a
+  strand, must move together (a 1.18 join gets nothing from 1.19). No Taleus code changes needed.
+  Scenarios, loopback: 22 s (1.18: 34-61 s); a payment 0.2-0.3 s; the closing chit 0.6-0.9 s
+  (1.18: 4.5-6.6 s). At 44 ms each way: 34.5 s (1.17: 60 s), forming 14.8 s, a payment ~0.75 s, the
+  closing chit 2.1 s. Profiled at 44 ms (`profile-formation --local-relay 44 --count-requests`):
+  accept 7.6-8.7 s (1.18: 12.0 s; 1.15: 28.1 s), waiting for terms 1-2 s (1.18: 7 s with the poll,
+  15-16 s without), a payment 0.6-0.7 s in 9-10 requests (1.18: 1.7 s, 31).
+  **Emulator <-> CLI over relay.sereus.org on 1.19 (2026-10-27, dev build, fresh parties):** onboarding
+  1 s, the emulator's invite 6 s (1.14: 71 s), the CLI's accept 15 s (earlier: 256-533 s), the
+  emulator's offer reached the CLI 7 s later, Open at once, the CLI's $1 at once; the emulator's
+  $2.50 back in 4.2 s; the emulator lists its tally in 91-316 ms (1.15: 208-272 s). Both sides end
+  at $1.50.
+  **S7 <-> CLI (same day, dev build, relay.sereus.org):** onboarding 5 s, the S7's invite 30 s (as
+  before: CPU-bound founding), the CLI's accept 40 s (1.15: 2 min 47 s), the S7's offer 89 s later
+  (1.15: ~3 min), Open and the CLI's $1 at once. But the S7 lags: it saw the tally Open 1 min 50 s
+  after the CLI, its reads took ~16 s then 2-3 s, and its own $2.50 took 117 s. It runs at 150-220%
+  CPU whenever the other party is online, ~30% once it leaves. A 60 s Hermes profile
+  (`scripts/cpu-profile.mjs`, symbolicated through Metro) is 100% busy: Ed25519 `verify` in pure JS
+  15.6% (92% of it cohort-topic gossip: filed **Optimystic#49** -- 216 frames a minute per party
+  while idle, one per watched collection every 5 s, each verified with noble; ~40 ms each on the
+  S7), peer-store `toPeerPB` sort `localeCompare` 6.5% (#40), a native cipher object per Noise
+  message (`createCipheriv` via cadre-rn `noise-crypto`) ~6.6%, WebSocket `sendBinary` 5.3%, young
+  GC 3.4%. Resident memory 503 -> 818 MB over 30 min with two tallies.
+  **First phone-to-phone tally (S7 <-> emulator):** the emulator invited (6 s), the S7 accepted
+  (65 s) and, once the offer arrived, accepted the terms (40 s; dev bridge `answerOffer`); the
+  emulator saw Open within 1 s. Payments: emulator -> S7 written in 16 s, seen 7 s later; S7 ->
+  emulator written in 31.5 s, seen 1 s later. Both end at $2.00.
+  **Optimystic#47 (filed 2026-10-22): fixed by 1.19** (not yet closed). A replicated commit applied
+  one collection at a time, so a table's wake came before its index was readable and the inviter
+  slept until a poll or the 30 s tick. Its repro `strand-watch-wakes-before-index` (copy in
+  `../sereus-wt-118`) passes 2 of 2 on 1.19; with Taleus's poll off, terms now arrive in 1 s.
+  **Optimystic#48 (filed 2026-10-22): mostly addressed by 1.19's batching** (not yet closed). The
+  reactivity tick still reads every watched tail every 30 s (20 s edge), but the held-block checks now
+  share requests: an idle party sends 2-5 `sync` requests a tick, not one per table (18).
+  Taleus's 10 s backstop poll is now the larger idle cost; with #47 fixed it can be lengthened.
+  **Optimystic#46 (filed 2026-10-22): fixed in 1.19** (not yet closed). Also seen while finding it:
+  the writer pends against a stale Ledger revision though it has already read the counterparty's
+  newer rows (the 2.1 s closing chit at 44 ms is likely that retry).
   `taleus-sereus`'s store takes a `StrandNode` (the node methods it uses) rather than the class.
   `@babel/runtime` must be
   ^7.29.2 (older helpers hang Quereus's lock under Hermes; sereus#8).
@@ -61,13 +76,22 @@ citations) is prepared separately for transmission to Nathan; this is the digest
     authorization; 10 s read-repair; libp2p ping; unbounded coordinator retry); #47 first, then
     filed upstream; asked for a rerun on 1.16. Rerun posted 2026-10-16: on 1.16 one run kept the
     strand nodes connected (a first), the other did not; with the link up, 8 and 6 of 8 rounds
-    failed (1.13: 1), deadline events 2-5x; never converged.
+    failed (1.13: 1), deadline events 2-5x; never converged. Maintainer (2026-10-26) asked for a
+    rerun on 1.19. The chat side ran one on a loaded Mac (not posted; `../chat/tmp/handoff-sereus48-1.19.md`):
+    every round's write still failed, seating 331.6 s, FRET marked the strand peer dead 27 times.
+    Two quiet reruns here (load ~2.5-3.5, 2026-10-26), alike: **no operation failed, converged with all
+    8 rows** (a first), 8 rounds 443-445 s (1.16: 603-1056 s), seated 220 s, FRET peer never marked
+    dead, 0 stream resets, 1 commit retry, 19.9k frames (chat run: 91.9k). The `it.fails` still fails
+    only on the DEBUG fault count: 106 "cohort silent", equal to the 106 "consult held" (background
+    held-block checks). CPU load looks decisive. Not posted yet.
   - gotchoices/Optimystic#42 (2026-10-19) -- a write pays 4 `cluster` requests per index (4(k+1) for k
     indexes; a Ledger payment 24) though one commit's trees are one batch; a partial index costs rows
     it excludes. Suggests carrying one commit's trees together per member per phase, deriving
     non-unique indexes locally, and honouring partial predicates. Repro `strand-index-write-cost`.
     Maintainer: groundwork shipped in 1.17 (not active; held on a mixed-version decision); the
-    partial-index bug split into its own issue.
+    partial-index bug split into its own issue. **Active in 1.19:** 3 `cluster` requests per insert at
+    0-5 indexes and for the excluded partial-index row (chat side's measurement, commented on the
+    issue 2026-10-26); a Taleus payment at 44 ms went from 31 requests to 9-10.
   - gotchoices/Optimystic#41 (2026-10-19) -- `FileRawStorage.listBlockIds` never lists a block id with a
     `/` (every collection header), so Sereus's join backfill skips them on file storage; fixing the
     listing halves formation at a 176 ms round trip (probe 14 s -> 1.7 s). Plain-Node repro in the issue.
