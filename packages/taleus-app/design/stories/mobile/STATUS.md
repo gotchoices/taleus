@@ -32,8 +32,8 @@ Group 1 — tally negotiation, one continuous thread (Jan and Sam, carried over 
 | 01 | [Invite a partner](01-invite-a-partner.md) | revised — trusted publishers' agreements; importing one (pending review) |
 | 02 | [Respond to an invitation](02-respond-to-an-invitation.md) | revised — unreadable agreement; unknown publisher (pending review) |
 | 03 | [Negotiate terms](03-negotiate-terms.md) | reviewed |
-| 04 | [First look at an open tally](04-first-look-at-an-open-tally.md) | revised — path B: close request not reversible (pending review) |
-| 05 | [Close a tally](05-close-a-tally.md) | revised — irreversible request; lifts only toward zero; settled by lift or the creditor's chit; closed is final (pending review) |
+| 04 | [First look at an open tally](04-first-look-at-an-open-tally.md) | reviewed |
+| 05 | [Close a tally](05-close-a-tally.md) | reviewed |
 | 06 | [Find a tally](06-find-a-tally.md) | reviewed |
 | 07 | [Review the agreement](07-review-the-agreement.md) | revised — contract read from the tally (pending review) |
 | 08 | [Publishers I trust](08-publishers-i-trust.md) | drafted (pending review) |

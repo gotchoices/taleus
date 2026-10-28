@@ -17,9 +17,7 @@ able to settle.
 ## Sequence
 
 1. Sam requests that the tally be closed.
-2. He is told what that means before it happens: the request cannot be taken back; what he owes does
-   not go away; automatic settling through the network (lifts) will only move the balance toward
-   zero; and the tally ends, for good, when the balance reaches zero.
+2. He is warned before it happens that a close request cannot be taken back.
 3. Jan is notified that the tally is closing. He does not get to refuse it — he keeps everything he is owed,
    and closing does not forgive it.
 4. The tally now shows as closing to both of them. Lifts through it may only move the balance toward
@@ -29,7 +27,7 @@ able to settle.
 5. Sam settles the $180 — all at once, or in pieces over several weeks — in one of two ways: lifts
    carry his debt away through the network, or he gives Jan something Jan accepts (cash, goods, an
    hour's work) and Jan records that he has received it. Jan's record is a chit from the party owed,
-   which lowers the balance; Sam cannot write down his own debt himself.
+   which lowers the balance.
 6. The balance reaches zero and the tally closes for both of them. Closed is final: the tally accepts
    nothing more, not even a properly signed entry.
 7. Both keep the record. A closed tally is still readable: what happened, what was agreed, who the
@@ -98,12 +96,10 @@ able to settle.
 ## Acceptance Criteria
 
 - [ ] Either party can ask to close, at any time, without the other's agreement
-- [ ] The consequences are stated before closing begins: irreversible, the balance still owed, lifts
-      only toward zero, and no further activity once closed
+- [ ] Requesting a close warns that it cannot be taken back
 - [ ] A closing tally takes lifts only toward zero; entries are still recorded, with a warning when
       one would grow the balance
-- [ ] The party owed can record what they received, bringing the balance toward zero; the debtor cannot
-      write down their own debt
+- [ ] The party owed can record what they received, bringing the balance toward zero
 - [ ] Closing does not forgive, reduce, or endanger what is owed
 - [ ] A tally with a settled balance of zero closes; one with a balance stays closing until settled
 - [ ] A creditor may return the balance to bring it to zero, and the tally then closes
