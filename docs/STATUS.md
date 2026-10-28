@@ -398,8 +398,7 @@ without the UI.
   uncaught "Database is closed".
 - [ ] An acceptance that outlives `joinPatienceMs`; reads failing while the counterparty is offline;
   half-committed seating; a signed tally sApp; verify on two phones (all in the ticket).
-- [ ] **Clean-up:** `probe-*.tmp.mjs` at the root and `profile.tmp.cjs` in the app.
-  (`USE_ENGINE`/`USE_CADRE` stay true: Mode C is the app's normal run; mocks only for a temporary need.)
+- `USE_ENGINE`/`USE_CADRE` stay true: Mode C is the app's normal run; mocks only for a temporary need.
 
 ## Contracts (Stroc)
 
