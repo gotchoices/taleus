@@ -306,6 +306,57 @@
         "requestedBy": "me",
         "requested": "2026-09-07T09:00:00Z"
       }
+    },
+    "tally:lee-closed": {
+      "id": "tally:lee-closed",
+      "counterparty": {
+        "sid": "sid:lee-3f07",
+        "name": "Lee Park",
+        "disclosed": {
+          "name": "Lee Park"
+        }
+      },
+      "unit": {
+        "denom": "iso4217:USD",
+        "scale": 2
+      },
+      "balance": {
+        "units": 0,
+        "perspective": "level"
+      },
+      "state": "Closed",
+      "waitingOn": "nobody",
+      "counterpartyReachable": true,
+      "opened": "2025-06-02T15:00:00Z",
+      "agreement": {
+        "id": "cid:bafy-standard-tally-v1",
+        "title": "Standard Tally Agreement",
+        "publisher": "taleus.org",
+        "language": "en"
+      },
+      "terms": {
+        "mine": {
+          "creditLimit": {
+            "units": 50000
+          },
+          "noticeDays": 21,
+          "effective": "2026-03-02"
+        },
+        "theirs": {
+          "creditLimit": {
+            "units": 0
+          },
+          "noticeDays": 21,
+          "effective": "2025-11-14"
+        }
+      },
+      "roomToSpend": {
+        "units": 0
+      },
+      "closing": {
+        "requestedBy": "me",
+        "requested": "2026-08-01T09:00:00Z"
+      }
     }
   }
 }

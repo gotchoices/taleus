@@ -14,6 +14,7 @@
  * Installed only in a development build.
  */
 import type { TaleusModel } from 'taleus-model'
+import { getGeneration } from './generation'
 
 const USD = { denom: 'iso4217:USD', scale: 2 }
 const usd = (units: number) => ({ units, ...USD })
@@ -80,6 +81,18 @@ function methods(model: TaleusModel, diagnostics: () => unknown, query: StrandQu
 					noticeDays: 14,
 				}),
 			)
+		},
+		/** How many times every screen has been told to re-read (`generation.ts`). */
+		async generation() {
+			return getGeneration()
+		},
+		/** Ask to close a tally (not reversible). */
+		async close(tallyId: string) {
+			return value(await model.tally.requestClose(tallyId))
+		},
+		/** What paying `units` would do, before signing it. */
+		async preview(tallyId: string, units: number) {
+			return value(await model.entries.previewEntry(tallyId, usd(units)))
 		},
 		/** Accept the terms offered on a tally. */
 		async answerOffer(tallyId: string) {

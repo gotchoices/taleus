@@ -12,6 +12,7 @@ dependsOn:
   - design/specs/mobile/global/i18n.md
   - design/specs/mobile/global/toolchain.md
   - design/stories/mobile/04-first-look-at-an-open-tally.md
+  - design/stories/mobile/05-close-a-tally.md
   - design/stories/mobile/07-review-the-agreement.md
   - design/generated/mobile/screens/TallyView.md
 depHashes: {}
@@ -35,6 +36,11 @@ depHashes: {}
 - **Disclosure carries a caveat line**: what is absent may be withheld or never held. Story 11's correction, surfaced where a reader would otherwise draw a conclusion.
 - **Requests are a section, not a ledger line**, with a note that only signed entries move the balance (story 24, `rules.md` § Requests).
 - Sections are plain cards; `global/ui.md` owns the tokens and nothing here hardcodes a colour.
+
+**Closing and closed** (stories 04 path B, 05 steps 4 and 6). A closing tally still offers paying,
+asking and the rest: entries are still recorded while it winds down, and its chip says it is winding
+down rather than that nothing more can happen. A closed tally accepts nothing more, so it offers
+nothing to do on it (no pay, ask or close) and keeps its terms and history readable.
 
 ## Navigation
 

@@ -8,7 +8,8 @@
  * <device> matches the inspector page's device name or title (e.g. `SM-G935V`, `sdk_gphone`).
  * Methods: status, onboard <name>, invite [creditLimitUnits] [agreementId], agreements, agreement <cid>,
  * import <link>, sql <tallyId> <sql>, accept <token> <name>
- * [creditLimitUnits], answerOffer <tallyId>, tallies, pay <tallyId> <units> <memo>. Arguments are JSON (a bare word is
+ * [creditLimitUnits], answerOffer <tallyId>, close <tallyId>, preview <tallyId> <units>, generation, tallies,
+ * pay <tallyId> <units> <memo>. Arguments are JSON (a bare word is
  * taken as a string). Prints the outcome as JSON; exits non-zero on an error.
  *
  * METRO_PORT (default 8086) and DRIVE_TIMEOUT_S (default 600) tune it.

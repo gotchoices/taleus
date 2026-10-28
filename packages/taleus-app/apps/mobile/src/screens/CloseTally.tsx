@@ -15,10 +15,9 @@ type Props = ScreenProps<'CloseTally'>
 /**
  * CloseTally (story 05) — winding a tally down.
  *
- * **Consequences before the act** (step 2). Closing is the one thing a party can
- * always do and the other cannot refuse, so the screen states what it costs
- * before asking for it: nothing more builds up, what is owed does not go away,
- * and the tally ends at zero.
+ * **Warned before the act** (step 2). Closing is the one thing a party can
+ * always do and the other cannot refuse, and the request cannot be taken back,
+ * so the screen says that before asking for it.
  *
  * **A closing tally is waiting, not broken** (path C). It can stay this way for
  * a year. The screen says so rather than presenting it as stuck or finished.
@@ -54,8 +53,6 @@ export function CloseTally({ route, navigation }: Props): React.JSX.Element {
 			<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
 				<Card title={t('screens.close-tally.before-title')}>
 					<Text style={styles.body}>{t('screens.close-tally.before-1')}</Text>
-					<Text style={styles.body}>{t('screens.close-tally.before-2')}</Text>
-					<Text style={styles.body}>{t('screens.close-tally.before-3')}</Text>
 					<Text style={styles.caption}>{t('screens.close-tally.no-permission')}</Text>
 				</Card>
 				<Action
@@ -110,8 +107,8 @@ export function CloseTally({ route, navigation }: Props): React.JSX.Element {
 				</Card>
 			) : null}
 
-			{/* The party owing settles; the party owed may hand the balance back —
-			    both are permitted because both move the balance to zero. */}
+			{/* The party owing settles; the party owed may hand the balance back, a chit
+			    from the party owed that brings it to zero (step 5). */}
 			{owed && !owedToMe ? (
 				<Action
 					label={t('screens.close-tally.settle')}

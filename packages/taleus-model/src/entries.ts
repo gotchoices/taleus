@@ -29,6 +29,19 @@ export interface Preview {
 	roomAfter: Amount
 	/** How far past that limit this entry goes, when it goes past it. */
 	beyondLimit?: Amount
+	/**
+	 * Story 05 step 4: the tally is closing and this entry would move its balance away from zero, or
+	 * past it. The entry is still recorded -- a promise is its maker's own -- but the app says so.
+	 */
+	growsClosing?: true
+}
+
+/**
+ * Whether moving a balance from `before` to `after` (signed, this party's side) leaves it no closer
+ * to zero: anything but staying on the same side and shrinking or reaching zero.
+ */
+export function awayFromZero(before: number, after: number): boolean {
+	return Math.sign(after) * Math.sign(before) < 0 || Math.abs(after) > Math.abs(before)
 }
 
 /** What a screen can read and do about entries. Both the mock and the engine implement it. */

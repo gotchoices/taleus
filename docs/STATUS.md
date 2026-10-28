@@ -43,6 +43,20 @@ citations) is prepared separately for transmission to Nathan; this is the digest
   (65 s) and, once the offer arrived, accepted the terms (40 s; dev bridge `answerOffer`); the
   emulator saw Open within 1 s. Payments: emulator -> S7 written in 16 s, seen 7 s later; S7 ->
   emulator written in 31.5 s, seen 1 s later. Both end at $2.00.
+  **Closing on the phones (2026-10-28, after stories 04/05 were reviewed):** the emulator asked to
+  close (8 s), the S7 saw Closing 5 s later; the creditor's previews warn only for an entry that
+  moves the balance away from or past zero (`growsClosing`); the S7's $2.00 settlement (8 s) closed
+  it on both; a further entry is refused (`closed`); TallyView on the closed tally offers no pay, ask
+  or close. Seen on the way: (1) an engine refusal reaches the screen as raw SQL ("CHECK constraint
+  failed: NotClosed (...)") -- `engine/translate.ts` `refused` passes the store's message through,
+  and screens print `error.message`; screens should word refusals by `kind`. (2) TallyView still
+  shows "Room to spend" on a closed tally. (3) A tally list that stayed stale after commits, cured by a
+  full reload: most likely Fast Refresh re-running the notification wiring after a dev-bridge edit
+  (after the reload, commits replicated from the other phone moved the screens' generation 5 -> 36
+  and the list followed). (4) cadre-core reports a failed relay dial as `[object Object]` when the
+  reason is not an `Error` (`relay-reservation.js`, `String(result.reason)`). (5) A second S7 join of
+  an emulator invitation timed out at 120 s ("the inviter's side has not answered") and had not
+  completed minutes later; the first, an hour earlier, took 65 s.
   **Optimystic#47 (filed 2026-10-22): fixed by 1.19** (not yet closed). A replicated commit applied
   one collection at a time, so a table's wake came before its index was readable and the inviter
   slept until a poll or the 30 s tick. Its repro `strand-watch-wakes-before-index` (copy in

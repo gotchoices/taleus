@@ -147,20 +147,26 @@ export function TallyView({ route, navigation }: Props): React.JSX.Element {
 			 * no button. Changing one's own limit is still unsliced, so it is still
 			 * absent.
 			 */}
-			<Action
-				label={t('screens.tally-view.pay')}
-				onPress={() => navigation.navigate('PayPartner', { tallyId: tally.id })}
-			/>
-			<Action
-				label={t('screens.tally-view.ask')}
-				onPress={() => navigation.navigate('CreateRequest', { tallyId: tally.id })}
-				secondary
-			/>
-			<Action
-				label={t('screens.tally-view.close')}
-				onPress={() => navigation.navigate('CloseTally', { tallyId: tally.id })}
-				secondary
-			/>
+			{/* Story 04 step 7.5 / 05 step 6: a closed tally accepts nothing more, so it offers
+			    nothing to do on it; it stays readable. */}
+			{tally.state === 'Closed' ? null : (
+				<>
+					<Action
+						label={t('screens.tally-view.pay')}
+						onPress={() => navigation.navigate('PayPartner', { tallyId: tally.id })}
+					/>
+					<Action
+						label={t('screens.tally-view.ask')}
+						onPress={() => navigation.navigate('CreateRequest', { tallyId: tally.id })}
+						secondary
+					/>
+					<Action
+						label={t('screens.tally-view.close')}
+						onPress={() => navigation.navigate('CloseTally', { tallyId: tally.id })}
+						secondary
+					/>
+				</>
+			)}
 			<Action
 				label={t('screens.tally-view.see-terms')}
 				onPress={() => navigation.navigate('TallyTerms', { tallyId: tally.id })}

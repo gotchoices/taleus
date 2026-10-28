@@ -31,7 +31,8 @@ pledge is the pledger's own promise, and the party holding it has given up nothi
 warned when a pledge goes beyond the limit — the one making it, and the one deciding whether to
 hand over goods for it. Lifts are governed by each party's lift settings (trading variables), not by
 the limits. A close request is irreversible: the tally winds down, accepting chits either way but
-lifts only toward zero, and once it reaches zero it is closed for good — nothing more is recorded.
+lifts only toward zero (a chit that grows the balance is recorded, with a warning), and once it
+reaches zero it is closed for good — nothing more is recorded.
 
 ## Agreements
 

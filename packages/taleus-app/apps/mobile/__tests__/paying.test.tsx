@@ -44,6 +44,18 @@ test('going past the limit warns with how far, and does not block', async () => 
 	await waitFor(() => expect(view.getByText('Recorded')).toBeTruthy())
 })
 
+test('on a closing tally, an entry that grows the balance warns and still signs', async () => {
+	setVariant('closing')
+	// Owed $180: giving $300 carries the balance past zero.
+	const view = await renderScreen(<PayPartner {...screenProps('PayPartner', { tallyId: 'tally:sam-bike' })} />)
+	await waitFor(() => expect(view.getByLabelText('Amount')).toBeTruthy())
+	fireEvent.changeText(view.getByLabelText('Amount'), '300')
+	await waitFor(() => expect(view.getByText('This tally is closing')).toBeTruthy())
+	expect(view.getByText(/It will still be recorded/)).toBeTruthy()
+	fireEvent.press(view.getByRole('button', { name: 'Sign it' }))
+	await waitFor(() => expect(view.getByText('Recorded')).toBeTruthy())
+})
+
 test('an entry needs nobody else s agreement, and lands in the history', async () => {
 	const made = await recordEntry('tally:sam-bike', { actId: 'a1', amount: { units: 4000 }, memo: 'Tube' })
 	expect(made.ok).toBe(true)

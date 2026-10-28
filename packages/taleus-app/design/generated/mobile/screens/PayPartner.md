@@ -12,10 +12,12 @@ dependsOn:
   - design/specs/mobile/global/i18n.md
   - design/specs/mobile/global/toolchain.md
   - design/stories/mobile/20-pay-a-partner.md
+  - design/stories/mobile/05-close-a-tally.md
   - design/generated/mobile/foundation.md
   - design/generated/mobile/screens/PayPartner.md
   - mock/data/tally.happy.json
   - mock/data/tally.error.json
+  - mock/data/tally.closing.json
   - mock/data/entries.happy.json
 depHashes: {}
 ---
@@ -40,6 +42,11 @@ is a pledge the party is entitled to make — refusing to let them make it prote
 counterparty has given up nothing by holding it. The warning names how far past it goes and the
 button stays live. Making the limit a wall would have been the natural reading of a "credit limit",
 and it is the wrong one; `rules.md` § Credit already says limits warn rather than block.
+
+**A closing tally warns too** (story 05 step 4). While a tally is closing, an entry that would move
+its balance away from zero, or past it, is still recorded: a chit is its maker's own promise, and
+closing gates only lifts. `previewEntry` reports it as `growsClosing`, and the screen shows a warning
+alongside the effect; the button stays live. A closed tally refuses the entry (`closed`).
 
 ## Which side of zero
 

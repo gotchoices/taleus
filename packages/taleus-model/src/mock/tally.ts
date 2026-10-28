@@ -27,7 +27,8 @@ export async function readTally(tallyId: string): Promise<Result<TallyDetail>> {
 		value: {
 			...found,
 			closing,
-			state: closing ? 'Closing' : found.state === 'Closing' ? 'Open' : found.state,
+			// Closed is final (story 05 step 6): a close request does not bring it back to closing.
+			state: found.state === 'Closed' ? 'Closed' : closing ? 'Closing' : found.state === 'Closing' ? 'Open' : found.state,
 		},
 	}
 }

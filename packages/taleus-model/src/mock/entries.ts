@@ -3,7 +3,7 @@ import { getVariant } from '../variant.js'
 import { applyToRequest } from './requests.js'
 import { readTally } from './tally.js'
 import type { Amount, Result } from '../types.js'
-import type { Entry, Preview } from '../entries.js'
+import { awayFromZero, type Entry, type Preview } from '../entries.js'
 
 /** A tally's signed entries, most recent first (story 24). */
 export async function listEntries(tallyId: string): Promise<Result<Entry[]>> {
@@ -69,6 +69,7 @@ export async function previewEntry(tallyId: string, amount: Amount): Promise<Res
 			},
 			roomAfter: { units: Math.max(0, room) },
 			beyondLimit: room < 0 ? { units: -room } : undefined,
+			growsClosing: tally.value.closing && awayFromZero(before, after) ? true : undefined,
 		},
 	}
 }
@@ -107,34 +108,17 @@ export async function recordEntry(
 		}
 	}
 	const already = (recorded[tallyId] ?? []).find(e => e.id === `entry:${entry.actId}`)
-	// Story 05 step 4: while closing, what each party may do has narrowed to one
-	// direction. Anything moving the balance toward zero goes through; anything
-	// moving it further from zero does not. Closing does not forgive what is owed,
-	// so settling is exactly what stays allowed.
-	if (tally.value.closing) {
-		const owedToMe = tally.value.balance.perspective === 'owed-to-me'
-		const settled = tally.value.balance.units === 0
-		// Value given moves the balance away from zero when this party is already
-		// the one owing, or when nothing is owed either way.
-		if (!owedToMe || settled) {
-			return {
-				ok: false,
-				error: {
-					kind: 'closing',
-					message: 'This tally is closing, so only what settles it can go through.',
-					retryable: false,
-				},
-			}
-		}
-		if (entry.amount.units > tally.value.balance.units) {
-			return {
-				ok: false,
-				error: {
-					kind: 'closing-overshoot',
-					message: 'That is more than is outstanding, which would move the balance past zero.',
-					retryable: false,
-				},
-			}
+	// Story 05 step 6: closed is final, and the tally accepts nothing more, however it is signed.
+	// While it is only closing, an entry is still the maker's own promise and is recorded; the
+	// warning when it grows the balance comes with the preview (step 4).
+	if (tally.value.state === 'Closed') {
+		return {
+			ok: false,
+			error: {
+				kind: 'closed',
+				message: 'This tally has closed, so nothing more can be recorded on it.',
+				retryable: false,
+			},
 		}
 	}
 	if (seen.has(entry.actId) && already) {

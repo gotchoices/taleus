@@ -3,7 +3,7 @@
  */
 import type { Entry as CoreEntry, PaymentRequest as CorePaymentRequest, Tally, TallyView } from 'taleus-core'
 
-import type { EntriesModel, Entry, Preview } from '../entries.js'
+import { awayFromZero, type EntriesModel, type Entry, type Preview } from '../entries.js'
 import type { PaymentRequest, RequestsModel } from '../requests.js'
 import { daysSince, type Unit } from '../types.js'
 import type { Session } from './session.js'
@@ -63,12 +63,14 @@ export function entriesModel(session: Session): EntriesModel {
 			if (!found) return failed<Preview>('not-found', `no tally ${tallyId}`)
 			const { view, unit } = found
 			// Paying lowers this party's balance and uses this party's room to spend.
-			const after = view.balances.settled.units - paying.units
+			const before = view.balances.settled.units
+			const after = before - paying.units
 			const room = view.balances.capacity.canSend.units - paying.units
 			return ok({
 				balanceAfter: balanceOf(after, unit),
 				roomAfter: amount(Math.max(0, room), unit),
 				...(room < 0 ? { beyondLimit: amount(-room, unit) } : {}),
+				...(view.state === 'closing' && awayFromZero(before, after) ? { growsClosing: true as const } : {}),
 			})
 		},
 

@@ -160,6 +160,13 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 				</Card>
 			) : null}
 
+			{/* Story 05 step 4: a closing tally still records the entry; it only says so. */}
+			{preview?.growsClosing ? (
+				<Card title={t('screens.pay-partner.closing-title')}>
+					<Text style={styles.caption}>{t('screens.pay-partner.closing-body')}</Text>
+				</Card>
+			) : null}
+
 			{failure ? (
 				<Card title={t('screens.pay-partner.failed-title')}>
 					<Text style={styles.caption}>{failure.message}</Text>
