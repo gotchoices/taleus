@@ -40,7 +40,8 @@ depHashes: {}
 **Closing and closed** (stories 04 path B, 05 steps 4 and 6). A closing tally still offers paying,
 asking and the rest: entries are still recorded while it winds down, and its chip says it is winding
 down rather than that nothing more can happen. A closed tally accepts nothing more, so it offers
-nothing to do on it (no pay, ask or close) and keeps its terms and history readable.
+nothing to do on it (no pay, ask or close), shows no room to spend, and keeps its terms and history
+readable.
 
 ## Navigation
 

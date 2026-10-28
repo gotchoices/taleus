@@ -6,7 +6,7 @@ import { previewEntry, recordEntry, type Preview } from '../data/entries'
 import { readTally, type TallyDetail } from '../data/tally'
 import type { DataError } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
-import { t } from '../i18n'
+import { errorText, t } from '../i18n'
 import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
@@ -169,7 +169,7 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 
 			{failure ? (
 				<Card title={t('screens.pay-partner.failed-title')}>
-					<Text style={styles.caption}>{failure.message}</Text>
+					<Text style={styles.caption}>{errorText(failure)}</Text>
 					<Text style={styles.caption}>{t('screens.pay-partner.nothing-changed')}</Text>
 				</Card>
 			) : null}

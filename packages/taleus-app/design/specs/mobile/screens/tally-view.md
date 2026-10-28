@@ -3,7 +3,7 @@
 ---
 id: tally-view
 route: TallyView
-variants: [happy, error]
+variants: [happy, error, closing]
 ---
 
 Stories 04 and 07 say what this screen is for. Only the correction is here.
@@ -19,4 +19,4 @@ Stories 04 and 07 say what this screen is for. Only the correction is here.
 - The `error` variant is an unreachable counterparty; the tally still reads (story 04 path C).
 - Two scenes worth reviewing are different tallies inside the happy fixture rather than variants: a
   new tally with a zero balance, and one in a unit that divides by sixty.
-- Acting on terms, closing, and paying are separate screens, not yet sliced.
+- The `closing` variant holds a closing tally and a closed one.

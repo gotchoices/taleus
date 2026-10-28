@@ -5,7 +5,7 @@ import { Action, Amount, Card, Empty, Failed, FormScroll, Loading, OpenableRow, 
 import { DEFAULT_NOTICE_DAYS, readInvitation, respondToInvitation, type OpenInvitation } from '../data/invitations'
 import { trustAgreement, trustPublisher } from '../data/publishers'
 import { useLoad } from '../hooks/useLoad'
-import { t } from '../i18n'
+import { errorText, t } from '../i18n'
 import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
@@ -80,7 +80,7 @@ export function ReviewInvitation({ route, navigation }: Props): React.JSX.Elemen
 			noticeDays: Number(notice || '0'),
 		})
 		if (!result.ok) {
-			setProblem(result.error.message)
+			setProblem(errorText(result.error))
 			return
 		}
 		if (result.value === 'accepted' && askTrust) {

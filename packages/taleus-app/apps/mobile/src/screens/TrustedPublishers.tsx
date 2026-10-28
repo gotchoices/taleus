@@ -4,7 +4,7 @@ import { Text, View } from 'react-native'
 import { Action, Card, Failed, FormScroll, Input, Loading, Row } from '../components'
 import { listTrusted, trustPublisher, untrustPublisher, type TrustedPublisher } from '../data/publishers'
 import { useLoad } from '../hooks/useLoad'
-import { t } from '../i18n'
+import { errorText, t } from '../i18n'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, spacing, type as typography, type Tokens } from '../theme'
 import { formatCivilDate } from '../util/date'
@@ -37,7 +37,7 @@ export function TrustedPublishers(_props: Props): React.JSX.Element {
 		setProblem(undefined)
 		const result = await trustPublisher(name)
 		if (!result.ok) {
-			setProblem(result.error.message)
+			setProblem(errorText(result.error))
 			return
 		}
 		setName('')
@@ -48,7 +48,7 @@ export function TrustedPublishers(_props: Props): React.JSX.Element {
 		const result = await untrustPublisher(domain)
 		setRemoving(undefined)
 		if (!result.ok) {
-			setProblem(result.error.message)
+			setProblem(errorText(result.error))
 			return
 		}
 		reload()

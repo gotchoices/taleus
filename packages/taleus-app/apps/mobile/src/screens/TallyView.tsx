@@ -99,11 +99,14 @@ export function TallyView({ route, navigation }: Props): React.JSX.Element {
 					note={`${t('screens.tally-view.notice-days', { count: tally.terms.theirs.noticeDays, days: tally.terms.theirs.noticeDays })} · ${t('screens.tally-view.effective-since', { date: formatCivilDate(tally.terms.theirs.effective) })}`}
 					value={<Amount value={tally.terms.theirs.creditLimit} unit={tally.unit} />}
 				/>
-				<Row
-					label={t('screens.tally-view.room-to-spend')}
-					note={t('screens.tally-view.room-note')}
-					value={<Amount value={tally.roomToSpend} unit={tally.unit} />}
-				/>
+				{/* A closed tally has nothing left to spend against. */}
+				{tally.state === 'Closed' ? null : (
+					<Row
+						label={t('screens.tally-view.room-to-spend')}
+						note={t('screens.tally-view.room-note')}
+						value={<Amount value={tally.roomToSpend} unit={tally.unit} />}
+					/>
+				)}
 			</Card>
 
 			<Card title={t('screens.tally-view.agreement-title')}>

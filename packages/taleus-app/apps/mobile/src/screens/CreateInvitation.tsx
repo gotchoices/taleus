@@ -16,7 +16,7 @@ import { buildInviteLink } from '../data/inviteLink'
 import { trustAgreement, trustPublisher } from '../data/publishers'
 import type { Unit } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
-import { t } from '../i18n'
+import { errorText, t } from '../i18n'
 import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
@@ -83,7 +83,7 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 		setFound(undefined)
 		const result = await importAgreement(link.trim())
 		if (!result.ok) {
-			setLinkProblem(result.error.message)
+			setLinkProblem(errorText(result.error))
 			return
 		}
 		setFound(result.value)
@@ -112,7 +112,7 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 				goodForDays: days,
 			})
 			if (!result.ok) {
-				setFailed(result.error.message)
+				setFailed(errorText(result.error))
 				return
 			}
 			setMade(result.value)

@@ -1,4 +1,4 @@
-import { getLocale, t } from '../src/i18n'
+import { errorText, getLocale, t } from '../src/i18n'
 
 /**
  * These are about the runtime, not about the strings.
@@ -95,5 +95,17 @@ describe('currency names', () => {
 		// `Intl.DisplayNames` is absent on Hermes; the polyfill is what makes this
 		// answer at all, and without it the app fell back to a fixture label.
 		expect(new Intl.DisplayNames(['en'], { type: 'currency' }).of('USD')).toBe('US Dollar')
+	})
+})
+
+describe('errors as a person reads them', () => {
+	test("an engine refusal is worded by its kind, not by the store's text", () => {
+		const raw = 'closed: CHECK constraint failed: NotClosed (not exists (select 1 from TallyClosed))'
+		expect(errorText({ kind: 'closed', message: raw })).toBe('This tally has closed, so nothing more can be recorded on it.')
+	})
+
+	test('a kind without wording keeps the message written for people', () => {
+		const message = 'Nothing of theirs is reachable, so this did not go through.'
+		expect(errorText({ kind: 'counterparty-unreachable', message })).toBe(message)
 	})
 })

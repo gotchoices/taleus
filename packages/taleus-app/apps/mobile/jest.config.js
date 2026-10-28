@@ -1,3 +1,8 @@
+// The fixtures' instants are shown in the device's zone, so a date near midnight UTC read one day on
+// a Mountain-time machine and the day before on a Pacific one. Pinned, as the clock is below; set
+// before jest starts its workers, which inherit it.
+process.env.TZ = 'UTC'
+
 module.exports = {
 	preset: '@react-native/jest-preset',
 	// Strips the `Intl` constructors Hermes lacks, then loads the app's polyfills,

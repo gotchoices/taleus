@@ -4,7 +4,7 @@ import { Text, TextInput, View } from 'react-native'
 import { Action, Card, FormScroll } from '../components'
 import { setDisplayName } from '../data/party'
 import type { DataError } from '../data/types'
-import { t } from '../i18n'
+import { errorText, t } from '../i18n'
 import type { OnboardingProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 
@@ -78,7 +78,7 @@ export function ChooseName({ onDone }: Props & { onDone?: () => void }): React.J
 			{error ? (
 				<Text style={styles.error}>
 					{t('screens.choose-name.failed-title')}
-					{error.message ? ` — ${error.message}` : ''}
+					{error.message ? ` — ${errorText(error)}` : ''}
 				</Text>
 			) : null}
 

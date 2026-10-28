@@ -6,7 +6,7 @@ import { createRequest } from '../data/requests'
 import { readTally } from '../data/tally'
 import type { DataError } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
-import { t } from '../i18n'
+import { errorText, t } from '../i18n'
 import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
@@ -98,7 +98,7 @@ export function CreateRequest({ route }: Props): React.JSX.Element {
 				<Text style={styles.caption}>{t('screens.create-request.obliges-nothing')}</Text>
 			</Card>
 
-			{failure ? <Text style={styles.error}>{failure.message}</Text> : null}
+			{failure ? <Text style={styles.error}>{errorText(failure)}</Text> : null}
 			<Action label={t('screens.create-request.send')} onPress={units ? () => void ask() : undefined} />
 		</FormScroll>
 	)

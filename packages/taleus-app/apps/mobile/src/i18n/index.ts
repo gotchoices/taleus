@@ -79,6 +79,16 @@ export function t(key: string, params?: Params): string {
 }
 
 /**
+ * An error as a person reads it. A refusal from the engine carries its store's own text (a
+ * constraint, a stack of causes), which is for logs, not people; its `kind` is what the screen
+ * words. A kind without wording here keeps its message, which the mock writes for people.
+ */
+export function errorText(error: { kind: string; message: string }): string {
+	const key = `errors.${error.kind}`
+	return i18next.exists(key) ? t(key) : error.message
+}
+
+/**
  * Whether a locale the app carries also has its `Intl` data loaded. A bundle
  * without plural rules for its language is worse than no bundle: every count
  * would silently take the `_other` form.

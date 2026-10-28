@@ -110,6 +110,7 @@ test('a closed tally offers nothing to do on it, and stays readable', async () =
 	expect(view.queryByRole('button', { name: 'Record value given' })).toBeNull()
 	expect(view.queryByRole('button', { name: 'Close this tally' })).toBeNull()
 	expect(view.getByRole('button', { name: 'See history' })).toBeTruthy()
+	expect(view.queryByText('Room to spend')).toBeNull()
 })
 
 test('a closing tally still offers paying, and says it is winding down', async () => {

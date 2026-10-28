@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 
-import { t } from '../i18n'
+import { errorText, t } from '../i18n'
 import { useStyles, useTokens, spacing, type as typography, type Tokens } from '../theme'
 import type { DataError } from '../data/types'
 import { Action } from './Card'
@@ -41,7 +41,7 @@ export function Failed({
 		<View style={[styles.fill, styles.centred]}>
 			<View style={styles.banner}>
 				<Text style={styles.title}>{title}</Text>
-				{error?.message ? <Text style={styles.caption}>{error.message}</Text> : null}
+				{error?.message ? <Text style={styles.caption}>{errorText(error)}</Text> : null}
 			</View>
 			{error?.retryable && onRetry ? <Action label={t('common.retry')} onPress={onRetry} /> : null}
 		</View>

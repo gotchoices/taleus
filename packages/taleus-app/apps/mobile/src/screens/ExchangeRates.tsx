@@ -14,7 +14,7 @@ import {
 import type { HeldUnit } from '../data/settings'
 import type { DataError, Unit } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
-import { t } from '../i18n'
+import { errorText, t } from '../i18n'
 import { useStyles, spacing, type as typography, type Tokens } from '../theme'
 import { divisorOf, unitLabel } from '../util/amount'
 import { formatInstant } from '../util/date'
@@ -345,7 +345,7 @@ function Editor({
 
 			{failure ? (
 				<Text style={styles.warning}>
-					{failure.kind === 'inverted' ? t('screens.rates.inverted') : failure.message}
+					{failure.kind === 'inverted' ? t('screens.rates.inverted') : errorText(failure)}
 				</Text>
 			) : null}
 
