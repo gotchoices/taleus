@@ -10,7 +10,7 @@
       "amount": {
         "units": 1500,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "waitingSince": "2026-09-01T09:00:00Z",
       "route": "RequestView",
@@ -28,7 +28,7 @@
       "amount": {
         "units": 2200,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "waitingSince": "2026-09-02T09:00:00Z",
       "route": "ReviewOffer",
@@ -44,7 +44,7 @@
       "amount": {
         "units": 2900,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "waitingSince": "2026-09-03T09:00:00Z",
       "route": "RequestView",
@@ -62,7 +62,7 @@
       "amount": {
         "units": 3600,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "waitingSince": "2026-09-04T09:00:00Z",
       "route": "ReviewOffer",
@@ -78,7 +78,7 @@
       "amount": {
         "units": 4300,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "waitingSince": "2026-09-05T09:00:00Z",
       "route": "RequestView",
@@ -96,7 +96,7 @@
       "amount": {
         "units": 5000,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "waitingSince": "2026-09-06T09:00:00Z",
       "route": "ReviewOffer",
@@ -112,7 +112,7 @@
       "amount": {
         "units": 5700,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "waitingSince": "2026-09-07T09:00:00Z",
       "route": "RequestView",
@@ -130,7 +130,7 @@
       "amount": {
         "units": 6400,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "waitingSince": "2026-09-01T09:00:00Z",
       "route": "ReviewOffer",
@@ -146,7 +146,7 @@
       "amount": {
         "units": 7100,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "waitingSince": "2026-09-02T09:00:00Z",
       "route": "RequestView",
@@ -164,7 +164,7 @@
       "amount": {
         "units": 7800,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "waitingSince": "2026-09-03T09:00:00Z",
       "route": "ReviewOffer",
@@ -193,7 +193,7 @@
       "amount": {
         "units": 50000,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "route": "ReviewOffer",
       "arrived": "2026-09-03T09:00:00Z",
@@ -211,7 +211,7 @@
       "amount": {
         "units": 4000,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "route": "RequestView",
       "arrived": "2026-08-28T09:00:00Z",
@@ -228,7 +228,6 @@
       "amount": {
         "units": 600,
         "denom": "cid:bafy-dave-hours",
-        "scale": 0,
         "divisor": 60,
         "code": "DVH",
         "mark": "DH",
@@ -249,7 +248,7 @@
       "amount": {
         "units": 1800,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "route": "RequestView",
       "arrived": "2026-08-12T11:00:00Z",

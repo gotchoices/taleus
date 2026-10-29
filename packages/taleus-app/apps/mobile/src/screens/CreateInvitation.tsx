@@ -17,7 +17,6 @@ import { trustAgreement, trustPublisher } from '../data/publishers'
 import type { Unit } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { errorText, t } from '../i18n'
-import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 import { formatInstant } from '../util/date'
@@ -27,8 +26,8 @@ type Props = ScreenProps<'CreateInvitation'>
 
 /** The units a party may denominate a new tally in (story 01 step 5). */
 const units: Unit[] = [
-	{ denom: 'iso4217:USD', scale: 2, code: 'USD' },
-	{ denom: 'CHIP', scale: 3, code: 'CHIP' },
+	{ denom: 'iso4217:USD', divisor: 100, code: 'USD' },
+	{ denom: 'CHIP', divisor: 1000, code: 'CHIP' },
 ]
 
 const goodFor = [
@@ -97,7 +96,7 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 		setLink('')
 		reload()
 	}
-	const amount = { units: Math.round(Number(limit || '0') * divisorOf(unit)) }
+	const amount = { units: Math.round(Number(limit || '0') * unit.divisor) }
 
 	const share = async () => {
 		setFailed(undefined)

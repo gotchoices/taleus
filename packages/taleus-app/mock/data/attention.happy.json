@@ -10,7 +10,7 @@
       "amount": {
         "units": 100000,
         "denom": "CHIP",
-        "scale": 3
+        "divisor": 1000
       },
       "waitingSince": "2026-09-05T07:30:00Z",
       "route": "ReviewOffer",
@@ -27,7 +27,7 @@
       "amount": {
         "units": 2500,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "waitingSince": "2026-09-04T11:05:00Z",
       "route": "RequestView",
@@ -58,7 +58,7 @@
       "amount": {
         "units": 50000,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "route": "ReviewOffer",
       "arrived": "2026-09-03T09:00:00Z",
@@ -76,7 +76,7 @@
       "amount": {
         "units": 4000,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "route": "RequestView",
       "arrived": "2026-08-28T09:00:00Z",
@@ -93,7 +93,6 @@
       "amount": {
         "units": 600,
         "denom": "cid:bafy-dave-hours",
-        "scale": 0,
         "divisor": 60,
         "code": "DVH",
         "mark": "DH",
@@ -114,7 +113,7 @@
       "amount": {
         "units": 1800,
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "route": "RequestView",
       "arrived": "2026-08-12T11:00:00Z",

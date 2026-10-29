@@ -103,7 +103,7 @@ test('publishing waits on the party saying they understand', async () => {
 test('what is published is a link a person can hand over', async () => {
 	setVariant('empty')
 	const published = await publishStanding({
-		unit: { denom: 'iso4217:USD', scale: 2 },
+		unit: { denom: 'iso4217:USD', divisor: 100 },
 		creditLimit: { units: 0 },
 		noticeDays: 14,
 		agreementId: 'cid:bafy-standard-tally-v1',

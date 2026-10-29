@@ -17,14 +17,14 @@ export type CivilDate = string
 export type Instant = string
 
 /**
- * A whole number of a unit's smallest part. `{ units: 18000 }` on a scale-2
- * dollar tally is $180.00. Never a decimal, never combined across units except
- * through an explicit estimate.
+ * A whole number of a unit's smallest part. `{ units: 18000 }` on a dollar
+ * tally (divisor 100) is $180.00. Never a decimal, never combined across units
+ * except through an explicit estimate.
  */
 export interface Amount {
 	units: number
 	denom?: string
-	scale?: number
+	divisor?: number
 }
 
 /**
@@ -32,13 +32,11 @@ export interface Amount {
  *
  * It has to carry the *whole* unit, not just the denomination: a figure in a
  * unit that divides by sixty renders as six hundred rather than ten without its
- * divisor, and one with a mark of its own loses it. `denom` and `scale` alone
- * were enough only while every such amount happened to be dollars.
+ * divisor, and one with a mark of its own loses it.
  */
 export interface UnitAmount extends Amount {
 	denom: string
-	scale: number
-	divisor?: number
+	divisor: number
 	code?: string
 	mark?: string
 	label?: string
@@ -48,7 +46,6 @@ export interface UnitAmount extends Amount {
 export function unitOf(amount: UnitAmount): Unit {
 	return {
 		denom: amount.denom,
-		scale: amount.scale,
 		divisor: amount.divisor,
 		code: amount.code,
 		mark: amount.mark,
@@ -66,16 +63,14 @@ export interface Balance extends Amount {
 /**
  * A unit of account, as the apps need it — `design/specs/domain/amounts.md`.
  *
- * `divisor` is how many smallest parts make one whole and is the general fact;
- * `scale` states it as a power of ten, which covers every unit the engine hands
- * over today. A unit that divides some other way — sixty minutes to an hour —
- * carries `divisor` instead, and is the reason the apps prefer it.
+ * `divisor` is how many smallest parts make one whole — any whole number, so a
+ * unit that divides by sixty is said as plainly as one that divides by a hundred.
+ * It is the tally contract's own `DenominationDivisor`.
  */
 export interface Unit {
 	denom: string
-	scale: number
-	/** Overrides `10 ** scale`; the only way to say a non-decimal subdivision. */
-	divisor?: number
+	/** How many of its smallest parts make one whole: 100 for cents, 60 for minutes of an hour. */
+	divisor: number
 	/** Short code, always safe to show. Standard units take theirs from the standard. */
 	code?: string
 	/**

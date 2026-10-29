@@ -173,17 +173,17 @@ class TallyEngine implements Tally {
 		return core
 	}
 
-	private async denomination(): Promise<{ code: string; scale: number }> {
-		const row = await this.one<{ Denomination: string; DenominationScale: number }>(
-			'select Denomination, DenominationScale from App.TallyContract order by Number desc limit 1',
+	private async denomination(): Promise<{ code: string; divisor: number }> {
+		const row = await this.one<{ Denomination: string; DenominationDivisor: number }>(
+			'select Denomination, DenominationDivisor from App.TallyContract order by Number desc limit 1',
 		)
 		const proposal = row
 			? undefined
-			: await this.one<{ Denomination: string; DenominationScale: number }>(
-					'select Denomination, DenominationScale from App.TallyContractProposal',
+			: await this.one<{ Denomination: string; DenominationDivisor: number }>(
+					'select Denomination, DenominationDivisor from App.TallyContractProposal',
 				)
 		const chosen = row ?? proposal
-		return { code: chosen?.Denomination ?? 'CHIP', scale: chosen?.DenominationScale ?? 0 }
+		return { code: chosen?.Denomination ?? 'CHIP', divisor: chosen?.DenominationDivisor ?? 1 }
 	}
 
 	private async state(): Promise<TallyState> {
@@ -204,7 +204,7 @@ class TallyEngine implements Tally {
 	 * member, and a dozen waits taken in turn are a dozen times one.
 	 */
 	async read(): Promise<TallyView> {
-		const [core, { code, scale }] = await Promise.all([this.core(), this.denomination()])
+		const [core, { code, divisor }] = await Promise.all([this.core(), this.denomination()])
 		const mySid = this.env.sid
 		const theirSid = core ? (core.StockSid === mySid ? core.FoilSid : core.StockSid) : ''
 		const [state, myCertificate, theirCertificate, balances, myTerms, theirTerms, myTrading, theirTrading, contract, offer, close] =
@@ -226,7 +226,7 @@ class TallyEngine implements Tally {
 			role: this.role,
 			state,
 			denomination: code,
-			denominationScale: scale,
+			denominationDivisor: divisor,
 			me: identity(mySid, myCertificate),
 			counterparty: identity(theirSid, theirCertificate),
 			balances,
@@ -567,8 +567,8 @@ class TallyEngine implements Tally {
 					proposer: this.side,
 					...revisions,
 					...(offer.denomination ? { denomination: offer.denomination } : {}),
-					...(offer.denominationScale !== undefined
-						? { denominationScale: offer.denominationScale }
+					...(offer.denominationDivisor !== undefined
+						? { denominationDivisor: offer.denominationDivisor }
 						: {}),
 					signer,
 				}),
@@ -585,7 +585,7 @@ class TallyEngine implements Tally {
 				StockCreditTermsRevision: number
 				FoilCreditTermsRevision: number
 				Denomination: string
-				DenominationScale: number
+				DenominationDivisor: number
 				SignerKey: string
 				ContractSignature: string
 			}>('select * from App.TallyContractProposal')
@@ -599,7 +599,7 @@ class TallyEngine implements Tally {
 					stockCreditTermsRevision: proposal.StockCreditTermsRevision,
 					foilCreditTermsRevision: proposal.FoilCreditTermsRevision,
 					denomination: proposal.Denomination,
-					denominationScale: proposal.DenominationScale,
+					denominationDivisor: proposal.DenominationDivisor,
 					proposer: proposal.Proposer,
 					proposerSignerKey: proposal.SignerKey,
 					proposerSignature: proposal.ContractSignature,

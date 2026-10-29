@@ -3,7 +3,7 @@
   "perUnit": [
     {
       "denom": "iso4217:USD",
-      "scale": 2,
+      "divisor": 100,
       "owedToMe": {
         "units": 22200
       },
@@ -13,7 +13,6 @@
     },
     {
       "denom": "cid:bafy-dave-hours",
-      "scale": 0,
       "label": "Dave-hours",
       "owedToMe": {
         "units": 367
@@ -27,7 +26,7 @@
     },
     {
       "denom": "CHIP",
-      "scale": 3,
+      "divisor": 1000,
       "owedToMe": {
         "units": 0
       },
@@ -38,7 +37,7 @@
   ],
   "estimate": {
     "unit": "iso4217:USD",
-    "scale": 2,
+    "divisor": 100,
     "owedToMe": {
       "units": 22200
     },
@@ -65,12 +64,12 @@
     "heldByOthers": {
       "units": 22200,
       "denom": "iso4217:USD",
-      "scale": 2
+      "divisor": 100
     },
     "creditExtendedToMe": {
       "units": 15750,
       "denom": "iso4217:USD",
-      "scale": 2
+      "divisor": 100
     }
   }
 }

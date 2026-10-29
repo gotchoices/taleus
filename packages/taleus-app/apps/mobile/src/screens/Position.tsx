@@ -76,7 +76,6 @@ export function Position({ navigation }: Props): React.JSX.Element {
 function UnitCard({ position }: { position: PerUnitPosition }): React.JSX.Element {
 	const unit: Unit = {
 		denom: position.denom,
-		scale: position.scale,
 		divisor: position.divisor,
 		code: position.code,
 		mark: position.mark,
@@ -98,7 +97,7 @@ function UnitCard({ position }: { position: PerUnitPosition }): React.JSX.Elemen
 
 function EstimateCard({ estimate }: { estimate: Estimate }): React.JSX.Element {
 	const styles = useStyles(make)
-	const unit: Unit = { denom: estimate.unit, scale: estimate.scale }
+	const unit: Unit = { denom: estimate.unit, divisor: estimate.divisor }
 	return (
 		<Card title={t('screens.position.estimate-title')}>
 			{/* Story 40 step 2: owed and owing are shown separately here too, not

@@ -74,7 +74,7 @@ export interface ContractTerms {
 	stockCreditTermsRevision: number
 	foilCreditTermsRevision: number
 	denomination?: string
-	denominationScale?: number
+	denominationDivisor?: number
 }
 
 /** The one message a contract's two signatures both cover. */
@@ -86,7 +86,7 @@ export function contractDigest(terms: ContractTerms): string {
 		terms.stockCreditTermsRevision,
 		terms.foilCreditTermsRevision,
 		terms.denomination ?? 'CHIP',
-		terms.denominationScale ?? 0,
+		terms.denominationDivisor ?? 1,
 	)
 }
 
@@ -99,7 +99,7 @@ export interface ContractOffer {
 	stockCreditTermsRevision: number
 	foilCreditTermsRevision: number
 	denomination?: string
-	denominationScale?: number
+	denominationDivisor?: number
 	signer: KeyPairText
 }
 
@@ -123,7 +123,7 @@ export function proposeContract(offer: ContractOffer): RowWrite {
 			StockCreditTermsRevision: offer.stockCreditTermsRevision,
 			FoilCreditTermsRevision: offer.foilCreditTermsRevision,
 			Denomination: offer.denomination ?? 'CHIP',
-			DenominationScale: offer.denominationScale ?? 0,
+			DenominationDivisor: offer.denominationDivisor ?? 1,
 			SignerKey: offer.signer.publicKey,
 			Signature: signText(
 				offer.signer,
@@ -135,7 +135,7 @@ export function proposeContract(offer: ContractOffer): RowWrite {
 					offer.stockCreditTermsRevision,
 					offer.foilCreditTermsRevision,
 					offer.denomination ?? 'CHIP',
-					offer.denominationScale ?? 0,
+					offer.denominationDivisor ?? 1,
 				),
 			),
 			ContractSignature: signText(
@@ -181,7 +181,7 @@ export function signContract(contract: SignedContract): RowWrite {
 			StockCreditTermsRevision: contract.stockCreditTermsRevision,
 			FoilCreditTermsRevision: contract.foilCreditTermsRevision,
 			Denomination: contract.denomination ?? 'CHIP',
-			DenominationScale: contract.denominationScale ?? 0,
+			DenominationDivisor: contract.denominationDivisor ?? 1,
 			StockSignerKey: stockIsProposer ? contract.proposerSignerKey : contract.accepter.publicKey,
 			StockSignature: stockIsProposer ? contract.proposerSignature : mine,
 			FoilSignerKey: stockIsProposer ? contract.accepter.publicKey : contract.proposerSignerKey,

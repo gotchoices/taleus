@@ -6,7 +6,7 @@
  * interprets. This module builds those term records from the three Taleus data
  * sources a hop draws on:
  *
- *   - the edge's `TallyContract`      → denomination + scale;
+ *   - the edge's `TallyContract`      → denomination + divisor;
  *   - the strand's `LiftLading` view  → movable capacity + fee, off the *reserved*
  *                                       balance (an open pledge already shrinks it);
  *   - the party's private portfolio    → the intermediary's `ExchangeRateQuote` for
@@ -26,7 +26,7 @@
  * without a live Quereus strand or cadre.
  *
  * NOTE: WIRE SERIALIZATION. Capacities and units are `bigint` here (exact,
- * arbitrarily large — a route can cross large scales). ChipNet frames the terms
+ * arbitrarily large — a route can cross large divisors). ChipNet frames the terms
  * as JSON (src/transport/comms.ts), and `JSON.stringify` throws on a `bigint`, so
  * when the real ChipNet engine lands these fields must be string-encoded at the
  * transport body boundary and parsed back here. No live engine sends these terms
@@ -38,7 +38,7 @@
  * `ExchangeRateQuote` (schema/portfolio.qsql). Effective rate — the party's spread
  * is already folded into `rateNum/rateDen` (the multi-denomination generalization
  * of a trading variable's reward). `from`/`to` are display-unit denominations, so
- * the quote is independent of any tally's per-contract scale; scales enter only at
+ * the quote is independent of any tally's per-contract divisor; divisors enter only at
  * conversion time (src/lift/convert.ts).
  */
 export interface RateQuote {
@@ -60,8 +60,8 @@ export interface LiftTerms {
 	readonly intent: 'L'
 	/** Denomination identifier from the edge's `TallyContract` (e.g. `CHIP`, `iso4217:USD`). */
 	readonly denom: string
-	/** Decimal scale from the edge's `TallyContract`: one smallest unit = 10^(-scale) display units. */
-	readonly scale: number
+	/** Divisor from the edge's `TallyContract`: how many smallest units make one display unit. */
+	readonly divisor: number
 	/** Units movable free up to the receiver's target, this edge's own denomination (LiftLading.FreeUnits). */
 	readonly freeUnits: bigint
 	/** Further units up to the receiver's bound, charged at `reward` (LiftLading.RewardedUnits). */
@@ -79,10 +79,10 @@ export interface CommsTerms {
 
 /* ── Data-source ports (backed in production by tally + portfolio strands) ───── */
 
-/** The edge's `TallyContract` denomination + scale. Resolved from the tally strand. */
+/** The edge's `TallyContract` denomination + divisor. Resolved from the tally strand. */
 export interface EdgeDenomination {
 	denom: string
-	scale: number
+	divisor: number
 }
 
 /**
@@ -120,12 +120,12 @@ export function buildLiftTerms(
 	linkId: string,
 	receiverSid: string,
 ): LiftTerms {
-	const { denom, scale } = source.denomination(linkId)
+	const { denom, divisor } = source.denomination(linkId)
 	const lading = source.lading(linkId, receiverSid)
 	return {
 		intent: 'L',
 		denom,
-		scale,
+		divisor,
 		freeUnits: lading.freeUnits,
 		rewardedUnits: lading.rewardedUnits,
 		reward: lading.reward,
@@ -182,7 +182,7 @@ export interface RouteEdge {
 	/** Real tally edge id — present only for edges the originator owns. */
 	linkId?: string
 	denom: string
-	scale: number
+	divisor: number
 	/** Ceiled pledge amount in this edge's own denomination (smallest units). */
 	units: bigint
 	/** Pledging side (S/F) — present only for owned edges; each participant fills its own at commit. */
@@ -197,7 +197,7 @@ export interface RouteEdge {
  */
 export interface SourceCost {
 	denom: string
-	scale: number
+	divisor: number
 	units: bigint
 	feeRatioPpm: number
 }

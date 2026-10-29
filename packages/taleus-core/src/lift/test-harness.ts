@@ -93,13 +93,13 @@ export class StubTermSource implements TermSource {
 /** Build a `RouteMathEdge` for a lift-capable hop. */
 export function liftMathEdge(
 	denom: string,
-	scale: number,
+	divisor: number,
 	capacity: { free: bigint; rewarded?: bigint; reward?: number; clutch?: number },
 	convertQuote?: RateQuote | null,
 ): RouteMathEdge {
 	return {
 		denom,
-		scale,
+		divisor,
 		freeUnits: capacity.free,
 		rewardedUnits: capacity.rewarded ?? 0n,
 		reward: capacity.reward ?? 0,

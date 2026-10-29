@@ -7,7 +7,6 @@ import { readTally } from '../data/tally'
 import type { Result, Unit } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
-import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 
@@ -46,7 +45,7 @@ export function RequestView({ route, navigation }: Props): React.JSX.Element {
 			ok: true,
 			value: {
 				request: request.value,
-				unit: tally.ok ? tally.value.unit : { denom: 'iso4217:USD', scale: 2 },
+				unit: tally.ok ? tally.value.unit : { denom: 'iso4217:USD', divisor: 100 },
 				counterparty: tally.ok
 					? tally.value.counterparty.name
 					: (request.value.requester?.name ?? ''),
@@ -126,7 +125,7 @@ export function RequestView({ route, navigation }: Props): React.JSX.Element {
 							onPress={() =>
 								navigation.navigate('PayPartner', {
 									tallyId: request.tallyId,
-									amount: request.stillAsked.units / divisorOf(unit),
+									amount: request.stillAsked.units / unit.divisor,
 									answers: request.id,
 								})
 							}

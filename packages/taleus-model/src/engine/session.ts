@@ -298,8 +298,8 @@ export class Session {
 
 	/** The unit a tally is in: agreed in its contract, or intended while it is still forming. */
 	unitOf(view: TallyView): Unit {
-		if (view.contract || view.offer) return { denom: view.denomination, scale: view.denominationScale }
-		return this.local.units[view.ref.id] ?? { denom: view.denomination, scale: view.denominationScale }
+		if (view.contract || view.offer) return { denom: view.denomination, divisor: view.denominationDivisor }
+		return this.local.units[view.ref.id] ?? { denom: view.denomination, divisor: view.denominationDivisor }
 	}
 
 	/** True while a run is queued and has not started: a further request joins it. */
@@ -384,7 +384,7 @@ export class Session {
 					contractCid: intended.propose.agreementId,
 					documents: contract.documents,
 					denomination: this.local.units[view.ref.id]?.denom ?? view.denomination,
-					denominationScale: this.local.units[view.ref.id]?.scale ?? view.denominationScale,
+					denominationDivisor: this.local.units[view.ref.id]?.divisor ?? view.denominationDivisor,
 				})
 			}
 		}

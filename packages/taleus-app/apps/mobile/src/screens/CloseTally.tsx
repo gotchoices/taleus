@@ -5,7 +5,6 @@ import { Action, Amount, Card, Failed, Loading, Row, amountText } from '../compo
 import { readTally, requestClose, type TallyDetail } from '../data/tally'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
-import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, spacing, type as typography, type Tokens } from '../theme'
 import { formatCivilDate, formatInstant } from '../util/date'
@@ -115,7 +114,7 @@ export function CloseTally({ route, navigation }: Props): React.JSX.Element {
 					onPress={() =>
 						navigation.navigate('PayPartner', {
 							tallyId,
-							amount: tally.balance.units / divisorOf(tally.unit),
+							amount: tally.balance.units / tally.unit.divisor,
 						})
 					}
 				/>
@@ -128,7 +127,7 @@ export function CloseTally({ route, navigation }: Props): React.JSX.Element {
 						onPress={() =>
 							navigation.navigate('PayPartner', {
 								tallyId,
-								amount: tally.balance.units / divisorOf(tally.unit),
+								amount: tally.balance.units / tally.unit.divisor,
 							})
 						}
 						secondary
@@ -147,7 +146,7 @@ export function CloseTally({ route, navigation }: Props): React.JSX.Element {
 						onPress={() =>
 							navigation.navigate('PayPartner', {
 								tallyId,
-								amount: tally.balance.units / divisorOf(tally.unit),
+								amount: tally.balance.units / tally.unit.divisor,
 							})
 						}
 					/>

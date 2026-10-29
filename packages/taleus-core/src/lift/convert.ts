@@ -5,14 +5,16 @@
  * denomination; this is that one-boundary step. `D_out` is the downstream
  * tally (nearer the payee), `D_in` the upstream tally (nearer the payer):
  *
- *   req_in = ceil( req_out * RateNum * 10^(s_in) / ( RateDen * 10^(s_out) ) )
+ *   req_in = ceil( req_out * RateNum * d_in / ( RateDen * d_out ) )
+ *
+ * where d is each tally's TallyContract.DenominationDivisor (sub-units per whole).
  *
  * Rounds UP so the downstream party is never shorted; the sub-unit
  * remainder is borne upstream, cascading to the originator.
  *
  * NOTE: OVERFLOW STRATEGY -- decided; do NOT "optimize" this back to a
- * native 64-bit multiply. `reqOut * rateNum * 10^scaleIn` overflows 64 bits
- * on large amount x large rate x large scale. Reduce rateNum/rateDen to
+ * native 64-bit multiply. `reqOut * rateNum * divisorIn` overflows 64 bits
+ * on large amount x large rate x large divisor. Reduce rateNum/rateDen to
  * lowest terms, then compute the intermediate product with BigInt
  * (cross-platform) and take the ceiling via integer division. Mirrored from
  * the rate definition's NOTE: in schema/portfolio.qsql -- keep both in sync.
@@ -30,10 +32,10 @@ export interface ConversionBoundary {
 	rateNum: bigint
 	/** Intermediary's ExchangeRateQuote.RateDen for the same row. */
 	rateDen: bigint
-	/** D_in's TallyContract.DenominationScale (upstream, nearer the payer). */
-	scaleIn: number
-	/** D_out's TallyContract.DenominationScale (downstream, nearer the payee). */
-	scaleOut: number
+	/** D_in's TallyContract.DenominationDivisor (upstream, nearer the payer). */
+	divisorIn: number
+	/** D_out's TallyContract.DenominationDivisor (downstream, nearer the payee). */
+	divisorOut: number
 }
 
 function gcd(a: bigint, b: bigint): bigint {
@@ -45,15 +47,15 @@ function gcd(a: bigint, b: bigint): bigint {
 	return x
 }
 
-function assertNonNegativeInt(value: number, name: string): void {
-	if (!Number.isInteger(value) || value < 0) {
-		throw new Error(`${name} must be a non-negative integer, got ${value}`)
+function assertPositiveInt(value: number, name: string): void {
+	if (!Number.isInteger(value) || value < 1) {
+		throw new Error(`${name} must be a positive integer, got ${value}`)
 	}
 }
 
 /** Converts a downstream requirement to the upstream requirement across one conversion boundary. */
 export function convertBoundary(boundary: ConversionBoundary): bigint {
-	const { reqOut, rateNum, rateDen, scaleIn, scaleOut } = boundary
+	const { reqOut, rateNum, rateDen, divisorIn, divisorOut } = boundary
 
 	if (reqOut < 0n) {
 		throw new Error(`reqOut must be >= 0, got ${reqOut}`)
@@ -61,15 +63,15 @@ export function convertBoundary(boundary: ConversionBoundary): bigint {
 	if (rateNum <= 0n || rateDen <= 0n) {
 		throw new Error(`rateNum/rateDen must be > 0, got ${rateNum}/${rateDen}`)
 	}
-	assertNonNegativeInt(scaleIn, 'scaleIn')
-	assertNonNegativeInt(scaleOut, 'scaleOut')
+	assertPositiveInt(divisorIn, 'divisorIn')
+	assertPositiveInt(divisorOut, 'divisorOut')
 
-	const divisor = gcd(rateNum, rateDen)
-	const num = rateNum / divisor
-	const den = rateDen / divisor
+	const common = gcd(rateNum, rateDen)
+	const num = rateNum / common
+	const den = rateDen / common
 
-	const numerator = reqOut * num * 10n ** BigInt(scaleIn)
-	const denominator = den * 10n ** BigInt(scaleOut)
+	const numerator = reqOut * num * BigInt(divisorIn)
+	const denominator = den * BigInt(divisorOut)
 
 	return (numerator + denominator - 1n) / denominator
 }

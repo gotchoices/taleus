@@ -53,6 +53,18 @@ void describe('amounts, in the tally\'s unit as written', () => {
 		assert.equal(formatAmount(5, UNITS.USD), '0.05 USD')
 		assert.equal(formatAmount(-1234, UNITS.CHIP), '-1.234 CHIP')
 	})
+	void it('reads and writes a unit that does not divide by ten as a whole and a part', () => {
+		const hours = { denom: 'cid:hours', divisor: 60, code: 'HRS' }
+		assert.equal(parseAmount('2 30/60', hours).units, 150)
+		assert.equal(parseAmount('2', hours).units, 120)
+		assert.equal(parseAmount('7/60', hours).units, 7)
+		assert.throws(() => parseAmount('2.5', hours), /not an amount/)
+		assert.throws(() => parseAmount('1 1/2', hours), /counted in 1\/60 parts/)
+		assert.throws(() => parseAmount('1 60/60', hours), /less than 60\/60/)
+		assert.equal(formatAmount(150, hours), '2 30/60 HRS')
+		assert.equal(formatAmount(127, hours), '2 07/60 HRS')
+		assert.equal(formatAmount(120, hours), '2 HRS')
+	})
 })
 
 void describe('naming tallies', () => {

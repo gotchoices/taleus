@@ -12,7 +12,7 @@
       },
       "unit": {
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "balance": {
         "units": 18000,
@@ -65,7 +65,7 @@
       },
       "unit": {
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "balance": {
         "units": 4250,
@@ -112,7 +112,6 @@
       },
       "unit": {
         "denom": "cid:bafy-dave-hours",
-        "scale": 0,
         "divisor": 60,
         "code": "DVH",
         "mark": "DH",
@@ -168,7 +167,7 @@
       },
       "unit": {
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "balance": {
         "units": 4200,
@@ -219,7 +218,7 @@
       },
       "unit": {
         "denom": "CHIP",
-        "scale": 3
+        "divisor": 1000
       },
       "balance": {
         "units": 0,
@@ -267,7 +266,7 @@
       },
       "unit": {
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "balance": {
         "units": 0,
@@ -318,7 +317,7 @@
       },
       "unit": {
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "balance": {
         "units": 0,

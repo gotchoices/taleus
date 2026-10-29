@@ -193,13 +193,13 @@ export class LiftAgent {
 			nonce: e.nonce,
 			linkId: e.linkId,
 			denom: e.math.denom,
-			scale: e.math.scale,
+			divisor: e.math.divisor,
 			units: chosen.result.perEdgeUnits[i],
 			issuer: e.issuer,
 		}))
 		const source: SourceCost = {
 			denom: edges[0].denom,
-			scale: edges[0].scale,
+			divisor: edges[0].divisor,
 			units: chosen.result.sourceUnits,
 			feeRatioPpm: chosen.result.feeRatioPpm,
 		}

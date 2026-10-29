@@ -48,7 +48,7 @@ table TallyRegistry (
                           -- as on another tally" -- recognising that is the party's own job, from
                           -- what the counterparty disclosed (docs/identity.md).
     Denomination text,                   -- cached from the tally's accepted contract
-    DenominationScale integer,
+    DenominationDivisor integer,        -- sub-units per whole, cached with the denomination
     State text,                          -- forming|open|closing|closed|void (cached)
     -- NOTE: display-only cache. Authoritative source is the tally strand, which can advance
     -- while hibernating (the counterparty writes a chit); refreshed opportunistically when the
@@ -110,9 +110,9 @@ view CurrentPreference as
 -- Mid*/SpreadPpm are optional display fields for re-deriving the effective rate; a negative
 -- SpreadPpm (subsidy) is permitted, mirroring Reward's signed semantics.
 --
--- Display-level, scale-independent: the rate is defined at each denomination's *display* unit
+-- Display-level, divisor-independent: the rate is defined at each denomination's *display* unit
 -- (1 USD, 1 CHIP), not at smallest-unit granularity, so a quote is independent of any tally's
--- per-contract scale. Scales enter only at conversion time, from each edge's contract.
+-- per-contract divisor. Divisors enter only at conversion time, from each edge's contract.
 table ExchangeRateQuote (
     FromDenom text,                           -- convert-FROM denom = D_in in the conversion NOTE below: the upstream (payer-side) edge; value the quoting party RECEIVES/accumulates
     ToDenom text,                             -- convert-TO   denom = D_out in the conversion NOTE below: the downstream (payee-side) edge; value the quoting party RELEASES/pays out
@@ -144,19 +144,19 @@ view CurrentExchangeRateQuote as
 -- contract is documented; that file mirrors it at the actual req_in computation site.
 -- Value flows payer->payee; discovery walks the route
 -- backward from the payee. At each boundary the downstream tally (nearer payee) is D_out at
--- scale s_out with required smallest-units req_out; the upstream tally (nearer payer) is D_in at
--- scale s_in; the intermediary quotes RateNum/RateDen for From=D_in, To=D_out. Required upstream
+-- divisor d_out with required smallest-units req_out; the upstream tally (nearer payer) is D_in at
+-- divisor d_in; the intermediary quotes RateNum/RateDen for From=D_in, To=D_out. Required upstream
 -- smallest-units:
---   req_in = ceil( req_out * RateNum * 10^(s_in) / ( RateDen * 10^(s_out) ) )
+--   req_in = ceil( req_out * RateNum * d_in / ( RateDen * d_out ) )
 -- Round UP so the downstream party is never shorted; the sub-unit remainder (< 1 smallest-unit
 -- of D_in per edge) is borne upstream, cascading to the originator (the payer for a linear lift /
 -- payment, the initiator for a circular clearing lift). Degenerate single-denomination case
--- (RateNum=RateDen=1, s_in=s_out) makes the ceiling a no-op -- exactly MyCHIPs behavior.
+-- (RateNum=RateDen=1, d_in=d_out) makes the ceiling a no-op -- exactly MyCHIPs behavior.
 --
 -- NOTE: OVERFLOW STRATEGY -- decided; do NOT "optimize" this back to a native 64-bit multiply.
--- Reduce RateNum/RateDen to lowest terms, then compute req_out*RateNum*10^(s_in) with BigInt
+-- Reduce RateNum/RateDen to lowest terms, then compute req_out*RateNum*d_in with BigInt
 -- (cross-platform) and take the ceiling via integer division. Large amount x large rate x large
--- scale overflows 64 bits otherwise. See src/lift/convert.ts for the landed implementation.
+-- divisor overflows 64 bits otherwise. See src/lift/convert.ts for the landed implementation.
 --
 -- NOTE: rounding-dust accumulation (tripwire) -- a route of N conversion boundaries can add up to
 -- N sub-units of extra originator cost. Bounded and acceptable now; only matters if very long

@@ -12,7 +12,7 @@
       },
       "unit": {
         "denom": "iso4217:USD",
-        "scale": 2
+        "divisor": 100
       },
       "balance": {
         "units": 18000,

@@ -96,7 +96,7 @@ test('attention items carry no prose and every amount carries its unit', async (
 			expect(item.waitingDays).toBeGreaterThanOrEqual(0)
 			if (item.amount) {
 				expect(typeof item.amount.denom).toBe('string')
-				expect(typeof item.amount.scale).toBe('number')
+				expect(typeof item.amount.divisor).toBe('number')
 			}
 		}
 	}
@@ -107,6 +107,6 @@ test('spending power carries its unit rather than leaving a screen to guess', as
 	expect(result.ok).toBe(true)
 	if (result.ok && result.value.spendingPower) {
 		expect(result.value.spendingPower.heldByOthers.denom).toBeTruthy()
-		expect(result.value.spendingPower.creditExtendedToMe.scale).toBeDefined()
+		expect(result.value.spendingPower.creditExtendedToMe.divisor).toBeDefined()
 	}
 })

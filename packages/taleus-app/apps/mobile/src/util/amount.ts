@@ -50,11 +50,6 @@ export function unitFace(names: UnitNames, style = unitStyle): { text?: string; 
 	return names.drawn ? { drawn: names.drawn } : { text: names.mark ?? names.code }
 }
 
-/** How many of a unit's smallest parts make one whole. */
-export function divisorOf(unit: Unit): number {
-	return unit.divisor ?? 10 ** unit.scale
-}
-
 function isPowerOfTen(divisor: number): boolean {
 	if (divisor < 1) {
 		return false
@@ -129,7 +124,7 @@ export interface AmountParts {
 }
 
 export function amountParts(amount: Amount, unit: Unit, locale = getLocale()): AmountParts {
-	const divisor = divisorOf({ ...unit, scale: amount.scale ?? unit.scale, divisor: unit.divisor })
+	const divisor = amount.divisor ?? unit.divisor
 	const names = namesFor({ ...unit, denom: amount.denom ?? unit.denom }, locale)
 	const units = Math.trunc(amount.units)
 
@@ -223,5 +218,5 @@ function currencyLabel(code: string, locale: string): string {
 
 /** A unit as a person would say it, for headings and labels. */
 export function unitLabel(denom: string, label?: string, locale = getLocale()): string {
-	return namesFor({ denom, scale: 0, label }, locale).label
+	return namesFor({ denom, divisor: 1, label }, locale).label
 }

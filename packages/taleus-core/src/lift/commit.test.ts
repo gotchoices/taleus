@@ -57,9 +57,9 @@ function makePlan(liftId: string, edges: Array<{ nonce: string; denom: string; u
 		liftId,
 		sessionCode: 's1',
 		kind: 'circular',
-		edges: edges.map((e) => ({ nonce: e.nonce, denom: e.denom, scale: 0, units: e.units })),
+		edges: edges.map((e) => ({ nonce: e.nonce, denom: e.denom, divisor: 1, units: e.units })),
 		referee: { key: 'ref' },
-		source: { denom: 'CHIP', scale: 0, units: 0n, feeRatioPpm: 0 },
+		source: { denom: 'CHIP', divisor: 1, units: 0n, feeRatioPpm: 0 },
 	}
 }
 

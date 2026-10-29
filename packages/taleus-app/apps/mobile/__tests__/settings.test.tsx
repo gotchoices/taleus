@@ -62,7 +62,7 @@ test('mark or code is the reader’s choice and reaches every figure', async () 
 
 	// Not just this screen: the shared component every figure goes through.
 	const figure = await renderScreen(
-		<Amount value={{ units: 18050 }} unit={{ denom: 'iso4217:USD', scale: 2 }} />,
+		<Amount value={{ units: 18050 }} unit={{ denom: 'iso4217:USD', divisor: 100 }} />,
 	)
 	expect(figure.getByText('USD')).toBeTruthy()
 	expect(figure.queryByText('$')).toBeNull()

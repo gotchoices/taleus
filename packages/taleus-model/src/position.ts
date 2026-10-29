@@ -3,8 +3,7 @@ import type { Amount, Result, UnitAmount } from './types.js'
 
 export interface PerUnitPosition {
 	denom: string
-	scale: number
-	divisor?: number
+	divisor: number
 	code?: string
 	mark?: string
 	label?: string
@@ -14,7 +13,7 @@ export interface PerUnitPosition {
 
 export interface Estimate {
 	unit: string
-	scale: number
+	divisor: number
 	owedToMe: Amount
 	owedByMe: Amount
 	net: Amount

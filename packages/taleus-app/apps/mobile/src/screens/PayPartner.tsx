@@ -7,7 +7,6 @@ import { readTally, type TallyDetail } from '../data/tally'
 import type { DataError } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { errorText, t } from '../i18n'
-import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 
@@ -57,12 +56,12 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 	}
 
 	const tally: TallyDetail = value
-	const units = Math.round(Number(text || '0') * divisorOf(tally.unit))
+	const units = Math.round(Number(text || '0') * tally.unit.divisor)
 	const amount = { units }
 
 	const look = async (next: string) => {
 		setText(next)
-		const parsed = Math.round(Number(next || '0') * divisorOf(tally.unit))
+		const parsed = Math.round(Number(next || '0') * tally.unit.divisor)
 		if (!parsed) {
 			setPreview(undefined)
 			return

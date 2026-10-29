@@ -6,7 +6,6 @@ import { DEFAULT_NOTICE_DAYS, readInvitation, respondToInvitation, type OpenInvi
 import { trustAgreement, trustPublisher } from '../data/publishers'
 import { useLoad } from '../hooks/useLoad'
 import { errorText, t } from '../i18n'
-import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 import { formatInstant } from '../util/date'
@@ -76,7 +75,7 @@ export function ReviewInvitation({ route, navigation }: Props): React.JSX.Elemen
 		setProblem(undefined)
 		const result = await respondToInvitation(token, answer, {
 			disclose: disclosed,
-			creditLimit: { units: Math.round(Number(limit || '0') * divisorOf(value.unit)) },
+			creditLimit: { units: Math.round(Number(limit || '0') * value.unit.divisor) },
 			noticeDays: Number(notice || '0'),
 		})
 		if (!result.ok) {

@@ -16,12 +16,12 @@ import type {
 import type { Amount, Balance, DataError, Instant, Result, TallyState, Unit } from '../types.js'
 
 /** The unit a tally is denominated in, as the model names it. */
-export function unitOf(view: Pick<TallyView, 'denomination' | 'denominationScale'>): Unit {
-	return { denom: view.denomination, scale: view.denominationScale }
+export function unitOf(view: Pick<TallyView, 'denomination' | 'denominationDivisor'>): Unit {
+	return { denom: view.denomination, divisor: view.denominationDivisor }
 }
 
 export function amount(units: number, unit: Unit): Amount {
-	return { units, denom: unit.denom, scale: unit.scale }
+	return { units, denom: unit.denom, divisor: unit.divisor }
 }
 
 export function fromCore(value: CoreAmount, unit: Unit): Amount {

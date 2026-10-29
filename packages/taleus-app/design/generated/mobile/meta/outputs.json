@@ -22,7 +22,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -31,7 +31,7 @@
         "design/specs/mobile/global/toolchain.md": "9887e906abc4794e8f6378ff488e78f083e6461be83ef292df912a9bfdad96e6",
         "design/stories/mobile/23-what-needs-my-attention.md": "e755289c2cbbcab9256b98c694396e5ea9cf72df902835f4a99b5eeb41013452",
         "design/generated/mobile/screens/Attention.md": "915e7488881ded3cc5e261d7ad205556987f88b7fe20704551ccdd0e416abf37",
-        "mock/data/attention.happy.json": "53779e4d98989839ffea2cfcd3f48682d09318a43af6286aecbdee2b56a63a39",
+        "mock/data/attention.happy.json": "73b083f495d440a3a9ac68f190787a61a98a052252222c3039a1d8e84630e33e",
         "mock/data/attention.empty.json": "1a7725eaf6ae7e74c205478833c9c42373265e7f50c039c7f74f84d2468c4585",
         "design/specs/mobile/components/index.md": "ce9d69b6fce7f0b1d5a11054ef40050b8cef7c7fba10458fd0ccc86451facf7f",
         "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
@@ -61,7 +61,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -71,7 +71,7 @@
         "design/stories/mobile/40-my-position.md": "14d9665c1b7871ab750e15a255fdb601f9874477d4392c1c069738f42a7eb787",
         "design/stories/mobile/41-my-exchange-rates.md": "e4748006b0d010ef7d77081ff377c841870b0e2d3c461da717a68a89fe80727c",
         "design/generated/mobile/screens/Position.md": "a6a4230ba2836908c4bb8434067af897dc6e47eb266ba3db4f383b4ef93122d7",
-        "mock/data/position.happy.json": "8998dea8d5dcc24e30f63e50440180a172890eff125163baa90464c1b2e3c34f",
+        "mock/data/position.happy.json": "06ed26ec5e47330e317b94bf6f7651ff0fe520a0284a3d5a71744e1b990b6517",
         "mock/data/position.empty.json": "949232ad2626c3c1a7ee6a43f26003fe8961d31a68027713cfac52288eb655be",
         "design/specs/mobile/components/index.md": "ce9d69b6fce7f0b1d5a11054ef40050b8cef7c7fba10458fd0ccc86451facf7f",
         "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
@@ -102,7 +102,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -145,7 +145,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -156,7 +156,7 @@
         "design/stories/mobile/04-first-look-at-an-open-tally.md": "774121f36732046ed12f5b37b23819a86d884dad6c9e48388d19b7a3c6c98efc",
         "design/stories/mobile/06-find-a-tally.md": "fde515a009819b815840bd1e4be5898c59efd2c553769b673c8249ef042e6ec7",
         "design/generated/mobile/screens/TallyList.md": "ac1b2bb561a0707bd1f7405aee6be21343dc5668f51c228cec47f7f0857ee732",
-        "mock/data/tallies.happy.json": "c3df85a88a68aa325cc163742ec04b5a94c4157cce92545866c836cd2c42c4d8",
+        "mock/data/tallies.happy.json": "ced0d3453e97fc3fbd5c76b31224583526f510ad4b8b23474133b95fc6d164d0",
         "mock/data/tallies.empty.json": "d8cc662307c9d780d5b01e726b6dcae0010cf83afed085b2d0412d07b719bbc4",
         "mock/data/tallies.error.json": "01da118fe2a946924a5dcbf26cd96622ffdd899f614c44fca5e3e1c9c7e510bd",
         "design/specs/mobile/components/index.md": "ce9d69b6fce7f0b1d5a11054ef40050b8cef7c7fba10458fd0ccc86451facf7f",
@@ -190,7 +190,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -201,8 +201,8 @@
         "design/stories/mobile/04-first-look-at-an-open-tally.md": "774121f36732046ed12f5b37b23819a86d884dad6c9e48388d19b7a3c6c98efc",
         "design/stories/mobile/07-review-the-agreement.md": "61c1cbb48af6be1fbc229aa294af9c2f6611d666c03bb8376060ee766aef7b6c",
         "design/generated/mobile/screens/TallyView.md": "001dc407abef5b5a408bb6b8580c6d2536d8da3680870fd07d411d26c27967b5",
-        "mock/data/tally.happy.json": "295ee6d6f889ac4e9728e5b621e41e5a6af6fc344c64e4c2474b2c6aaf4dfd77",
-        "mock/data/tally.error.json": "50c8e9885e1e6866ba74932e24c93dcff1ff4375bd3d24efcd02b7e27b649ed6",
+        "mock/data/tally.happy.json": "8b19cc6c3e3a29922d372b61db0270ff26b59b04efe411e1a86980626e58e735",
+        "mock/data/tally.error.json": "969ce346b98a1608769b5d60563b09407d1a45510c9062c27c0607facb5d6803",
         "mock/data/requests.happy.json": "834b1d0b88397484d8f1369e005868f9ccf67e7cdbcf8f45ee2017638b7b81ae",
         "design/specs/mobile/components/index.md": "ce9d69b6fce7f0b1d5a11054ef40050b8cef7c7fba10458fd0ccc86451facf7f",
         "design/stories/mobile/21-ask-to-be-paid.md": "16e3b799c5042893aca9cab300eb63940a7db154804c803aa4c646906b4112ff",
@@ -251,7 +251,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -328,7 +328,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -384,7 +384,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
         "design/specs/mobile/global/ui.md": "a10ee4ace153a7ad64aa9d02737a9140b502aed5e2b4f17474ec8660f801f90e",
@@ -421,7 +421,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
@@ -432,9 +432,9 @@
         "design/stories/mobile/05-close-a-tally.md": "d6203ec0e2764daa4c864941b261523ece5cd019c84e6c6cb1bb58cf5e050166",
         "design/generated/mobile/foundation.md": "bc5ba61b98d29b946cb50d43394b24d5c6de85efb3bde72387f7d36647a59277",
         "design/generated/mobile/screens/CloseTally.md": "d3ae021102bc12fde8e8fa995674da8e6f240ed64e983e53297ea02e2b388b9b",
-        "mock/data/tally.happy.json": "295ee6d6f889ac4e9728e5b621e41e5a6af6fc344c64e4c2474b2c6aaf4dfd77",
-        "mock/data/tally.closing.json": "068cee9fa71477d09480953272576dec594fedaf864e9b3000efbb8ba6660360",
-        "mock/data/tally.error.json": "50c8e9885e1e6866ba74932e24c93dcff1ff4375bd3d24efcd02b7e27b649ed6"
+        "mock/data/tally.happy.json": "8b19cc6c3e3a29922d372b61db0270ff26b59b04efe411e1a86980626e58e735",
+        "mock/data/tally.closing.json": "b7b52cf73a3ead9bb332d00d93b4193798e246a7762d752e7082535fd1f5d34d",
+        "mock/data/tally.error.json": "969ce346b98a1608769b5d60563b09407d1a45510c9062c27c0607facb5d6803"
       },
       "output": "apps/mobile/src/screens/CloseTally.tsx"
     },
@@ -462,7 +462,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
@@ -473,7 +473,7 @@
         "design/generated/mobile/foundation.md": "bc5ba61b98d29b946cb50d43394b24d5c6de85efb3bde72387f7d36647a59277",
         "design/stories/mobile/01-invite-a-partner.md": "94871542a83c234b91a1fe08da6024ea1342fce0bb77b66f4d58072c3fd3f37b",
         "design/generated/mobile/screens/CreateInvitation.md": "a627a7a56dcce5af4f1075f591f3d61ae888e00a26031ead75aa5203d672e87c",
-        "mock/data/invitations.happy.json": "f6ae0dd38cfbc073cfd1842f645d50bab619a5a41f2a257b97d937bd079fcfe4",
+        "mock/data/invitations.happy.json": "6a0a9aefeae7cd3efbdb8be9e7c444b45c04bcd6f8023539d96c87efb7477674",
         "mock/data/invitations.empty.json": "394798d5086d61c0a465375761015c7b5c845fc4a5402bd07dafec3e952ec178",
         "mock/data/agreements.happy.json": "9590ed560812f738e4c0333e65dad26927a398c5d8086c0fe17ef5900cfd6c08",
         "design/stories/mobile/08-publishers-i-trust.md": "645f6c81b31ab9dfb1ffc3126034eb89f14bd3c7b0043435bd04e3fd07e9716a",
@@ -502,7 +502,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
@@ -513,7 +513,7 @@
         "design/generated/mobile/foundation.md": "bc5ba61b98d29b946cb50d43394b24d5c6de85efb3bde72387f7d36647a59277",
         "design/stories/mobile/21-ask-to-be-paid.md": "16e3b799c5042893aca9cab300eb63940a7db154804c803aa4c646906b4112ff",
         "design/generated/mobile/screens/CreateRequest.md": "79c040f1a335fdaf5a9a604bd62a74025ddd06e1c2b2a59785062ebd97ccd86a",
-        "mock/data/tally.happy.json": "295ee6d6f889ac4e9728e5b621e41e5a6af6fc344c64e4c2474b2c6aaf4dfd77",
+        "mock/data/tally.happy.json": "8b19cc6c3e3a29922d372b61db0270ff26b59b04efe411e1a86980626e58e735",
         "mock/data/requests.happy.json": "834b1d0b88397484d8f1369e005868f9ccf67e7cdbcf8f45ee2017638b7b81ae"
       },
       "output": "apps/mobile/src/screens/CreateRequest.tsx"
@@ -559,7 +559,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -636,7 +636,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -713,7 +713,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -790,7 +790,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -867,7 +867,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -1000,7 +1000,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
@@ -1011,8 +1011,8 @@
         "design/generated/mobile/foundation.md": "bc5ba61b98d29b946cb50d43394b24d5c6de85efb3bde72387f7d36647a59277",
         "design/stories/mobile/20-pay-a-partner.md": "b8f081a0f1cb50b4959c3294b3d3c26500496eaa5868d78697365a851892941c",
         "design/generated/mobile/screens/PayPartner.md": "866072388dbbf3f42efdd98f41f39923953de2e3ced7438b6c046076c1904304",
-        "mock/data/tally.happy.json": "295ee6d6f889ac4e9728e5b621e41e5a6af6fc344c64e4c2474b2c6aaf4dfd77",
-        "mock/data/tally.error.json": "50c8e9885e1e6866ba74932e24c93dcff1ff4375bd3d24efcd02b7e27b649ed6",
+        "mock/data/tally.happy.json": "8b19cc6c3e3a29922d372b61db0270ff26b59b04efe411e1a86980626e58e735",
+        "mock/data/tally.error.json": "969ce346b98a1608769b5d60563b09407d1a45510c9062c27c0607facb5d6803",
         "mock/data/entries.happy.json": "1800a93e9eda7d3724c650955be28a8eeab1897861c3e1899950a0c1abef97ff"
       },
       "output": "apps/mobile/src/screens/PayPartner.tsx"
@@ -1134,7 +1134,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -1267,7 +1267,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
@@ -1280,7 +1280,7 @@
         "design/generated/mobile/foundation.md": "bc5ba61b98d29b946cb50d43394b24d5c6de85efb3bde72387f7d36647a59277",
         "design/generated/mobile/screens/RequestView.md": "af5d6969d3653967800f0362d4dfdab03b8355dc1aeca8536b53edeaa884f743",
         "mock/data/requests.happy.json": "834b1d0b88397484d8f1369e005868f9ccf67e7cdbcf8f45ee2017638b7b81ae",
-        "mock/data/tally.happy.json": "295ee6d6f889ac4e9728e5b621e41e5a6af6fc344c64e4c2474b2c6aaf4dfd77"
+        "mock/data/tally.happy.json": "8b19cc6c3e3a29922d372b61db0270ff26b59b04efe411e1a86980626e58e735"
       },
       "output": "apps/mobile/src/screens/RequestView.tsx"
     },
@@ -1308,7 +1308,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
@@ -1320,8 +1320,8 @@
         "design/stories/mobile/02-respond-to-an-invitation.md": "a42683077099fd5b76bc4326846543186a4effb658145ae22b6a4400af6c6f34",
         "design/stories/mobile/11-my-profile-and-disclosure.md": "8d54afdc6fde4d8415284b1eb5fefa3f84e7b3435104f5f12bd8cc244cb05d8e",
         "design/generated/mobile/screens/ReviewInvitation.md": "549324260d2ec475f71034736fb6d3eadcbe66e57e7c08fc4021465f70b3bf0e",
-        "mock/data/invitation.happy.json": "a8f472c8139698a8cc2a052ac73da992de370041a107496ae8430f7fe13caeb9",
-        "mock/data/invitation.expired.json": "ad9cd16324e50c86a2ecc0c88bb572f16fea76a853718ca9cfb024d85e6cdeaf",
+        "mock/data/invitation.happy.json": "940daeaff926064aefdde17d8296af301151c28178cfaa67cffb2399f8305f6c",
+        "mock/data/invitation.expired.json": "06fa6b57bc4841433e710f04ff0a68e6e17e9afaf9d104e69501cf3bc82b6dd3",
         "design/stories/mobile/08-publishers-i-trust.md": "645f6c81b31ab9dfb1ffc3126034eb89f14bd3c7b0043435bd04e3fd07e9716a",
         "design/stories/mobile/01-invite-a-partner.md": "94871542a83c234b91a1fe08da6024ea1342fce0bb77b66f4d58072c3fd3f37b",
         "design/generated/mobile/screens/Agreement.md": "461699c0a246dff61044e31c34bbd89bf8ccf36b3a926ad2295497ae5d5cb9aa"
@@ -1352,7 +1352,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/domain/amounts.md": "717ab35cebe8de022f581be90857048c6ef80955d8b80c7267a59f993afeba09",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
@@ -1363,9 +1363,9 @@
         "design/stories/mobile/03-negotiate-terms.md": "c0307186274b73d6eb5fe832e55e1d4c3f9f249195a100e5e3e1eda327f78fcd",
         "design/generated/mobile/foundation.md": "bc5ba61b98d29b946cb50d43394b24d5c6de85efb3bde72387f7d36647a59277",
         "design/generated/mobile/screens/ReviewOffer.md": "d2524a1c16f0be53e8cdb51950c0baa0682dbe3793af90df28c2f91ca3d12257",
-        "mock/data/offer.happy.json": "5e99a184bb3b94493eb0bc56227e5252837a8e9da1b84ffcdcae30c88e93adaa",
+        "mock/data/offer.happy.json": "144dce63ac72e3b7266747164a32eb84fd182cf88828e54005b876e6caf45f3e",
         "mock/data/offer.empty.json": "63146681c89edaa44890ccd1ac214eb46825ada3bbe6c9e12a57d8a59c0a02a9",
-        "mock/data/offer.superseded.json": "dc07234031a0a948d7297028d77257a5830086d0e2de31a5f5c592ffc45d3fed",
+        "mock/data/offer.superseded.json": "964e917cc446657223541317e48ca00cb2745456f938b8f19f2390ce6781a62b",
         "design/stories/mobile/08-publishers-i-trust.md": "645f6c81b31ab9dfb1ffc3126034eb89f14bd3c7b0043435bd04e3fd07e9716a",
         "design/stories/mobile/02-respond-to-an-invitation.md": "a42683077099fd5b76bc4326846543186a4effb658145ae22b6a4400af6c6f34",
         "design/generated/mobile/screens/Agreement.md": "461699c0a246dff61044e31c34bbd89bf8ccf36b3a926ad2295497ae5d5cb9aa"
@@ -1442,7 +1442,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -1526,7 +1526,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -1610,7 +1610,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/domain/rules.md": "42508dbd220bab6b4b501c94d09a396ffb6c464aa2a1b7e4b8bd2ac56ae4584d",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
@@ -1747,7 +1747,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
         "design/specs/mobile/global/ui.md": "a10ee4ace153a7ad64aa9d02737a9140b502aed5e2b4f17474ec8660f801f90e",
@@ -1783,7 +1783,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
         "design/specs/mobile/global/ui.md": "a10ee4ace153a7ad64aa9d02737a9140b502aed5e2b4f17474ec8660f801f90e",
@@ -1817,7 +1817,7 @@
       ],
       "depHashes": {
         "design/specs/project.md": "fa9c9a094af334044594d832cee4855521f1729353e2ff396faa63e36d01380f",
-        "design/specs/domain/interfaces.md": "f0d77fdc63513d999b28ecb54771c7931faed0eff7c30b74d509ca8acd43f2b8",
+        "design/specs/domain/interfaces.md": "a0567ad28d991594ed9b8fbc294745ccb1d649ff724bb6fde5cfdd44eeb14670",
         "design/specs/mobile/navigation.md": "131a422f7b555c368efe3a0c94f576529568d6ed7c7ac96e0ae779b37674d258",
         "design/specs/mobile/screens/index.md": "48ab734199374e9554a3c3b308b9115ebcea76ac5af6ff7fa9250a760462e334",
         "design/specs/mobile/global/ui.md": "a10ee4ace153a7ad64aa9d02737a9140b502aed5e2b4f17474ec8660f801f90e",

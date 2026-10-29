@@ -13,7 +13,7 @@ beforeEach(() => {
 
 test('an invitation names nobody — whoever accepts becomes the other party', async () => {
 	const made = await createInvitation({
-		unit: { denom: 'iso4217:USD', scale: 2 },
+		unit: { denom: 'iso4217:USD', divisor: 100 },
 		creditLimit: { units: 50000 },
 		noticeDays: 14,
 		agreementId: 'cid:bafy-standard-tally-v1',
@@ -31,7 +31,7 @@ test('an invitation names nobody — whoever accepts becomes the other party', a
 test('the private note is a memo, not a claim about who responds', async () => {
 	await createInvitation({
 		note: 'Sam, the bike',
-		unit: { denom: 'iso4217:USD', scale: 2 },
+		unit: { denom: 'iso4217:USD', divisor: 100 },
 		creditLimit: { units: 50000 },
 		noticeDays: 14,
 		agreementId: 'cid:bafy-standard-tally-v1',

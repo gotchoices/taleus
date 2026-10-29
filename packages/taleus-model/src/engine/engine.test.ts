@@ -8,7 +8,7 @@ import { offline, testContract } from '../testing/index.js'
 
 const CONTRACT = await testContract()
 
-const USD = { denom: 'iso4217:USD', scale: 2 }
+const USD = { denom: 'iso4217:USD', divisor: 100 }
 const usd = (units: number) => ({ units, ...USD })
 const NOW = () => new Date('2026-09-07T12:00:00Z')
 

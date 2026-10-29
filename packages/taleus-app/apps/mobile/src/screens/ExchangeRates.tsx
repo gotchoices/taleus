@@ -16,7 +16,7 @@ import type { DataError, Unit } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { errorText, t } from '../i18n'
 import { useStyles, spacing, type as typography, type Tokens } from '../theme'
-import { divisorOf, unitLabel } from '../util/amount'
+import { unitLabel } from '../util/amount'
 import { formatInstant } from '../util/date'
 
 /** What the party is filling in, before any of it is signed. */
@@ -56,8 +56,8 @@ export function ExchangeRates(): React.JSX.Element {
 		return <Failed title={t('screens.rates.unreadable-title')} error={error} onRetry={reload} />
 	}
 
-	const against: Unit = { denom: value.against, scale: 2 }
-	const divisor = divisorOf(against)
+	const against: Unit = { denom: value.against, divisor: 100 }
+	const divisor = against.divisor
 
 	const begin = (unit: Unit, existing?: Rate) =>
 		setDraft({
@@ -413,7 +413,7 @@ function ConversionRow({
  * have.
  */
 function formatRate(rate: number, against: string): string {
-	const divisor = divisorOf({ denom: against, scale: 2 })
+	const divisor = 100
 	return `${(rate / divisor).toFixed(String(divisor - 1).length)}`
 }
 

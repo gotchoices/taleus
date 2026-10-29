@@ -15,7 +15,7 @@ import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, spacing, type as typography, type Tokens } from '../theme'
-import { divisorOf, unitLabel } from '../util/amount'
+import { unitLabel } from '../util/amount'
 import { formatInstant } from '../util/date'
 import { fieldLabel, fieldList } from '../util/fields'
 
@@ -36,7 +36,7 @@ interface Draft {
 	understood: boolean
 }
 
-const DOLLARS: Unit = { denom: 'iso4217:USD', scale: 2 }
+const DOLLARS: Unit = { denom: 'iso4217:USD', divisor: 100 }
 
 /**
  * StandingInvitation (story 01 path C, story 10 path E) — one set of terms that
@@ -95,7 +95,7 @@ export function StandingInvitation({ navigation }: Props): React.JSX.Element {
 	const publish = async (current: Draft) => {
 		await publishStanding({
 			unit: DOLLARS,
-			creditLimit: { units: Math.round(Number(current.limit || '0') * divisorOf(DOLLARS)) },
+			creditLimit: { units: Math.round(Number(current.limit || '0') * DOLLARS.divisor) },
 			noticeDays: current.noticeDays,
 			agreementId: current.agreementId,
 			disclose: current.disclose,

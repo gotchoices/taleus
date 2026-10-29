@@ -300,8 +300,8 @@ export interface TallyView {
 	role: Role
 	state: TallyState
 	denomination: string
-	/** Decimal exponent: one `Amount.units` is 10^-scale of the denomination's display unit. */
-	denominationScale: number
+	/** How many `Amount.units` make one whole of the denomination's display unit (100 for cents, 60 for minutes of an hour). */
+	denominationDivisor: number
 	me: PartyIdentity
 	counterparty: PartyIdentity
 	balances: Balances
@@ -436,11 +436,11 @@ export interface ContractOffer extends ActOptions {
 	 * The tally's unit of account, fixed for its life. It belongs here rather than on the
 	 * invitation because it is a **bilateral** term: one shared value both parties sign, unlike
 	 * credit limits, which each party sets alone. An invitation may advertise a denomination,
-	 * but nothing is agreed until the contract is. Defaults to `CHIP` at scale 0.
+	 * but nothing is agreed until the contract is. Defaults to `CHIP` at divisor 1.
 	 */
 	denomination?: string
-	/** Decimal exponent: one unit is 10^-scale of the denomination's display unit. */
-	denominationScale?: number
+	/** How many units make one whole of the denomination's display unit (any integer >= 1). */
+	denominationDivisor?: number
 }
 
 export interface KeyAddition extends ActOptions {

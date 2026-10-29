@@ -1,10 +1,10 @@
-import { amountParts, divisorOf, namesFor } from '../src/util/amount'
+import { amountParts, namesFor } from '../src/util/amount'
 import type { Unit } from '../src/data/types'
 
-const usd: Unit = { denom: 'iso4217:USD', scale: 2 }
-const chip: Unit = { denom: 'CHIP', scale: 3 }
-const hours: Unit = { denom: 'cid:bafy-dave-hours', scale: 0, divisor: 60, code: 'DVH', label: 'Dave-hours' }
-const whole: Unit = { denom: 'cid:bafy-widgets', scale: 0, code: 'WDG', label: 'Widgets' }
+const usd: Unit = { denom: 'iso4217:USD', divisor: 100 }
+const chip: Unit = { denom: 'CHIP', divisor: 1000 }
+const hours: Unit = { denom: 'cid:bafy-dave-hours', divisor: 60, code: 'DVH', label: 'Dave-hours' }
+const whole: Unit = { denom: 'cid:bafy-widgets', divisor: 1, code: 'WDG', label: 'Widgets' }
 
 test('a decimal unit implies its denominator; the digit count says it', () => {
 	const p = amountParts({ units: 18000 }, usd, 'en')
@@ -60,7 +60,7 @@ test('a standard unit takes its mark from the standard, not from the tally', () 
 })
 
 test('a tally mark containing a currency symbol is refused', () => {
-	const spoof: Unit = { denom: 'cid:bafy-fake', scale: 2, code: 'FAK', mark: 'US$', label: 'Fakes' }
+	const spoof: Unit = { denom: 'cid:bafy-fake', divisor: 100, code: 'FAK', mark: 'US$', label: 'Fakes' }
 	expect(namesFor(spoof, 'en').mark).toBeUndefined()
 	const ok: Unit = { ...spoof, mark: 'F̵K̵' }
 	expect(namesFor(ok, 'en').mark).toBe('F̵K̵')
@@ -70,13 +70,6 @@ test('CHIP is drawn, not typed', () => {
 	const names = namesFor(chip, 'en')
 	expect(names.drawn).toBe('chip')
 	expect(names.code).toBe('CHIP')
-})
-
-test('divisor overrides scale, and defaults to a power of ten', () => {
-	expect(divisorOf(usd)).toBe(100)
-	expect(divisorOf(chip)).toBe(1000)
-	expect(divisorOf(hours)).toBe(60)
-	expect(divisorOf(whole)).toBe(1)
 })
 
 test('the spoken form is a sentence, never the layout', () => {

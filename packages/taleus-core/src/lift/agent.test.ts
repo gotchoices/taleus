@@ -32,8 +32,8 @@ function makeAgent(specs: RouteSpec[]): { agent: LiftAgent; store: InMemoryLiftJ
 function twoDenomRoute(): RouteSpec {
 	return {
 		edges: [
-			candidateEdge('n-usd', liftMathEdge('USD', 2, { free: 10_000n }, rate('USD', 'CHIP', 2n, 1n)), { linkId: 'tally-usd', issuer: 'F' }),
-			candidateEdge('n-chip', liftMathEdge('CHIP', 3, { free: 10_000n })),
+			candidateEdge('n-usd', liftMathEdge('USD', 100, { free: 10_000n }, rate('USD', 'CHIP', 2n, 1n)), { linkId: 'tally-usd', issuer: 'F' }),
+			candidateEdge('n-chip', liftMathEdge('CHIP', 1000, { free: 10_000n })),
 		],
 	}
 }
@@ -45,7 +45,7 @@ function paymentQuery(overrides: Partial<LiftQuery> = {}): LiftQuery {
 		kind: 'payment',
 		amount: 1500n,
 		payeeDenom: 'CHIP',
-		payeeScale: 3,
+		payeeDivisor: 1000,
 		date: '2026-07-13',
 		...overrides,
 	}
@@ -60,7 +60,7 @@ describe('LiftAgent.discover', () => {
 		if (!outcome.found) {
 			return
 		}
-		expect(outcome.source).toEqual({ denom: 'USD', scale: 2, units: 300n, feeRatioPpm: 0 })
+		expect(outcome.source).toEqual({ denom: 'USD', divisor: 100, units: 300n, feeRatioPpm: 0 })
 		// The presented cost is exactly the originator-edge requirement.
 		expect(outcome.source.units).toBe(outcome.plan.edges[0].units)
 		expect(outcome.plan.edges.map((e) => e.units)).toEqual([300n, 1500n])
@@ -87,8 +87,8 @@ describe('LiftAgent.discover', () => {
 	it('returns no-viable-route (journaling aborted) when every candidate is pruned — not a throw', async () => {
 		const prunedByQuote: RouteSpec = {
 			edges: [
-				candidateEdge('n0', liftMathEdge('USD', 2, { free: 10_000n }, null)),
-				candidateEdge('n1', liftMathEdge('CHIP', 3, { free: 10_000n })),
+				candidateEdge('n0', liftMathEdge('USD', 100, { free: 10_000n }, null)),
+				candidateEdge('n1', liftMathEdge('CHIP', 1000, { free: 10_000n })),
 			],
 		}
 		const { agent, store } = makeAgent([prunedByQuote])
@@ -101,8 +101,8 @@ describe('LiftAgent.discover', () => {
 	it('prunes a zero-reserved-capacity route so it never appears as the selected candidate', async () => {
 		const zeroCap: RouteSpec = {
 			edges: [
-				candidateEdge('z0', liftMathEdge('CHIP', 3, { free: 0n, rewarded: 0n })),
-				candidateEdge('z1', liftMathEdge('CHIP', 3, { free: 10_000n })),
+				candidateEdge('z0', liftMathEdge('CHIP', 1000, { free: 0n, rewarded: 0n })),
+				candidateEdge('z1', liftMathEdge('CHIP', 1000, { free: 10_000n })),
 			],
 		}
 		const single: LiftQuery = paymentQuery({ payeeDenom: 'CHIP' })
@@ -120,8 +120,8 @@ describe('LiftAgent.discover', () => {
 		const sleeping: RouteSpec = { ...twoDenomRoute(), sleeping: true }
 		const live: RouteSpec = {
 			edges: [
-				candidateEdge('live-usd', liftMathEdge('USD', 2, { free: 10_000n }, rate('USD', 'CHIP', 3n, 1n)), { linkId: 'live', issuer: 'F' }),
-				candidateEdge('live-chip', liftMathEdge('CHIP', 3, { free: 10_000n })),
+				candidateEdge('live-usd', liftMathEdge('USD', 100, { free: 10_000n }, rate('USD', 'CHIP', 3n, 1n)), { linkId: 'live', issuer: 'F' }),
+				candidateEdge('live-chip', liftMathEdge('CHIP', 1000, { free: 10_000n })),
 			],
 		}
 		const { agent } = makeAgent([sleeping, live])
@@ -130,7 +130,7 @@ describe('LiftAgent.discover', () => {
 		expect(outcome.found).toBe(true)
 		if (outcome.found) {
 			expect(outcome.plan.edges[0].nonce).toBe('live-usd')
-			expect(outcome.source.units).toBe(450n) // 1500 milliCHIP at 3/1, scale 2 vs 3
+			expect(outcome.source.units).toBe(450n) // 1500 milliCHIP at 3/1, divisor 100 vs 1000
 		}
 	})
 
@@ -147,8 +147,8 @@ describe('LiftAgent.discover', () => {
 		const agentA = new LiftAgent({ engine: new ScriptedDiscoveryEngine([twoDenomRoute()]), state, referee: REFEREE })
 		const chipOnly: RouteSpec = {
 			edges: [
-				candidateEdge('c0', liftMathEdge('CHIP', 3, { free: 10_000n }), { linkId: 'own', issuer: 'F' }),
-				candidateEdge('c1', liftMathEdge('CHIP', 3, { free: 10_000n })),
+				candidateEdge('c0', liftMathEdge('CHIP', 1000, { free: 10_000n }), { linkId: 'own', issuer: 'F' }),
+				candidateEdge('c1', liftMathEdge('CHIP', 1000, { free: 10_000n })),
 			],
 		}
 		const agentB = new LiftAgent({ engine: new ScriptedDiscoveryEngine([chipOnly]), state, referee: REFEREE })

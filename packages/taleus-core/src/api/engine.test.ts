@@ -119,7 +119,7 @@ async function opened(world: World): Promise<{ janTally: Tally; samTally: Tally 
 			contractCid: CONTRACT_DOCUMENT.cid,
 			documents: [CONTRACT_DOCUMENT],
 			denomination: USD,
-			denominationScale: 2,
+			denominationDivisor: 100,
 		}),
 	)
 	must(await samTally.acceptContract())
@@ -531,7 +531,7 @@ describe('what the view says about whose move it is', () => {
 		must(await samTally.offerCredit({ limit: usd(0), callDays: 21 }))
 		expect((await janTally.read()).offer).toBeUndefined()
 
-		must(await janTally.offerContract({ contractCid: CONTRACT_DOCUMENT.cid, documents: [CONTRACT_DOCUMENT], denomination: USD, denominationScale: 2 }))
+		must(await janTally.offerContract({ contractCid: CONTRACT_DOCUMENT.cid, documents: [CONTRACT_DOCUMENT], denomination: USD, denominationDivisor: 100 }))
 		expect((await janTally.read()).offer).toEqual({ contractCid: CONTRACT_DOCUMENT.cid, by: 'me' })
 		expect((await samTally.read()).offer).toEqual({ contractCid: CONTRACT_DOCUMENT.cid, by: 'them' })
 		// The offer brought its contract: the counterparty reads it from the tally itself.

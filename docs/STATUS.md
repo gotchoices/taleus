@@ -201,9 +201,9 @@ module keeps its in-process suite against doubles until direct chits work on a r
 
 - [ ] **Rename `chipnet` → `tallyNet`** (or similar): branding sweep across docs, code (`src/lift/`,
   `src/transport/`, `/taleus/chipnet/1.0.0`), and tickets. (Noted in `docs/index.md`; sweep not yet done.)
-- [ ] **Rational vs. decimal denomination multiplier** — decide whether to extend beyond `10^n` for
-  non-decimal units, and if so carry the rational in the `cid:` descriptor's `canonicalUnit`. Captured in
-  `docs/denominations.md`; decision open.
+- [x] **Denomination multiplier: an integer divisor** (decided 2026-10-28). `DenominationDivisor` (sub-units
+  per whole, any integer ≥ 1) replaces the decimal `DenominationScale` on the contract, through core, the
+  lift conversion, the model, both apps and the fixtures; why, in `docs/denominations.md`.
 - [x] **Contract-governance principle** — captured in `docs/tally-lifecycle.md § Contract governance`
   (direct chits grantor-authorized anytime; lift chits per signed trading variables; good-faith timing).
 - [x] **Lift-chit ↔ trading-variable conformance is agent-enforced, not schema-gated** — documented in

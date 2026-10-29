@@ -33,7 +33,7 @@ async function waitingItems(session: Session): Promise<{ open: Waiting[]; past: 
 				...base,
 				id: `request:${request.id}`,
 				kind: 'request' as const,
-				amount: { ...amount(request.amount.units, unit), denom: unit.denom, scale: unit.scale },
+				amount: { ...amount(request.amount.units, unit), denom: unit.denom, divisor: unit.divisor },
 				route: 'RequestView',
 				requestId: request.id,
 			}

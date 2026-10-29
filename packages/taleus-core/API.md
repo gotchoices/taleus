@@ -220,7 +220,7 @@ must(await janTally.establish())
 must(await janTally.offerCredit({ limit: usd(50000), callDays: 21 }))
 must(await samTally.offerCredit({ limit: usd(0), callDays: 21 }))
 must(await janTally.offerContract({ contractCid: 'cid:standard-tally-v1',
-                                    denomination: 'iso4217:USD', denominationScale: 2 }))
+                                    denomination: 'iso4217:USD', denominationDivisor: 100 }))
 must(await samTally.acceptContract())        // state: 'open'
 
 // Value moves. A chit is never refused for its amount: a credit limit says what the other party will

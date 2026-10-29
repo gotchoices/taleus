@@ -2,16 +2,16 @@ import { buildCommsTerms, buildLiftTerms, resolveBoundaryQuote } from './terms.j
 import { rate, StubTermSource } from './test-harness.js'
 
 describe('term population', () => {
-	it('builds L-intent terms from the edge contract (denom/scale) and its reserved-balance lading', () => {
+	it('builds L-intent terms from the edge contract (denom/divisor) and its reserved-balance lading', () => {
 		const source = new StubTermSource(
-			{ 'tally-0': { denom: 'iso4217:USD', scale: 2 } },
+			{ 'tally-0': { denom: 'iso4217:USD', divisor: 100 } },
 			{ 'tally-0|stockSid': { freeUnits: 500n, rewardedUnits: 200n, reward: 30_000, clutch: 10_000 } },
 			{},
 		)
 		expect(buildLiftTerms(source, 'tally-0', 'stockSid')).toEqual({
 			intent: 'L',
 			denom: 'iso4217:USD',
-			scale: 2,
+			divisor: 100,
 			freeUnits: 500n,
 			rewardedUnits: 200n,
 			reward: 30_000,

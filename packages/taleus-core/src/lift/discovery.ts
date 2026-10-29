@@ -42,9 +42,9 @@ export interface LiftQuery {
 	kind: 'payment' | 'circular'
 	/** Target amount in the payee edge's denomination smallest units. */
 	amount: bigint
-	/** Payee edge denomination + scale (the downstream-most edge of every candidate). */
+	/** Payee edge denomination + divisor (the downstream-most edge of every candidate). */
 	payeeDenom: string
-	payeeScale: number
+	payeeDivisor: number
 	/** Decision date: quote-validity cutoff and the pledge date the reserved-credit gate keys off. */
 	date: string
 	/** ChipNet depth/cost cut-off (advisory here; the real engine enforces query economics). */
@@ -61,7 +61,7 @@ export interface LiftQuery {
  */
 export interface RouteMathEdge {
 	denom: string
-	scale: number
+	divisor: number
 	/** Movable capacity in this edge's own denomination (LiftLading.FreeUnits). */
 	freeUnits: bigint
 	/** Further movable capacity charged at `reward` (LiftLading.RewardedUnits). */
@@ -83,7 +83,7 @@ export interface RouteMathEdge {
 export function mathEdge(terms: LiftTerms, convertQuote?: RateQuote | null): RouteMathEdge {
 	return {
 		denom: terms.denom,
-		scale: terms.scale,
+		divisor: terms.divisor,
 		freeUnits: terms.freeUnits,
 		rewardedUnits: terms.rewardedUnits,
 		reward: terms.reward,
@@ -189,13 +189,13 @@ function convertUpstream(
 	atEdge: number,
 ): { pruned: false; value: bigint } | PrunedRoute {
 	if (upstream.denom === downstream.denom) {
-		// Same denomination — no conversion, no quote lookup even if scales differ.
+		// Same denomination — no conversion, no quote lookup even if divisors differ.
 		const value = convertBoundary({
 			reqOut,
 			rateNum: 1n,
 			rateDen: 1n,
-			scaleIn: upstream.scale,
-			scaleOut: downstream.scale,
+			divisorIn: upstream.divisor,
+			divisorOut: downstream.divisor,
 		})
 		return { pruned: false, value }
 	}
@@ -210,8 +210,8 @@ function convertUpstream(
 		reqOut,
 		rateNum: quote.rateNum,
 		rateDen: quote.rateDen,
-		scaleIn: upstream.scale,
-		scaleOut: downstream.scale,
+		divisorIn: upstream.divisor,
+		divisorOut: downstream.divisor,
 	})
 	return { pruned: false, value }
 }

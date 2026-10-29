@@ -32,8 +32,8 @@ async function mockWorld(): Promise<TaleusModel> {
 
 /** Two tallies with the simulated counterparty, value moved both ways, a request standing. */
 async function engineWorld(): Promise<TaleusModel> {
-	const USD = { denom: 'iso4217:USD', scale: 2 }
-	const CHIP = { denom: 'CHIP', scale: 3 }
+	const USD = { denom: 'iso4217:USD', divisor: 100 }
+	const CHIP = { denom: 'CHIP', divisor: 1000 }
 	const world = await createLocalWorld({ schema: tallySchema(), now: () => new Date('2026-09-07T12:00:00Z'), documents: CONTRACT.cache, fetch: offline })
 	const me = world.me.model
 	const them = world.counterparty.model

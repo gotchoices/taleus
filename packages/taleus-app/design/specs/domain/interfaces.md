@@ -114,14 +114,9 @@ and never combine amounts in different units except through an explicit estimate
 
 ## Units
 
-A unit says how many of its smallest parts make one whole — its **divisor**. For most units that is a
-power of ten, and `scale` states the exponent: `iso4217:USD` at scale 2 is a hundred cents to the
-dollar. A unit may instead divide some other way — sixty minutes to an hour — in which case the count
-is the fact and an exponent cannot express it.
-
-The divisor is the more general of the two: `scale` is recoverable from a power-of-ten divisor, and
-the apps need the divisor either way, because it decides both the arithmetic and how a figure is
-written ([amounts.md](amounts.md)).
+A unit says how many of its smallest parts make one whole — its **divisor**, any whole number:
+`iso4217:USD` at 100 is a hundred cents to the dollar, an hour at 60 is sixty minutes. The tally's
+contract fixes it; it decides both the arithmetic and how a figure is written ([amounts.md](amounts.md)).
 
 A unit the app cannot recognise also needs a **code**, and may have a **mark** — the short forms the
 parties write it with. Both belong to the tally, because the parties agreed the unit. A unit that *is*

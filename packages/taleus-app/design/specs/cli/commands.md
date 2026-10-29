@@ -61,8 +61,9 @@ An ambiguous or unknown name is an error (exit 4) listing the candidates.
 ## Amounts
 
 Typed in the tally's unit, as written: `12.50` on a dollar tally is 1250 cents. More decimal places
-than the unit has is a usage error, never rounded. Printed the same way, with the unit's code
-(`12.50 USD`). Output never combines units.
+than the unit has is a usage error, never rounded. A unit that does not divide by ten is written as a
+whole and a part over its own divisor: `2 30/60` on a tally of hours counted in minutes. Printed the
+same way, with the unit's code (`12.50 USD`, `2 30/60 HRS`). Output never combines units.
 
 ## Output
 

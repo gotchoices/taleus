@@ -20,7 +20,7 @@ const LIFECYCLE_MS = 180_000
 const CONVERGE_MS = 90_000
 const SAPP = taleusSApp()
 const CONTRACT = await testContract()
-const USD = { denom: 'iso4217:USD', scale: 2 }
+const USD = { denom: 'iso4217:USD', divisor: 100 }
 const usd = (units: number) => ({ units, ...USD })
 
 function must<T>(result: Result<T>): T {

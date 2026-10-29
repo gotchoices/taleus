@@ -16,7 +16,7 @@
 import type { TaleusModel } from 'taleus-model'
 import { getGeneration } from './generation'
 
-const USD = { denom: 'iso4217:USD', scale: 2 }
+const USD = { denom: 'iso4217:USD', divisor: 100 }
 const usd = (units: number) => ({ units, ...USD })
 
 type Outcome = { ok: true; value: unknown } | { ok: false; error: string }

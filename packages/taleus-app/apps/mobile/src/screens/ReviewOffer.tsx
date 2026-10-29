@@ -5,7 +5,6 @@ import { Action, Amount, Card, Empty, Failed, FormScroll, Loading, OpenableRow, 
 import { readOffer, respondToOffer, type Change, type Offer, type ProposedTerms } from '../data/offers'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
-import { divisorOf } from '../util/amount'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 import { formatInstant } from '../util/date'
@@ -61,7 +60,7 @@ export function ReviewOffer({ route, navigation }: Props): React.JSX.Element {
 			mine: {
 				creditLimit: {
 					units: limit
-						? Math.round(Number(limit) * divisorOf(value.unit))
+						? Math.round(Number(limit) * value.unit.divisor)
 						: value.proposed.mine.creditLimit.units,
 				},
 				noticeDays: notice ? Number(notice) : value.proposed.mine.noticeDays,
@@ -160,7 +159,7 @@ export function ReviewOffer({ route, navigation }: Props): React.JSX.Element {
 						value={limit}
 						onChangeText={setLimit}
 						keyboardType="numeric"
-						placeholder={String(value.proposed.mine.creditLimit.units / divisorOf(value.unit))}
+						placeholder={String(value.proposed.mine.creditLimit.units / value.unit.divisor)}
 					/>
 				</View>
 				<View style={styles.field}>

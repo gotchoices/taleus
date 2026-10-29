@@ -105,7 +105,6 @@ test('a unit only one circle uses is presented as the low-risk case it is', asyn
 test('parting with a unit cannot cost less than taking it', async () => {
 	const inverted = await setRate({
 		denom: 'cid:bafy-dave-hours',
-		scale: 0,
 		divisor: 60,
 		basis: 'fixed',
 		accept: 2500,
@@ -121,7 +120,6 @@ test('parting with a unit cannot cost less than taking it', async () => {
 test('setting a rate folds the unit in; clearing it puts the unit back outside', async () => {
 	const set = await setRate({
 		denom: 'cid:bafy-dave-hours',
-		scale: 0,
 		divisor: 60,
 		label: 'Dave-hours',
 		basis: 'fixed',

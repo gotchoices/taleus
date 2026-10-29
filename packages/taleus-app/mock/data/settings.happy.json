@@ -13,13 +13,12 @@
     "unitsHeld": [
       {
         "denom": "iso4217:USD",
-        "scale": 2,
+        "divisor": 100,
         "label": "US dollars",
         "priced": true
       },
       {
         "denom": "cid:bafy-dave-hours",
-        "scale": 0,
         "divisor": 60,
         "code": "DVH",
         "mark": "DH",
@@ -28,7 +27,7 @@
       },
       {
         "denom": "CHIP",
-        "scale": 3,
+        "divisor": 1000,
         "label": "CHIP",
         "priced": true
       }

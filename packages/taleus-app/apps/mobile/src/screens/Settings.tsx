@@ -8,7 +8,7 @@ import { setLocale } from '../i18n'
 import { t } from '../i18n'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTheme, spacing, type as typography, type Tokens } from '../theme'
-import { divisorOf, setUnitStyle, unitLabel, type UnitStyle } from '../util/amount'
+import { setUnitStyle, unitLabel, type UnitStyle } from '../util/amount'
 import type { ThemeChoice } from '../theme'
 
 type Props = ScreenProps<'Settings'>
@@ -217,7 +217,7 @@ function Sample({
 	if (!unit) {
 		return null
 	}
-	const divisor = divisorOf(unit)
+	const divisor = unit.divisor
 	return (
 		<Amount
 			value={{ units: 180 * divisor + Math.floor(divisor / 2) }}
