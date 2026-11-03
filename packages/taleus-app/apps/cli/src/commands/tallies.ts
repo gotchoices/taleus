@@ -3,7 +3,7 @@ import { onWorldChanged, type TallySummary } from 'taleus-model'
 
 import { formatAmount } from '../amount.ts'
 import type { Row } from '../output.ts'
-import { CliFailure, EXIT, titleOf } from '../session.ts'
+import { CliFailure, EXIT, titleOf, type Session } from '../session.ts'
 import { need, text, usage, type Command } from './command.ts'
 
 const TALLY_COLUMNS = ['row', 'id', 'counterparty', 'balance', 'perspective', 'state', 'waitingOn', 'lastActivity'] as const
@@ -178,7 +178,7 @@ const wait: Command = {
 				await new Promise(resolve => setTimeout(resolve, 2000))
 				continue
 			}
-			const candidates = only === undefined ? list : [await session.tally(only)]
+			const candidates = only === undefined ? list : await named(session, only, deadline)
 			const reached = candidates.find(tally => tallyRow(tally).state === state)
 			if (reached) {
 				await session.rememberTallies(list.map(tally => tally.id))
@@ -191,6 +191,19 @@ const wait: Command = {
 			await new Promise(resolve => setTimeout(resolve, 1000))
 		}
 	},
+}
+
+/**
+ * The tally a `wait --tally` names, or none yet: a tally just accepted is listed before its
+ * counterparty's name has arrived, so a name that matches nothing is waited for until the deadline.
+ */
+async function named(session: Session, ref: string, deadline: number): Promise<TallySummary[]> {
+	try {
+		return [await session.tally(ref)]
+	} catch (error) {
+		if (!(error instanceof CliFailure && error.code === EXIT.notFound) || Date.now() >= deadline) throw error
+		return []
+	}
 }
 
 const close: Command = {

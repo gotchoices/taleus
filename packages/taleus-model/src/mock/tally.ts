@@ -3,7 +3,7 @@ import { getVariant } from '../variant.js'
 import {
 	type Result,
 } from '../types.js'
-import type { AgreementDocument, TermsChange, TermsProposal, TermsRecord, Closing, TallyDetail } from '../tally.js'
+import type { AgreementDocument, TermsChange, TermsProposal, TermsRecord, Closing, TallyDetail, UnrecordedAct } from '../tally.js'
 
 /**
  * One tally, read from this party's side (stories 04, 07).
@@ -128,6 +128,17 @@ export async function requestClose(tallyId: string): Promise<Result<TallyDetail>
 
 export function resetCloses(): void {
 	closes = {}
+}
+
+/** The mock records every act, so none is ever refused. */
+export async function listUnrecorded(tallyId: string): Promise<Result<UnrecordedAct[]>> {
+	const current = await readTally(tallyId)
+	return current.ok ? { ok: true, value: [] } : current
+}
+
+export async function acknowledgeUnrecorded(tallyId: string, _actId: string): Promise<Result<void>> {
+	const current = await readTally(tallyId)
+	return current.ok ? { ok: true, value: undefined } : current
 }
 
 function fixtureFor(variant: string): { tallies: Record<string, TallyDetail> } {

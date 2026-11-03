@@ -162,8 +162,9 @@ until Ctrl-C.
 ### `wait <state> [--tally <tally>] [--timeout <seconds>]`
 For scripts: waits (default 600 s) until a tally -- the one named, else any -- shows `state`
 (`Invited`, `Forming`, `Offered`, `Open`, …), then prints its row as `tallies` does and remembers
-the listing, so `offer 1` and `pay 1` that follow name it. Says how long it took on stderr. Times out
-with exit 3.
+the listing, so `offer 1` and `pay 1` that follow name it. Says how long it took on stderr. A named
+tally that matches nothing yet is waited for too: a tally just accepted is listed before its
+counterparty's name arrives. Times out with exit 3.
 
 ### `strands`
 Diagnostics: each tally's strand on this node: `row  tally  status  connections`.

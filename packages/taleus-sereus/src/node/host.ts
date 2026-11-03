@@ -13,7 +13,7 @@ import { join } from 'node:path'
 import { circuitRelayTransport } from '@libp2p/circuit-relay-v2'
 import { multiaddr } from '@multiformats/multiaddr'
 import { webSockets } from '@libp2p/websockets'
-import { FileRawStorage } from '@optimystic/db-p2p-storage-fs'
+import { FileKVStore, FileRawStorage } from '@optimystic/db-p2p-storage-fs'
 import { CadreNode, createOwnerKey, DEFAULT_IDENTITY_KEY_ID, loadOwnerSigner, type CadreNodeConfig, type DurableSlot, type KeyStore } from '@serfab/cadre-core'
 import { FileBootstrapPeerStore } from '@serfab/cadre-core/bootstrap-peer-store-file'
 import { FileEnrolledMachineStore } from '@serfab/cadre-core/enrolled-machine-store-file'
@@ -41,18 +41,41 @@ export interface NodeHostOptions {
 	 * than leaving it to the store's poll. On by default; off only to measure what it costs.
 	 */
 	reactivity?: boolean
+	/**
+	 * Strand offline mode (sereus `docs/strands.md`, "Offline mode"): a write resolves once it is
+	 * saved in a journal in the party's folder, and is sent to the counterparty after. Off by default,
+	 * so a write's time is the stack's real cost; on to exercise the path the phone runs.
+	 */
+	offline?: boolean
 }
+
+/** Each running node's offline journals, one per strand: closed by `stopPartyNode` after the node stops. */
+const journals = new WeakMap<CadreNode, Map<string, FileKVStore>>()
 
 /** Start the party's node: built over its folder, started, and enrolled as its own owner. */
 export async function startPartyNode(options: NodeHostOptions): Promise<CadreNode> {
 	const keyStore = new FileKeyStore(options.dirs.keys)
-	const node = new CadreNode(await nodeConfig(options, keyStore))
+	const opened = new Map<string, FileKVStore>()
+	const node = new CadreNode(await nodeConfig(options, keyStore, opened))
+	journals.set(node, opened)
 	await node.start()
 	await bounded(enrollOwner(node, keyStore))
 	return node
 }
 
-async function nodeConfig({ dirs, config, sAppId, extraRelays = [], listen = [], reactivity = true }: NodeHostOptions, keyStore: KeyStore): Promise<CadreNodeConfig> {
+/** Stop a node `startPartyNode` started, then close its offline journals. */
+export async function stopPartyNode(node: CadreNode): Promise<void> {
+	await node.stop()
+	const opened = journals.get(node)
+	journals.delete(node)
+	await Promise.all([...(opened?.values() ?? [])].map(journal => journal.close()))
+}
+
+async function nodeConfig(
+	{ dirs, config, sAppId, extraRelays = [], listen = [], reactivity = true, offline = false }: NodeHostOptions,
+	keyStore: KeyStore,
+	opened: Map<string, FileKVStore>,
+): Promise<CadreNodeConfig> {
 	const { partyId } = config
 	return {
 		keyStore,
@@ -74,6 +97,7 @@ async function nodeConfig({ dirs, config, sAppId, extraRelays = [], listen = [],
 		// The tally sApp is unsigned until Taleus signs it at release (`taleusSApp`).
 		requireSignedSchemas: false,
 		strandReactivity: { enabled: reactivity },
+		...(offline ? { strandOffline: { journal: (scope: string) => journalFor(dirs, scope, opened), initialMode: 'offline' as const } } : {}),
 		trustedOwners: { store: await FileTrustedOwnerStore.open(dirs.node, partyId) },
 		bootstrapPeers: { store: await FileBootstrapPeerStore.open(dirs.node, partyId) },
 		enrolledMachines: { store: await FileEnrolledMachineStore.open(dirs.node, partyId) },
@@ -137,6 +161,17 @@ function freePort(): Promise<number> {
 			server.close(() => resolve(port))
 		})
 	})
+}
+
+/** One strand's journal: the same store for the same scope, every rebuild (cadre-core's contract). */
+function journalFor(dirs: PartyDirs, scope: string, opened: Map<string, FileKVStore>): FileKVStore {
+	let journal = opened.get(scope)
+	if (!journal) {
+		// Beside the blocks, not among them: block storage lists nested folders as blocks.
+		journal = new FileKVStore(join(dirs.root, 'journals', scope))
+		opened.set(scope, journal)
+	}
+	return journal
 }
 
 /**

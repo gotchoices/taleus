@@ -42,6 +42,9 @@ const NAMES = {
 const SESSION_DB = 'taleus-session'
 const SESSION_STATE_KEY = 'state'
 const DOCUMENT_KEY_PREFIX = 'document:'
+const WRITE_LOG_KEY_PREFIX = 'writes:'
+/** The strand mode a fresh party starts in. */
+const STRAND_OFFLINE_MODE = 'offline' as const
 const IDENTITY_SLOT = 'taleus.identity'
 
 /** The format of the data this build writes, reported back by the next start's saved record. */
@@ -73,7 +76,15 @@ const phone = createPhoneNode({
  */
 export async function startCadreEngine(relayAddrs: readonly string[]): Promise<TaleusModel> {
 	const saved = await phone.loadSavedStart()
-	const options: PhoneNodeOptions = saved?.options ?? { partyId: `taleus-${randomId()}`, bootstrapAddrs: [], relayAddrs: [...relayAddrs] }
+	// Strand offline mode (sereus docs/strands.md, "Offline mode"): an act returns once it is saved on
+	// this phone and is sent to the counterparty after, each entry marked until they hold it. A fresh
+	// party starts in it; a saved start keeps the mode it last ran with (the developer switch sets it).
+	const options: PhoneNodeOptions = saved?.options ?? {
+		partyId: `taleus-${randomId()}`,
+		bootstrapAddrs: [],
+		relayAddrs: [...relayAddrs],
+		strandOfflineMode: STRAND_OFFLINE_MODE,
+	}
 	const node = await phone.start(options)
 	createBackgroundRunner({ ...phoneNodeLifecycle(phone), appState: AppState }).start()
 
@@ -81,7 +92,14 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 	const engine = await createEngineModel({
 		// Reactivity carries a counterparty's commits, so the backstop poll only catches a missed
 		// watch. At the default 10 s it kept the S7's agent busy about a quarter of the time.
-		store: cadreStoreProvider({ node, sApp: taleusSApp(), disclosure: { purpose: 'tally' }, pollMs: 120_000 }),
+		store: cadreStoreProvider({
+			node,
+			sApp: taleusSApp(),
+			disclosure: { purpose: 'tally' },
+			pollMs: 120_000,
+			// Which of its own writes this phone still follows, per tally, beside the device state.
+			writeLog: strandId => kvStoreSlot(session, `${WRITE_LOG_KEY_PREFIX}${strandId}`),
+		}),
 		storage: {
 			state: kvStoreSlot(session, SESSION_STATE_KEY),
 			identity: secureStoreSlot(keychainSecureStore, IDENTITY_SLOT),

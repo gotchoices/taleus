@@ -17,6 +17,8 @@ const STEP_MS = 300_000
 
 /** The one tally a party holds, as `tallies` lists it. */
 const only = (rows: Record<string, unknown>[]) => (rows.length === 1 ? rows[0] : undefined)
+/** The suite run in strand offline mode (`TALEUS_SCENARIO_OFFLINE=1`), as the phone runs. */
+const OFFLINE = process.env.TALEUS_SCENARIO_OFFLINE === '1'
 const inState = (state: string) => (rows: Record<string, unknown>[]) => only(rows)?.state === state
 const balanced = (balance: string, perspective: string) => (rows: Record<string, unknown>[]) =>
 	only(rows)?.balance === balance && only(rows)?.perspective === perspective
@@ -89,11 +91,15 @@ void describe('a tally between two parties', { timeout: 30 * 60_000 }, () => {
 	})
 
 	void it('delivers: a payment the partner holds reads delivered; one made while they are away is held here until they are back', { timeout: STEP_MS * 2 }, async () => {
+		// Online, a write returns once the cohort it can reach takes it; offline, once it is saved
+		// here, and the queue may already be sending it.
+		const queued = ['waiting', 'sending']
 		const [now] = await jan.ok('pay Sam 5 while Sam is here')
-		assert.equal(now?.delivery, 'delivered')
+		assert.ok(OFFLINE ? queued.includes(String(now?.delivery)) : now?.delivery === 'delivered', String(now?.delivery))
+		await jan.until('history Sam', rows => rows.some(row => row.id === now?.id && row.delivery === 'delivered'), STEP_MS)
 		await sam.stop()
 		const [away] = await jan.ok('pay Sam 5 while Sam is away')
-		assert.equal(away?.delivery, 'here-only')
+		assert.ok(OFFLINE ? queued.includes(String(away?.delivery)) : away?.delivery === 'here-only', String(away?.delivery))
 		await sam.restart()
 		await jan.until('history Sam', rows => rows.some(row => row.id === away?.id && row.delivery === 'delivered'), STEP_MS)
 		await sam.until('tallies', balanced('540.00 USD', 'owed-by-me'), STEP_MS)

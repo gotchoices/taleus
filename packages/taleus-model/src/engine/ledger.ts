@@ -35,6 +35,7 @@ function entryOf(entry: CoreEntry, unit: Unit): Entry {
 		balanceAfter: balanceOf(entry.balanceAfter.units, unit),
 		...(entry.requestId ? { answers: [entry.requestId] } : {}),
 		...(entry.delivery ? { delivery: entry.delivery } : {}),
+		...(entry.mayFail ? { mayFail: true as const } : {}),
 		...(entry.datedAhead ? { datedAhead: true as const } : {}),
 	}
 }

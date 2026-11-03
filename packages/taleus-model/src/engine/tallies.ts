@@ -6,8 +6,8 @@ import type { CreditTerms, PaymentRequest as CorePaymentRequest, Tally, TallyVie
 import { agreementDocumentOf, agreementOf, agreementToDecide } from '../contracts/index.js'
 import type { Offer, OffersModel } from '../offers.js'
 import type { TalliesModel } from '../tallies.js'
-import type { Terms, TallyDetail, TallyModel, TermsRecord } from '../tally.js'
-import type { TallySummary, Unit, WaitingOn } from '../types.js'
+import type { Terms, TallyDetail, TallyModel, TermsRecord, UnrecordedAct } from '../tally.js'
+import type { Amount, TallySummary, Unit, WaitingOn } from '../types.js'
 import type { MadeInvitation, Session } from './session.js'
 import {
 	amount,
@@ -79,6 +79,12 @@ async function lastActivity(tally: Tally, view: TallyView, invited?: MadeInvitat
 	return at || !invited ? instantOf(at) : invited.created
 }
 
+/** Of the balance, what this party gave that the counterparty does not hold yet; nothing when none. */
+function undeliveredOf(view: TallyView, unit: Unit): { undelivered?: Amount } {
+	const units = view.balances.undelivered.units
+	return units ? { undelivered: amount(units, unit) } : {}
+}
+
 export async function summaryOf(session: Session, tally: Tally, view: TallyView): Promise<TallySummary> {
 	const unit = session.unitOf(view)
 	const invited = session.local.madeInvitations.find(made => made.tallyId === view.ref.id)
@@ -88,6 +94,7 @@ export async function summaryOf(session: Session, tally: Tally, view: TallyView)
 		counterparty: { sid: view.counterparty.sid, name: nameOf(view.counterparty.sid, view.counterparty.certificate) },
 		unit,
 		balance: balanceOf(view.balances.settled.units, unit),
+		...undeliveredOf(view, unit),
 		state: stateOf(view.state),
 		...situationOf(view, await tally.requests()),
 		lastActivity: await lastActivity(tally, view, invited),
@@ -118,6 +125,7 @@ export function tallyModel(session: Session): TallyModel {
 			counterparty: summary.counterparty,
 			unit,
 			balance: summary.balance,
+			...(summary.undelivered ? { undelivered: summary.undelivered } : {}),
 			state: summary.state,
 			waitingOn: summary.waitingOn,
 			opened: instantOf(view.createdAt),
@@ -176,6 +184,25 @@ export function tallyModel(session: Session): TallyModel {
 			return detail(tallyId)
 		},
 
+		async listUnrecorded(tallyId) {
+			const tally = await session.tally(tallyId)
+			if (!tally) return failed<UnrecordedAct[]>('not-found', `no tally ${tallyId}`)
+			const unit = session.unitOf(await tally.read())
+			return ok((await tally.unrecorded()).map(act => ({
+				id: act.id,
+				kind: act.kind,
+				...(act.amount ? { amount: fromCore(act.amount, unit) } : {}),
+				...(act.memo ? { memo: act.memo } : {}),
+				reason: act.reason,
+			})))
+		},
+
+		async acknowledgeUnrecorded(tallyId, actId) {
+			const tally = await session.tally(tallyId)
+			if (!tally) return failed<void>('not-found', `no tally ${tallyId}`)
+			tally.acknowledge(actId)
+			return ok(undefined)
+		},
 	}
 }
 

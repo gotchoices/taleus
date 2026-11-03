@@ -8,7 +8,7 @@ import type { TaleusModel } from 'taleus-model'
 import { slotDocumentCache } from 'taleus-model/contracts'
 import { createEngineModel, type EngineModel } from 'taleus-model/engine'
 import { cadreStoreProvider, taleusSApp } from 'taleus-sereus'
-import { fileSlot, heldStrandIds, saveConfig, startPartyNode, type PartyConfig, type PartyDirs } from 'taleus-sereus/node'
+import { fileSlot, heldStrandIds, saveConfig, startPartyNode, stopPartyNode, type PartyConfig, type PartyDirs } from 'taleus-sereus/node'
 
 const SAPP = taleusSApp()
 
@@ -36,6 +36,11 @@ export interface PartyOptions {
 	reactivity: boolean
 	/** The store's backstop poll, in seconds (0: none); unset, the store's default. */
 	pollSeconds?: number
+	/**
+	 * Strand offline mode: a write returns once it is saved here, and is sent after. Off by default,
+	 * so the CLI measures what a write really costs; on to exercise the path the phone runs.
+	 */
+	offline?: boolean
 }
 
 export function runningParty(options: PartyOptions): RunningParty {
@@ -44,13 +49,15 @@ export function runningParty(options: PartyOptions): RunningParty {
 	let engine: EngineModel | undefined
 
 	async function start(): Promise<void> {
-		node = await startPartyNode({ dirs, config, sAppId: SAPP.id, extraRelays: options.extraRelays, listen: options.listen, reactivity: options.reactivity })
+		node = await startPartyNode({ dirs, config, sAppId: SAPP.id, extraRelays: options.extraRelays, listen: options.listen, reactivity: options.reactivity, offline: options.offline })
 		engine = await createEngineModel({
 			store: cadreStoreProvider({
 				node,
 				sApp: SAPP,
 				disclosure: { purpose: 'tally' },
 				...(options.pollSeconds === undefined ? {} : { pollMs: options.pollSeconds * 1000 }),
+				// Which of its own writes this party still follows, one file per tally.
+				writeLog: strandId => fileSlot(dirs, 'writes', strandId),
 			}),
 			storage: { state: fileSlot(dirs, 'session'), identity: fileSlot(dirs, 'identity') },
 			// Every contract document this party has seen, one file each.
@@ -63,7 +70,7 @@ export function runningParty(options: PartyOptions): RunningParty {
 		engine = undefined
 		node = undefined
 		await stoppingEngine?.stop()
-		await stoppingNode?.stop()
+		if (stoppingNode) await stopPartyNode(stoppingNode)
 	}
 
 	return {

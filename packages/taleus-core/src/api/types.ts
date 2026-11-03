@@ -214,6 +214,12 @@ export interface TallyRef {
  */
 export interface Balances {
 	settled: Amount
+	/**
+	 * Of `settled`, what this party's own entries moved that the counterparty does not hold yet:
+	 * entries waiting to be sent, being sent, or held only here (`Entry.delivery`). Signed as
+	 * `settled` is. Zero on a store that cannot say.
+	 */
+	undelivered: Amount
 	projected: Amount
 	requested: { toMe: Amount; byMe: Amount }
 	capacity: { canReceive: Amount; canSend: Amount }
@@ -356,24 +362,55 @@ export interface Entry {
 	datedAhead?: true
 	/**
 	 * Where this party's own entry stands on its way to the counterparty, when the store can say
-	 * (a networked store, for a write it made this session). Absent for the counterparty's entries,
+	 * (a networked store, for a write it still follows). Absent for the counterparty's entries,
 	 * which are here because they arrived, and for an entry the store no longer follows.
 	 */
 	delivery?: Delivery
+	/** Set while it waits to be sent and something the counterparty does could still refuse it. */
+	mayFail?: true
 }
 
 /**
- * Where one of this party's own writes stands (sereus `docs/strands.md`, "A commit's durability").
- * `here-only`: committed, held on this machine alone, and followed, so `delivered` will be reported
- * when the counterparty holds it. `unconfirmed`: held here alone and nothing will report its arrival
- * this session. `delivered`: the counterparty holds it.
+ * Where one of this party's own writes stands (sereus `docs/strands.md`, "A commit's durability"
+ * and "Offline mode"). In offline mode a write is first `waiting` (saved on this device, not sent),
+ * then `sending`; committed, it is `here-only` (held on this machine alone, and followed, so
+ * `delivered` will be reported when the counterparty holds it), `unconfirmed` (held here alone,
+ * and nothing will report its arrival this session) or `delivered`. `not-recorded`: the network
+ * refused it, and its rows have left this device's view.
  */
-export type Delivery = 'here-only' | 'unconfirmed' | 'delivered'
+export type Delivery = 'waiting' | 'sending' | 'here-only' | 'unconfirmed' | 'delivered' | 'not-recorded'
+
+/** A store's word on one write: where it stands, and what more it knows. */
+export interface DeliveryStatus {
+	state: Delivery
+	/** `waiting` only: the queue judged that another writer's act could make it fail. */
+	mayFail?: true
+	/** `not-recorded` only: why (the queue's reason: `constraint`, `rejected`, `expired`, ...). */
+	reason?: string
+}
+
+/** One of this device's own single-row writes that a store follows, with where it stands. */
+export interface FollowedWrite {
+	write: RowWrite
+	status: DeliveryStatus
+}
 
 /** What a store says about a write it applied. */
 export interface WriteReceipt {
 	/** The strand transaction it committed in, when the store knows it (a single-row write). */
 	transactionId?: string
+}
+
+/** One of this party's own acts the network refused after it was saved here: its rows are gone. */
+export interface UnrecordedAct {
+	/** The act's id: an entry's, a request's, a decline's or a close request's. */
+	id: string
+	kind: 'payment' | 'request' | 'decline' | 'close'
+	/** What it moved or asked for, for a payment or a request. */
+	amount?: Amount
+	memo?: string
+	/** Why, as the queue said it. */
+	reason: string
 }
 
 /** An open request for payment, from either side. */
@@ -590,6 +627,10 @@ export interface Tally {
 	document(cid: string): Promise<StoredDocument | undefined>
 	balances(): Promise<Balances>
 	history(query?: HistoryQuery): Promise<Entry[]>
+	/** This party's own acts the network refused after they were saved here, until acknowledged. */
+	unrecorded(): Promise<UnrecordedAct[]>
+	/** The party has seen a refused act: stop reporting it. */
+	acknowledge(actId: string): void
 	requests(): Promise<PaymentRequest[]>
 	keys(): Promise<KeyRecord[]>
 
@@ -699,10 +740,17 @@ export interface Taleus {
 export interface TallyStore {
 	query<T>(sql: string, params?: unknown[]): Promise<T[]>
 	apply(writes: RowWrite[]): Promise<WriteReceipt>
-	/** Where a transaction this store applied stands, if it can say. Absent on a store with no network. */
-	delivery?(transactionId: string): Delivery | undefined
-	/** Fire when a transaction this store applied changes where it stands. */
-	onDelivery?(listener: (transactionId: string) => void): Unsubscribe
+	/**
+	 * Where a single-row write this device made stands, by its row's `Id`, while the store follows
+	 * it (until it is delivered, or a refusal is acknowledged). Absent on a store with no network.
+	 */
+	writeStatus?(rowId: string): DeliveryStatus | undefined
+	/** Every single-row write this device made that the store still follows. */
+	followedWrites?(): FollowedWrite[]
+	/** Stop following a refused write, once its party has seen it. */
+	acknowledge?(rowId: string): void
+	/** Fire when one of those writes changes where it stands. */
+	onDelivery?(listener: () => void): Unsubscribe
 	/**
 	 * Fire after a transaction commits on **this replica**, naming the tables it touched.
 	 *

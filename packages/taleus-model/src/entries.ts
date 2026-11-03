@@ -22,11 +22,14 @@ export interface Entry {
 	unsettled?: boolean
 	/**
 	 * Where this party's own entry stands on its way to the counterparty, when known:
-	 * `here-only` (recorded on this device, not yet with them, and followed), `unconfirmed`
-	 * (recorded here, and nothing will say when it reaches them), `delivered` (they hold it).
+	 * `waiting` (saved on this device, not sent yet), `sending`, `here-only` (recorded on this
+	 * device, not yet with them, and followed), `unconfirmed` (recorded here, and nothing will say
+	 * when it reaches them), `delivered` (they hold it).
 	 * Absent for their entries, and for one this session did not write.
 	 */
-	delivery?: 'here-only' | 'unconfirmed' | 'delivered'
+	delivery?: 'waiting' | 'sending' | 'here-only' | 'unconfirmed' | 'delivered' | 'not-recorded'
+	/** While it waits to be sent: something the counterparty does could still make it fail. */
+	mayFail?: true
 	/**
 	 * Their entry, dated ahead of this device's clock by more than clock drift explains. Recorded
 	 * either way; the app says so, so the reader can judge it (docs/timestamps.md).

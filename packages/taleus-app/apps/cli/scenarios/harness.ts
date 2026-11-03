@@ -23,6 +23,8 @@ import { createSession, EXIT, type Session } from '../src/session.ts'
 
 /** `TALEUS_SCENARIO_TRACE=1`: each command's time, and how many polls a wait took, on stderr. */
 const TRACE = process.env.TALEUS_SCENARIO_TRACE === '1'
+/** `TALEUS_SCENARIO_OFFLINE=1`: every party in strand offline mode, the path the phone runs. */
+const OFFLINE = process.env.TALEUS_SCENARIO_OFFLINE === '1'
 
 /** How long a party gets to settle after starting (relay reservation, strands launched). */
 const SETTLE_MS = 60_000
@@ -88,7 +90,7 @@ async function startParty(home: string, name: string, relay: string): Promise<Sc
 	let running: { party: RunningParty; session: Session; captured: Captured } | undefined
 
 	async function start(): Promise<void> {
-		const party = runningParty({ dirs, config, extraRelays: [], listen: [], reactivity: true })
+		const party = runningParty({ dirs, config, extraRelays: [], listen: [], reactivity: true, offline: OFFLINE })
 		const captured = capture()
 		const ready = party.start()
 		const session = createSession({

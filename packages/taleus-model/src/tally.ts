@@ -95,6 +95,11 @@ export interface TallyDetail {
 	counterparty: Counterparty
 	unit: Unit
 	balance: Balance
+	/**
+	 * Of the balance, what this party gave that the counterparty does not hold yet: its own entries
+	 * waiting to be sent, being sent, or held only on this device. Absent when there is none.
+	 */
+	undelivered?: Amount
 	state: TallyState
 	waitingOn: WaitingOn
 	opened: Instant
@@ -112,6 +117,17 @@ export interface TallyDetail {
 }
 
 /** What a screen can read and do about tally. Both the mock and the engine implement it. */
+/** A payment, request, decline or close request this party made that is not on the tally. */
+export interface UnrecordedAct {
+	id: string
+	kind: 'payment' | 'request' | 'decline' | 'close'
+	/** What a payment gave or a request asked for. */
+	amount?: Amount
+	memo?: string
+	/** Why, in the network's words. */
+	reason: string
+}
+
 export interface TallyModel {
 	/**
 	 * One tally, read from this party's side (stories 04, 07).
@@ -139,4 +155,11 @@ export interface TallyModel {
 	 * undone. A second request changes nothing (path F) — one was already enough.
 	 */
 	requestClose(tallyId: string): Promise<Result<TallyDetail>>
+	/**
+	 * This party's acts that left this device but the network refused (offline mode), reported
+	 * until the party has seen them. None when every act was recorded.
+	 */
+	listUnrecorded(tallyId: string): Promise<Result<UnrecordedAct[]>>
+	/** The party has seen a refused act: stop reporting it. */
+	acknowledgeUnrecorded(tallyId: string, actId: string): Promise<Result<void>>
 }

@@ -357,6 +357,20 @@ The mobile client is the **`taleus-app`** package.
 - Storage on device via Quereus's NativeScript plugin (`quereus-plugin-nativescript-sqlite`); the `taleus-core` library itself is platform-neutral and also runs in Node (the `taleus-node` headless agent) and the browser.
 - App surfaces: tally list + balances (per denomination), formation (QR invite/scan), negotiation (certificates, contract, terms), payments/invoices, lift activity, and cadre management (delegated to Sereus UX patterns).
 
+### Delivery of a party's own acts
+
+Each single-row act (a chit, a request, a decline, a close request) is one transaction, and its id comes back with the write. The store keeps a small device-local **write log**: the row's id and its transaction. It is kept in a file in the CLI's party folder and in a key of the phone's session store, never in the strand. The store reads where the transaction stands from the strand (sereus `docs/strands.md`, "A commit's durability" and "Offline mode") and reports it as the entry's **delivery**:
+
+- `waiting` or `sending`: queued on this device.
+- `here-only`: recorded, not yet held by the counterparty, and followed.
+- `unconfirmed`: recorded, and nothing will report when it arrives.
+- `delivered`: the counterparty holds it.
+- `not-recorded`: the network refused it.
+
+A queued write the counterparty could still make fail is marked `mayFail`. The tally's `undelivered` balance is the part of the balance this party's travelling chits make up. A refused act stays listed (`unrecorded`) until the party acknowledges it.
+
+The phone runs the strand in **offline mode**: a write returns once it is saved on the device. The CLI stays synchronous by default, so the stack's latency stays measurable; `--offline` opts in. A chit is the issuer's own promise, keyed by a fresh id, and no other chit has to come before it. So a queued chit is assured, unless it answers a request.
+
 ## Tally Lifecycle
 
 | State | Meaning |

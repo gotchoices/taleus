@@ -30,6 +30,7 @@ import type {
 	Balances,
 	Change,
 	ChangeKind,
+	Delivery,
 	ContractOffer,
 	CreditOffer,
 	CreditTerms,
@@ -66,6 +67,7 @@ import type {
 	TradingPolicy,
 	TradingPolicyChange,
 	Unsubscribe,
+	UnrecordedAct,
 } from './types.js'
 
 /**
@@ -383,6 +385,7 @@ class TallyEngine implements Tally {
 		const projectedUnits = (projected?.Balance ?? 0) + 0
 		return {
 			settled: amount(settledUnits, code),
+			undelivered: amount(this.undeliveredUnits() + 0, code),
 			projected: amount(projectedUnits, code),
 			requested: {
 				toMe: amount(sum(this.side), code),
@@ -442,6 +445,36 @@ class TallyEngine implements Tally {
 		})
 	}
 
+	/**
+	 * Of the settled balance, what this party's own chits moved that the counterparty does not hold
+	 * yet, from this party's side: each followed chit not yet delivered nor refused.
+	 */
+	private undeliveredUnits(): number {
+		const travelling: Delivery[] = ['waiting', 'sending', 'here-only', 'unconfirmed']
+		let units = 0
+		for (const { write, status } of this.store.followedWrites()) {
+			if (write.table !== 'Ledger' || !travelling.includes(status.state)) continue
+			// This party's own chit lowers its own balance by what it gives.
+			units -= Number(write.row.Units)
+		}
+		return units
+	}
+
+	async unrecorded(): Promise<UnrecordedAct[]> {
+		const { code } = await this.denomination()
+		const acts: UnrecordedAct[] = []
+		for (const { write, status } of this.store.followedWrites()) {
+			if (status.state !== 'not-recorded') continue
+			const act = unrecordedAct(write, status.reason ?? 'refused', code)
+			if (act) acts.push(act)
+		}
+		return acts
+	}
+
+	acknowledge(actId: string): void {
+		this.store.acknowledge(actId)
+	}
+
 	/** The settled balance, stock-perspective (`SettledBalance`). */
 	private async settledStockBalance(): Promise<number> {
 		return (await this.one<{ Balance: number }>('select Balance from App.SettledBalance'))?.Balance ?? 0
@@ -453,10 +486,11 @@ class TallyEngine implements Tally {
 		const sign = this.role === 'stock' ? 1 : -1
 		// Only this party's own direct chits travel from here; the counterparty's arrived.
 		const mineToSend = r.Issuer === this.side && r.Kind !== 'lift'
-		const delivery = mineToSend ? this.store.deliveryOfRow(r.Id) : undefined
+		const status = mineToSend ? this.store.writeStatus(r.Id) : undefined
 		const datedAhead = !mineToSend && r.Kind !== 'lift' && r.At !== null && aheadOf(r.At, this.instant())
 		return {
-			...(delivery ? { delivery } : {}),
+			...(status ? { delivery: status.state } : {}),
+			...(status?.mayFail ? { mayFail: true as const } : {}),
 			...(r.At ? { madeAt: r.At } : {}),
 			...(datedAhead ? { datedAhead: true as const } : {}),
 			id: r.Id,
@@ -933,7 +967,7 @@ class TallyEngine implements Tally {
 				listener({ tally: this.ref, kind, at })
 			}
 		})
-		// One of this party's writes reached the counterparty (or stopped being followed).
+		// One of this party's writes moved toward the counterparty, reached it, or was refused.
 		const stopDelivery = this.store.onDelivery(() => listener({ tally: this.ref, kind: 'delivery', at: this.now() }))
 		return () => {
 			stopTables()
@@ -1082,6 +1116,26 @@ function sameRequest(stored: InvoiceRow, side: Side, draft: PaymentRequestDraft)
 		(stored.Reference || undefined) === draft.reference &&
 		(stored.Memo || undefined) === draft.memo
 	)
+}
+
+/** A refused write, as the act it was. Undefined for a row no act of this party's makes alone. */
+function unrecordedAct(write: RowWrite, reason: string, code: string): UnrecordedAct | undefined {
+	const row = write.row
+	const key = row.Id ?? row.InvoiceId
+	const id = typeof key === 'string' ? key : ''
+	const memo = typeof row.Memo === 'string' && row.Memo ? { memo: row.Memo } : {}
+	switch (write.table) {
+		case 'Ledger':
+			return { id, kind: 'payment', amount: amount(Number(row.Units), code), ...memo, reason }
+		case 'Invoice':
+			return { id, kind: 'request', amount: amount(Number(row.Units), code), ...memo, reason }
+		case 'InvoiceDecline':
+			return { id, kind: 'decline', reason }
+		case 'CloseRequest':
+			return { id, kind: 'close', reason }
+		default:
+			return undefined
+	}
 }
 
 /**

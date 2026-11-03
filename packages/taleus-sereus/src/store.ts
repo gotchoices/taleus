@@ -19,16 +19,19 @@
 
 import { describeThrown, generateStrandMemberKey, StrandAwaitingFirstSyncError } from '@serfab/cadre-core'
 import { decodeStrandAddress, encodeStrandAddress } from './address.js'
+import { WriteLog } from './write-log.js'
 import type {
 	CadreNode,
 	PendingJoinStatus,
 	SAppConfig,
+	DurableSlot,
+	StrandDatabase,
 	StrandFormationDisclosure,
 	StrandInstance,
 	StrandRow,
 } from '@serfab/cadre-core'
 import type { Database } from '@quereus/quereus'
-import type { Delivery, InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe, WriteReceipt } from 'taleus-core'
+import type { DeliveryStatus, FollowedWrite, InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe, WriteReceipt } from 'taleus-core'
 import { insertReturningTransaction, tablesIn, transactionBatch, watchTables, type RowWrite } from 'taleus-core/host'
 
 /**
@@ -75,6 +78,11 @@ export interface CadreStoreOptions {
 	 * no watch. Default 10 s; 0 turns it off.
 	 */
 	pollMs?: number
+	/**
+	 * Where this device keeps its log of its own writes to one tally (`write-log.ts`), so a write's
+	 * mark survives a restart: a device-local slot per strand id. Absent, the log lives in memory.
+	 */
+	writeLog?: (strandId: string) => DurableSlot
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -87,6 +95,8 @@ class CadreStoreProvider implements StoreProvider {
 	private readonly tables: readonly string[]
 	/** Each strand's attach, started once and shared by everyone who waits for it. */
 	private readonly attaching = new Map<string, Promise<StrandInstance>>()
+	/** One write log per strand, shared by every store opened on it, so no store saves over another's. */
+	private readonly logs = new Map<string, Promise<WriteLog>>()
 	/** Callers waiting for a strand that has not been offered yet. */
 	private readonly awaited = new Map<string, ((instance: Promise<StrandInstance>) => void)[]>()
 
@@ -108,7 +118,7 @@ class CadreStoreProvider implements StoreProvider {
 	}
 
 	async open(ref: TallyRef): Promise<TallyStore> {
-		return this.storeFor(await this.whenAttached(ref.id))
+		return await this.storeFor(await this.whenAttached(ref.id))
 	}
 
 	/**
@@ -133,7 +143,7 @@ class CadreStoreProvider implements StoreProvider {
 			expiresAtMs: Date.now() + lifetimeMs,
 			totalUses: 1,
 		})
-		return { ref: { id: strandId, address: encodeStrandAddress(invitation) }, store: this.storeFor(instance) }
+		return { ref: { id: strandId, address: encodeStrandAddress(invitation) }, store: await this.storeFor(instance) }
 	}
 
 	/**
@@ -145,7 +155,7 @@ class CadreStoreProvider implements StoreProvider {
 		// Already joined -- an acceptance that failed after the strand arrived, now retried: the
 		// strand invitation is spent, so asking again could only be refused.
 		if (this.attaching.has(ticket.ref.id) || node.getStrands().has(ticket.ref.id)) {
-			return { ref: { id: ticket.ref.id }, store: this.storeFor(await this.whenAttached(ticket.ref.id)) }
+			return { ref: { id: ticket.ref.id }, store: await this.storeFor(await this.whenAttached(ticket.ref.id)) }
 		}
 		const address = ticket.ref.address
 		if (!address) throw new Error(`the invitation to ${ticket.ref.id} carries no strand address to join it by`)
@@ -153,7 +163,7 @@ class CadreStoreProvider implements StoreProvider {
 		if (status.strandId !== ticket.ref.id) {
 			throw new Error(`the strand invitation admitted to ${status.strandId ?? 'nothing'}, not the tally ${ticket.ref.id}`)
 		}
-		return { ref: { id: ticket.ref.id }, store: this.storeFor(await this.whenAttached(ticket.ref.id)) }
+		return { ref: { id: ticket.ref.id }, store: await this.storeFor(await this.whenAttached(ticket.ref.id)) }
 	}
 
 	/** Follow a join request until it has joined, failing on a refusal or when patience runs out. */
@@ -234,14 +244,26 @@ class CadreStoreProvider implements StoreProvider {
 		}
 	}
 
-	private storeFor(instance: StrandInstance): TallyStore {
+	private async storeFor(instance: StrandInstance): Promise<TallyStore> {
 		return new CadreTallyStore(
 			this.options.node,
 			instance.strandId,
 			this.tables,
 			this.options.pollMs ?? 10_000,
 			this.options.firstSyncPatienceMs ?? 240_000,
+			await this.logFor(instance.strandId),
 		)
+	}
+
+	private logFor(strandId: string): Promise<WriteLog> {
+		let log = this.logs.get(strandId)
+		if (!log) {
+			log = WriteLog.open(this.options.writeLog?.(strandId))
+			// A slot that could not be read is tried again by the next store, not remembered.
+			log.catch(() => this.logs.delete(strandId))
+			this.logs.set(strandId, log)
+		}
+		return log
 	}
 }
 
@@ -273,6 +295,7 @@ class CadreTallyStore implements TallyStore {
 		private readonly tables: readonly string[],
 		private readonly pollMs: number,
 		private readonly patienceMs: number,
+		private readonly log: WriteLog,
 	) {}
 
 	/** The strand's current database, waiting for one while the strand is syncing. */
@@ -320,6 +343,8 @@ class CadreTallyStore implements TallyStore {
 			const { sql, params } = insertReturningTransaction(writes[0])
 			let transactionId: string | undefined
 			for await (const row of db.eval(sql, params as never)) transactionId ??= typeof row.Tx === 'string' ? row.Tx : undefined
+			const rowId = writes[0].row.Id
+			if (transactionId && typeof rowId === 'string') this.log.record(rowId, { transactionId, write: writes[0] })
 			return transactionId ? { transactionId } : {}
 		}
 		const { sql, params } = transactionBatch(writes)
@@ -328,25 +353,60 @@ class CadreTallyStore implements TallyStore {
 	}
 
 	/**
-	 * Where a transaction this store applied stands (sereus `docs/strands.md`, "A commit's
-	 * durability"): held by another member, held here and followed until it is, or held here with
-	 * nothing to report its arrival. Undefined once the database no longer knows it (a restart, a
-	 * rebuild, or more than 256 commits back).
+	 * Where a single-row write this device made stands, while it is followed. In offline mode the
+	 * queue says first -- waiting, sending, refused -- and once committed, the commit's durability
+	 * (sereus `docs/strands.md`, "Offline mode" and "A commit's durability"): held by another
+	 * member, held here and followed until it is, or held here with nothing to report its arrival.
+	 * A write delivered, or one nothing can account for any more (committed in an earlier run, online),
+	 * stops being followed; a refusal stays until it is acknowledged.
 	 */
-	delivery(transactionId: string): Delivery | undefined {
-		const durability = this.node.getStrands().get(this.strandId)?.database?.commitDurability(transactionId)
-		if (!durability) return undefined
-		if (durability.heldElsewhere) return 'delivered'
-		return durability.followed ? 'here-only' : 'unconfirmed'
+	writeStatus(rowId: string): DeliveryStatus | undefined {
+		if (this.log.delivered(rowId)) return { state: 'delivered' }
+		const logged = this.log.get(rowId)
+		if (!logged) return undefined
+		const database = this.node.getStrands().get(this.strandId)?.database
+		// Not running yet (a restart, before its first sync): nothing to judge by, so keep it.
+		if (!database) return undefined
+		const status = statusOf(database, logged.transactionId)
+		if (status?.state === 'delivered') this.log.settle(rowId)
+		else if (!status) this.log.forget(rowId)
+		return status
 	}
 
-	/** Once every member holds a followed commit, `strand:commit-held` names it. */
-	onDelivery(listener: (transactionId: string) => void): Unsubscribe {
-		const held = ({ strandId, transactionId }: { strandId: string; transactionId: string }) => {
-			if (strandId === this.strandId) listener(transactionId)
+	followedWrites(): FollowedWrite[] {
+		const followed: FollowedWrite[] = []
+		for (const [rowId, logged] of this.log.entries()) {
+			const status = this.writeStatus(rowId)
+			if (status) followed.push({ write: logged.write, status })
+		}
+		return followed
+	}
+
+	/** The party has seen a refusal: forget it here, and in the queue's retained outcomes. */
+	acknowledge(rowId: string): void {
+		const logged = this.log.get(rowId)
+		if (!logged) return
+		const queue = this.node.getStrands().get(this.strandId)?.database?.offline
+		if (queue?.status(logged.transactionId)?.kind === 'failed') queue.acknowledge(logged.transactionId)
+		this.log.forget(rowId)
+	}
+
+	/** The queue's statuses, and `strand:commit-held` once every member holds a followed commit. */
+	onDelivery(listener: () => void): Unsubscribe {
+		const mine = ({ strandId, transactionId }: { strandId: string; transactionId: string }) =>
+			strandId === this.strandId && this.log.has(transactionId)
+		const held = (event: { strandId: string; transactionId: string }) => {
+			if (mine(event)) listener()
+		}
+		const queued = ({ strandId, status }: { strandId: string; status: { transactionId: string } }) => {
+			if (mine({ strandId, transactionId: status.transactionId })) listener()
 		}
 		this.node.on('strand:commit-held', held)
-		return () => this.node.off('strand:commit-held', held)
+		this.node.on('strand:offline-status', queued)
+		return () => {
+			this.node.off('strand:commit-held', held)
+			this.node.off('strand:offline-status', queued)
+		}
 	}
 
 	/**
@@ -403,4 +463,29 @@ function randomHex(bytes: number): string {
 	const buffer = new Uint8Array(bytes)
 	crypto.getRandomValues(buffer)
 	return [...buffer].map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Where one transaction stands, from the strand database's queue and its commit reports. */
+function statusOf(database: StrandDatabase, transactionId: string): DeliveryStatus | undefined {
+	const queued = database.offline?.status(transactionId)
+	switch (queued?.kind) {
+		case 'queued':
+			return { state: 'waiting', ...(queued.outlook?.kind === 'exposed' ? { mayFail: true as const } : {}) }
+		case 'outlook-changed':
+			return { state: 'waiting', ...(queued.outlook.kind === 'exposed' ? { mayFail: true as const } : {}) }
+		case 'submitting':
+		case 'partially-committed':
+			return { state: 'sending' }
+		case 'failed':
+			return { state: 'not-recorded', reason: queued.reason }
+		default:
+			break
+	}
+	const durability = database.commitDurability(transactionId)
+	if (durability) {
+		if (durability.heldElsewhere) return { state: 'delivered' }
+		return { state: durability.followed ? 'here-only' : 'unconfirmed' }
+	}
+	// Sent and committed, but no longer in the database's last 256 reports.
+	return queued?.kind === 'committed' ? { state: 'unconfirmed' } : undefined
 }

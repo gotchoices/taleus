@@ -9,7 +9,7 @@ import { CONTRACT_DOCUMENT } from '../tally/test-harness.js'
 import { MemoryFabric } from './store-memory.js'
 import { createPartyIdentity, localSigner, openTaleus } from './engine.js'
 import { registerCrypto, row, type RowWrite } from '../store/strand.js'
-import type { Amount, Result, StoreProvider, Taleus, Tally, TallyStore, WriteReceipt } from './types.js'
+import type { Amount, DeliveryStatus, FollowedWrite, Result, StoreProvider, Taleus, Tally, TallyStore, WriteReceipt } from './types.js'
 
 /**
  * The API, driven the way a consumer drives it: two parties, two engines, no shared secrets.
@@ -671,18 +671,23 @@ describe('paying once, however many attempts it takes', () => {
 })
 
 describe('where this party’s own entries stand', () => {
-	/** A store that names each write's transaction and says where it stands, as a networked one does. */
-	function delivering(store: TallyStore, state: Map<string, 'here-only' | 'delivered'>, listeners: Set<(tx: string) => void>): TallyStore {
-		let next = 0
-		return {
+	/** A store that follows each single-row write as a networked one does; a test moves its status. */
+	function following(store: TallyStore) {
+		const writes = new Map<string, FollowedWrite>()
+		const listeners = new Set<() => void>()
+		const wrapped: TallyStore = {
 			query: (sql, params) => store.query(sql, params),
-			apply: async writes => {
-				await store.apply(writes)
-				const transactionId = `tx:${++next}`
-				state.set(transactionId, 'here-only')
-				return { transactionId }
+			apply: async rows => {
+				const receipt = await store.apply(rows)
+				const id = rows.length === 1 ? rows[0].row.Id : undefined
+				if (typeof id === 'string') writes.set(id, { write: rows[0], status: { state: 'waiting' } })
+				return receipt
 			},
-			delivery: transactionId => state.get(transactionId),
+			writeStatus: id => writes.get(id)?.status,
+			followedWrites: () => [...writes.values()],
+			acknowledge: id => {
+				writes.delete(id)
+			},
 			onDelivery: listener => {
 				listeners.add(listener)
 				return () => listeners.delete(listener)
@@ -690,26 +695,57 @@ describe('where this party’s own entries stand', () => {
 			subscribe: listener => store.subscribe(listener),
 			close: () => store.close(),
 		}
+		const move = (id: string, status: DeliveryStatus) => {
+			writes.set(id, { write: writes.get(id)!.write, status })
+			for (const listener of listeners) listener()
+		}
+		return { wrapped, move }
 	}
 
-	it('marks a payment held here only until the counterparty holds it, and says when that changes', async () => {
-		const state = new Map<string, 'here-only' | 'delivered'>()
-		const listeners = new Set<(tx: string) => void>()
-		const world = await twoParties({ sam: store => delivering(store, state, listeners) })
+	it('follows a payment from waiting to delivered, and says when it moves', async () => {
+		let moves: ReturnType<typeof following> | undefined
+		const world = await twoParties({ sam: store => (moves = following(store)).wrapped })
 		const { janTally, samTally } = await opened(world)
 		const changes: string[] = []
 		const stop = samTally.watch(change => changes.push(change.kind))
 
 		const paid = must(await samTally.pay({ amount: usd(1000), id: 'chit:lunch' }))
-		expect(paid.delivery).toBe('here-only')
-		const tx = [...state.keys()].pop()!
-		state.set(tx, 'delivered')
-		for (const listener of listeners) listener(tx)
+		expect(paid.delivery).toBe('waiting')
+		expect((await samTally.balances()).undelivered).toEqual(usd(-1000))
+		moves!.move('chit:lunch', { state: 'here-only' })
 		expect(changes).toContain('delivery')
+		expect((await samTally.balances()).undelivered).toEqual(usd(-1000))
+		moves!.move('chit:lunch', { state: 'delivered' })
 		expect((await samTally.history()).find(e => e.id === 'chit:lunch')?.delivery).toBe('delivered')
+		expect((await samTally.balances()).undelivered).toEqual(usd(0))
 		// The counterparty's entries are there because they arrived; they carry no mark.
 		expect((await janTally.history()).find(e => e.id === 'chit:lunch')?.delivery).toBeUndefined()
 		stop()
+	})
+
+	it('reports a refused payment as unrecorded, with its reason, until it is acknowledged', async () => {
+		let moves: ReturnType<typeof following> | undefined
+		const world = await twoParties({ sam: store => (moves = following(store)).wrapped })
+		const { samTally } = await opened(world)
+		must(await samTally.pay({ amount: usd(1000), id: 'chit:late', memo: 'too late' }))
+		moves!.move('chit:late', { state: 'not-recorded', reason: 'rejected' })
+
+		expect(await samTally.unrecorded()).toEqual([
+			{ id: 'chit:late', kind: 'payment', amount: usd(1000), memo: 'too late', reason: 'rejected' },
+		])
+		// Refused, so not travelling: nothing of it is counted as on its way.
+		expect((await samTally.balances()).undelivered).toEqual(usd(0))
+		samTally.acknowledge('chit:late')
+		expect(await samTally.unrecorded()).toEqual([])
+	})
+
+	it('marks a waiting payment that the other side could still refuse', async () => {
+		let moves: ReturnType<typeof following> | undefined
+		const world = await twoParties({ sam: store => (moves = following(store)).wrapped })
+		const { samTally } = await opened(world)
+		must(await samTally.pay({ amount: usd(1000), id: 'chit:exposed' }))
+		moves!.move('chit:exposed', { state: 'waiting', mayFail: true })
+		expect((await samTally.history()).find(e => e.id === 'chit:exposed')?.mayFail).toBe(true)
 	})
 })
 

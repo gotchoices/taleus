@@ -226,9 +226,18 @@ module keeps its in-process suite against doubles until direct chits work on a r
   party's own entries (`Entry.delivery`) and raises a `delivery` change; the CLI prints a `delivery`
   column. Scenario: a payment with the partner online reads `delivered`; one made while the partner
   is stopped reads `here-only`, and `delivered` 3 s after the partner is back. Known only for writes
-  this session (the stack forgets followed commits on restart). (3) Offline mode in the engine (the
-  phone only), (4) the mobile marks and pending balances, (5) story 20 (the payee trusts their own
-  screen). Same-day order: each chit carries `At`, the issuer's signed instant (decided 2026-11-03);
+  this session (the stack forgets followed commits on restart). (3) **Offline mode in the engine,
+  done (2026-11-03):** the store keeps a device-local write log (row id → transaction; a file in
+  the CLI party folder, a session-store key on the phone), so marks survive a restart while the
+  queue still knows the transaction; `waiting` / `sending` / `not-recorded` and `mayFail` come from
+  `StrandDatabase.offline`; `balances.undelivered`, `unrecorded()` / `acknowledge()` in the engine and
+  `TallyModel.listUnrecorded` / `acknowledgeUnrecorded` in the model (the mock records everything).
+  The phone starts in offline mode; the CLI with `--offline` (scenarios: `TALEUS_SCENARIO_OFFLINE=1`,
+  8 of 8, and 8 of 8 online). Offline, each CLI step runs about twice as long as online. Seen once
+  online, not reproduced: after the partner's restart, every write of theirs failed "pending
+  conflict: block(s) held by unresolved rival action(s)" naming the same transaction for 20 s and
+  more; to repro before reporting. (4) The mobile marks and pending balances, (5) story 20 (the
+  payee trusts their own screen). Same-day order: each chit carries `At`, the issuer's signed instant (decided 2026-11-03);
   history orders by date, then `At`. The reader's engine flags a counterparty chit dated ahead of its
   own clock (`datedAhead`); flagging one dated long before it arrived waits on tracking arrival time
   against the counterparty's absence (step 3).

@@ -1,5 +1,5 @@
 import type { RowWrite } from '../store/strand.js'
-import type { Delivery, TallyStore, Unsubscribe, WriteReceipt } from './types.js'
+import type { DeliveryStatus, FollowedWrite, TallyStore, Unsubscribe, WriteReceipt } from './types.js'
 
 /**
  * A tally's store, with identical reads shared.
@@ -17,14 +17,11 @@ import type { Delivery, TallyStore, Unsubscribe, WriteReceipt } from './types.js
  * cadre store's backstop poll exists for -- is bounded by `maxAgeMs`, after which a result is read
  * afresh. A failed read is not kept, so the next caller tries again.
  *
- * It also remembers, for this session, which transaction wrote each single-row write's row (by the
- * row's `Id`), so the engine can say where one of this party's own entries stands without the
- * store below knowing what an entry is.
+ * Where this device's own writes stand (`writeStatus` and its siblings) is the store below's to
+ * say, and is passed through unshared: it changes without any table changing.
  */
 export class SharedReadStore implements TallyStore {
 	private readonly results = new Map<string, { at: number; rows: Promise<unknown[]> }>()
-	/** Row `Id` -> the transaction that wrote it, for this party's own single-row writes this session. */
-	private readonly transactions = new Map<string, string>()
 	private listening: Unsubscribe | undefined
 
 	constructor(
@@ -49,28 +46,31 @@ export class SharedReadStore implements TallyStore {
 
 	async apply(writes: RowWrite[]): Promise<WriteReceipt> {
 		try {
-			const receipt = await this.store.apply(writes)
-			const id = writes.length === 1 ? writes[0].row.Id : undefined
-			if (receipt.transactionId && typeof id === 'string') this.transactions.set(id, receipt.transactionId)
-			return receipt
+			return await this.store.apply(writes)
 		} finally {
 			// Even a failed act may have committed part of itself, so nothing read before it stands.
 			this.forget()
 		}
 	}
 
-	delivery(transactionId: string): Delivery | undefined {
-		return this.store.delivery?.(transactionId)
+	writeStatus(rowId: string): DeliveryStatus | undefined {
+		return this.store.writeStatus?.(rowId)
 	}
 
-	/** Where the row this party wrote under `id` stands, if this session wrote it and the store can say. */
-	deliveryOfRow(id: string): Delivery | undefined {
-		const transactionId = this.transactions.get(id)
-		return transactionId ? this.delivery(transactionId) : undefined
+	followedWrites(): FollowedWrite[] {
+		return this.store.followedWrites?.() ?? []
 	}
 
-	onDelivery(listener: (transactionId: string) => void): Unsubscribe {
-		return this.store.onDelivery?.(listener) ?? (() => {})
+	acknowledge(rowId: string): void {
+		this.store.acknowledge?.(rowId)
+	}
+
+	onDelivery(listener: () => void): Unsubscribe {
+		return this.store.onDelivery?.(() => {
+			// A refused write's rows have left the view: nothing read before it stands.
+			this.forget()
+			listener()
+		}) ?? (() => {})
 	}
 
 	subscribe(listener: (tables: readonly string[]) => void): Unsubscribe {
