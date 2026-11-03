@@ -15,6 +15,7 @@
  */
 import type { TaleusModel } from 'taleus-model'
 import { getGeneration } from './generation'
+import { describeThrown } from 'taleus-model'
 
 const USD = { denom: 'iso4217:USD', divisor: 100 }
 const usd = (units: number) => ({ units, ...USD })
@@ -122,7 +123,7 @@ export function installDevBridge(model: TaleusModel, diagnostics: () => unknown,
 			const call = calls[method] as (...a: unknown[]) => Promise<unknown>
 			call(...args).then(
 				v => results.set(id, { ok: true, value: v }),
-				(e: unknown) => results.set(id, { ok: false, error: e instanceof Error ? e.message : String(e) }),
+				(e: unknown) => results.set(id, { ok: false, error: describeThrown(e) }),
 			)
 			return true
 		},

@@ -8,6 +8,7 @@ import type { Result } from '../types.js'
 import { decodeEnvelope, encodeEnvelope, type Envelope } from './envelope.js'
 import type { Session } from './session.js'
 import { failed, ok, refused, unsupported } from './translate.js'
+import { describeThrown } from '../thrown.js'
 
 const DAY = 86_400_000
 
@@ -179,7 +180,7 @@ export function invitationsModel(session: Session): InvitationsModel {
 				// Joining the strand failed -- the inviter's side unreachable or slow to answer. A
 				// network failure, not a refusal: the party may keep asking, and the person can retry.
 				console.warn('taleus-model: joining the invitation\'s strand failed:', error)
-				return failed('unreachable', error instanceof Error ? error.message : String(error), true)
+				return failed('unreachable', describeThrown(error), true)
 			}
 			if (!accepted.ok) return refused(accepted.refusal)
 			const tallyId = accepted.value.ref.id

@@ -20,6 +20,7 @@ import { errorText, t } from '../i18n'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
 import { formatInstant } from '../util/date'
+import { describeThrown } from 'taleus-model'
 
 type Props = ScreenProps<'CreateInvitation'>
 
@@ -117,7 +118,7 @@ export function CreateInvitation({ navigation }: Props): React.JSX.Element {
 			setMade(result.value)
 			outstanding.reload()
 		} catch (thrown) {
-			setFailed(thrown instanceof Error ? thrown.message : String(thrown))
+			setFailed(describeThrown(thrown))
 		} finally {
 			setMaking(false)
 		}

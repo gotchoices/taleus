@@ -7,6 +7,7 @@ import type { DataError } from '../data/types'
 import { errorText, t } from '../i18n'
 import type { OnboardingProps } from '../navigation/routes'
 import { useStyles, useTokens, spacing, touchTarget, type as typography, type Tokens } from '../theme'
+import { describeThrown } from 'taleus-model'
 
 type Props = OnboardingProps<'ChooseName'>
 
@@ -43,7 +44,7 @@ export function ChooseName({ onDone }: Props & { onDone?: () => void }): React.J
 		} catch (thrown) {
 			setError({
 				kind: 'unexpected',
-				message: thrown instanceof Error ? thrown.message : String(thrown),
+				message: describeThrown(thrown),
 				retryable: true,
 			})
 		} finally {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 
 import { getGeneration, subscribeGeneration } from '../data/generation'
 import type { DataError, Result } from '../data/types'
+import { describeThrown } from 'taleus-model'
 
 export type LoadState = 'loading' | 'ready' | 'failed'
 
@@ -63,7 +64,7 @@ export function useLoad<T>(load: () => Promise<Result<T>>): Loaded<T> {
 			}
 			setError({
 				kind: 'unexpected',
-				message: thrown instanceof Error ? thrown.message : String(thrown),
+				message: describeThrown(thrown),
 				retryable: true,
 			})
 			setState('failed')

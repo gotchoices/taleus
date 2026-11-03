@@ -17,7 +17,7 @@
  * attaches it, once.
  */
 
-import { generateStrandMemberKey, StrandAwaitingFirstSyncError } from '@serfab/cadre-core'
+import { describeThrown, generateStrandMemberKey, StrandAwaitingFirstSyncError } from '@serfab/cadre-core'
 import { decodeStrandAddress, encodeStrandAddress } from './address.js'
 import type {
 	CadreNode,
@@ -254,7 +254,7 @@ class CadreStoreProvider implements StoreProvider {
  * typed error, match on that instead -- a reworded message would silently stop the retries.
  */
 function lackedSuperMajority(error: unknown): boolean {
-	return /Failed to get super-majority/i.test(error instanceof Error ? error.message : String(error))
+	return /Failed to get super-majority/i.test(describeThrown(error))
 }
 
 const WRITE_ATTEMPTS = 5

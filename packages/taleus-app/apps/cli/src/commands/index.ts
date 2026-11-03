@@ -6,6 +6,7 @@ import { inviteCommands } from './invites.ts'
 import { moneyCommands } from './money.ts'
 import { setupCommands } from './setup.ts'
 import { tallyCommands } from './tallies.ts'
+import { describeThrown } from 'taleus-model'
 
 const help: Command = {
 	name: 'help',
@@ -68,7 +69,7 @@ async function runOne(session: Session, name: string, words: string[]): Promise<
 			return error.code
 		}
 		// A thrown error is a defect, or the party failing to start.
-		session.out.note(`taleus: ${error instanceof Error ? (session.verbose ? error.stack : error.message) : String(error)}`)
+		session.out.note(`taleus: ${error instanceof Error && session.verbose ? error.stack : describeThrown(error)}`)
 		return EXIT.failed
 	}
 }

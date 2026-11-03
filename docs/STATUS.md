@@ -12,7 +12,25 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [ ] **Stack: on Sereus 1.19 / Optimystic 1.19 / Quereus 4.21.0 / FRET 1.2.1, one copy each.**
+- [ ] **Stack: on Sereus 1.20 / Optimystic 1.24 / Quereus 4.24.0 / FRET 1.3.0, one copy each.**
+  Sereus 1.20 (2026-11-02) carries Optimystic 1.21-1.24: cohort gossip and notifications only on change
+  plus a 30 s refresh (Optimystic#49), one read check in ten for an idle watched table (#48), the
+  peer-record rewrite throttled (#40), partial indexes hold only admitted rows (#42), `cid()` takes
+  dag-json (#33), FRET deadlines from `linkRoundTripMs` (sereus#48), `describeThrown` (sereus#54).
+  API changes that touch Taleus: none we call (`StrandAppSchemaState` gains `'waiting-for-cohort'`;
+  `strand:app-schema-deferred` carries `waitingFor`; app-schema listeners moved to `StartStrandConfig.appSchema`;
+  `registerSelfUnlessCouldFork`). Taleus now words thrown values with `describeThrown` (taleus-model's
+  copy for the apps and model, cadre-core's in taleus-sereus). Requests per act unchanged (accept 111,
+  a payment 9 at 44 ms); idle gossip 108 -> 18 frames per 30 s per party. Wall-clock times were higher
+  on a loaded Mac (load 4-6): scenarios 29-35 s loopback, 42-47 s at 44 ms; a loopback payment 0.4 s.
+  **Phones (S7 + emulator, fresh parties, 2026-11-02):** the S7's accept of an emulator invitation
+  completed (82 s; last time it timed out at 120 s). A 60 s S7 profile with the peer online is 56%
+  idle (1.19: 0%): pure-JS Ed25519 verify 15.6% -> ~0, peer-store `toPeerPB` 6.5% -> 0; app CPU
+  68-91% while profiled (1.19: 150-220%). But writes were slower than on 1.19 under the same Mac
+  load: the emulator's payments 24-36 s (16 s), the S7's 109 s (31.5 s), and the emulator's reads
+  13-19 s while the S7 was busy, 0.8-1.3 s after. Emulator <-> CLI: accept 24 s (15 s), the offer
+  32 s later (7 s), payment 4 s. Not yet separated from the Mac's load.
+  1.19 notes:
   Sereus/Optimystic 1.19 (2026-10-26): one commit's tables, indexes and `unique` columns go to each
   member together (Optimystic#42 active: 3 `cluster` requests per insert at any index count, measured
   by the chat side); a remote `cancel` reply is read as done (Optimystic#46 fixed); a read's

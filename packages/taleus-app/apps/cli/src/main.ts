@@ -21,6 +21,7 @@ import { splitArgv, splitLine } from './lex.ts'
 import { createOutput } from './output.ts'
 import { runningParty, settle } from './party.ts'
 import { createSession, EXIT, type Session } from './session.ts'
+import { describeThrown } from 'taleus-model'
 
 const VERSION = '0.1.0'
 const HISTORY_LINES = 1000
@@ -319,7 +320,7 @@ async function prompt(
 main(process.argv.slice(2)).then(
 	code => process.exit(code),
 	(error: unknown) => {
-		process.stderr.write(`taleus: ${error instanceof Error ? error.message : String(error)}\n`)
+		process.stderr.write(`taleus: ${describeThrown(error)}\n`)
 		process.exit(EXIT.failed)
 	},
 )
