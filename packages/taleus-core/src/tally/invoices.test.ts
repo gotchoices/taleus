@@ -85,7 +85,7 @@ describe('answering an invoice', () => {
 	it('is one chit, from the payer, for the exact units', async () => {
 		const { jan, sam, tally, invoice, chit } = await trading()
 		await tally.propose([invoice({ id: 'inv:1', units: 12000 })])
-		await tally.propose([chit({ number: 1, units: 12000, balance: 12000, invoiceId: 'inv:1' })])
+		await tally.propose([chit({ seq: 1, units: 12000, invoiceId: 'inv:1' })])
 
 		for (const party of [jan, sam]) {
 			await expect(stateOf(tally, party, 'inv:1')).resolves.toEqual({ State: 'paid' })
@@ -99,7 +99,7 @@ describe('answering an invoice', () => {
 		await tally.propose([invoice({ id: 'inv:1', units: 12000 })])
 		await expect(
 			tally.refuses([
-				chit({ number: 1, issuer: 'S', units: 12000, balance: -12000, invoiceId: 'inv:1' }),
+				chit({ seq: 1, issuer: 'S', units: 12000, invoiceId: 'inv:1' }),
 			]),
 		).resolves.toMatch(/InvoiceLink/)
 	})
@@ -108,26 +108,26 @@ describe('answering an invoice', () => {
 		const { tally, invoice, chit } = await trading()
 		await tally.propose([invoice({ id: 'inv:1', units: 12000 })])
 		await expect(
-			tally.refuses([chit({ number: 1, units: 5000, balance: 5000, invoiceId: 'inv:1' })]),
+			tally.refuses([chit({ seq: 1, units: 5000, invoiceId: 'inv:1' })]),
 		).resolves.toMatch(/InvoiceLink/)
 	})
 
 	it('refuses a second chit against the same invoice', async () => {
 		const { tally, invoice, chit } = await trading()
 		await tally.propose([invoice({ id: 'inv:1', units: 12000 })])
-		await tally.propose([chit({ number: 1, units: 12000, balance: 12000, invoiceId: 'inv:1' })])
+		await tally.propose([chit({ seq: 1, units: 12000, invoiceId: 'inv:1' })])
 		// The unique index `LedgerByInvoice`, not a count in `InvoiceLink`: the two chits have
 		// different Numbers, and only a declared unique value is guaranteed to refuse the second
 		// when both are written at the same instant on different machines.
 		await expect(
-			tally.refuses([chit({ number: 2, units: 12000, balance: 24000, invoiceId: 'inv:1' })]),
+			tally.refuses([chit({ seq: 2, units: 12000, invoiceId: 'inv:1' })]),
 		).resolves.toMatch(/UNIQUE constraint failed: Ledger \(InvoiceId\)/)
 	})
 
 	it('refuses a chit naming an invoice that does not exist', async () => {
 		const { tally, chit } = await trading()
 		await expect(
-			tally.refuses([chit({ number: 1, units: 12000, balance: 12000, invoiceId: 'inv:ghost' })]),
+			tally.refuses([chit({ seq: 1, units: 12000, invoiceId: 'inv:ghost' })]),
 		).resolves.toMatch(/InvoiceLink/)
 	})
 
@@ -137,18 +137,18 @@ describe('answering an invoice', () => {
 		// to be renegotiated out of band.
 		const { jan, tally, invoice, chit } = await trading()
 		await tally.propose([invoice({ id: 'inv:1', units: 12000 })])
-		await tally.propose([chit({ number: 1, units: 5000, balance: 5000 })])
+		await tally.propose([chit({ seq: 1, units: 5000 })])
 
 		await expect(stateOf(tally, jan, 'inv:1')).resolves.toEqual({ State: 'open' })
 		await expect(
-			tally.seesOne(jan, 'select Balance from App.Ledger order by Number desc limit 1'),
+			tally.seesOne(jan, 'select Balance from App.SettledBalance'),
 		).resolves.toEqual({ Balance: 5000 })
 	})
 
 	it('accepts an answering chit past the payer’s credit, as any chit', async () => {
 		const { jan, tally, invoice, chit } = await trading()
 		await tally.propose([invoice({ id: 'inv:big', units: 90000 })])
-		await tally.propose([chit({ number: 1, units: 90000, balance: 90000, invoiceId: 'inv:big' })])
+		await tally.propose([chit({ seq: 1, units: 90000, invoiceId: 'inv:big' })])
 		await expect(stateOf(tally, jan, 'inv:big')).resolves.toEqual({ State: 'paid' })
 	})
 })
@@ -187,7 +187,7 @@ describe('declining', () => {
 	it('refuses to decline an invoice already paid', async () => {
 		const { tally, invoice, chit, decline } = await trading()
 		await tally.propose([invoice({ id: 'inv:1', units: 12000 })])
-		await tally.propose([chit({ number: 1, units: 12000, balance: 12000, invoiceId: 'inv:1' })])
+		await tally.propose([chit({ seq: 1, units: 12000, invoiceId: 'inv:1' })])
 		await expect(tally.refuses([decline('inv:1')])).resolves.toMatch(/NotPaid/)
 	})
 
@@ -196,7 +196,7 @@ describe('declining', () => {
 		await tally.propose([invoice({ id: 'inv:1', units: 12000 })])
 		await tally.propose([decline('inv:1')])
 		await expect(
-			tally.refuses([chit({ number: 1, units: 12000, balance: 12000, invoiceId: 'inv:1' })]),
+			tally.refuses([chit({ seq: 1, units: 12000, invoiceId: 'inv:1' })]),
 		).resolves.toMatch(/InvoiceLink/)
 	})
 
@@ -233,7 +233,7 @@ describe('expiry and state precedence', () => {
 		// doing the requester a favour, and the schema does not stand in the way.
 		const { jan, sam, tally, invoice, chit } = await trading()
 		await tally.propose([invoice({ id: 'inv:old', units: 12000, expiryDate: LONG_PAST })])
-		await tally.propose([chit({ number: 1, units: 12000, balance: 12000, invoiceId: 'inv:old' })])
+		await tally.propose([chit({ seq: 1, units: 12000, invoiceId: 'inv:old' })])
 
 		for (const party of [jan, sam]) {
 			await expect(stateOf(tally, party, 'inv:old')).resolves.toEqual({ State: 'paid' })
@@ -253,7 +253,7 @@ describe('expiry and state precedence', () => {
 		await tally.propose([invoice({ id: 'inv:paid', units: 4000 })])
 		await tally.propose([invoice({ id: 'inv:declined', units: 5000 })])
 		await tally.propose([invoice({ id: 'inv:old', units: 6000, expiryDate: LONG_PAST })])
-		await tally.propose([chit({ number: 1, units: 4000, balance: 4000, invoiceId: 'inv:paid' })])
+		await tally.propose([chit({ seq: 1, units: 4000, invoiceId: 'inv:paid' })])
 		await tally.propose([decline('inv:declined')])
 
 		await expect(tally.sees(jan, 'select Id from App.OpenInvoice order by Id')).resolves.toEqual([

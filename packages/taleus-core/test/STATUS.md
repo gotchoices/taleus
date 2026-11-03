@@ -195,7 +195,8 @@ Things the tests turned up that are design questions rather than test failures.
   `Ledger.Reference`, `Ledger.Memo`, and `Invoice`'s pair. The schema's convention is an explicit
   `null` (six columns have it); these do not, so they cannot be omitted. The core passes empty text
   and the signature covers that — worth settling before anything signs in anger.
-- **`Ledger.BalanceCorrect` did not chain — the most serious defect found so far.** It read
+- **`Ledger.BalanceCorrect` did not chain — the most serious defect found so far.** (Later moot: the
+  ledger is now a set with no stored running balance, `SettledBalance` its sum.) It read
   `(select Balance from Ledger where Number = Number - 1)`; both `Number`s resolve to the subquery's
   own column, so the predicate was `Number = Number - 1` — never true. The lookup always returned
   nothing, `Coalesce` made it `0`, and **every chit's `Balance` had to equal its own delta**. The
@@ -375,7 +376,7 @@ Things the tests turned up that are design questions rather than test failures.
      attempt, and the chit's own `Id` was not unique — so `pay({ id })` twice stored two chits with
      one id, balance doubled. Reproduced before fixing. The guide's rule is that an event's key is
      minted once and a retry reads before it re-writes; `ActOptions.id` promised exactly that and did
-     not deliver it. Now `unique index LedgerById`, and `pay` / `requestPayment` read before writing.
+     not deliver it. Now `Id` is the ledger's primary key, and `pay` / `requestPayment` read before writing.
   2. **Taleus's `Digest` replaced the stack's `digest`.** Quereus resolves function names
      case-insensitively; registering ours after `@optimystic/quereus-plugin-crypto` made every
      `digest(…)` on the database Taleus's — Sereus's own `Strand` membership constraints included.
@@ -513,8 +514,10 @@ Things the tests turned up that are design questions rather than test failures.
 - [x] Wrong arithmetic is refused in either direction
 - [x] No credit gate: a chit inside the limit, past it, into credit never extended, and with no
       terms published at all is accepted when duly signed
-- [x] `DateMonotonic`: a chit dated before its predecessor is refused; the same day is fine
-      *(`docs/timestamps.md`)*
+- [x] `DateMonotonic`, per issuer: a chit dated before its own issuer's latest is refused; the same
+      day is fine; the other party's dates do not bind it *(`docs/timestamps.md`)*
+- [x] The ledger is a set: the balance is the same whichever order chits arrive in, both parties'
+      chits land together, and a second chit under one id is refused
 - [x] A chit's `Id` is inside its signed digest, so it cannot be assigned by the store
 - [x] **FINDING** — the digest names the issuer under an alias saying recipient; see § 0
 - [x] Every act is validated independently by both parties' engines *(the harness does this for

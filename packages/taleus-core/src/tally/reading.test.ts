@@ -45,7 +45,7 @@ const limitGrantedBy = (tally: Tally, reader: Party, grantor: Party) =>
 describe('perspective', () => {
 	it('states one balance oppositely to each party', async () => {
 		const { jan, sam, tally, chit } = await trading()
-		await tally.propose([chit({ number: 1, units: 18000, balance: 18000 })])
+		await tally.propose([chit({ seq: 1, units: 18000 })])
 
 		// Jan is stock and has accumulated value; Sam is foil and owes it.
 		await expect(perspective(tally, jan)).resolves.toEqual({ Balance: 18000 })
@@ -56,7 +56,7 @@ describe('perspective', () => {
 		// Each party holds its own database. A view that read differently depending on *which*
 		// copy answered would make the two parties disagree about a signed fact.
 		const { jan, sam, tally, chit } = await trading()
-		await tally.propose([chit({ number: 1, units: 18000, balance: 18000 })])
+		await tally.propose([chit({ seq: 1, units: 18000 })])
 
 		for (const reader of [jan, sam]) {
 			await expect(
@@ -124,7 +124,7 @@ describe('credit limits', () => {
 describe('settled versus reserved', () => {
 	it('keeps an open pledge out of the settled balance and inside the reserved one', async () => {
 		const { jan, sam, tally, cid, chit } = await trading()
-		await tally.propose([chit({ number: 1, units: 18000, balance: 18000 })])
+		await tally.propose([chit({ seq: 1, units: 18000 })])
 
 		const referee = newKey()
 		const expiry = '2026-04-01'

@@ -7,7 +7,7 @@
  *
  * Nothing in this file names a table, a column or a constraint. That is the seam: the row
  * builders in `src/tally/` speak the schema's language, and everything above this line speaks
- * the domain's. Where a schema concept has no domain meaning -- `Ledger.Number`, the `'S'`/`'F'`
+ * the domain's. Where a schema concept has no domain meaning -- the contract's `Number`, the `'S'`/`'F'`
  * side codes, the stock-perspective sign convention -- it does not appear at all.
  *
  * Two conventions run through the whole surface:

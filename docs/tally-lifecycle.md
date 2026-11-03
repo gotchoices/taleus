@@ -105,7 +105,7 @@ deferred).
 - **B2 — malicious counterparty unilateral rekey** (total-loss recovery): inherent to a two-party
   human-trust root, documented, out of scope by design. Disputable.
 - **B3 — backdated chit**: misstates when a debt arose (statements, and interest once rich terms land).
-  Nothing in the schema keys a limit to the date, so it buys no credit. Bounded by `DateMonotonic` and
+  Nothing in the schema keys a limit to the date, so it buys no credit. Bounded by `DateMonotonic` (per issuer) and
   the receiving agent's clock; disputable (the signed date is visible to both). See
   [timestamps.md](timestamps.md).
 

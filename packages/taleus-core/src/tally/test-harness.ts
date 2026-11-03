@@ -33,8 +33,11 @@ export interface TradingTally {
 	sam: Party
 	tally: Tally
 	cid: string
-	/** A chit from whichever side is giving. Sam (foil), paying Jan, by default. */
-	chit: (over: Partial<Chit> & Pick<Chit, 'number' | 'units' | 'balance'>) => ReturnType<typeof issueChit>
+	/**
+	 * A chit from whichever side is giving. Sam (foil), paying Jan, by default. `seq` only names it
+	 * (`chit:<seq>`): the ledger is a set, so nothing about a chit depends on what came before it.
+	 */
+	chit: (over: Partial<Chit> & Pick<Chit, 'units'> & { seq: number }) => ReturnType<typeof issueChit>
 	/** An invoice from whichever side is asking to be paid. Jan (stock) by default. */
 	invoice: (
 		over: Partial<InvoiceRequest> & Pick<InvoiceRequest, 'id' | 'units'>,
@@ -112,13 +115,13 @@ export async function trading({ janGrants = 50000, samGrants = 0 } = {}): Promis
 		sam,
 		tally,
 		cid,
-		chit: over => {
+		chit: ({ seq, ...over }) => {
 			const issuer = over.issuer ?? 'F'
 			const party = sideParty(issuer)
 			return issueChit({
 				tallyCid: cid,
 				contractNumber: 1,
-				id: `chit:${over.number}`,
+				id: `chit:${seq}`,
 				date: TODAY,
 				signer: party.keys[0],
 				issuerSid: party.sid,
@@ -143,6 +146,6 @@ export async function trading({ janGrants = 50000, samGrants = 0 } = {}): Promis
 	}
 }
 
-/** The running stock-perspective balance both parties should agree on. */
+/** The stock-perspective settled balance both parties should agree on: the sum of the ledger. */
 export const balanceOf = (tally: Tally, party: Party) =>
-	tally.seesOne<{ Balance: number }>(party, 'select Balance from App.Ledger order by Number desc limit 1')
+	tally.seesOne<{ Balance: number }>(party, 'select Balance from App.SettledBalance')

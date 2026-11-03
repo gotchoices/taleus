@@ -203,15 +203,16 @@ so the suite exercises the same rules.
 - **An event's key is minted once and held across attempts; a retry reads before it re-writes.** A
   strand write can fail without settling whether it landed (`TornActionError` not marked final,
   `SyncRetryExhaustedError`, a lost reply), and strand writes get no retry funnel. `pay` and
-  `requestPayment` follow the rule; `Ledger.Id` is unique so a retry cannot become a second chit.
+  `requestPayment` follow the rule; `Ledger.Id` is the primary key so a retry cannot become a second chit.
   Never `insert or ignore`: it skips CHECK and NOT NULL failures silently too.
 - **"At most one" is a declared `unique`, never a `count(*)` CHECK.** Sereus guarantees exactly one of
   two racing rows commits for a primary key or secondary unique index; a counting CHECK gets no such
   guarantee. A concurrent refusal can arrive as a plain `Error` with the constraint text on its
   `cause` chain, so `refusal.ts` reads the whole chain.
-- **A gapless integer key retries with randomized backoff.** The ledger's `Number` is the case the
-  guide allows, because the balance chain is gapless; both racers recompute the same next number, so
-  an immediate retry re-collides.
+- **No key two writers can both claim.** The ledger is a set keyed by fresh issuer-generated ids
+  (`"optimystic.fresh" = true`), with no running number or stored running balance: a balance is a sum
+  (`SettledBalance`), computed on read. So two parties writing at once never collide, and a chit queued
+  offline is `assured` unless it answers a request (`LedgerByInvoice`).
 - **Atomic acts**: `exec(sql, params, { transaction: true })` for a batch the caller owns. Explicit
   `begin`/`commit` only where a Sereus writer joins the transaction (`joinOpenTransaction`), as
   seating does with `consumeInvite`.

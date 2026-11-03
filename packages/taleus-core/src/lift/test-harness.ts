@@ -162,7 +162,7 @@ interface StoredPledge {
  * One tally strand's lift state, reproducing the schema's lift gates in-memory
  * (schema/draft1.qsql): single-finalize + finalize-after-void exclusion (`Ledger.LiftFinalize`), void-after-
  * finalize exclusion (`LiftVoid.NotFinalized`), the referee-signature checks
- * (`LiftFinalize` / `RefereeVoidValid`), and the settled-balance chain (`BalanceCorrect`).
+ * (`LiftFinalize` / `RefereeVoidValid`), and the settled balance (`SettledBalance`, a sum).
  * The AUTHORITATIVE gate is Quereus; this is agent-layer behavioral parity while no runner
  * exists (the feat-schema-lift-chits review's caveat). Re-run these flows against a runner
  * when one lands.

@@ -219,6 +219,12 @@ module keeps its in-process suite against doubles until direct chits work on a r
 
 - [ ] **Rename `chipnet` → `tallyNet`** (or similar): branding sweep across docs, code (`src/lift/`,
   `src/transport/`, `/taleus/chipnet/1.0.0`), and tickets. (Noted in `docs/index.md`; sweep not yet done.)
+- [x] **The ledger is a set, not a chain** (decided 2026-11-03). `Ledger.Id` (fresh, issuer-generated,
+  signed) is the primary key; no stored `Number` or running `Balance`; `SettledBalance` sums the ledger,
+  and the views that read "the latest row's balance" read it. `DateMonotonic` is per issuer. So two
+  parties writing at once never contend, and a queued chit is `assured` unless it answers a request.
+  The groundwork for offline mode; existing tallies must be formed again. Lift code (Nate's) needed
+  only a comment: its finalize writes go through a port and its in-memory double keeps its own sum.
 - [x] **Denomination multiplier: an integer divisor** (decided 2026-10-28). `DenominationDivisor` (sub-units
   per whole, any integer ≥ 1) replaces the decimal `DenominationScale` on the contract, through core, the
   lift conversion, the model, both apps and the fixtures; why, in `docs/denominations.md`.

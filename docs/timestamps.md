@@ -49,10 +49,12 @@ sees history in, and — when rich credit terms land ([`drafts/credit-terms.md`]
 — interest, which makes dates directly monetary. It can also blur which credit terms were in force
 when the creditor delivered against it. Two things bound it.
 
-- **Date order.** A chit may not be dated before the chit preceding it in the chain
-  (`Ledger.DateMonotonic`). Deterministic, costs nothing, and any activity on the tally re-anchors
-  the floor. On an active tally the reachable window is the gap since the last chit; on a dormant
-  one it is the time since it last moved.
+- **Date order, per issuer.** A chit may not be dated before its own issuer's latest chit
+  (`Ledger.DateMonotonic`). Deterministic and costs nothing. It is per issuer, not across the tally,
+  because the ledger is a set both parties write at once: a rule that read the other party's dates
+  could fail a chit for something the other party did, including a chit queued offline. The price is a
+  weaker floor: an issuer's own activity re-anchors it, the other party's does not, so the reachable
+  window is the time since the issuer last issued.
 - **The counterparty's own clock, at receipt.** A node that receives a chit dated far from its own
   clock can decline to act on it — before shipping goods, before extending further credit. This is
   the layer where "the other party objects" actually happens, and it happens in real time, not in a
@@ -63,13 +65,13 @@ when the creditor delivered against it. Two things bound it.
 
 Mostly self-harm, and the same kind of harm to the record: balances as of a date and history
 ordering as a reader sees it. A postdated chit also raises the floor `DateMonotonic` sets for the
-next one. The receiving agent should bound future dates against its own clock for the same reason it
+issuer's next one. The receiving agent should bound future dates against its own clock for the same reason it
 bounds past ones.
 
 ## What this means for the schema
 
 - Constraints key off `New.Date`, never a clock. Already true.
-- `Ledger.DateMonotonic` keeps the chain in date order.
+- `Ledger.DateMonotonic` keeps each issuer's chits in date order.
 - Dates are `YYYY-MM-DD` text, checked with `IsISODate`, and compared as text, which is calendar
   order. Date arithmetic inside a constraint adds a `timespan` (`Date + timespan('P21D')`), which is
   deterministic; `julianday()` and `date()` are not, because they accept `'now'`. Only Quereus

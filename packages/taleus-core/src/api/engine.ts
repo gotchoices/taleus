@@ -3,7 +3,7 @@ import { bytesToHex, fromText, toText } from '../lift/digest.js'
 import { newInvitation, newKey, sidFor, signText, type KeyPairText } from '../store/index.js'
 import type { RowWrite } from '../store/strand.js'
 import { publishCertificate } from '../tally/certificates.js'
-import { issueChit } from '../tally/chits.js'
+import { chitDelta, issueChit } from '../tally/chits.js'
 import { requestClose as closeRow } from '../tally/close.js'
 import { storeDocument } from '../tally/documents.js'
 import { createTally, seatFoil, seatStock } from '../tally/formation.js'
@@ -420,14 +420,29 @@ class TallyEngine implements Tally {
 		const rows = await this.store.query<LedgerRow>(
 			`select ${LEDGER_COLUMNS} from App.Ledger
 			 ${query?.since ? 'where Date >= ?' : ''}
-			 order by Number desc ${query?.limit ? 'limit ?' : ''}`,
+			 order by Date desc, Id desc ${query?.limit ? 'limit ?' : ''}`,
 			[...(query?.since ? [query.since] : []), ...(query?.limit ? [query.limit] : [])],
 		)
-		return rows.map(r => this.entryFrom(r, code))
+		// The ledger stores no running balance (it is a set; `SettledBalance` is its sum), so the
+		// balance after each entry is walked back from today's: the newest entry leaves the tally at
+		// the current balance, and each older one at that less the entries after it. The window is
+		// always the newest entries (`since` and `limit` both trim from the old end), so the walk
+		// starts right whatever the filter.
+		let after = await this.settledStockBalance()
+		return rows.map(r => {
+			const entry = this.entryFrom(r, after, code)
+			after -= chitDelta(r.Issuer, r.Units)
+			return entry
+		})
 	}
 
-	/** One ledger row, from this party's side. */
-	private entryFrom(r: LedgerRow, code: string): Entry {
+	/** The settled balance, stock-perspective (`SettledBalance`). */
+	private async settledStockBalance(): Promise<number> {
+		return (await this.one<{ Balance: number }>('select Balance from App.SettledBalance'))?.Balance ?? 0
+	}
+
+	/** One ledger row, from this party's side, given the stock-perspective balance just after it. */
+	private entryFrom(r: LedgerRow, stockBalanceAfter: number, code: string): Entry {
 		const mine = this.side === 'S' ? 'F' : 'S' // the issuer whose chit raises MY balance
 		const sign = this.role === 'stock' ? 1 : -1
 		return {
@@ -435,7 +450,7 @@ class TallyEngine implements Tally {
 			at: r.Date,
 			amount: amount(r.Units, code),
 			direction: r.Issuer === mine ? 'in' : 'out',
-			balanceAfter: amount(r.Balance * sign, code),
+			balanceAfter: amount(stockBalanceAfter * sign + 0, code),
 			origin: r.Kind === 'lift' ? 'lift' : 'payment',
 			...(r.InvoiceId ? { requestId: r.InvoiceId } : {}),
 			...(r.Reference ? { reference: r.Reference } : {}),
@@ -634,47 +649,36 @@ class TallyEngine implements Tally {
 	 * accepted while its reply is lost. So:
 	 *
 	 * - **Read before writing.** If a chit with this id is already stored, the earlier attempt
-	 *   landed; report it, write nothing. The unique index `LedgerById` makes this a guarantee
-	 *   rather than a courtesy -- a lookup that wrongly came back empty leads to an insert the
-	 *   index refuses, never to a second payment.
-	 * - **Retry a lost race for the next Number, with randomized backoff.** The ledger is a
-	 *   gapless sequence because the balance chain is one, which is the case the guide allows a
-	 *   `max + 1` key for. When both parties issue at once, one commits and the other is refused
-	 *   on the primary key; the loser re-reads and tries the next Number. The delay is random
-	 *   because both would otherwise recompute the same next Number and collide again.
+	 *   landed; report it, write nothing. The id is the ledger's primary key, so this is a
+	 *   guarantee rather than a courtesy -- a lookup that wrongly came back empty leads to an
+	 *   insert the key refuses, never to a second payment.
 	 *
-	 * The chit's signature covers its id, issuer, units, date, reference, memo and invoice --
-	 * not its Number or running Balance -- so a retry re-numbers without re-signing anything a
-	 * counterparty relies on.
+	 * Nothing else can refuse the write for being concurrent: the ledger is a set, keyed by fresh
+	 * ids, with no running number or balance two parties could both claim at once.
 	 */
 	async pay(payment: Payment): Promise<Result<Entry>> {
 		return this.guarded(async core => {
 			const { signer, on, id } = this.act(payment)
 			const { code } = await this.denomination()
-			for (let attempt = 1; ; attempt++) {
+			for (;;) {
 				const stored = await this.one<LedgerRow>(`select ${LEDGER_COLUMNS} from App.Ledger where Id = ?`, [id])
 				if (stored) {
 					if (!sameChit(stored, this.side, payment)) throw new EventIdReused(id)
-					return this.entryFrom(stored, code)
+					return this.entryFrom(stored, await this.settledStockBalance(), code)
 				}
 				try {
 					return await this.writeChit(core, payment, id, on, signer, code)
 				} catch (error) {
-					const collided = uniqueViolation(error)
 					// It landed after all -- ours, from an attempt whose reply went missing. Loop, and
 					// the read above returns it.
-					if (collided?.table === 'Ledger' && collided.key === 'Id') continue
-					if (collided?.table === 'Ledger' && collided.key === 'PK' && attempt < NUMBER_RACE_ATTEMPTS) {
-						await raceBackoff(attempt)
-						continue
-					}
+					if (uniqueViolation(error)?.table === 'Ledger') continue
 					throw error
 				}
 			}
 		})
 	}
 
-	/** One attempt at a chit: read the chain's head, number the next link, write it. */
+	/** One attempt at a chit: sign it under the contract in force, and write it. */
 	private async writeChit(
 		core: Core,
 		payment: Payment,
@@ -687,29 +691,22 @@ class TallyEngine implements Tally {
 			'select Number from App.TallyContract order by Number desc limit 1',
 		)
 		if (!contract) throw new NotOpen()
-		const last = await this.one<{ Number: number; Balance: number }>(
-			'select Number, Balance from App.Ledger order by Number desc limit 1',
-		)
-		// `Balance` is the stock party's perspective throughout the ledger; a chit from the
-		// foil raises it. Giving therefore lowers the giver's own perspective balance.
-		const delta = this.side === 'F' ? payment.amount.units : -payment.amount.units
+		const before = await this.settledStockBalance()
 		const row = issueChit({
 			tallyCid: core.Cid,
 			contractNumber: contract.Number,
-			number: (last?.Number ?? 0) + 1,
 			id,
 			issuer: this.side,
 			issuerSid: this.env.sid,
 			units: payment.amount.units,
 			date: on,
-			balance: (last?.Balance ?? 0) + delta,
 			...(payment.answers ? { invoiceId: payment.answers } : {}),
 			...(payment.reference ? { reference: payment.reference } : {}),
 			...(payment.memo ? { memo: payment.memo } : {}),
 			signer,
 		})
 		await this.store.apply([row])
-		return this.entryFrom(row.row as unknown as LedgerRow, code)
+		return this.entryFrom(row.row as unknown as LedgerRow, before + chitDelta(this.side, payment.amount.units), code)
 	}
 
 	/**
@@ -1019,14 +1016,13 @@ const identity = (sid: string, certificate: unknown): PartyIdentity => ({
 })
 
 /** The ledger columns an `Entry` is built from, in the one order both readers use. */
-const LEDGER_COLUMNS = 'Id, Issuer, Units, Date, Balance, Kind, InvoiceId, Reference, Memo'
+const LEDGER_COLUMNS = 'Id, Issuer, Units, Date, Kind, InvoiceId, Reference, Memo'
 
 interface LedgerRow {
 	Id: string
 	Issuer: Side
 	Units: number
 	Date: string
-	Balance: number
 	Kind: string
 	InvoiceId: string | null
 	Reference: string
@@ -1066,15 +1062,6 @@ function sameRequest(stored: InvoiceRow, side: Side, draft: PaymentRequestDraft)
 		(stored.Reference || undefined) === draft.reference &&
 		(stored.Memo || undefined) === draft.memo
 	)
-}
-
-/** How many times a chit may lose the race for the next Number before the refusal stands. */
-const NUMBER_RACE_ATTEMPTS = 6
-
-/** Randomized exponential backoff: both racers must not re-collide on the next Number. */
-function raceBackoff(attempt: number): Promise<void> {
-	const ms = 15 * 2 ** attempt * (0.5 + Math.random())
-	return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 class EventIdReused extends Error {
