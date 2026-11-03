@@ -132,7 +132,9 @@ Shows the terms proposed on a tally (key/value: `waitingOn`, `myLimit`, `myNotic
 `theirNotice`, `agreement`), or accepts them. Countering is the phone's for now.
 
 ### `history <tally> [-n <count>]`
-Entries oldest first, default the last 20: `row  id  date  issuer  amount  balanceAfter  memo`.
+Entries oldest first, default the last 20: `row  id  date  issuer  amount  balanceAfter  delivery  memo`.
+`delivery` is set on this party's own entries written this session: `here-only` (held here, not yet
+by the partner), `unconfirmed` (held here, and nothing will report its arrival), `delivered`.
 
 ### `pay <tally> <amount> [--answers <request>] [<memo...>]`
 Records value given to the partner. Never refused for its amount: a credit limit is what the partner

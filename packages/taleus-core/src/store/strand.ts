@@ -206,6 +206,17 @@ export function transactionBatch(writes: RowWrite[]): { sql: string; params: Rec
 }
 
 /**
+ * One row's insert as a single statement that returns the strand transaction it commits in
+ * (`returning StampId() as Tx`): how a networked store learns the id the stack reports that
+ * write's durability under (sereus `docs/strands.md`, "A commit's durability"). One statement holds
+ * Quereus's execution lock for its whole run, so no other writer's commit is mixed in.
+ */
+export function insertReturningTransaction(write: RowWrite): { sql: string; params: Record<string, unknown> } {
+	const { sql, params } = transactionBatch([write])
+	return { sql: `${sql} returning StampId() as Tx`, params }
+}
+
+/**
  * The schema's base tables, read from the DDL rather than listed by hand -- a table added to
  * the schema and forgotten here would be a watch that silently never fires.
  */

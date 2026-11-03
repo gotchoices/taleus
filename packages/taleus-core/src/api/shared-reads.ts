@@ -1,5 +1,5 @@
 import type { RowWrite } from '../store/strand.js'
-import type { TallyStore, Unsubscribe } from './types.js'
+import type { Delivery, TallyStore, Unsubscribe, WriteReceipt } from './types.js'
 
 /**
  * A tally's store, with identical reads shared.
@@ -16,9 +16,15 @@ import type { TallyStore, Unsubscribe } from './types.js'
  * counterparty's replicated commit counts too. A change that raises no notification -- the case the
  * cadre store's backstop poll exists for -- is bounded by `maxAgeMs`, after which a result is read
  * afresh. A failed read is not kept, so the next caller tries again.
+ *
+ * It also remembers, for this session, which transaction wrote each single-row write's row (by the
+ * row's `Id`), so the engine can say where one of this party's own entries stands without the
+ * store below knowing what an entry is.
  */
 export class SharedReadStore implements TallyStore {
 	private readonly results = new Map<string, { at: number; rows: Promise<unknown[]> }>()
+	/** Row `Id` -> the transaction that wrote it, for this party's own single-row writes this session. */
+	private readonly transactions = new Map<string, string>()
 	private listening: Unsubscribe | undefined
 
 	constructor(
@@ -41,13 +47,30 @@ export class SharedReadStore implements TallyStore {
 		return rows
 	}
 
-	async apply(writes: RowWrite[]): Promise<void> {
+	async apply(writes: RowWrite[]): Promise<WriteReceipt> {
 		try {
-			await this.store.apply(writes)
+			const receipt = await this.store.apply(writes)
+			const id = writes.length === 1 ? writes[0].row.Id : undefined
+			if (receipt.transactionId && typeof id === 'string') this.transactions.set(id, receipt.transactionId)
+			return receipt
 		} finally {
 			// Even a failed act may have committed part of itself, so nothing read before it stands.
 			this.forget()
 		}
+	}
+
+	delivery(transactionId: string): Delivery | undefined {
+		return this.store.delivery?.(transactionId)
+	}
+
+	/** Where the row this party wrote under `id` stands, if this session wrote it and the store can say. */
+	deliveryOfRow(id: string): Delivery | undefined {
+		const transactionId = this.transactions.get(id)
+		return transactionId ? this.delivery(transactionId) : undefined
+	}
+
+	onDelivery(listener: (transactionId: string) => void): Unsubscribe {
+		return this.store.onDelivery?.(listener) ?? (() => {})
 	}
 
 	subscribe(listener: (tables: readonly string[]) => void): Unsubscribe {

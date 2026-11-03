@@ -9,7 +9,7 @@ import { CONTRACT_DOCUMENT } from '../tally/test-harness.js'
 import { MemoryFabric } from './store-memory.js'
 import { createPartyIdentity, localSigner, openTaleus } from './engine.js'
 import { registerCrypto, row, type RowWrite } from '../store/strand.js'
-import type { Amount, Result, StoreProvider, Taleus, Tally, TallyStore } from './types.js'
+import type { Amount, Result, StoreProvider, Taleus, Tally, TallyStore, WriteReceipt } from './types.js'
 
 /**
  * The API, driven the way a consumer drives it: two parties, two engines, no shared secrets.
@@ -47,7 +47,7 @@ interface World {
 type StoreWrap = (store: TallyStore) => TallyStore
 
 /** A store whose `apply` runs `around` in place of the real one. */
-function aroundApply(store: TallyStore, around: (writes: RowWrite[], apply: () => Promise<void>) => Promise<void>): TallyStore {
+function aroundApply(store: TallyStore, around: (writes: RowWrite[], apply: () => Promise<WriteReceipt>) => Promise<WriteReceipt>): TallyStore {
 	return {
 		query: (sql, params) => store.query(sql, params),
 		apply: writes => around(writes, () => store.apply(writes)),
@@ -72,10 +72,10 @@ function wrapProvider(provider: StoreProvider, wrap?: StoreWrap): StoreProvider 
 	}
 }
 
-async function twoParties(wraps: { sam?: StoreWrap } = {}): Promise<World> {
+async function twoParties(wraps: { sam?: StoreWrap; samClock?: () => string } = {}): Promise<World> {
 	const fabric = new MemoryFabric(readSchema('draft1'))
 	let counter = 0
-	const party = async (name: string, wrap?: StoreWrap) => {
+	const party = async (name: string, wrap?: StoreWrap, clock?: () => string) => {
 		const key = newKey()
 		const sid = `sid:${name}`
 		const signer = localSigner(key)
@@ -87,12 +87,13 @@ async function twoParties(wraps: { sam?: StoreWrap } = {}): Promise<World> {
 				signer,
 				sid,
 				now: () => TODAY,
+				...(clock ? { clock } : {}),
 				newId: () => `${name}:${++counter}`,
 			}),
 		}
 	}
 	const jan = await party('jan')
-	const sam = await party('sam', wraps.sam)
+	const sam = await party('sam', wraps.sam, wraps.samClock)
 	return {
 		jan: jan.engine,
 		sam: sam.engine,
@@ -602,18 +603,19 @@ describe('paying once, however many attempts it takes', () => {
 	})
 
 	it('is not paid twice when the first attempt landed but its reply was lost', async () => {
-		// The case the guide names: the commit was accepted, the answer never came back. Before
-		// the unique index on `Ledger.Id`, the retry renumbered the same signed chit and stored
-		// it again -- a double payment, reproduced before this was fixed.
+		// The case the guide names: the commit was accepted, the answer never came back. The chit's
+		// id is the ledger's primary key, so the retry finds it stored instead of storing it again
+		// (a double payment, reproduced before the id was made the chit's identity).
 		let dropped = false
 		const world = await twoParties({
 			sam: store =>
 				aroundApply(store, async (writes, apply) => {
-					await apply()
+					const receipt = await apply()
 					if (!dropped && writes.some(w => w.table === 'Ledger')) {
 						dropped = true
 						throw new Error('connection reset: reply lost')
 					}
+					return receipt
 				}),
 		})
 		const { janTally, samTally } = await opened(world)
@@ -637,10 +639,9 @@ describe('paying once, however many attempts it takes', () => {
 		expect(edited.ok ? '' : edited.refusal.code).toBe('already-exists')
 	})
 
-	it('renumbers a chit that lost the race for the next Number, and loses nothing', async () => {
-		// A real race, staged in process: at the instant Sam's chit is written, Jan's lands first
-		// and takes the Number Sam had read. Sam's write is refused on the ledger's primary key;
-		// the engine re-reads the chain's head and writes the next link.
+	it('lands both parties’ chits written at the same instant: there is nothing to race for', async () => {
+		// Staged in process: at the instant Sam's chit is written, Jan's lands first. The ledger is
+		// a set keyed by fresh ids, so Sam's write claims nothing Jan's took and lands as it is.
 		const race: { jan?: Tally; ran: boolean } = { ran: false }
 		const world = await twoParties({
 			sam: store =>
@@ -649,7 +650,7 @@ describe('paying once, however many attempts it takes', () => {
 						race.ran = true
 						must(await race.jan.pay({ amount: usd(300) }))
 					}
-					await apply()
+					return apply()
 				}),
 		})
 		const tallies = await opened(world)
@@ -661,12 +662,80 @@ describe('paying once, however many attempts it takes', () => {
 		expect(race.ran).toBe(true)
 		const history = await janTally.history()
 		expect(history.map(e => e.amount.units).sort((a, b) => a - b)).toEqual([300, 1000])
-		// Jan gave 300, Sam gave 1000: Jan is owed 700, and the chain agrees on both replicas.
+		// Jan gave 300, Sam gave 1000: Jan is owed 700, and both replicas agree.
 		expect((await janTally.balances()).settled).toEqual(usd(700))
 		expect((await tallies.samTally.balances()).settled).toEqual(usd(-700))
-		// Three payments, a backoff and four reads across two replicas -- more round trips than any
-		// other test here, so it gets more than Jest's default five seconds.
+		// Three payments and four reads across two replicas -- more round trips than most tests
+		// here, so it gets more than Jest's default five seconds.
 	}, 30_000)
+})
+
+describe('where this party’s own entries stand', () => {
+	/** A store that names each write's transaction and says where it stands, as a networked one does. */
+	function delivering(store: TallyStore, state: Map<string, 'here-only' | 'delivered'>, listeners: Set<(tx: string) => void>): TallyStore {
+		let next = 0
+		return {
+			query: (sql, params) => store.query(sql, params),
+			apply: async writes => {
+				await store.apply(writes)
+				const transactionId = `tx:${++next}`
+				state.set(transactionId, 'here-only')
+				return { transactionId }
+			},
+			delivery: transactionId => state.get(transactionId),
+			onDelivery: listener => {
+				listeners.add(listener)
+				return () => listeners.delete(listener)
+			},
+			subscribe: listener => store.subscribe(listener),
+			close: () => store.close(),
+		}
+	}
+
+	it('marks a payment held here only until the counterparty holds it, and says when that changes', async () => {
+		const state = new Map<string, 'here-only' | 'delivered'>()
+		const listeners = new Set<(tx: string) => void>()
+		const world = await twoParties({ sam: store => delivering(store, state, listeners) })
+		const { janTally, samTally } = await opened(world)
+		const changes: string[] = []
+		const stop = samTally.watch(change => changes.push(change.kind))
+
+		const paid = must(await samTally.pay({ amount: usd(1000), id: 'chit:lunch' }))
+		expect(paid.delivery).toBe('here-only')
+		const tx = [...state.keys()].pop()!
+		state.set(tx, 'delivered')
+		for (const listener of listeners) listener(tx)
+		expect(changes).toContain('delivery')
+		expect((await samTally.history()).find(e => e.id === 'chit:lunch')?.delivery).toBe('delivered')
+		// The counterparty's entries are there because they arrived; they carry no mark.
+		expect((await janTally.history()).find(e => e.id === 'chit:lunch')?.delivery).toBeUndefined()
+		stop()
+	})
+})
+
+describe('the instant an entry asserts', () => {
+	it('orders entries within a day by the instant their issuers made them, not by id', async () => {
+		// A clock that moves a second per reading, so the two payments cannot share a millisecond.
+		let tick = Date.parse(`${TODAY}T12:00:00.000Z`)
+		const world = await twoParties({ samClock: () => new Date((tick += 1000)).toISOString() })
+		const { janTally, samTally } = await opened(world)
+		must(await samTally.pay({ amount: usd(100), id: 'z:first' }))
+		must(await samTally.pay({ amount: usd(200), id: 'a:second' }))
+		// Newest first: the later payment leads although its id sorts first.
+		expect((await janTally.history()).map(e => e.id)).toEqual(['a:second', 'z:first'])
+		expect((await janTally.history())[0].balanceAfter).toEqual(usd(300))
+	})
+
+	it('flags the counterparty’s entry dated ahead of this party’s clock: the reader is the watchdog', async () => {
+		const ahead = () => new Date(Date.now() + 3 * 3_600_000).toISOString()
+		const world = await twoParties({ samClock: ahead })
+		const { janTally, samTally } = await opened(world)
+		must(await samTally.pay({ amount: usd(100), id: 'chit:tomorrowish' }))
+		const seen = (await janTally.history()).find(e => e.id === 'chit:tomorrowish')
+		expect(seen?.datedAhead).toBe(true)
+		// Recorded either way, and never flagged to its own issuer, whose clock it agrees with.
+		expect((await samTally.history()).find(e => e.id === 'chit:tomorrowish')?.datedAhead).toBeUndefined()
+	})
 })
 
 describe('how a refusal reads', () => {

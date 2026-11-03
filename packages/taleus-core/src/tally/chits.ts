@@ -30,6 +30,8 @@ export interface Chit {
 	units: number
 	/** A calendar date the issuer asserts and signs. */
 	date: string
+	/** The instant the issuer made it, as it asserts and signs it (`toISOString()`, UTC). Orders chits within a day. */
+	at: string
 	reference?: string
 	memo?: string
 	/** Set when this chit answers an invoice. */
@@ -65,6 +67,7 @@ export function issueChit(chit: Chit): RowWrite {
 			Issuer: chit.issuer,
 			Units: chit.units,
 			Date: chit.date,
+			At: chit.at,
 			Reference: reference,
 			Memo: memo,
 			InvoiceId: invoiceId,
@@ -77,6 +80,7 @@ export function issueChit(chit: Chit): RowWrite {
 					chit.issuerSid,
 					chit.units,
 					chit.date,
+					chit.at,
 					reference,
 					memo,
 					invoiceId,

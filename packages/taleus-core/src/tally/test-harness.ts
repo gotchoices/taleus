@@ -123,6 +123,8 @@ export async function trading({ janGrants = 50000, samGrants = 0 } = {}): Promis
 				contractNumber: 1,
 				id: `chit:${seq}`,
 				date: TODAY,
+				// On the chit's own day, `seq` milliseconds past noon: chits in a test order by seq.
+				at: `${over.date ?? TODAY}T12:00:00.${String(seq).padStart(3, '0')}Z`,
 				signer: party.keys[0],
 				issuerSid: party.sid,
 				issuer,

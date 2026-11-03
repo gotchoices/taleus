@@ -1,5 +1,5 @@
 import { SharedReadStore } from './shared-reads.js'
-import type { TallyStore } from './types.js'
+import type { TallyStore, WriteReceipt } from './types.js'
 
 /** A store that counts its reads and lets the test raise a change or fail the next read. */
 class CountingStore implements TallyStore {
@@ -16,7 +16,9 @@ class CountingStore implements TallyStore {
 		return [{ read: this.reads }] as T[]
 	}
 
-	async apply(): Promise<void> {}
+	async apply(): Promise<WriteReceipt> {
+		return {}
+	}
 
 	subscribe(listener: (tables: readonly string[]) => void): () => void {
 		this.listeners.add(listener)

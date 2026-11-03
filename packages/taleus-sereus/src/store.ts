@@ -28,8 +28,8 @@ import type {
 	StrandRow,
 } from '@serfab/cadre-core'
 import type { Database } from '@quereus/quereus'
-import type { InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe } from 'taleus-core'
-import { tablesIn, transactionBatch, watchTables, type RowWrite } from 'taleus-core/host'
+import type { Delivery, InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe, WriteReceipt } from 'taleus-core'
+import { insertReturningTransaction, tablesIn, transactionBatch, watchTables, type RowWrite } from 'taleus-core/host'
 
 /**
  * What the store asks of the app's running node: these methods of `CadreNode`, and nothing else.
@@ -297,7 +297,7 @@ class CadreTallyStore implements TallyStore {
 	 * (`CoordinatorPartialCommitError`). The engine mints its keys once and reads before it
 	 * re-writes, so a retry after one does not double a row; the half that stood is visible.
 	 */
-	async apply(writes: RowWrite[]): Promise<void> {
+	async apply(writes: RowWrite[]): Promise<WriteReceipt> {
 		for (let attempt = 1; ; attempt++) {
 			try {
 				return await this.applyOnce(writes)
@@ -309,10 +309,44 @@ class CadreTallyStore implements TallyStore {
 		}
 	}
 
-	private async applyOnce(writes: RowWrite[]): Promise<void> {
+	/**
+	 * A single-row write runs as one statement returning its transaction's id, which is what the
+	 * stack reports its durability under (`delivery`). A write of several rows runs as one
+	 * transaction and names none: no act that needs a delivery mark writes more than one row.
+	 */
+	private async applyOnce(writes: RowWrite[]): Promise<WriteReceipt> {
 		const db = await this.db()
+		if (writes.length === 1) {
+			const { sql, params } = insertReturningTransaction(writes[0])
+			let transactionId: string | undefined
+			for await (const row of db.eval(sql, params as never)) transactionId ??= typeof row.Tx === 'string' ? row.Tx : undefined
+			return transactionId ? { transactionId } : {}
+		}
 		const { sql, params } = transactionBatch(writes)
 		await db.exec(sql, params as never, { transaction: true })
+		return {}
+	}
+
+	/**
+	 * Where a transaction this store applied stands (sereus `docs/strands.md`, "A commit's
+	 * durability"): held by another member, held here and followed until it is, or held here with
+	 * nothing to report its arrival. Undefined once the database no longer knows it (a restart, a
+	 * rebuild, or more than 256 commits back).
+	 */
+	delivery(transactionId: string): Delivery | undefined {
+		const durability = this.node.getStrands().get(this.strandId)?.database?.commitDurability(transactionId)
+		if (!durability) return undefined
+		if (durability.heldElsewhere) return 'delivered'
+		return durability.followed ? 'here-only' : 'unconfirmed'
+	}
+
+	/** Once every member holds a followed commit, `strand:commit-held` names it. */
+	onDelivery(listener: (transactionId: string) => void): Unsubscribe {
+		const held = ({ strandId, transactionId }: { strandId: string; transactionId: string }) => {
+			if (strandId === this.strandId) listener(transactionId)
+		}
+		this.node.on('strand:commit-held', held)
+		return () => this.node.off('strand:commit-held', held)
 	}
 
 	/**

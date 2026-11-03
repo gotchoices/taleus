@@ -23,12 +23,13 @@ const pay: Command = {
 			...(memo ? { memo } : {}),
 			...(answers ? { answers } : {}),
 		}))
-		session.out.rows(['id', 'date', 'issuer', 'amount', 'balanceAfter', 'memo'], [{
+		session.out.rows(['id', 'date', 'issuer', 'amount', 'balanceAfter', 'delivery', 'memo'], [{
 			id: entry.id,
 			date: entry.date,
 			issuer: entry.issuer,
 			amount: formatAmount(entry.amount.units, unit),
 			balanceAfter: `${formatAmount(entry.balanceAfter.units, unit)} ${entry.balanceAfter.perspective}`,
+			delivery: entry.delivery,
 			memo: entry.memo,
 		}])
 	},

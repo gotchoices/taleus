@@ -74,13 +74,14 @@ const history: Command = {
 		})
 		const entries = session.unwrap(await session.party.model.entries.listEntries(id))
 		const oldestFirst = [...entries].sort((a, b) => a.date.localeCompare(b.date)).slice(-count)
-		session.out.rows(['row', 'id', 'date', 'issuer', 'amount', 'balanceAfter', 'memo'], oldestFirst.map((entry, i) => ({
+		session.out.rows(['row', 'id', 'date', 'issuer', 'amount', 'balanceAfter', 'delivery', 'memo'], oldestFirst.map((entry, i) => ({
 			row: i + 1,
 			id: entry.id,
 			date: entry.date,
 			issuer: entry.issuer,
 			amount: formatAmount(entry.amount.units, unit),
 			balanceAfter: `${formatAmount(entry.balanceAfter.units, unit)} ${entry.balanceAfter.perspective}`,
+			delivery: entry.delivery,
 			memo: entry.memo,
 		})))
 	},

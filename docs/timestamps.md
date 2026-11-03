@@ -68,9 +68,17 @@ ordering as a reader sees it. A postdated chit also raises the floor `DateMonoto
 issuer's next one. The receiving agent should bound future dates against its own clock for the same reason it
 bounds past ones.
 
+### The instant within the day
+
+A chit also carries `At`: the instant its issuer made it, a UTC timestamp in one fixed shape
+(`YYYY-MM-DDTHH:MM:SS.sssZ`), signed with the rest. The ledger is a set of chits rather than a
+numbered chain, so `At` is what orders chits within a day, and the running balance a history shows
+between them. It is asserted like the date and carries the same risks: an issuer can misstate it,
+and only the other party's clock can object.
+
 ## What this means for the schema
 
-- Constraints key off `New.Date`, never a clock. Already true.
+- Constraints key off `New.Date`, never a clock. Already true. `At` is checked for shape only.
 - `Ledger.DateMonotonic` keeps each issuer's chits in date order.
 - Dates are `YYYY-MM-DD` text, checked with `IsISODate`, and compared as text, which is calendar
   order. Date arithmetic inside a constraint adds a `timespan` (`Date + timespan('P21D')`), which is
@@ -82,7 +90,12 @@ bounds past ones.
 
 ## What this means for an agent
 
-Clock policy belongs to whoever has a clock. A receiving node should:
+Clock policy belongs to whoever has a clock, so the **other party is the watchdog** for the dates an
+issuer asserts. The engine marks a counterparty's chit whose `At` is ahead of its own clock by more
+than clock drift explains (`Entry.datedAhead`, beyond ten minutes); the app says so, and the reader
+decides. A chit dated well before it arrived is not flagged by that alone: a chit queued offline
+arrives late by design, so arrival time has to be weighed against how long the counterparty was
+unreachable. A receiving node should:
 
 - decline to act on a chit dated meaningfully in the future, or implausibly far in the past;
 - record when it *received* a chit, separately from when the chit says it was made — the two are

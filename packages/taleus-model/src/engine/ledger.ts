@@ -29,10 +29,13 @@ function entryOf(entry: CoreEntry, unit: Unit): Entry {
 		// Signed from the reader's side, as the model's `Entry` states: value toward this party is
 		// positive, value away is negative. The core gives the size and the direction separately.
 		amount: amount(entry.direction === 'in' ? entry.amount.units : -entry.amount.units, unit),
-		date: instantOf(entry.at),
+		// The instant its issuer made it, as signed; a routed entry has only its pledge's day.
+		date: entry.madeAt ?? instantOf(entry.at),
 		...(entry.memo ? { memo: entry.memo } : {}),
 		balanceAfter: balanceOf(entry.balanceAfter.units, unit),
 		...(entry.requestId ? { answers: [entry.requestId] } : {}),
+		...(entry.delivery ? { delivery: entry.delivery } : {}),
+		...(entry.datedAhead ? { datedAhead: true as const } : {}),
 	}
 }
 

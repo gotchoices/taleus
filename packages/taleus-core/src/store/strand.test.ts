@@ -34,7 +34,7 @@ describe('the schema calls only what every Sereus node has', () => {
 	// read the schema, not memory.
 
 	/** Quereus built-ins the schemas call. */
-	const BUILTIN_SCALARS = ['IsISODate', 'length', 'glob', 'date', 'timespan', 'Greatest', 'Least']
+	const BUILTIN_SCALARS = ['IsISODate', 'IsISODateTime', 'length', 'substr', 'glob', 'date', 'timespan', 'Greatest', 'Least']
 	/** The stack's, from `@optimystic/quereus-plugin-crypto`, which Sereus registers itself. */
 	const STACK_SCALARS = ['digest', 'verify']
 
@@ -56,7 +56,9 @@ describe('the schema calls only what every Sereus node has', () => {
 		// Arity differs, so call each with what it takes; the point is that it resolves.
 		const calls = [
 			"IsISODate('2026-03-02')",
+			"IsISODateTime('2026-03-02T12:00:00.000Z')",
 			"length('abc')",
+			"substr('abc', 2, 1)",
 			"glob('a*', 'abc')",
 			"date('now')",
 			"timespan('P21D')",

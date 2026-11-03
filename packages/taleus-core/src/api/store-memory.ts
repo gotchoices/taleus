@@ -9,7 +9,7 @@ import {
 	watchTables,
 	type RowWrite,
 } from '../store/strand.js'
-import type { InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe } from './types.js'
+import type { InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe, WriteReceipt } from './types.js'
 
 /**
  * An in-memory strand fabric: several parties, each holding their own replica, with every act
@@ -180,7 +180,7 @@ class MemoryTallyStore implements TallyStore {
 	 * Several rows per act is not a convenience: seating a party is circular by construction,
 	 * and only a transaction whose subquery CHECKs defer to COMMIT can do it at all.
 	 */
-	async apply(writes: RowWrite[]): Promise<void> {
+	async apply(writes: RowWrite[]): Promise<WriteReceipt> {
 		const accepted: string[] = []
 		const rejected: { member: string; message: string }[] = []
 		for (const replica of this.strand.replicas) {
@@ -198,6 +198,8 @@ class MemoryTallyStore implements TallyStore {
 			throw new Error(rejected[0].message)
 		}
 		this.strand.log.push(writes)
+		// No network, so nothing to say about where a write stands.
+		return {}
 	}
 
 	/**

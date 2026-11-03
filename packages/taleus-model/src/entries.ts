@@ -20,6 +20,18 @@ export interface Entry {
 	answers?: string[]
 	/** True while a routed payment has not committed (story 24 path A). */
 	unsettled?: boolean
+	/**
+	 * Where this party's own entry stands on its way to the counterparty, when known:
+	 * `here-only` (recorded on this device, not yet with them, and followed), `unconfirmed`
+	 * (recorded here, and nothing will say when it reaches them), `delivered` (they hold it).
+	 * Absent for their entries, and for one this session did not write.
+	 */
+	delivery?: 'here-only' | 'unconfirmed' | 'delivered'
+	/**
+	 * Their entry, dated ahead of this device's clock by more than clock drift explains. Recorded
+	 * either way; the app says so, so the reader can judge it (docs/timestamps.md).
+	 */
+	datedAhead?: true
 }
 
 /** What an entry would do to where the parties stand, before it is signed. */

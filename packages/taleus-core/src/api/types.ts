@@ -345,6 +345,35 @@ export interface Entry {
 	requestId?: string
 	reference?: string
 	memo?: string
+	/** The instant its issuer made it, as the issuer asserted and signed it (absent on a routed entry). */
+	madeAt?: string
+	/**
+	 * Set on the counterparty's entry when its issuer dated it ahead of this party's clock, beyond
+	 * what clock skew explains (docs/timestamps.md, "What this means for an agent"): this party's
+	 * engine is the watchdog for the dates the other side asserts. Information, not a refusal: the
+	 * entry is signed and recorded either way.
+	 */
+	datedAhead?: true
+	/**
+	 * Where this party's own entry stands on its way to the counterparty, when the store can say
+	 * (a networked store, for a write it made this session). Absent for the counterparty's entries,
+	 * which are here because they arrived, and for an entry the store no longer follows.
+	 */
+	delivery?: Delivery
+}
+
+/**
+ * Where one of this party's own writes stands (sereus `docs/strands.md`, "A commit's durability").
+ * `here-only`: committed, held on this machine alone, and followed, so `delivered` will be reported
+ * when the counterparty holds it. `unconfirmed`: held here alone and nothing will report its arrival
+ * this session. `delivered`: the counterparty holds it.
+ */
+export type Delivery = 'here-only' | 'unconfirmed' | 'delivered'
+
+/** What a store says about a write it applied. */
+export interface WriteReceipt {
+	/** The strand transaction it committed in, when the store knows it (a single-row write). */
+	transactionId?: string
 }
 
 /** An open request for payment, from either side. */
@@ -497,7 +526,7 @@ export interface AcceptRequest extends ActOptions {
 
 export type Unsubscribe = () => void
 
-export type ChangeKind = 'balance' | 'terms' | 'contract' | 'request' | 'keys' | 'close' | 'lift'
+export type ChangeKind = 'balance' | 'terms' | 'contract' | 'request' | 'keys' | 'close' | 'lift' | 'delivery'
 
 /**
  * Something moved. Deliberately thin -- it says *that* a tally changed and roughly where, not
@@ -669,7 +698,11 @@ export interface Taleus {
  */
 export interface TallyStore {
 	query<T>(sql: string, params?: unknown[]): Promise<T[]>
-	apply(writes: RowWrite[]): Promise<void>
+	apply(writes: RowWrite[]): Promise<WriteReceipt>
+	/** Where a transaction this store applied stands, if it can say. Absent on a store with no network. */
+	delivery?(transactionId: string): Delivery | undefined
+	/** Fire when a transaction this store applied changes where it stands. */
+	onDelivery?(listener: (transactionId: string) => void): Unsubscribe
 	/**
 	 * Fire after a transaction commits on **this replica**, naming the tables it touched.
 	 *
@@ -708,6 +741,8 @@ export interface Environment {
 	signer: LocalSigner
 	sid: string
 	now?: () => IsoDate
+	/** The current instant (`toISOString()`, UTC): stamps an entry, and judges one the counterparty dated ahead of it. */
+	clock?: () => string
 	newId?: () => string
 	certificate?: unknown
 }

@@ -582,12 +582,18 @@ table Ledger (
     -- knows it first). A tally's ledger is a SET of signed chits, not a chain: no running number and no
     -- stored running balance, so two parties writing at once never contend for the same key -- an insert
     -- conflicts only with its own retry. The balance is their sum (SettledBalance, below); the order a
-    -- reader sees is the chits' dates, then their ids.
+    -- reader sees is the chits' dates, then the instants their issuers made them (At), then their ids.
     Id text primary key with tags ("optimystic.fresh" = true),
     ContractNumber integer,
     Issuer text check (Issuer in ('S', 'F')), -- S = Stock, F = Foil
     Units integer check (Units > 0),
     Date text check ((IsISODate(Date) and length(Date) = 10)),
+    -- The moment the issuer made the chit, as the issuer asserts and signs it: a UTC instant in one
+    -- fixed shape (`YYYY-MM-DDTHH:MM:SS.sssZ`), so its text order is time order. It orders chits within
+    -- a day, which the set itself does not (docs/timestamps.md). Date stays the calendar day the
+    -- issuer dates the chit by; the two need not share a day, since Date is the issuer's own calendar.
+    -- Direct chits only (KindColumnsConsistent); a lift finalize carries its pledge's Date.
+    At text null check (At is null or (IsISODateTime(At) and length(At) = 24 and substr(At, 24, 1) = 'Z')),
     Reference text, -- JSON object
     Memo text,
     InvoiceId text null,   -- set when this chit answers an invoice (see InvoiceLink)
@@ -621,6 +627,7 @@ table Ledger (
                 (select case when Issuer = 'F' then FoilSid else StockSid end RecipientSid from TallyCore),
                 Units,
                 Date,
+                At,
                 Reference,
                 Memo,
                 InvoiceId
@@ -715,14 +722,14 @@ table Ledger (
             and not exists (select 1 from LiftVoid V where V.LiftId = New.LiftId)
         )
     ),
-    -- Null-hygiene across Kind. A direct chit carries a fresh issuer signature and no lift fields; a
+    -- Null-hygiene across Kind. A direct chit carries a fresh issuer signature, its instant, and no lift fields; a
     -- finalize carries the lift fields, no issuer signature, and never answers an invoice. Written as a
     -- disjunction so a NULL Kind (which the column-level `Kind in (...)` check would let pass, since a CHECK
     -- passes on NULL) makes BOTH arms FALSE -> definite reject; a malformed row of either kind is rejected.
     constraint KindColumnsConsistent check on insert (
         (New.Kind = 'direct'
             and New.LiftId is null and New.RefereeSignature is null
-            and New.SignerKey is not null and New.Signature is not null)
+            and New.SignerKey is not null and New.Signature is not null and New.At is not null)
         or (New.Kind = 'lift'
             and New.LiftId is not null and New.RefereeSignature is not null
             and New.SignerKey is null and New.Signature is null and New.InvoiceId is null)

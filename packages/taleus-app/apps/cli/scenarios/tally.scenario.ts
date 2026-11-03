@@ -88,6 +88,20 @@ void describe('a tally between two parties', { timeout: 30 * 60_000 }, () => {
 		await jan.until('tallies', balanced('550.00 USD', 'owed-to-me'), STEP_MS)
 	})
 
+	void it('delivers: a payment the partner holds reads delivered; one made while they are away is held here until they are back', { timeout: STEP_MS * 2 }, async () => {
+		const [now] = await jan.ok('pay Sam 5 while Sam is here')
+		assert.equal(now?.delivery, 'delivered')
+		await sam.stop()
+		const [away] = await jan.ok('pay Sam 5 while Sam is away')
+		assert.equal(away?.delivery, 'here-only')
+		await sam.restart()
+		await jan.until('history Sam', rows => rows.some(row => row.id === away?.id && row.delivery === 'delivered'), STEP_MS)
+		await sam.until('tallies', balanced('540.00 USD', 'owed-by-me'), STEP_MS)
+		// Back to where the close below starts from.
+		await sam.ok('pay Jan 10 back')
+		await jan.until('tallies', balanced('550.00 USD', 'owed-to-me'), STEP_MS)
+	})
+
 	void it('closes: chits either way while closing, closed at zero, then nothing more', { timeout: STEP_MS * 2 }, async () => {
 		await jan.ok('close Sam')
 		await sam.until('tallies', inState('Closing'), STEP_MS)

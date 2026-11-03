@@ -132,7 +132,7 @@ class TallyEngine implements Tally {
 	constructor(
 		readonly ref: TallyRef,
 		readonly role: Role,
-		private readonly store: TallyStore,
+		private readonly store: SharedReadStore,
 		private readonly env: Required<Pick<Environment, 'signer' | 'sid'>> & Environment,
 	) {}
 
@@ -148,10 +148,16 @@ class TallyEngine implements Tally {
 		return this.env.newId ? this.env.newId() : `id:${bytesToHex(randomBytes(12))}`
 	}
 
+	/** The current instant, UTC, in the one shape `Ledger.At` takes. */
+	private instant(): string {
+		return this.env.clock ? this.env.clock() : new Date().toISOString()
+	}
+
 	private act(options?: ActOptions) {
 		return {
 			signer: asPair(options?.signer ?? this.env.signer),
 			on: options?.on ?? this.now(),
+			at: this.instant(),
 			id: options?.id ?? this.newId(),
 		}
 	}
@@ -420,7 +426,7 @@ class TallyEngine implements Tally {
 		const rows = await this.store.query<LedgerRow>(
 			`select ${LEDGER_COLUMNS} from App.Ledger
 			 ${query?.since ? 'where Date >= ?' : ''}
-			 order by Date desc, Id desc ${query?.limit ? 'limit ?' : ''}`,
+			 order by Date desc, At desc, Id desc ${query?.limit ? 'limit ?' : ''}`,
 			[...(query?.since ? [query.since] : []), ...(query?.limit ? [query.limit] : [])],
 		)
 		// The ledger stores no running balance (it is a set; `SettledBalance` is its sum), so the
@@ -445,7 +451,14 @@ class TallyEngine implements Tally {
 	private entryFrom(r: LedgerRow, stockBalanceAfter: number, code: string): Entry {
 		const mine = this.side === 'S' ? 'F' : 'S' // the issuer whose chit raises MY balance
 		const sign = this.role === 'stock' ? 1 : -1
+		// Only this party's own direct chits travel from here; the counterparty's arrived.
+		const mineToSend = r.Issuer === this.side && r.Kind !== 'lift'
+		const delivery = mineToSend ? this.store.deliveryOfRow(r.Id) : undefined
+		const datedAhead = !mineToSend && r.Kind !== 'lift' && r.At !== null && aheadOf(r.At, this.instant())
 		return {
+			...(delivery ? { delivery } : {}),
+			...(r.At ? { madeAt: r.At } : {}),
+			...(datedAhead ? { datedAhead: true as const } : {}),
 			id: r.Id,
 			at: r.Date,
 			amount: amount(r.Units, code),
@@ -658,7 +671,7 @@ class TallyEngine implements Tally {
 	 */
 	async pay(payment: Payment): Promise<Result<Entry>> {
 		return this.guarded(async core => {
-			const { signer, on, id } = this.act(payment)
+			const { signer, on, at, id } = this.act(payment)
 			const { code } = await this.denomination()
 			for (;;) {
 				const stored = await this.one<LedgerRow>(`select ${LEDGER_COLUMNS} from App.Ledger where Id = ?`, [id])
@@ -667,7 +680,7 @@ class TallyEngine implements Tally {
 					return this.entryFrom(stored, await this.settledStockBalance(), code)
 				}
 				try {
-					return await this.writeChit(core, payment, id, on, signer, code)
+					return await this.writeChit(core, payment, { id, on, at }, signer, code)
 				} catch (error) {
 					// It landed after all -- ours, from an attempt whose reply went missing. Loop, and
 					// the read above returns it.
@@ -682,8 +695,7 @@ class TallyEngine implements Tally {
 	private async writeChit(
 		core: Core,
 		payment: Payment,
-		id: string,
-		on: IsoDate,
+		{ id, on, at }: { id: string; on: IsoDate; at: string },
 		signer: KeyPairText,
 		code: string,
 	): Promise<Entry> {
@@ -700,6 +712,7 @@ class TallyEngine implements Tally {
 			issuerSid: this.env.sid,
 			units: payment.amount.units,
 			date: on,
+			at,
 			...(payment.answers ? { invoiceId: payment.answers } : {}),
 			...(payment.reference ? { reference: payment.reference } : {}),
 			...(payment.memo ? { memo: payment.memo } : {}),
@@ -914,12 +927,18 @@ class TallyEngine implements Tally {
 	}
 
 	watch(listener: (change: Change) => void): Unsubscribe {
-		return this.store.subscribe(tables => {
+		const stopTables = this.store.subscribe(tables => {
 			const at = this.now()
 			for (const kind of kindsOf(tables)) {
 				listener({ tally: this.ref, kind, at })
 			}
 		})
+		// One of this party's writes reached the counterparty (or stopped being followed).
+		const stopDelivery = this.store.onDelivery(() => listener({ tally: this.ref, kind: 'delivery', at: this.now() }))
+		return () => {
+			stopTables()
+			stopDelivery()
+		}
 	}
 
 	async close(): Promise<void> {
@@ -1016,13 +1035,14 @@ const identity = (sid: string, certificate: unknown): PartyIdentity => ({
 })
 
 /** The ledger columns an `Entry` is built from, in the one order both readers use. */
-const LEDGER_COLUMNS = 'Id, Issuer, Units, Date, Kind, InvoiceId, Reference, Memo'
+const LEDGER_COLUMNS = 'Id, Issuer, Units, Date, At, Kind, InvoiceId, Reference, Memo'
 
 interface LedgerRow {
 	Id: string
 	Issuer: Side
 	Units: number
 	Date: string
+	At: string | null
 	Kind: string
 	InvoiceId: string | null
 	Reference: string
@@ -1062,6 +1082,17 @@ function sameRequest(stored: InvoiceRow, side: Side, draft: PaymentRequestDraft)
 		(stored.Reference || undefined) === draft.reference &&
 		(stored.Memo || undefined) === draft.memo
 	)
+}
+
+/**
+ * How far ahead of this party's clock an entry may be dated before its issuer's clock is not
+ * credible. Generous: phones' clocks drift, and a minute here is no evidence of anything.
+ */
+const DATED_AHEAD_MS = 10 * 60_000
+
+/** Whether an issuer's asserted instant is ahead of `now` by more than clock skew explains. */
+function aheadOf(madeAt: string, now: string): boolean {
+	return Date.parse(madeAt) - Date.parse(now) > DATED_AHEAD_MS
 }
 
 class EventIdReused extends Error {

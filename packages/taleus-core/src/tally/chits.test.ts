@@ -121,6 +121,7 @@ describe('who may issue a chit', () => {
 					issuer: 'F',
 					units: 18000,
 					date: TODAY,
+					at: `${TODAY}T12:00:00.000Z`,
 					signer: jan.keys[0],
 					issuerSid: sam.sid,
 				}),
@@ -168,6 +169,26 @@ describe('the date a chit asserts', () => {
 	})
 })
 
+describe('the instant a chit asserts', () => {
+	it('must be a UTC instant in the one fixed shape, so its text order is time order', async () => {
+		const t = await trading()
+		const write = t.chit({ seq: 1, units: 1000 })
+		for (const at of ['2026-03-02T12:00:00Z', '2026-03-02T12:00:00.000+01:00', '2026-03-02']) {
+			const resigned = t.chit({ seq: 1, units: 1000, at })
+			await expect(t.tally.refuses([resigned])).resolves.toBeTruthy()
+		}
+		await expect(t.tally.propose([write])).resolves.toBeUndefined()
+	})
+
+	it('is inside the signature, so it cannot be changed after signing', async () => {
+		const t = await trading()
+		const write = t.chit({ seq: 1, units: 1000 })
+		await expect(
+			t.tally.refuses([{ ...write, row: { ...write.row, At: '2026-03-02T23:59:59.999Z' } }]),
+		).resolves.toMatch(/SignatureValid/)
+	})
+})
+
 describe('what a chit is signed over', () => {
 	it('FINDING: the digest names the issuer, under an alias saying recipient', async () => {
 		// `Ledger.SignatureValid` computes
@@ -184,7 +205,7 @@ describe('what a chit is signed over', () => {
 		)
 		// Signed over Sam's own Sid -- the issuer -- not Jan's.
 		expect(row?.Signature).toBe(
-			signText(sam.keys[0], digest('chit:1', 'F', sam.sid, 18000, TODAY, '', '', null)),
+			signText(sam.keys[0], digest('chit:1', 'F', sam.sid, 18000, TODAY, `${TODAY}T12:00:00.001Z`, '', '', null)),
 		)
 		expect(cid).toBeTruthy()
 	})
