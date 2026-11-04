@@ -59,15 +59,9 @@ Either party can be either role at any time. Recording value is always the giver
 
 ### Alternative Path D: the counterparty is unreachable
 4.1. Nothing of Mara's is reachable when Sam signs. The entry is saved on his phone and goes to her
-     side when it can.
-4.2. Sam's screen says where it stands: waiting to send, or recorded on his side and not yet on
-     hers. Once she holds it, it says nothing more. Asked "did that go through", it gives the
-     straight answer.
-4.3. Mara trusts her own screen. She hands over the tube when the entry shows on her side, not on the
-     strength of what Sam's phone says.
-4.4. If it is refused after all, Sam is told what was not recorded, and why, until he has seen it.
-     Trying again cannot record it twice.
-4.5. A shop that needs entries to land while a customer waits keeps something of its own always on.
+     side when it can; his screen shows where it stands. → [15](15-what-reaches-my-partner.md)
+4.2. Mara hands over the tube when the entry shows on her side, not on the strength of Sam's screen.
+4.3. A shop that needs entries to land while a customer waits keeps something of its own always on.
      → [14](14-my-cadre.md)
 
 ### Alternative Path F: paying down what she owes him
@@ -93,19 +87,11 @@ Either party can be either role at any time. Recording value is always the giver
 - [ ] The receiving party is warned when a pledge exceeds what they extended, before they act on it
 - [ ] Entries cannot be edited or removed; a correction is a further entry, and both remain visible
 - [ ] Whether an entry is recorded is stated plainly, never ambiguously
-- [ ] An entry not yet with the counterparty says so on the giver's side, until it is
 - [ ] The receiver acts on what their own side shows, never on the giver's screen
-- [ ] An entry that is refused says so until seen, leaves nothing half-done, and can be retried
-      without risk of recording twice
+- [ ] Retrying an entry cannot record it twice
 - [ ] Both parties end up seeing the same entry, amount, and reason
 
 ## Variants
 - happy: a purchase, and a settlement
 - empty: a tally with no entries yet — the first one
 - error: pledge beyond the limit; counterparty unreachable; a mistaken amount
-
-## Open
-
-How long an entry may wait unsent, and when the giver is told it has not reached the other side,
-depends on how many machines each party runs. The rule the screens hold either way: the giver sees
-where their entry stands, and the receiver trusts their own side.

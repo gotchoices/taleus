@@ -11,7 +11,8 @@ planned story; it states the topic and what it must not lose from MyCHIPs.
 ## Grouping
 
 - **01–08 Tally lifecycle** — negotiation through close, and the agreements tallies are made under
-- **10–14 Identity** — who I am, what I disclose, my keys, devices, and machines
+- **10–15 Identity** — who I am, what I disclose, my keys, devices, and machines, and what my
+  machines have carried to my partners
 - **20–25 Trading** — direct chits between two partners, and getting the record out
 - **30–31 Network** — lifts, and the settings that make them possible
 - **40–43 Position and preferences**
@@ -33,6 +34,8 @@ net worth and the nature of value, not merely list transactions. That intent dri
 - **08 Publishers I trust** — agreements are judged by who stands behind them; the app keeps the
   party's trusted publishers (sereus.org built in) and says who published every agreement it shows
 - **14 My cadre** — a party's own machines; tallies survive with counterparties, private records do not
+- **15 What reaches my partner** — an act is saved on the party's device first and reaches the
+  partner afterwards; the app shows where each stands, and defers the why to Sereus
 - **25 My records in my books** — accounting integration, with Bonum on the same platform as the
   case worth designing for
 - **13 My devices** — a party is a cadre of devices, not one key on one phone.  There will likely be a cadre management screen that is just like other Sereus apps (see chat, health, etc)

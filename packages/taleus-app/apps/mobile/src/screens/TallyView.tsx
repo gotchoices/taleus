@@ -83,11 +83,11 @@ export function TallyView({ route, navigation }: Props): React.JSX.Element {
 				{tally.balance.perspective === 'level' ? (
 					<Text style={styles.centredCaption}>{t('screens.tally-view.settled-note')}</Text>
 				) : null}
-				{/* Story 20 path D: the part of the balance the counterparty does not hold yet.
-				    Rendered rather than interpolated, so the figure keeps its notation. */}
+				{/* Story 20 path D: what this party gave that the counterparty does not hold yet --
+				    movement, not a part of what is owed. Rendered rather than interpolated, so the
+				    figure keeps its notation. */}
 				{tally.undelivered ? (
 					<View style={styles.undelivered}>
-						<Text style={styles.centredCaption}>{t('screens.tally-view.undelivered-prefix')}</Text>
 						<Amount value={tally.undelivered} unit={tally.unit} size="small" />
 						<Text style={styles.centredCaption}>
 							{t('screens.tally-view.undelivered-suffix', { name: tally.counterparty.name })}

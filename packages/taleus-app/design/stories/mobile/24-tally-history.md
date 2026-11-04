@@ -82,6 +82,7 @@ Either party, from their own side. Both see the same entries; each sees them in 
 - [ ] A request never affects the balance; only signed entries do, and the difference is evident
 - [ ] Unfinished movement is visibly unfinished, with its prospective effect shown
 - [ ] The party's own entries not yet with the counterparty say so
+      ([15](15-what-reaches-my-partner.md))
 - [ ] An entry dated ahead of this device's clock says so
 - [ ] Long histories can be narrowed by period, size, exact amount, or purpose
 - [ ] The running balance over a period is available, not only individual entries

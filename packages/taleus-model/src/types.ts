@@ -100,8 +100,9 @@ export interface TallySummary {
 	unit: Unit
 	balance: Balance
 	/**
-	 * Of the balance, what this party gave that the counterparty does not hold yet: its own entries
-	 * waiting to be sent, being sent, or held only on this device, as a size. Absent when there is none.
+	 * What this party gave that the counterparty does not hold yet (movement, not a part of the
+	 * balance owed): its own entries waiting to be sent, being sent, or held only on this device, as
+	 * a size. Absent when there is none.
 	 */
 	undelivered?: Amount
 	state: TallyState

@@ -41,12 +41,13 @@ Group 1 — tally negotiation, one continuous thread (Jan and Sam, carried over 
 | 11 | [My profile and what I disclose](11-my-profile-and-disclosure.md) | revised — dropped withdrawal path; corrections now authorized |
 | 12 | [Keys and backup](12-keys-and-backup.md) | reviewed |
 | 13 | [My devices](13-my-devices.md) | reviewed |
+| 15 | [What reaches my partner](15-what-reaches-my-partner.md) | new — every act's delivery, generic; rules in specs/domain/rules.md § Delivery |
 | 50 | [Recover after losing a device](50-recover-after-losing-a-device.md) | reviewed |
-| 20 | [Pay a partner](20-pay-a-partner.md) | revised — over-limit pledges warn, not block; path D: an unsent entry waits on the giver's phone, the receiver trusts their own side |
+| 20 | [Pay a partner](20-pay-a-partner.md) | revised — over-limit pledges warn, not block; path D: an unsent entry waits on the giver's phone (→ 15), the receiver trusts their own side |
 | 21 | [Ask to be paid](21-ask-to-be-paid.md) | revised — direct requests stay in-band; newcomer gets a tally |
 | 22 | [Respond to a request](22-respond-to-a-request.md) | reviewed |
 | 23 | [What needs my attention](23-what-needs-my-attention.md) | reviewed |
-| 24 | [Tally history](24-tally-history.md) | revised — running balance separated from net worth; delivery marks; path F: dated ahead |
+| 24 | [Tally history](24-tally-history.md) | revised — running balance separated from net worth; delivery marks (→ 15); path F: dated ahead |
 | 30 | [Pay someone I'm not connected to](30-pay-through-the-network.md) | revised — no directory; suggested partners; vendor-funded route |
 | 31 | [Trading settings](31-trading-variables.md) | revised — cross-unit movement needs a rate first |
 | 40 | [My position](40-my-position.md) | reviewed |
@@ -67,8 +68,8 @@ Open points carried by reviewed stories, each tracked as a ticket:
 - ~~Whether over-limit pledges warn rather than block~~ — **resolved**: they warn; no pledge is
   refused for its amount; closing gates only lifts, and a closed tally accepts nothing
   (docs/architecture.md § Ledger Operation, § Tally close).
-- Whether a party can record while the counterparty is unreachable — `feat-engine-tally-api`
-  (story 20).
+- ~~Whether a party can record while the counterparty is unreachable~~ — **resolved**: yes; the act
+  is saved on the party's device and delivered later (Sereus offline mode; stories 15, 20 path D).
 
 ## Not yet written
 

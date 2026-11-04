@@ -367,7 +367,7 @@ Each single-row act (a chit, a request, a decline, a close request) is one trans
 - `delivered`: the counterparty holds it.
 - `not-recorded`: the network refused it.
 
-A queued write the counterparty could still make fail is marked `mayFail`. The tally's `undelivered` balance is the part of the balance this party's travelling chits make up. A refused act stays listed (`unrecorded`) until the party acknowledges it.
+A queued write the counterparty could still make fail is marked `mayFail`. The tally's `undelivered` amount is what this party's travelling chits gave: movement the counterparty does not hold yet, not a part of the balance owed. A refused act stays listed (`unrecorded`) until the party acknowledges it.
 
 The phone runs the strand in **offline mode**: a write returns once it is saved on the device. The CLI stays synchronous by default, so the stack's latency stays measurable; `--offline` opts in. A chit is the issuer's own promise, keyed by a fresh id, and no other chit has to come before it. So a queued chit is assured, unless it answers a request.
 

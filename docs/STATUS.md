@@ -251,9 +251,15 @@ module keeps its in-process suite against doubles until direct chits work on a r
   lock, so a statement finishing meanwhile, a read included, commits the same transaction again
   (Node repro on 4.24: one begin, two overlapping commits). The store now runs each strand's
   statements through one lane (offline 6 of 6, online 3 of 3) until quereus#38 is fixed (above).
-  (4) The mobile marks and pending balances, and (5) story 20 path D (an unsent
-  entry waits on the giver's phone; the receiver trusts their own side): written, awaiting a device
-  check. Same-day order: each chit carries `At`, the issuer's signed instant (decided 2026-11-03);
+  (4) The mobile marks, the undelivered amount and the refusal card, and (5) story 20 path D (an
+  unsent entry waits on the giver's phone; the receiver trusts their own side) and story 24 path F
+  (dated ahead): done 2026-11-03. Reviewed in mock (emulator) and in engine mode on S21 + S7
+  (offline mode): a pay returns in 0.7-1.2 s (was 24-109 s on phones); with the partner up it is
+  with them in ~3 s; with the partner's app stopped it reads "Waiting to send" and "$7.00 you gave
+  is not yet with Sev", and both clear 52 s after the partner's app is launched (cold start
+  included). Formation S7 -> S21 ~76 s. **Open: screen loads are slow on the phone** (S21: a
+  history 10 s, PayPartner 40 s, `tallies` over the bridge 2.9 s) -- not yet profiled; whether the
+  per-strand statement lane adds to it is the first question. Same-day order: each chit carries `At`, the issuer's signed instant (decided 2026-11-03);
   history orders by date, then `At`. The reader's engine flags a counterparty chit dated ahead of its
   own clock (`datedAhead`); flagging one dated long before it arrived waits on tracking arrival time
   against the counterparty's absence (step 3).

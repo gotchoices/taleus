@@ -71,6 +71,31 @@ So the app never asks a party to approve a lift, and never fails to ask before a
 party's settings currently permit is something they can see and change; changing them is itself an
 act they sign.
 
+## Delivery
+
+A party's own act is saved on their device first and reaches the counterparty afterwards (story 15;
+the mechanics are Sereus's: `../sereus/docs/strands.md`, "Offline mode" and "A commit's
+durability"). Each of the party's own acts carries one of these states, which the app shows and
+never computes:
+
+| State | Shown as |
+|---|---|
+| waiting | "Waiting to send"; with "May not go through" when the counterparty can still make it fail |
+| sending | "Sending" |
+| here-only | "Not yet with {name}" |
+| unconfirmed | "Not confirmed delivered", never "stuck" |
+| delivered | nothing: the normal case |
+| not-recorded | leaves the record; listed with its reason until the party has seen it |
+
+- States only move forward.
+- The counterparty's acts carry no state; they appear when they arrive.
+- An amount that the counterparty does not hold yet is stated on its own, as movement ("$70.00 you
+  gave is not yet with Mara"), never as a part of the balance owed.
+- The receiver of value acts on their own side's record, never on the giver's screen. The app says
+  so where it matters (the giver's confirmation).
+- A date is its signer's. The counterparty's entry dated ahead of this device's clock is recorded
+  and marked, not refused.
+
 ## Offers
 
 - An offer is not an agreement until both parties sign it.

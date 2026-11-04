@@ -91,9 +91,14 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 		return (
 			<Empty
 				title={t(travelling ? 'screens.pay-partner.saved-title' : 'screens.pay-partner.recorded-title')}
-				body={t(travelling ? 'screens.pay-partner.saved-body' : 'screens.pay-partner.recorded-body', {
-					name: tally.counterparty.name,
-				})}
+				body={t(
+					!travelling
+						? 'screens.pay-partner.recorded-body'
+						: done.delivery === 'waiting'
+							? 'screens.pay-partner.saved-body-waiting'
+							: 'screens.pay-partner.saved-body',
+					{ name: tally.counterparty.name },
+				)}
 			/>
 		)
 	}
