@@ -3,11 +3,13 @@
  * same composition the phone's `engine-cadre.ts` makes over the phone kit's node. Relays are node
  * start options, so changing them restarts both.
  */
+import { appendFileSync } from 'node:fs'
+
 import type { CadreNode } from '@serfab/cadre-core'
 import type { TaleusModel } from 'taleus-model'
 import { slotDocumentCache } from 'taleus-model/contracts'
 import { createEngineModel, type EngineModel } from 'taleus-model/engine'
-import { cadreStoreProvider, taleusSApp } from 'taleus-sereus'
+import { cadreStoreProvider, taleusSApp, type StatementTiming } from 'taleus-sereus'
 import { fileSlot, heldStrandIds, saveConfig, startPartyNode, stopPartyNode, type PartyConfig, type PartyDirs } from 'taleus-sereus/node'
 
 const SAPP = taleusSApp()
@@ -58,6 +60,7 @@ export function runningParty(options: PartyOptions): RunningParty {
 				...(options.pollSeconds === undefined ? {} : { pollMs: options.pollSeconds * 1000 }),
 				// Which of its own writes this party still follows, one file per tally.
 				writeLog: strandId => fileSlot(dirs, 'writes', strandId),
+				...statementLog(),
 			}),
 			storage: { state: fileSlot(dirs, 'session'), identity: fileSlot(dirs, 'identity') },
 			// Every contract document this party has seen, one file each.
@@ -111,4 +114,14 @@ export async function settle(party: RunningParty, ms: number): Promise<void> {
 		return held.some(id => !launched.has(id) || launched.get(id)?.status === 'starting')
 	}
 	while (Date.now() < deadline && busy()) await new Promise(resolve => setTimeout(resolve, 500))
+}
+
+/**
+ * `TALEUS_STATEMENTS=<file>`: append every store statement, with how long it waited and ran, to
+ * `<file>` as JSON lines -- for finding which reads a command spends its time on.
+ */
+function statementLog(): { onStatement?: (statement: StatementTiming) => void } {
+	const file = process.env.TALEUS_STATEMENTS
+	if (!file) return {}
+	return { onStatement: statement => appendFileSync(file, `${JSON.stringify({ ...statement, at: Date.now() })}\n`) }
 }

@@ -83,6 +83,19 @@ export interface CadreStoreOptions {
 	 * mark survives a restart: a device-local slot per strand id. Absent, the log lives in memory.
 	 */
 	writeLog?: (strandId: string) => DurableSlot
+	/** Diagnostics: told of every statement this provider's stores run, once it finishes. */
+	onStatement?: (statement: StatementTiming) => void
+}
+
+/** One statement a store ran: how long it waited behind the strand's others, and how long it took. */
+export interface StatementTiming {
+	strandId: string
+	sql: string
+	kind: 'read' | 'write'
+	waitedMs: number
+	ranMs: number
+	rows: number
+	failed?: true
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -255,6 +268,7 @@ class CadreStoreProvider implements StoreProvider {
 			this.options.firstSyncPatienceMs ?? 240_000,
 			await this.logFor(instance.strandId),
 			this.laneFor(instance.strandId),
+			this.options.onStatement,
 		)
 	}
 
@@ -327,7 +341,27 @@ class CadreTallyStore implements TallyStore {
 		private readonly patienceMs: number,
 		private readonly log: WriteLog,
 		private readonly lane: StatementLane,
+		private readonly onStatement?: (statement: StatementTiming) => void,
 	) {}
+
+	/** Run one statement in the lane, timing it for `onStatement` when there is one. */
+	private async timed<T>(sql: string, kind: StatementTiming['kind'], run: () => Promise<{ value: T; rows: number }>): Promise<T> {
+		const report = this.onStatement
+		if (!report) return (await this.lane.run(run)).value
+		const queued = performance.now()
+		let started = queued
+		try {
+			const { value, rows } = await this.lane.run(() => {
+				started = performance.now()
+				return run()
+			})
+			report({ strandId: this.strandId, sql, kind, waitedMs: started - queued, ranMs: performance.now() - started, rows })
+			return value
+		} catch (error) {
+			report({ strandId: this.strandId, sql, kind, waitedMs: started - queued, ranMs: performance.now() - started, rows: 0, failed: true })
+			throw error
+		}
+	}
 
 	/** The strand's current database, waiting for one while the strand is syncing. */
 	private async db(): Promise<Database> {
@@ -340,10 +374,10 @@ class CadreTallyStore implements TallyStore {
 
 	async query<T>(sql: string, params?: unknown[]): Promise<T[]> {
 		const db = await this.db()
-		return await this.lane.run(async () => {
+		return await this.timed(sql, 'read', async () => {
 			const collected: T[] = []
 			for await (const row of db.eval(sql, params as never)) collected.push(row as T)
-			return collected
+			return { value: collected, rows: collected.length }
 		})
 	}
 
@@ -372,7 +406,8 @@ class CadreTallyStore implements TallyStore {
 	 */
 	private async applyOnce(writes: RowWrite[]): Promise<WriteReceipt> {
 		const db = await this.db()
-		return await this.lane.run(() => this.write(db, writes))
+		const label = writes.map(write => `insert ${write.table}`).join('; ')
+		return await this.timed(label, 'write', async () => ({ value: await this.write(db, writes), rows: writes.length }))
 	}
 
 	private async write(db: Database, writes: RowWrite[]): Promise<WriteReceipt> {

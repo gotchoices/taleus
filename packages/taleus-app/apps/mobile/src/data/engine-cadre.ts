@@ -20,6 +20,7 @@ import { slotDocumentCache } from 'taleus-model/contracts'
 import { createEngineModel } from 'taleus-model/engine'
 
 import { installDevBridge } from './dev-bridge'
+import { recordStatement } from './statement-log'
 import { keychainSecureStore } from './keychain'
 
 const leveldb = {
@@ -99,6 +100,7 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 			pollMs: 120_000,
 			// Which of its own writes this phone still follows, per tally, beside the device state.
 			writeLog: strandId => kvStoreSlot(session, `${WRITE_LOG_KEY_PREFIX}${strandId}`),
+			...(__DEV__ ? { onStatement: recordStatement } : {}),
 		}),
 		storage: {
 			state: kvStoreSlot(session, SESSION_STATE_KEY),

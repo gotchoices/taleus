@@ -257,9 +257,20 @@ module keeps its in-process suite against doubles until direct chits work on a r
   (offline mode): a pay returns in 0.7-1.2 s (was 24-109 s on phones); with the partner up it is
   with them in ~3 s; with the partner's app stopped it reads "Waiting to send" and "$7.00 you gave
   is not yet with Sev", and both clear 52 s after the partner's app is launched (cold start
-  included). Formation S7 -> S21 ~76 s. **Open: screen loads are slow on the phone** (S21: a
-  history 10 s, PayPartner 40 s, `tallies` over the bridge 2.9 s) -- not yet profiled; whether the
-  per-strand statement lane adds to it is the first question. Same-day order: each chit carries `At`, the issuer's signed instant (decided 2026-11-03);
+  included). Formation S7 -> S21 ~76 s. Screen loads, profiled 2026-11-04: the
+  10-40 s first seen were `uiautomator dump` waiting for an idle UI; by screenshots TallyView shows
+  in ~3.5 s on the S21, and model reads over the bridge take 50-100 ms warm (1.6 s cold), including
+  while the partner reconnects. Of the load window's 2.7 s of JS, 24% is pure-JS Ed25519 on inbound
+  cohort-topic register/renew frames (filed optimystic#55; 37% of idle JS on the S21). Diagnostics
+  kept: the store's `onStatement` hook (CLI `TALEUS_STATEMENTS=<file>`, phone bridge `statements`).
+  Ledger growth (CLI, 0-300 chits): `SettledBalance` 2-6 ms and history 1-4 ms, linear; the balance
+  views cost ~1.2x their sum (plain quereus), so their 100-300 ms in the CLI is waiting behind
+  replication. No index would help yet: every "latest/newest" read is a scan + sort until
+  optimystic#52 (and quereus#32) land; the declared descending indexes then apply. A balance over
+  years of chits (~9 us/chit in Node) wants a materialized `SettledBalance` -- quereus maintains a
+  single-source aggregate per insert -- once Sereus confirms such a view stays correct under
+  replicated commits. Open: the S7 moves ~140 Noise frames/s "idle" (43% JS busy; per-frame cipher
+  object construction is 0.3 of 0.44 ms) -- what generates that traffic is not yet known. Same-day order: each chit carries `At`, the issuer's signed instant (decided 2026-11-03);
   history orders by date, then `At`. The reader's engine flags a counterparty chit dated ahead of its
   own clock (`datedAhead`); flagging one dated long before it arrived waits on tracking arrival time
   against the counterparty's absence (step 3).

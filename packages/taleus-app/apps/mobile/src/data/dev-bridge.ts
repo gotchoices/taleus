@@ -16,6 +16,7 @@
 import type { TaleusModel } from 'taleus-model'
 import { getGeneration } from './generation'
 import { describeThrown } from 'taleus-model'
+import { takeStatements } from './statement-log'
 
 const USD = { denom: 'iso4217:USD', divisor: 100 }
 const usd = (units: number) => ({ units, ...USD })
@@ -105,6 +106,20 @@ function methods(model: TaleusModel, diagnostics: () => unknown, query: StrandQu
 		},
 		async tallies() {
 			return value(await model.tallies.listTallies())
+		},
+		/** The store's statements since the last reset, with how long each waited and ran. */
+		statements(reset = true) {
+			return Promise.resolve(takeStatements(reset))
+		},
+		/** What TallyHistory reads, one call each, so a script can time a screen's load. */
+		async readTally(tallyId: string) {
+			return value(await model.tally.readTally(tallyId))
+		},
+		async entries(tallyId: string) {
+			return value(await model.entries.listEntries(tallyId))
+		},
+		async requests(tallyId: string) {
+			return value(await model.requests.listRequests(tallyId))
 		},
 		/** Record value given on a tally. */
 		async pay(tallyId: string, units: number, memo: string) {
