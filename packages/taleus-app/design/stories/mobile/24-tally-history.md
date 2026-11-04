@@ -64,6 +64,11 @@ Either party, from their own side. Both see the same entries; each sees them in 
      better answer is not a file at all — it is granting them access to what is already there.
      → [25](25-my-records-in-my-books.md)
 
+### Alternative Path F: an entry dated ahead
+2.1. One of Mara's entries is dated later than Sam's phone says it is now.
+2.2. It is recorded all the same; the date is hers to sign. The app says it is dated ahead, so Sam
+     can judge it — her clock may be off, or she may be dating something that has not happened yet.
+
 ## Acceptance Criteria
 
 - [ ] Entries are listed most recent first, each with amount, direction, date, and stated purpose
@@ -76,6 +81,8 @@ Either party, from their own side. Both see the same entries; each sees them in 
       is still asked
 - [ ] A request never affects the balance; only signed entries do, and the difference is evident
 - [ ] Unfinished movement is visibly unfinished, with its prospective effect shown
+- [ ] The party's own entries not yet with the counterparty say so
+- [ ] An entry dated ahead of this device's clock says so
 - [ ] Long histories can be narrowed by period, size, exact amount, or purpose
 - [ ] The running balance over a period is available, not only individual entries
 - [ ] Movement over a period is presented as distinct from what the party is worth at a moment
@@ -85,4 +92,5 @@ Either party, from their own side. Both see the same entries; each sees them in 
 ## Variants
 - happy: a year of mixed entries, direct and routed
 - empty: a tally with no entries yet
-- error: an entry whose counterparty details cannot be loaded; movement stuck unfinished
+- error: an entry whose counterparty details cannot be loaded; movement stuck unfinished; an entry
+  dated ahead

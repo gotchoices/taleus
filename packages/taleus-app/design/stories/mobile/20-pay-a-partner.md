@@ -58,15 +58,17 @@ Either party can be either role at any time. Recording value is always the giver
      is proud of.
 
 ### Alternative Path D: the counterparty is unreachable
-4.1. Nothing of Mara's is reachable when Sam signs. Their tally is one shared record kept by both of
-     them, so with her side wholly absent there is nowhere for the entry to land.
-4.2. It does not go through, and Sam is told so. Standing at a counter, "did that go through" is the
-     only question he has, and he gets a straight answer: no, not yet, nothing is owed differently
-     than a moment ago.
-4.3. Nothing is left half-done, and trying again later cannot end up recording it twice.
-4.4. A shop that cannot afford this answer keeps something of its own always on, which is what makes
-     it reachable when a customer is standing there. → [14](14-my-cadre.md)
-
+4.1. Nothing of Mara's is reachable when Sam signs. The entry is saved on his phone and goes to her
+     side when it can.
+4.2. Sam's screen says where it stands: waiting to send, or recorded on his side and not yet on
+     hers. Once she holds it, it says nothing more. Asked "did that go through", it gives the
+     straight answer.
+4.3. Mara trusts her own screen. She hands over the tube when the entry shows on her side, not on the
+     strength of what Sam's phone says.
+4.4. If it is refused after all, Sam is told what was not recorded, and why, until he has seen it.
+     Trying again cannot record it twice.
+4.5. A shop that needs entries to land while a customer waits keeps something of its own always on.
+     → [14](14-my-cadre.md)
 
 ### Alternative Path F: paying down what she owes him
 1.1. Mara already owes Sam $200 from a job he did for her.
@@ -91,8 +93,10 @@ Either party can be either role at any time. Recording value is always the giver
 - [ ] The receiving party is warned when a pledge exceeds what they extended, before they act on it
 - [ ] Entries cannot be edited or removed; a correction is a further entry, and both remain visible
 - [ ] Whether an entry is recorded is stated plainly, never ambiguously
-- [ ] An entry that cannot be recorded says so, leaves nothing half-done, and can be retried without
-      risk of recording twice
+- [ ] An entry not yet with the counterparty says so on the giver's side, until it is
+- [ ] The receiver acts on what their own side shows, never on the giver's screen
+- [ ] An entry that is refused says so until seen, leaves nothing half-done, and can be retried
+      without risk of recording twice
 - [ ] Both parties end up seeing the same entry, amount, and reason
 
 ## Variants
@@ -102,8 +106,6 @@ Either party can be either role at any time. Recording value is always the giver
 
 ## Open
 
-Path D reflects what the platform actually does: a write to a shared record commits only with enough
-of both parties' machines present, and a write that cannot reach that bar fails cleanly rather than
-queueing. What remains open is the boundary — how much of the other side must be reachable — which
-depends on how many machines each party runs. The user-visible rule holds either way: it either went
-through or it did not, and the app says which.
+How long an entry may wait unsent, and when the giver is told it has not reached the other side,
+depends on how many machines each party runs. The rule the screens hold either way: the giver sees
+where their entry stands, and the receiver trusts their own side.

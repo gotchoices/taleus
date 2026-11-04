@@ -42,11 +42,11 @@ Group 1 — tally negotiation, one continuous thread (Jan and Sam, carried over 
 | 12 | [Keys and backup](12-keys-and-backup.md) | reviewed |
 | 13 | [My devices](13-my-devices.md) | reviewed |
 | 50 | [Recover after losing a device](50-recover-after-losing-a-device.md) | reviewed |
-| 20 | [Pay a partner](20-pay-a-partner.md) | revised — over-limit pledges warn, not block |
+| 20 | [Pay a partner](20-pay-a-partner.md) | revised — over-limit pledges warn, not block; path D: an unsent entry waits on the giver's phone, the receiver trusts their own side |
 | 21 | [Ask to be paid](21-ask-to-be-paid.md) | revised — direct requests stay in-band; newcomer gets a tally |
 | 22 | [Respond to a request](22-respond-to-a-request.md) | reviewed |
 | 23 | [What needs my attention](23-what-needs-my-attention.md) | reviewed |
-| 24 | [Tally history](24-tally-history.md) | revised — running balance separated from net worth |
+| 24 | [Tally history](24-tally-history.md) | revised — running balance separated from net worth; delivery marks; path F: dated ahead |
 | 30 | [Pay someone I'm not connected to](30-pay-through-the-network.md) | revised — no directory; suggested partners; vendor-funded route |
 | 31 | [Trading settings](31-trading-variables.md) | revised — cross-unit movement needs a rate first |
 | 40 | [My position](40-my-position.md) | reviewed |

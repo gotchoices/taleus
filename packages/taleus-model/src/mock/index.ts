@@ -40,7 +40,7 @@ const RESETS: Record<keyof TaleusModel, (() => void)[]> = {
 	requests: [requests.resetRequests],
 	settings: [settings.resetSettings],
 	standing: [standing.resetStanding],
-	tally: [tally.resetCloses],
+	tally: [tally.resetCloses, tally.resetUnrecorded],
 	position: [],
 	tallies: [],
 }

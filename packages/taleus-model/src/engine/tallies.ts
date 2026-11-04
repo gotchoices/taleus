@@ -81,7 +81,8 @@ async function lastActivity(tally: Tally, view: TallyView, invited?: MadeInvitat
 
 /** Of the balance, what this party gave that the counterparty does not hold yet; nothing when none. */
 function undeliveredOf(view: TallyView, unit: Unit): { undelivered?: Amount } {
-	const units = view.balances.undelivered.units
+	// The core signs it as the balance is signed; the model states it as a size.
+	const units = Math.abs(view.balances.undelivered.units)
 	return units ? { undelivered: amount(units, unit) } : {}
 }
 

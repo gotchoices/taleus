@@ -35,7 +35,10 @@
       "state": "Open",
       "waitingOn": "me",
       "waitingReason": "request",
-      "lastActivity": "2026-09-04T11:05:00Z"
+      "lastActivity": "2026-09-04T11:05:00Z",
+      "undelivered": {
+        "units": 7000
+      }
     },
     {
       "id": "tally:dave-hours",

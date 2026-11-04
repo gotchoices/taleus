@@ -31,7 +31,8 @@
         },
         "answers": [
           "request:jan-sam-40"
-        ]
+        ],
+        "datedAhead": true
       },
       {
         "id": "entry:0005",
@@ -78,7 +79,9 @@
         },
         "answers": [
           "request:mara-95"
-        ]
+        ],
+        "delivery": "waiting",
+        "mayFail": true
       },
       {
         "id": "entry:0100",

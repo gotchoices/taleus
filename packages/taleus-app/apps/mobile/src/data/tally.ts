@@ -12,6 +12,10 @@ export const readAgreement = (...args: Parameters<TallyModel['readAgreement']>):
 	getModel().tally.readAgreement(...args)
 export const requestClose = (...args: Parameters<TallyModel['requestClose']>): ReturnType<TallyModel['requestClose']> =>
 	getModel().tally.requestClose(...args)
+export const listUnrecorded = (...args: Parameters<TallyModel['listUnrecorded']>): ReturnType<TallyModel['listUnrecorded']> =>
+	getModel().tally.listUnrecorded(...args)
+export const acknowledgeUnrecorded = (...args: Parameters<TallyModel['acknowledgeUnrecorded']>): ReturnType<TallyModel['acknowledgeUnrecorded']> =>
+	getModel().tally.acknowledgeUnrecorded(...args)
 
 /** Forget this namespace's mock writes. Tests and scenario capture only. */
 export function resetCloses(): void {

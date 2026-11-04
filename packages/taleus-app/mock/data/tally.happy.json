@@ -94,6 +94,9 @@
       },
       "roomToSpend": {
         "units": 15750
+      },
+      "undelivered": {
+        "units": 7000
       }
     },
     "tally:dave-hours": {

@@ -97,6 +97,8 @@ class CadreStoreProvider implements StoreProvider {
 	private readonly attaching = new Map<string, Promise<StrandInstance>>()
 	/** One write log per strand, shared by every store opened on it, so no store saves over another's. */
 	private readonly logs = new Map<string, Promise<WriteLog>>()
+	/** One statement lane per strand database, shared likewise: see {@link StatementLane}. */
+	private readonly lanes = new Map<string, StatementLane>()
 	/** Callers waiting for a strand that has not been offered yet. */
 	private readonly awaited = new Map<string, ((instance: Promise<StrandInstance>) => void)[]>()
 
@@ -252,7 +254,17 @@ class CadreStoreProvider implements StoreProvider {
 			this.options.pollMs ?? 10_000,
 			this.options.firstSyncPatienceMs ?? 240_000,
 			await this.logFor(instance.strandId),
+			this.laneFor(instance.strandId),
 		)
+	}
+
+	private laneFor(strandId: string): StatementLane {
+		let lane = this.lanes.get(strandId)
+		if (!lane) {
+			lane = new StatementLane()
+			this.lanes.set(strandId, lane)
+		}
+		return lane
 	}
 
 	private logFor(strandId: string): Promise<WriteLog> {
@@ -288,6 +300,24 @@ const WRITE_RETRY_MS = 3_000
  * a wake from hibernation) and closes the old one, so a handle that kept the first would read a
  * closed database ever after.
  */
+/**
+ * A strand database's statements, one at a time. Quereus commits a statement's implicit transaction
+ * after releasing its own lock, so a statement that finishes meanwhile -- a read included -- commits
+ * that same transaction again (gotchoices/quereus#38); in offline mode the second commit throws
+ * "entry … is already sealed". Waiting for each statement, its commit included, before the next
+ * keeps this store's own statements from overlapping. Statements sereus runs itself are not covered.
+ * Back out once quereus#38 ships (docs/STATUS.md, "Workaround to back out").
+ */
+class StatementLane {
+	private last: Promise<unknown> = Promise.resolve()
+
+	run<T>(statement: () => Promise<T>): Promise<T> {
+		const next = this.last.then(statement, statement)
+		this.last = next.catch(() => undefined)
+		return next
+	}
+}
+
 class CadreTallyStore implements TallyStore {
 	constructor(
 		private readonly node: StrandNode,
@@ -296,6 +326,7 @@ class CadreTallyStore implements TallyStore {
 		private readonly pollMs: number,
 		private readonly patienceMs: number,
 		private readonly log: WriteLog,
+		private readonly lane: StatementLane,
 	) {}
 
 	/** The strand's current database, waiting for one while the strand is syncing. */
@@ -309,9 +340,11 @@ class CadreTallyStore implements TallyStore {
 
 	async query<T>(sql: string, params?: unknown[]): Promise<T[]> {
 		const db = await this.db()
-		const collected: T[] = []
-		for await (const row of db.eval(sql, params as never)) collected.push(row as T)
-		return collected
+		return await this.lane.run(async () => {
+			const collected: T[] = []
+			for await (const row of db.eval(sql, params as never)) collected.push(row as T)
+			return collected
+		})
 	}
 
 	/**
@@ -326,7 +359,7 @@ class CadreTallyStore implements TallyStore {
 				return await this.applyOnce(writes)
 			} catch (error) {
 				if (!lackedSuperMajority(error) || attempt >= WRITE_ATTEMPTS) throw error
-				console.warn(`taleus-sereus: write attempt ${attempt} lacked a super-majority; retrying`)
+				console.warn(`taleus-sereus: write attempt ${attempt} lacked a super-majority; retrying: ${describeThrown(error)}`)
 				await new Promise<void>(resolve => setTimeout(() => resolve(), WRITE_RETRY_MS))
 			}
 		}
@@ -339,6 +372,10 @@ class CadreTallyStore implements TallyStore {
 	 */
 	private async applyOnce(writes: RowWrite[]): Promise<WriteReceipt> {
 		const db = await this.db()
+		return await this.lane.run(() => this.write(db, writes))
+	}
+
+	private async write(db: Database, writes: RowWrite[]): Promise<WriteReceipt> {
 		if (writes.length === 1) {
 			const { sql, params } = insertReturningTransaction(writes[0])
 			let transactionId: string | undefined

@@ -12,6 +12,13 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
+- [ ] **Workaround to back out: quereus#38.** Quereus commits an implicit transaction after
+  releasing its lock, so a statement finishing meanwhile commits it again; in offline mode that
+  throws "entry … is already sealed". `StatementLane` in `packages/taleus-sereus/src/store.ts` runs
+  each strand's statements one at a time until the fix ships. To back out on the fixed release: drop
+  `StatementLane`, `laneFor` and the `lanes` map, call `db.eval` directly in `query` and `applyOnce`,
+  and run the CLI scenarios with `TALEUS_SCENARIO_OFFLINE=1` a few times (without the lane, about
+  half failed). Repro: quereus#38's script.
 - [ ] **Stack: on Sereus 1.20 / Optimystic 1.24 / Quereus 4.24.0 / FRET 1.3.0, one copy each.**
   Sereus 1.20 (2026-11-02) carries Optimystic 1.21-1.24: cohort gossip and notifications only on change
   plus a 30 s refresh (Optimystic#49), one read check in ten for an idle watched table (#48), the
@@ -233,11 +240,20 @@ module keeps its in-process suite against doubles until direct chits work on a r
   `StrandDatabase.offline`; `balances.undelivered`, `unrecorded()` / `acknowledge()` in the engine and
   `TallyModel.listUnrecorded` / `acknowledgeUnrecorded` in the model (the mock records everything).
   The phone starts in offline mode; the CLI with `--offline` (scenarios: `TALEUS_SCENARIO_OFFLINE=1`,
-  8 of 8, and 8 of 8 online). Offline, each CLI step runs about twice as long as online. Seen once
-  online, not reproduced: after the partner's restart, every write of theirs failed "pending
-  conflict: block(s) held by unresolved rival action(s)" naming the same transaction for 20 s and
-  more; to repro before reporting. (4) The mobile marks and pending balances, (5) story 20 (the
-  payee trusts their own screen). Same-day order: each chit carries `At`, the issuer's signed instant (decided 2026-11-03);
+  8 of 8, and 8 of 8 online). Offline is not slower: a pay returns in ~150 ms (online 200-430) and
+  the partner has it ~500 ms later (online by the first poll), so ~400 ms more end to end
+  (`TALEUS_SCENARIO_POLL_MS=50` measures it). Fixed 2026-11-03: the Node host never closed its block
+  stores, so a restart inside their idle-flush window lost recent commits while their pending records
+  survived, wedging the Ledger for both parties ("unresolved rival action", about 3 runs in 8);
+  `stopPartyNode` now bounds the stop and closes stores and journals either way. The phone kit
+  closes its own. Fixed the same day: offline runs failed about half the time with "entry … is
+  already sealed in this collection". Quereus commits an implicit transaction after releasing its
+  lock, so a statement finishing meanwhile, a read included, commits the same transaction again
+  (Node repro on 4.24: one begin, two overlapping commits). The store now runs each strand's
+  statements through one lane (offline 6 of 6, online 3 of 3) until quereus#38 is fixed (above).
+  (4) The mobile marks and pending balances, and (5) story 20 path D (an unsent
+  entry waits on the giver's phone; the receiver trusts their own side): written, awaiting a device
+  check. Same-day order: each chit carries `At`, the issuer's signed instant (decided 2026-11-03);
   history orders by date, then `At`. The reader's engine flags a counterparty chit dated ahead of its
   own clock (`datedAhead`); flagging one dated long before it arrived waits on tracking arrival time
   against the counterparty's absence (step 3).

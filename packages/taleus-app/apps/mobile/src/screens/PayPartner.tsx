@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { Text, TextInput, View } from 'react-native'
 
 import { Action, Amount, amountText, Card, Empty, Failed, FormScroll, Loading, Row } from '../components'
-import { previewEntry, recordEntry, type Preview } from '../data/entries'
+import { previewEntry, recordEntry, type Entry, type Preview } from '../data/entries'
 import { readTally, type TallyDetail } from '../data/tally'
 import type { DataError } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
@@ -39,7 +39,7 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 	const [text, setText] = useState(prefill ? String(prefill) : '')
 	const [memo, setMemo] = useState('')
 	const [preview, setPreview] = useState<Preview | undefined>()
-	const [done, setDone] = useState(false)
+	const [done, setDone] = useState<Entry | undefined>()
 	const [failure, setFailure] = useState<DataError | undefined>()
 
 	// One id per attempt at one act: retrying must not record it twice (path D).
@@ -79,17 +79,21 @@ export function PayPartner({ route }: Props): React.JSX.Element {
 			answers: answers ? [answers] : undefined,
 		})
 		if (result.ok) {
-			setDone(true)
+			setDone(result.value)
 			return
 		}
 		setFailure(result.error)
 	}
 
 	if (done) {
+		// Story 20 path D: recorded on this side is not yet with them; the screen says which.
+		const travelling = done.delivery !== undefined && done.delivery !== 'delivered'
 		return (
 			<Empty
-				title={t('screens.pay-partner.recorded-title')}
-				body={t('screens.pay-partner.recorded-body')}
+				title={t(travelling ? 'screens.pay-partner.saved-title' : 'screens.pay-partner.recorded-title')}
+				body={t(travelling ? 'screens.pay-partner.saved-body' : 'screens.pay-partner.recorded-body', {
+					name: tally.counterparty.name,
+				})}
 			/>
 		)
 	}

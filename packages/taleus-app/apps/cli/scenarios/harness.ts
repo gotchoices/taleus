@@ -25,6 +25,8 @@ import { createSession, EXIT, type Session } from '../src/session.ts'
 const TRACE = process.env.TALEUS_SCENARIO_TRACE === '1'
 /** `TALEUS_SCENARIO_OFFLINE=1`: every party in strand offline mode, the path the phone runs. */
 const OFFLINE = process.env.TALEUS_SCENARIO_OFFLINE === '1'
+/** `TALEUS_SCENARIO_POLL_MS`: how often `until` asks again; finer to measure how soon a write lands. */
+const POLL_MS = Number(process.env.TALEUS_SCENARIO_POLL_MS ?? 1000)
 
 /** How long a party gets to settle after starting (relay reservation, strands launched). */
 const SETTLE_MS = 60_000
@@ -136,7 +138,7 @@ async function startParty(home: string, name: string, relay: string): Promise<Sc
 					if (TRACE) process.stderr.write(`[trace] ${name} until ${line}: ${Date.now() - started} ms, ${polls} polls\n`)
 					return last.rows
 				}
-				await new Promise(resolve => setTimeout(resolve, 1000))
+				await new Promise(resolve => setTimeout(resolve, POLL_MS))
 			}
 			throw new Error(`${name}: \`${line}\` did not reach the expected state in ${timeoutMs} ms; last: ${JSON.stringify(last)}`)
 		},

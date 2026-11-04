@@ -3,7 +3,7 @@ import { ScrollView, Text, View } from 'react-native'
 
 import { Action, Amount, Card, Chip, Failed, Loading, Row } from '../components'
 import { listRequests, type PaymentRequest } from '../data/requests'
-import { readTally, type TallyDetail } from '../data/tally'
+import { acknowledgeUnrecorded, listUnrecorded, readTally, type TallyDetail, type UnrecordedAct } from '../data/tally'
 import type { Result } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
@@ -16,6 +16,7 @@ type Props = ScreenProps<'TallyView'>
 interface TallyPage {
 	tally: TallyDetail
 	requests: PaymentRequest[]
+	unrecorded: UnrecordedAct[]
 }
 
 /**
@@ -36,11 +37,26 @@ export function TallyView({ route, navigation }: Props): React.JSX.Element {
 		if (!detail.ok) {
 			return detail
 		}
-		const asked = await listRequests(tallyId)
-		return { ok: true, value: { tally: detail.value, requests: asked.ok ? asked.value : [] } }
+		const [asked, refused] = await Promise.all([listRequests(tallyId), listUnrecorded(tallyId)])
+		return {
+			ok: true,
+			value: {
+				tally: detail.value,
+				requests: asked.ok ? asked.value : [],
+				unrecorded: refused.ok ? refused.value : [],
+			},
+		}
 	}, [tallyId])
 
 	const { state, value, error, reload } = useLoad(load)
+
+	const seen = useCallback(
+		async (actId: string) => {
+			await acknowledgeUnrecorded(tallyId, actId)
+			reload()
+		},
+		[tallyId, reload],
+	)
 
 	if (state === 'loading') {
 		return <Loading />
@@ -49,7 +65,7 @@ export function TallyView({ route, navigation }: Props): React.JSX.Element {
 		return <Failed title={t('screens.tally-view.unreadable-title')} error={error} onRetry={reload} />
 	}
 
-	const { tally, requests } = value
+	const { tally, requests, unrecorded } = value
 	const open = requests.filter(request => request.state !== 'answered' && request.state !== 'withdrawn')
 
 	return (
@@ -67,7 +83,33 @@ export function TallyView({ route, navigation }: Props): React.JSX.Element {
 				{tally.balance.perspective === 'level' ? (
 					<Text style={styles.centredCaption}>{t('screens.tally-view.settled-note')}</Text>
 				) : null}
+				{/* Story 20 path D: the part of the balance the counterparty does not hold yet.
+				    Rendered rather than interpolated, so the figure keeps its notation. */}
+				{tally.undelivered ? (
+					<View style={styles.undelivered}>
+						<Text style={styles.centredCaption}>{t('screens.tally-view.undelivered-prefix')}</Text>
+						<Amount value={tally.undelivered} unit={tally.unit} size="small" />
+						<Text style={styles.centredCaption}>
+							{t('screens.tally-view.undelivered-suffix', { name: tally.counterparty.name })}
+						</Text>
+					</View>
+				) : null}
 			</View>
+
+			{unrecorded.length ? (
+				<Card title={t('screens.tally-view.unrecorded-title')} footnote={t('screens.tally-view.unrecorded-note')}>
+					{unrecorded.map(act => (
+						<View key={act.id} style={styles.unrecorded}>
+							<Row
+								label={act.memo ?? t(`screens.tally-view.unrecorded-${act.kind}`)}
+								note={act.reason}
+								value={act.amount ? <Amount value={act.amount} unit={tally.unit} /> : undefined}
+							/>
+							<Action label={t('screens.tally-view.unrecorded-seen')} onPress={() => void seen(act.id)} secondary />
+						</View>
+					))}
+				</Card>
+			) : null}
 
 			{tally.state !== 'Open' ? (
 				<View style={styles.chipRow}>
@@ -189,6 +231,8 @@ const make = (tokens: Tokens) => ({
 	content: { padding: spacing[3], gap: spacing[3] },
 	balanceBlock: { alignItems: 'center' as const, paddingVertical: spacing[3], gap: spacing[0] },
 	balanceLabel: { ...typography.body, color: tokens.textSecondary },
+	undelivered: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 3, flexWrap: 'wrap' as const, justifyContent: 'center' as const },
+	unrecorded: { gap: spacing[1] },
 	chipRow: { flexDirection: 'row' as const },
 	body: { ...typography.body, color: tokens.textPrimary },
 	caption: { ...typography.caption, color: tokens.textSecondary },

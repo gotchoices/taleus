@@ -49,32 +49,60 @@ export interface NodeHostOptions {
 	offline?: boolean
 }
 
-/** Each running node's offline journals, one per strand: closed by `stopPartyNode` after the node stops. */
-const journals = new WeakMap<CadreNode, Map<string, FileKVStore>>()
+/**
+ * What a running node opened in the party's folder: its block stores, one per scope, and its offline
+ * journals, one per strand. A block store holds recent writes in memory until it flushes, so
+ * `stopPartyNode` closes both after the node stops; the phone kit does the same for its own.
+ */
+interface Opened {
+	storages: FileRawStorage[]
+	journals: Map<string, FileKVStore>
+}
+
+const openedBy = new WeakMap<CadreNode, Opened>()
 
 /** Start the party's node: built over its folder, started, and enrolled as its own owner. */
 export async function startPartyNode(options: NodeHostOptions): Promise<CadreNode> {
 	const keyStore = new FileKeyStore(options.dirs.keys)
-	const opened = new Map<string, FileKVStore>()
+	const opened: Opened = { storages: [], journals: new Map() }
 	const node = new CadreNode(await nodeConfig(options, keyStore, opened))
-	journals.set(node, opened)
+	openedBy.set(node, opened)
 	await node.start()
 	await bounded(enrollOwner(node, keyStore))
 	return node
 }
 
-/** Stop a node `startPartyNode` started, then close its offline journals. */
-export async function stopPartyNode(node: CadreNode): Promise<void> {
-	await node.stop()
-	const opened = journals.get(node)
-	journals.delete(node)
-	await Promise.all([...(opened?.values() ?? [])].map(journal => journal.close()))
+/**
+ * Stop a node `startPartyNode` started, then close what it opened. Without the close, writes the
+ * block stores still hold are lost while their pending records survive, which wedges the strand
+ * on the next start (optimystic #54). A stop that hangs on a peer is given `patienceMs`; the stores
+ * are closed either way, so an exit after this returns loses nothing it was told.
+ */
+export async function stopPartyNode(node: CadreNode, patienceMs = 5_000): Promise<void> {
+	let timer: ReturnType<typeof setTimeout> | undefined
+	const outlasted = new Promise<'outlasted'>(resolve => {
+		timer = setTimeout(() => resolve('outlasted'), patienceMs)
+	})
+	try {
+		const stopped = await Promise.race([node.stop().then(() => 'stopped' as const), outlasted])
+		if (stopped === 'outlasted') console.warn(`taleus-sereus: the node did not stop within ${patienceMs} ms; closing its stores anyway`)
+	} finally {
+		clearTimeout(timer)
+		await closeOpened(node)
+	}
+}
+
+async function closeOpened(node: CadreNode): Promise<void> {
+	const opened = openedBy.get(node)
+	openedBy.delete(node)
+	if (!opened) return
+	await Promise.all([...opened.storages, ...opened.journals.values()].map(store => store.close()))
 }
 
 async function nodeConfig(
 	{ dirs, config, sAppId, extraRelays = [], listen = [], reactivity = true, offline = false }: NodeHostOptions,
 	keyStore: KeyStore,
-	opened: Map<string, FileKVStore>,
+	opened: Opened,
 ): Promise<CadreNodeConfig> {
 	const { partyId } = config
 	return {
@@ -82,7 +110,7 @@ async function nodeConfig(
 		identityKeyId: DEFAULT_IDENTITY_KEY_ID,
 		controlNetwork: { partyId, bootstrapNodes: [] },
 		profile: 'transaction',
-		storage: { provider: (scope: string) => new FileRawStorage(join(dirs.blocks, scope)) },
+		storage: { provider: (scope: string) => storageFor(dirs, scope, opened) },
 		network: {
 			transports: [webSockets(), circuitRelayTransport()] as never,
 			listenAddrs: [...listen],
@@ -97,7 +125,7 @@ async function nodeConfig(
 		// The tally sApp is unsigned until Taleus signs it at release (`taleusSApp`).
 		requireSignedSchemas: false,
 		strandReactivity: { enabled: reactivity },
-		...(offline ? { strandOffline: { journal: (scope: string) => journalFor(dirs, scope, opened), initialMode: 'offline' as const } } : {}),
+		...(offline ? { strandOffline: { journal: (scope: string) => journalFor(dirs, scope, opened.journals), initialMode: 'offline' as const } } : {}),
 		trustedOwners: { store: await FileTrustedOwnerStore.open(dirs.node, partyId) },
 		bootstrapPeers: { store: await FileBootstrapPeerStore.open(dirs.node, partyId) },
 		enrolledMachines: { store: await FileEnrolledMachineStore.open(dirs.node, partyId) },
@@ -161,6 +189,13 @@ function freePort(): Promise<number> {
 			server.close(() => resolve(port))
 		})
 	})
+}
+
+/** The scope's block store, held so `stopPartyNode` can close it. cadre-core asks once per scope. */
+function storageFor(dirs: PartyDirs, scope: string, opened: Opened): FileRawStorage {
+	const storage = new FileRawStorage(join(dirs.blocks, scope))
+	opened.storages.push(storage)
+	return storage
 }
 
 /** One strand's journal: the same store for the same scope, every rebuild (cadre-core's contract). */

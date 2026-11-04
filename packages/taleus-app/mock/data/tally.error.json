@@ -53,6 +53,70 @@
           "since": "2026-09-05T14:20:00Z"
         }
       ]
+    },
+    "tally:mara-shop": {
+      "id": "tally:mara-shop",
+      "counterparty": {
+        "sid": "sid:mara-4d10",
+        "name": "Mara's Bike Shop",
+        "disclosed": {
+          "name": "Mara's Bike Shop",
+          "address": "14 Ferrier Row"
+        }
+      },
+      "unit": {
+        "denom": "iso4217:USD",
+        "divisor": 100
+      },
+      "balance": {
+        "units": 4250,
+        "perspective": "owed-by-me"
+      },
+      "state": "Open",
+      "waitingOn": "me",
+      "counterpartyReachable": true,
+      "opened": "2025-08-03T10:15:00Z",
+      "agreement": {
+        "id": "cid:bafy-standard-tally-v1",
+        "title": "Standard Tally Agreement",
+        "publisher": "taleus.org",
+        "language": "en"
+      },
+      "terms": {
+        "mine": {
+          "creditLimit": {
+            "units": 0
+          },
+          "noticeDays": 30,
+          "effective": "2025-08-03"
+        },
+        "theirs": {
+          "creditLimit": {
+            "units": 20000
+          },
+          "noticeDays": 30,
+          "effective": "2026-01-19"
+        }
+      },
+      "roomToSpend": {
+        "units": 15750
+      },
+      "undelivered": {
+        "units": 7000
+      }
     }
+  },
+  "unrecorded": {
+    "tally:mara-shop": [
+      {
+        "id": "entry:0102",
+        "kind": "payment",
+        "amount": {
+          "units": 2500
+        },
+        "memo": "Valve caps",
+        "reason": "the tally was closed before it arrived"
+      }
+    ]
   }
 }

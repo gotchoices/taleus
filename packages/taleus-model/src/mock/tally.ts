@@ -130,15 +130,36 @@ export function resetCloses(): void {
 	closes = {}
 }
 
-/** The mock records every act, so none is ever refused. */
+/** The variant's refused acts, less those the party has seen. */
 export async function listUnrecorded(tallyId: string): Promise<Result<UnrecordedAct[]>> {
 	const current = await readTally(tallyId)
-	return current.ok ? { ok: true, value: [] } : current
+	if (!current.ok) {
+		return current
+	}
+	const listed = unrecordedFor(getVariant())[tallyId] ?? []
+	return { ok: true, value: listed.filter(act => !acknowledged.has(act.id)) }
 }
 
-export async function acknowledgeUnrecorded(tallyId: string, _actId: string): Promise<Result<void>> {
+export async function acknowledgeUnrecorded(tallyId: string, actId: string): Promise<Result<void>> {
 	const current = await readTally(tallyId)
-	return current.ok ? { ok: true, value: undefined } : current
+	if (!current.ok) {
+		return current
+	}
+	acknowledged.add(actId)
+	return { ok: true, value: undefined }
+}
+
+const acknowledged = new Set<string>()
+
+export function resetUnrecorded(): void {
+	acknowledged.clear()
+}
+
+function unrecordedFor(variant: string): Record<string, UnrecordedAct[]> {
+	if (variant !== 'error') {
+		return {}
+	}
+	return (fixture('tally.error') as { unrecorded?: Record<string, UnrecordedAct[]> }).unrecorded ?? {}
 }
 
 function fixtureFor(variant: string): { tallies: Record<string, TallyDetail> } {

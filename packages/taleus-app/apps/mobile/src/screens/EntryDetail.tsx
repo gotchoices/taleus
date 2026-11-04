@@ -11,6 +11,7 @@ import { t } from '../i18n'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, spacing, type as typography, type Tokens } from '../theme'
 import { formatInstantTime } from '../util/date'
+import { entryMarks } from '../util/marks'
 
 type Props = ScreenProps<'EntryDetail'>
 
@@ -64,6 +65,7 @@ export function EntryDetail({ route, navigation }: Props): React.JSX.Element {
 	const name = tally.counterparty.name
 	const direction = directionOf(entry.amount)
 	const toward = entry.amount.units > 0
+	const marks = entryMarks(entry)
 
 	return (
 		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -77,7 +79,20 @@ export function EntryDetail({ route, navigation }: Props): React.JSX.Element {
 						: t(toward ? 'screens.entry-detail.gave-me' : 'screens.entry-detail.gave-them', { name })}
 				</Text>
 				{entry.unsettled ? <Chip label={t('screens.entry-detail.unsettled')} urgent /> : null}
+				{marks.map(mark => (
+					<Chip key={mark.key} label={t(`marks.${mark.key}`, { name })} urgent={mark.urgent} />
+				))}
 			</View>
+
+			{marks.length ? (
+				<Card>
+					{marks.map(mark => (
+						<Text key={mark.key} style={styles.caption}>
+							{t(`marks.${mark.key}-note`, { name })}
+						</Text>
+					))}
+				</Card>
+			) : null}
 
 			{entry.unsettled ? (
 				<Card>

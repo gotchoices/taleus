@@ -11,6 +11,7 @@ import { t } from '../i18n'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, spacing, type as typography, type Tokens } from '../theme'
 import { formatInstant } from '../util/date'
+import { entryMarks } from '../util/marks'
 
 type Props = ScreenProps<'TallyHistory'>
 
@@ -81,6 +82,7 @@ export function TallyHistory({ route, navigation }: Props): React.JSX.Element {
 				<EntryRow
 					entry={item}
 					unit={tally.unit}
+					name={tally.counterparty.name}
 					onOpen={() => navigation.navigate('EntryDetail', { tallyId, entryId: item.id })}
 				/>
 			)}
@@ -125,15 +127,18 @@ function Asked({ requests, unit }: { requests: PaymentRequest[]; unit: Unit }): 
 function EntryRow({
 	entry,
 	unit,
+	name,
 	onOpen,
 }: {
 	entry: Entry
 	unit: Unit
+	name: string
 	onOpen: () => void
 }): React.JSX.Element {
 	const styles = useStyles(make)
 	const direction = directionOf(entry.amount)
 	const after = entry.balanceAfter
+	const marks = entryMarks(entry)
 
 	// The row keeps its own layout rather than becoming an `OpenableRow`: what a
 	// reader scans here is the figure and the balance after it, and a chevron
@@ -180,10 +185,13 @@ function EntryRow({
 					)}
 				</View>
 			</View>
-			{entry.answers?.length || entry.unsettled ? (
+			{entry.answers?.length || entry.unsettled || marks.length ? (
 				<View style={styles.entryChips}>
 					{entry.answers?.length ? <Chip label={t('screens.tally-history.answered')} /> : null}
 					{entry.unsettled ? <Chip label={t('screens.tally-history.unsettled')} urgent /> : null}
+					{marks.map(mark => (
+						<Chip key={mark.key} label={t(`marks.${mark.key}`, { name })} urgent={mark.urgent} />
+					))}
 				</View>
 			) : null}
 		</Pressable>
@@ -211,7 +219,7 @@ const make = (tokens: Tokens) => ({
 	entryTop: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, gap: spacing[2] },
 	entryMeta: { flexDirection: 'row' as const, gap: spacing[2], flexWrap: 'wrap' as const, alignItems: 'center' as const },
 	balanceAfter: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 3 },
-	entryChips: { flexDirection: 'row' as const, gap: spacing[1], marginTop: spacing[0] },
+	entryChips: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing[1], marginTop: spacing[0] },
 	pressed: { opacity: 0.6 },
 	body: { ...typography.body, color: tokens.textPrimary, flexShrink: 1 },
 	caption: { ...typography.caption, color: tokens.textSecondary },
