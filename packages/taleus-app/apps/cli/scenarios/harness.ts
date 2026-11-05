@@ -27,6 +27,8 @@ const TRACE = process.env.TALEUS_SCENARIO_TRACE === '1'
 const OFFLINE = process.env.TALEUS_SCENARIO_OFFLINE === '1'
 /** `TALEUS_SCENARIO_POLL_MS`: how often `until` asks again; finer to measure how soon a write lands. */
 const POLL_MS = Number(process.env.TALEUS_SCENARIO_POLL_MS ?? 1000)
+/** `TALEUS_SCENARIO_BACKSTOP_S`: the store's backstop poll, in seconds (0 turns it off); default the store's. */
+const BACKSTOP_S = process.env.TALEUS_SCENARIO_BACKSTOP_S === undefined ? undefined : Number(process.env.TALEUS_SCENARIO_BACKSTOP_S)
 
 /** How long a party gets to settle after starting (relay reservation, strands launched). */
 const SETTLE_MS = 60_000
@@ -92,7 +94,7 @@ async function startParty(home: string, name: string, relay: string): Promise<Sc
 	let running: { party: RunningParty; session: Session; captured: Captured } | undefined
 
 	async function start(): Promise<void> {
-		const party = runningParty({ dirs, config, extraRelays: [], listen: [], reactivity: true, offline: OFFLINE })
+		const party = runningParty({ dirs, config, extraRelays: [], listen: [], reactivity: true, offline: OFFLINE, ...(BACKSTOP_S === undefined ? {} : { pollSeconds: BACKSTOP_S }) })
 		const captured = capture()
 		const ready = party.start()
 		const session = createSession({

@@ -1162,8 +1162,13 @@ class NotOpen extends Error {}
 
 /* ── the engine ──────────────────────────────────────────────────────────── */
 
-/** How long a shared read may answer for a tally that has raised no change since (`SharedReadStore`). */
-const SHARED_READ_MS = 5_000
+/**
+ * How long a shared read may answer for a tally that has raised no change since (`SharedReadStore`):
+ * the bound on a change no notification reported. Watches carry every change the scenarios make,
+ * and each read of a strand may cost a round trip to the partner (optimystic#56), so this matches
+ * the cadre store's backstop poll rather than undercutting it.
+ */
+const SHARED_READ_MS = 600_000
 
 class TaleusEngine implements Taleus {
 	readonly identity: { sid: string }

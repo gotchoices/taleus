@@ -91,13 +91,12 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 
 	const session = new LevelDBKVStore(openOptimysticRNDb({ ...leveldb, name: SESSION_DB }), 'taleus:session:')
 	const engine = await createEngineModel({
-		// Reactivity carries a counterparty's commits, so the backstop poll only catches a missed
-		// watch. At the default 10 s it kept the S7's agent busy about a quarter of the time.
+		// Reactivity carries a counterparty's commits; the store's backstop poll (default 10 min)
+		// only catches a missed watch.
 		store: cadreStoreProvider({
 			node,
 			sApp: taleusSApp(),
 			disclosure: { purpose: 'tally' },
-			pollMs: 120_000,
 			// Which of its own writes this phone still follows, per tally, beside the device state.
 			writeLog: strandId => kvStoreSlot(session, `${WRITE_LOG_KEY_PREFIX}${strandId}`),
 			...(__DEV__ ? { onStatement: recordStatement } : {}),
@@ -121,8 +120,9 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 						status: strand.status,
 						connectedPeers: strand.connectedPeers,
 						error: strand.error,
-						connections: strand.libp2pNode?.getConnections().map(c => ({ peer: c.remotePeer.toString(), addr: c.remoteAddr.toString(), status: c.status })),
+						connections: strand.libp2pNode?.getConnections().map(connectionOf),
 					})),
+					control: running.getControlNode()?.getConnections().map(connectionOf) ?? [],
 				}
 			: { status: phone.status.state }
 	}, async (strandId, text) => {
@@ -142,4 +142,19 @@ function randomId(): string {
 	const bytes = new Uint8Array(8)
 	crypto.getRandomValues(bytes)
 	return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** One libp2p connection as the dev bridge's `status` reports it, with its open streams' protocols. */
+function connectionOf(connection: {
+	remotePeer: { toString(): string }
+	remoteAddr: { toString(): string }
+	status: string
+	streams: { protocol?: string; direction: string }[]
+}) {
+	return {
+		peer: connection.remotePeer.toString(),
+		addr: connection.remoteAddr.toString(),
+		status: connection.status,
+		streams: connection.streams.map(stream => `${stream.direction === 'inbound' ? 'in' : 'out'} ${stream.protocol ?? '?'}`),
+	}
 }

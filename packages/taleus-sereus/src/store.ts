@@ -32,7 +32,7 @@ import type {
 } from '@serfab/cadre-core'
 import type { Database } from '@quereus/quereus'
 import type { DeliveryStatus, FollowedWrite, InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe, WriteReceipt } from 'taleus-core'
-import { insertReturningTransaction, tablesIn, transactionBatch, watchTables, type RowWrite } from 'taleus-core/host'
+import { insertReturningTransaction, tablesIn, tablesReadBy, transactionBatch, watchTables, type RowWrite } from 'taleus-core/host'
 
 /**
  * What the store asks of the app's running node: these methods of `CadreNode`, and nothing else.
@@ -75,7 +75,9 @@ export interface CadreStoreOptions {
 	joinPatienceMs?: number
 	/**
 	 * A backstop: report every table as changed this often, in case a replicated commit raises
-	 * no watch. Default 10 s; 0 turns it off.
+	 * no watch. Each report re-reads everything, and every read of a strand may consult the
+	 * partner (optimystic#56), so it is rare: the watch carries the counterparty's commits, and
+	 * the scenarios pass with it off, online and offline. Default 10 min; 0 turns it off.
 	 */
 	pollMs?: number
 	/**
@@ -264,7 +266,7 @@ class CadreStoreProvider implements StoreProvider {
 			this.options.node,
 			instance.strandId,
 			this.tables,
-			this.options.pollMs ?? 10_000,
+			this.options.pollMs ?? 600_000,
 			this.options.firstSyncPatienceMs ?? 240_000,
 			await this.logFor(instance.strandId),
 			this.laneFor(instance.strandId),
@@ -348,17 +350,17 @@ class CadreTallyStore implements TallyStore {
 	private async timed<T>(sql: string, kind: StatementTiming['kind'], run: () => Promise<{ value: T; rows: number }>): Promise<T> {
 		const report = this.onStatement
 		if (!report) return (await this.lane.run(run)).value
-		const queued = performance.now()
+		const queued = Date.now()
 		let started = queued
 		try {
 			const { value, rows } = await this.lane.run(() => {
-				started = performance.now()
+				started = Date.now()
 				return run()
 			})
-			report({ strandId: this.strandId, sql, kind, waitedMs: started - queued, ranMs: performance.now() - started, rows })
+			report({ strandId: this.strandId, sql, kind, waitedMs: started - queued, ranMs: Date.now() - started, rows })
 			return value
 		} catch (error) {
-			report({ strandId: this.strandId, sql, kind, waitedMs: started - queued, ranMs: performance.now() - started, rows: 0, failed: true })
+			report({ strandId: this.strandId, sql, kind, waitedMs: started - queued, ranMs: Date.now() - started, rows: 0, failed: true })
 			throw error
 		}
 	}
@@ -370,6 +372,11 @@ class CadreTallyStore implements TallyStore {
 		const instance = await awake(this.node, this.strandId, this.patienceMs)
 		if (!instance.database) throw new Error(`strand ${this.strandId} is not writable`)
 		return instance.database.getDatabase()
+	}
+
+	/** What `sql` reads, as Quereus plans it -- planning only, so it needs no turn in the lane. */
+	async tablesRead(sql: string): Promise<readonly string[]> {
+		return await tablesReadBy(await this.db(), sql)
 	}
 
 	async query<T>(sql: string, params?: unknown[]): Promise<T[]> {

@@ -61,7 +61,7 @@ const USAGE = `usage: taleus [options] [command [args] [\\; command ...]]
   -v, --verbose          the stack's log lines on stderr
       --no-reactivity    diagnostic: no push wakes for the partner's commits (poll only)
       --offline          strand offline mode: a write returns once saved here, sent after
-      --poll <seconds>   diagnostic: the backstop poll's interval (0: none; default 10)
+      --poll <seconds>   diagnostic: the backstop poll's interval (0: none; default 600)
   -h, --help · --version
 
 With no command: an interactive prompt, or commands from stdin. "help" lists commands.`

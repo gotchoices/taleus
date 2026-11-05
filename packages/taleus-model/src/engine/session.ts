@@ -16,7 +16,7 @@ import {
 import type { NotificationSettings } from '../notifications.js'
 import type { Rate } from '../rates.js'
 import type { Settings } from '../settings.js'
-import type { Amount, Unit } from '../types.js'
+import type { Amount, TallySummary, Unit } from '../types.js'
 import { notifyWorldChanged } from '../world.js'
 import { BUILT_IN_PUBLISHER } from '../agreement.js'
 import type { AgreementContext } from '../contracts/agreements.js'
@@ -76,6 +76,11 @@ export interface LocalState {
 	trustedPublishers: { domain: string; since: string }[]
 	/** Agreements the party trusts on their own, by CID: offered, and not warned about. */
 	trustedAgreements: string[]
+	/**
+	 * Each tally's summary as last read, by id. A tally's strand is not readable while the node
+	 * starts or a strand is rebuilt; the list shows what was last known rather than going empty.
+	 */
+	lastSummaries: Record<string, TallySummary>
 }
 
 /** One durable text value the host keeps: the same shape as cadre-core's `DurableSlot`. */
@@ -127,6 +132,7 @@ export function initialLocalState(): LocalState {
 		deviceName: 'This device',
 		trustedPublishers: [],
 		trustedAgreements: [],
+		lastSummaries: {},
 	}
 }
 
@@ -274,7 +280,9 @@ export class Session {
 		if (!this.engine) return undefined
 		const cached = this.tallies.get(id)
 		if (cached) return cached
-		const known = (await this.options.store.list()).some(ref => ref.id === id)
+		// A tally this session has read before is known even while its strand is not readable yet
+		// (the node starting, a strand rebuilt); opening it waits for the strand.
+		const known = id in this.local.lastSummaries || (await this.options.store.list()).some(ref => ref.id === id)
 		if (!known) return undefined
 		const opened = await this.engine.open({ id })
 		this.tallies.set(id, opened)

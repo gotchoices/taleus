@@ -269,8 +269,23 @@ module keeps its in-process suite against doubles until direct chits work on a r
   optimystic#52 (and quereus#32) land; the declared descending indexes then apply. A balance over
   years of chits (~9 us/chit in Node) wants a materialized `SettledBalance` -- quereus maintains a
   single-source aggregate per insert -- once Sereus confirms such a view stays correct under
-  replicated commits. Open: the S7 moves ~140 Noise frames/s "idle" (43% JS busy; per-frame cipher
-  object construction is 0.3 of 0.44 ms) -- what generates that traffic is not yet known. Same-day order: each chit carries `At`, the issuer's signed instant (decided 2026-11-03);
+  replicated commits. The S7's "idle" 43% busy was a partner's restart: settled, the S7
+  runs ~22% (cohort-topic bursts every 30 s); for ~60 s after the S21 restarts it serves a steady ~5
+  inbound `db-p2p/sync` requests at a time over the relay (each local read on the restarted side
+  checks every collection's latest revision with the partner), ~10 s of it at 100%. In the CLI the
+  idle traffic is the store's backstop poll: one re-read every 10 s costs ~82 block gets and 16-22
+  "latest" requests to the partner, and nothing else moves between polls. Per-frame cipher object
+  construction is 0.3 of 0.44 ms on the S7 (not filed: the Node-style API needs a cipher per
+  nonce). Dev bridge `status` now lists each libp2p node's connections and open streams by
+  protocol and direction. Reads cut (2026-11-04): the cadre store's backstop poll is 10 min
+  (was 10 s CLI / 120 s phone) and `SHARED_READ_MS` matches it (was 5 s), since watches carry
+  every change (scenarios pass with the poll off, online and offline); `SharedReadStore` now drops
+  only results over the tables a change names (`TallyStore.tablesRead`, from Quereus's change
+  scope). CLI, two idle parties: 0 statements and 0 partner consults a minute (was 216 and ~120);
+  per payment 19 statements and 4.6 consults (was 34 and 8.8). What a read still costs on a strand
+  -- a consult per collection once the 10 s read-repair window lapses -- is optimystic#56 (Node
+  repro in the issue). The settled S7 still runs ~30% busy, mostly stack traffic (Noise/muxer,
+  cohort gossip) plus dev-bundle module loading. Same-day order: each chit carries `At`, the issuer's signed instant (decided 2026-11-03);
   history orders by date, then `At`. The reader's engine flags a counterparty chit dated ahead of its
   own clock (`datedAhead`); flagging one dated long before it arrived waits on tracking arrival time
   against the counterparty's absence (step 3).

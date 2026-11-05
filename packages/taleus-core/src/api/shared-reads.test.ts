@@ -25,8 +25,20 @@ class CountingStore implements TallyStore {
 		return () => this.listeners.delete(listener)
 	}
 
-	change(): void {
-		for (const listener of this.listeners) listener(['App.Ledger'])
+	/** The tables each statement reads, when a test says; others cannot be planned. */
+	readonly tables = new Map<string, string[]>()
+	/** Absent unless a test asks for it, as on a store that cannot say. */
+	tablesRead?: (sql: string) => Promise<readonly string[]>
+
+	knowsTables(): void {
+		this.tablesRead = sql => {
+			const known = this.tables.get(sql)
+			return known ? Promise.resolve(known) : Promise.reject(new Error(`no plan for ${sql}`))
+		}
+	}
+
+	change(tables: readonly string[] = ['App.Ledger']): void {
+		for (const listener of this.listeners) listener(tables)
 	}
 
 	get listening(): number {
@@ -107,5 +119,52 @@ describe('sharing reads', () => {
 		expect(store.listening).toBe(1)
 		await shared.close()
 		expect(store.listening).toBe(0)
+	})
+})
+
+describe('keeping what a change did not touch', () => {
+	it('keeps a result over other tables, and drops one over the changed table', async () => {
+		const { store, shared } = setup()
+		store.knowsTables()
+		store.tables.set('select terms', ['CreditTerms'])
+		store.tables.set('select balance', ['Ledger'])
+		await shared.query('select terms')
+		await shared.query('select balance')
+		await Promise.resolve()
+		store.change(['App.Ledger'])
+		await shared.query('select terms')
+		await shared.query('select balance')
+		expect(store.reads).toBe(3)
+	})
+
+	it('drops every result whose tables it cannot tell', async () => {
+		const { store, shared } = setup()
+		store.knowsTables()
+		// The store cannot plan it, which the cache reports; quiet here.
+		const warn = console.warn
+		console.warn = () => {}
+		try {
+			await shared.query('select unknown')
+			await Promise.resolve()
+			store.change(['App.CreditTerms'])
+			await shared.query('select unknown')
+			expect(store.reads).toBe(2)
+		} finally {
+			console.warn = warn
+		}
+	})
+
+	it('drops only what a write through it touched', async () => {
+		const { store, shared } = setup()
+		store.knowsTables()
+		store.tables.set('select terms', ['CreditTerms'])
+		store.tables.set('select balance', ['Ledger'])
+		await shared.query('select terms')
+		await shared.query('select balance')
+		await Promise.resolve()
+		await shared.apply([{ table: 'Ledger', row: {} }])
+		await shared.query('select terms')
+		await shared.query('select balance')
+		expect(store.reads).toBe(3)
 	})
 })

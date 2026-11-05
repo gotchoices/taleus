@@ -103,12 +103,29 @@ export async function summaryOf(session: Session, tally: Tally, view: TallyView)
 	}
 }
 
+/** Keep the summaries just read as the last known, saving only when one changed. */
+function remember(session: Session, summaries: TallySummary[]): void {
+	const kept = session.local.lastSummaries
+	let changed = false
+	for (const summary of summaries) {
+		if (JSON.stringify(kept[summary.id]) === JSON.stringify(summary)) continue
+		kept[summary.id] = summary
+		changed = true
+	}
+	if (changed) session.changed()
+}
+
 export function talliesModel(session: Session): TalliesModel {
 	return {
 		async listTallies() {
 			const out: TallySummary[] = []
 			for (const { tally, view } of await session.views()) out.push(await summaryOf(session, tally, view))
-			return ok(out.sort((a, b) => b.lastActivity.localeCompare(a.lastActivity)))
+			remember(session, out)
+			const read = new Set(out.map(summary => summary.id))
+			// A tally whose strand is not readable just now -- the node starting, a strand rebuilt --
+			// is listed as it was last read, not dropped: no tally is ever removed.
+			const unread = Object.values(session.local.lastSummaries).filter(summary => !read.has(summary.id))
+			return ok([...out, ...unread].sort((a, b) => b.lastActivity.localeCompare(a.lastActivity)))
 		},
 	}
 }

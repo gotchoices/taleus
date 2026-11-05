@@ -6,6 +6,7 @@ import {
 	rows,
 	tablesIn,
 	transactionBatch,
+	tablesReadBy,
 	watchTables,
 	type RowWrite,
 } from '../store/strand.js'
@@ -172,6 +173,10 @@ class MemoryTallyStore implements TallyStore {
 
 	async query<T>(sql: string, params?: unknown[]): Promise<T[]> {
 		return rows<T>(this.replica.db, sql, params)
+	}
+
+	tablesRead(sql: string): Promise<readonly string[]> {
+		return tablesReadBy(this.replica.db, sql)
 	}
 
 	/**

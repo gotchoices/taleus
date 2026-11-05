@@ -230,6 +230,19 @@ export function tablesIn(schema: string): string[] {
 }
 
 /**
+ * The app tables a read depends on, as Quereus plans it: through views, down to base tables. A
+ * cache can then keep a result no change since could have touched (`SharedReadStore`).
+ */
+export async function tablesReadBy(db: Database, sql: string): Promise<string[]> {
+	const statement = db.prepare(sql)
+	try {
+		return [...new Set(statement.getChangeScope().watches.map(watch => watch.table.table))]
+	} finally {
+		await statement.finalize()
+	}
+}
+
+/**
  * Quereus's post-commit watchers over the app's tables, reporting which ones a commit touched.
  * They fire for a commit made on this database, and -- on a strand database -- for one replicated
  * from a peer, which Optimystic reports through `notifyExternalChange`.

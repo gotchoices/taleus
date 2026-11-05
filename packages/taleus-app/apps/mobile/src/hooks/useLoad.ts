@@ -9,7 +9,10 @@ export type LoadState = 'loading' | 'ready' | 'failed'
 export interface Loaded<T> {
 	state: LoadState
 	value?: T
+	/** The last read failed. With a value still shown (`ready`), the value is the last good one. */
 	error?: DataError
+	/** A re-read is under way behind the value shown. */
+	refreshing: boolean
 	reload(): void
 }
 
@@ -24,12 +27,18 @@ export interface Loaded<T> {
  *
  * A release build swallows unhandled rejections silently, so the catch is not
  * decoration: without it a throw shows as a spinner that never resolves.
+ *
+ * Only the first read shows `loading`. A re-read -- every commit asks for one -- keeps the last
+ * value on screen until a newer one arrives, and a re-read that fails keeps it too, with the error
+ * beside it: a screen never blanks for a read it already answered.
  */
 export function useLoad<T>(load: () => Promise<Result<T>>): Loaded<T> {
 	const [state, setState] = useState<LoadState>('loading')
 	const [value, setValue] = useState<T | undefined>()
 	const [error, setError] = useState<DataError | undefined>()
+	const [refreshing, setRefreshing] = useState(false)
 	const live = useRef(true)
+	const hasValue = useRef(false)
 	// The latest `load`, so a re-read asked for during a run reads what the screen now wants.
 	const latest = useRef(load)
 	latest.current = load
@@ -44,30 +53,37 @@ export function useLoad<T>(load: () => Promise<Result<T>>): Loaded<T> {
 	}, [])
 
 	const once = useCallback(async () => {
-		setState('loading')
-		setError(undefined)
+		if (hasValue.current) setRefreshing(true)
+		else setState('loading')
+		const fail = (failure: DataError) => {
+			setError(failure)
+			// The last good value stays on screen; only a screen with nothing to show fails.
+			if (!hasValue.current) setState('failed')
+		}
 		try {
 			const result = await latest.current()
 			if (!live.current) {
 				return
 			}
 			if (result.ok) {
+				hasValue.current = true
 				setValue(result.value)
+				setError(undefined)
 				setState('ready')
 				return
 			}
-			setError(result.error)
-			setState('failed')
+			fail(result.error)
 		} catch (thrown) {
 			if (!live.current) {
 				return
 			}
-			setError({
+			fail({
 				kind: 'unexpected',
 				message: describeThrown(thrown),
 				retryable: true,
 			})
-			setState('failed')
+		} finally {
+			if (live.current) setRefreshing(false)
 		}
 	}, [])
 
@@ -99,9 +115,15 @@ export function useLoad<T>(load: () => Promise<Result<T>>): Loaded<T> {
 	// variant does not remount a screen that is already showing.
 	const generation = useSyncExternalStore(subscribeGeneration, getGeneration, getGeneration)
 
+	// A different `load` is a different read (another tally, say): what was shown is not its answer.
+	const shownFor = useRef(load)
 	useEffect(() => {
+		if (shownFor.current !== load) {
+			shownFor.current = load
+			hasValue.current = false
+		}
 		void run()
 	}, [run, load, generation])
 
-	return { state, value, error, reload: () => void run() }
+	return { state, value, error, refreshing, reload: () => void run() }
 }

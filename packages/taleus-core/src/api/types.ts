@@ -760,6 +760,11 @@ export interface TallyStore {
 	 * `notifyExternalTableChange(table)` is the hook a replicated write will come in through.
 	 */
 	subscribe(listener: (tables: readonly string[]) => void): Unsubscribe
+	/**
+	 * The tables a read depends on (base tables, through views), when the store can say. Lets a
+	 * cache keep results a change to other tables cannot have touched. Absent: every change counts.
+	 */
+	tablesRead?(sql: string): Promise<readonly string[]>
 	close(): Promise<void>
 }
 
