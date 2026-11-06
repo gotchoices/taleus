@@ -131,6 +131,16 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 		const rows: unknown[] = []
 		for await (const row of database.getDatabase().eval(text)) rows.push(row)
 		return rows
+	}, async strandId => {
+		const running = phone.node
+		if (!running) throw new Error('the node is not running')
+		// A row this party signed is one it founded; anything else it joined.
+		if (running.getDiscoveredStrands().get(strandId)?.FounderOwnerKey) {
+			await running.unpublishStrand(strandId, { discardQueued: true })
+			return 'unpublished'
+		}
+		await running.forgetJoinedStrand(strandId, { discardQueued: true })
+		return 'forgot the join'
 	})
 	return engine.model
 }

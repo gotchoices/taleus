@@ -12,6 +12,48 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
+- [ ] **Stack evaluation follow-ups (Sereus 1.20 / Optimystic 1.24 / Quereus 4.24), in order.**
+  1. [x] Idle profile of a production bundle (2026-11-04; Metro serving `dev=false&minify=true` to the
+     debug app via its `js_dev_mode_debug` pref; symbolicate frames with Metro's `/symbolicate`).
+     Settled, the S21 runs 5.8% busy (dev bundle ~30% on the S7); the S7 23%, a ~10 s burst of it
+     consistent with the dead tally's start-up retry (item 2). Left: Noise cipher work and
+     multiaddr/base32 conversions (small), #55's register verify, and `reactivityRootCoord`
+     rehashing the same tail id on every use (448 of 448 calls repeated in 120 s idle, filed
+     optimystic#57, low priority).
+  2. [x] The S7's dead tally (`tally-e447`, formed before the ledger redesign; partner gone),
+     2026-11-04. Its app-schema apply fails, and cadre-core relaunches it forever on a 5 s-doubling
+     ladder capped at 5 min, each attempt a full strand bring-up: on the S7 9-11 s at 60-100% CPU,
+     32% busy over the first 6 min after an app start, then ~10 s every 5 min. Filed sereus#57
+     (Node repro: a deterministic DDL refusal is retried with a libp2p build each time; suggests
+     treating a refused apply as non-transient for that schema). The migration side is
+     quereus#39 (Node repro: migration steps and their undo hit the CHECK drop guards and ignore
+     view order; our real schemas cannot migrate across a change to `TallyClosed`, which a CHECK
+     reads, and a failed migration can leave every view gone). Correction: in Node a nullable
+     `ADD COLUMN` applies on this stack (Optimystic adds it in the catalog); why the S7 reported
+     "does not support ALTER TABLE ADD COLUMN" is not explained. Ours: an old-schema tally is
+     unrecoverable under "no backwards compat yet", and the app shows nothing for a tally that
+     never loaded; removing `tally-e447` from the S7 waits on the user.
+  3. [x] Cross-runtime check (2026-11-05): one esbuild bundle of the hot primitives (noble ed25519
+     verify, noble sha256 on 64 B, multiformats base32 on a 38 B peer id), injected through each
+     runtime's inspector (Metro for Hermes; NativeScript's `<appId>-inspectorServer` socket on a
+     debug build for V8), so the same library code runs everywhere. Per call:
+     | | Node 24 (Mac) | emulator Hermes (Mac CPU) | S21 Hermes | S7 Hermes | S7 V8 (NativeScript) |
+     |---|---|---|---|---|---|
+     | ed25519 verify | 2.95 ms | 23.3 ms | 25.3 ms | 57.9 ms | 17.7 ms |
+     | sha256 64 B | 0.005 ms | 0.133 ms | 0.114 ms | 0.49 ms | 0.074 ms |
+     | base32 encode | 0.001 ms | 0.009 ms | 0.010 ms | 0.038 ms | 0.015 ms |
+     Hermes is 8-90x Node on the same hardware (the emulator shares the Mac's CPU), and 3-7x V8 on
+     the same phone: pure-JS crypto on a hot path (optimystic#55, #57) costs every phone engine,
+     Hermes most.
+  4. [x] cadre-rn `noiseCrypto` `full` mode (2026-11-05): broken -- every start fails "x25519
+     keypair did not come back as DER buffers" on the S21 and the S7: quick-crypto 1.1.7's
+     `generateKeyPairSync('x25519', DER)` returns `ArrayBuffer`s (`export` and `diffieHellman`
+     return `Buffer`s). Filed sereus#58 with the device probe and the one-function fix. Measured in
+     `symmetric` (two S7 cold starts): strand active at ~38 s, 37.3 s of JS in the first 60 s,
+     1.2-1.3 s of it pure-JS X25519; `full` cut that to 17-29 ms before failing. Adopt once fixed --
+     and note a saved start keeps its first `noiseCryptoMode`, so pass the mode explicitly (or use
+     `setNoiseCryptoMode`) rather than changing `defaultMode`. The S7's dead tally is gone
+     (`forgetJoinedStrand`, via the dev bridge's new `leaveStrand`); it did not return on restart.
 - [ ] **Workaround to back out: quereus#38.** Quereus commits an implicit transaction after
   releasing its lock, so a statement finishing meanwhile commits it again; in offline mode that
   throws "entry … is already sealed". `StatementLane` in `packages/taleus-sereus/src/store.ts` runs

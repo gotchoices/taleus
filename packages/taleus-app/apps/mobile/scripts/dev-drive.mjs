@@ -9,7 +9,7 @@
  * Methods: status, onboard <name>, invite [creditLimitUnits] [agreementId], agreements, agreement <cid>,
  * import <link>, sql <tallyId> <sql>, accept <token> <name>
  * [creditLimitUnits], answerOffer <tallyId>, close <tallyId>, preview <tallyId> <units>, generation, tallies,
- * pay <tallyId> <units> <memo>, readTally|entries|requests <tallyId>, statements [reset]. Arguments are JSON (a bare word is
+ * pay <tallyId> <units> <memo>, readTally|entries|requests <tallyId>, statements [reset], leaveStrand <strandId>. Arguments are JSON (a bare word is
  * taken as a string). Prints the outcome as JSON; exits non-zero on an error.
  *
  * METRO_PORT (default 8086) and DRIVE_TIMEOUT_S (default 600) tune it.

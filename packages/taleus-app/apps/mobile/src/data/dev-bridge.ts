@@ -31,8 +31,10 @@ function value<T>(result: { ok: true; value: T } | { ok: false; error: { kind: s
 
 /** A raw read of a strand's database, for looking under the model (`sql`). */
 export type StrandQuery = (strandId: string, sql: string) => Promise<unknown[]>
+/** Remove one of this party's strands for good, as its founder or as a joiner (`leaveStrand`). */
+export type StrandLeave = (strandId: string) => Promise<string>
 
-function methods(model: TaleusModel, diagnostics: () => unknown, query: StrandQuery) {
+function methods(model: TaleusModel, diagnostics: () => unknown, query: StrandQuery, leave: StrandLeave) {
 	return {
 		/** Where this phone stands: its node and relay, its party. */
 		async status() {
@@ -104,6 +106,10 @@ function methods(model: TaleusModel, diagnostics: () => unknown, query: StrandQu
 		async sql(strandId: string, text: string) {
 			return query(strandId, text)
 		},
+		/** Remove a strand this node cannot use (say, one formed under an old schema), for good. */
+		async leaveStrand(strandId: string) {
+			return leave(strandId)
+		},
 		async tallies() {
 			return value(await model.tallies.listTallies())
 		},
@@ -128,9 +134,9 @@ function methods(model: TaleusModel, diagnostics: () => unknown, query: StrandQu
 	}
 }
 
-export function installDevBridge(model: TaleusModel, diagnostics: () => unknown, query: StrandQuery): void {
+export function installDevBridge(model: TaleusModel, diagnostics: () => unknown, query: StrandQuery, leave: StrandLeave): void {
 	if (!__DEV__) return
-	const calls = methods(model, diagnostics, query)
+	const calls = methods(model, diagnostics, query, leave)
 	const results = new Map<string, Outcome>()
 	const bridge = {
 		...calls,
