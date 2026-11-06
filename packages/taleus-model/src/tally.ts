@@ -8,6 +8,7 @@ import {
 	type Balance,
 	type CivilDate,
 	type Counterparty,
+	type Delivery,
 	type Instant,
 	type TallyState,
 	type Unit,
@@ -82,6 +83,10 @@ export interface Closing {
 	 * this: what counts as trivial depends on the unit and the parties.
 	 */
 	offerWriteOff?: boolean
+	/** Where this party's own close request stands on its way to them, while it travels. */
+	delivery?: Delivery
+	/** While it waits to be sent: something they do could still make it fail. */
+	mayFail?: true
 }
 
 /** Work that needs the counterparty and has not reached them yet (story 04 path C). */

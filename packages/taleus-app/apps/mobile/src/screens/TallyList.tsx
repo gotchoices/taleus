@@ -2,7 +2,7 @@ import Ionicons from '@react-native-vector-icons/ionicons'
 import { useCallback, useLayoutEffect } from 'react'
 import { FlatList, Pressable, Text, View } from 'react-native'
 
-import { Action, Amount, Chip, Empty, Failed, Loading, OpenableRow } from '../components'
+import { Action, Amount, amountText, Chip, Empty, Failed, Loading, OpenableRow } from '../components'
 import { listTallies } from '../data/tallies'
 import type { TallySummary } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
@@ -105,6 +105,10 @@ function TallyRow({ tally, onOpen }: { tally: TallySummary; onOpen: () => void }
 			</View>
 			<View style={styles.rowMeta}>
 				{tally.waitingOn === 'me' ? <Chip label={t('screens.tally-list.waiting-on-me')} urgent /> : null}
+				{/* Story 15 step 3: the balance includes what the counterparty does not hold yet. */}
+				{tally.undelivered ? (
+					<Chip label={t('screens.tally-list.undelivered', { amount: amountText(tally.undelivered, tally.unit) })} />
+				) : null}
 				{tally.state !== 'Open' ? (
 					<Chip label={tally.invitation ? t('screens.tally-list.state-invited') : t(`screens.tally-list.state-${tally.state.toLowerCase()}`)} />
 				) : null}

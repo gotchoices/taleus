@@ -11,7 +11,7 @@ import { t } from '../i18n'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, spacing, type as typography, type Tokens } from '../theme'
 import { formatInstantTime } from '../util/date'
-import { entryMarks } from '../util/marks'
+import { actMarks } from '../util/marks'
 
 type Props = ScreenProps<'EntryDetail'>
 
@@ -65,7 +65,7 @@ export function EntryDetail({ route, navigation }: Props): React.JSX.Element {
 	const name = tally.counterparty.name
 	const direction = directionOf(entry.amount)
 	const toward = entry.amount.units > 0
-	const marks = entryMarks(entry)
+	const marks = actMarks(entry)
 
 	return (
 		<ScrollView style={styles.screen} contentContainerStyle={styles.content}>

@@ -125,7 +125,9 @@ has taken up shows its note as the counterparty.
 
 ### `tally <tally>`
 Key/value: `id`, `counterparty`, `state`, `waitingOn`, `balance`, `perspective`, `myLimit`,
-`myNotice`, `theirLimit`, `theirNotice`, `roomToSpend`, `agreement`, `opened`.
+`myNotice`, `theirLimit`, `theirNotice`, `roomToSpend`, `agreement`, `opened`; and, while they apply,
+`undelivered` (what this party gave that the partner does not hold yet) and `closeDelivery` (where
+this party's close request stands, as `delivery` does for an entry).
 
 ### `offer <tally> [accept]`
 Shows the terms proposed on a tally (key/value: `waitingOn`, `myLimit`, `myNotice`, `theirLimit`,
@@ -142,8 +144,10 @@ will extend, not what may be promised. `--answers` names the request it pays in 
 entry as `history` does.
 
 ### `request <tally> <amount> [<memo...>]` · `requests [<tally>]`
-Asks the partner to pay, or lists requests: `row  id  tally  direction  amount  stillAsked  state  memo`.
-A request is named by its `id`, or by its `row` in `requests` with no tally given.
+Asks the partner to pay, or lists requests: `row  id  tally  direction  amount  stillAsked  state
+delivery  memo`. `delivery` is set while this party's own act on the request -- the request it made,
+or its decline of theirs -- is on its way, as for `history`. A request is named by its `id`, or by its
+`row` in `requests` with no tally given.
 
 ### `decline <request> [<why...>]`
 Declines a request to pay: nothing moves, and the requester sees it `refused`. Prints `id  state`.

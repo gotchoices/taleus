@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { Text, TextInput, View } from 'react-native'
 
 import { Action, Card, Empty, Failed, FormScroll, Loading } from '../components'
-import { createRequest } from '../data/requests'
+import { createRequest, type PaymentRequest } from '../data/requests'
 import { readTally } from '../data/tally'
 import type { DataError } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
@@ -29,7 +29,7 @@ export function CreateRequest({ route }: Props): React.JSX.Element {
 
 	const [text, setText] = useState('')
 	const [memo, setMemo] = useState('')
-	const [sent, setSent] = useState(false)
+	const [sent, setSent] = useState<PaymentRequest | undefined>()
 	const [failure, setFailure] = useState<DataError | undefined>()
 
 	if (state === 'loading') {
@@ -39,10 +39,19 @@ export function CreateRequest({ route }: Props): React.JSX.Element {
 		return <Failed title={t('screens.create-request.failed-title')} error={error} onRetry={reload} />
 	}
 	if (sent) {
+		// Story 15: a request saved here is not yet asked of them; the screen says which.
+		const travelling = sent.delivery !== undefined && sent.delivery !== 'delivered'
 		return (
 			<Empty
 				title={t('screens.create-request.sent-title')}
-				body={t('screens.create-request.sent-body')}
+				body={t(
+					!travelling
+						? 'screens.create-request.sent-body'
+						: sent.delivery === 'waiting'
+							? 'screens.create-request.saved-body-waiting'
+							: 'screens.create-request.saved-body',
+					{ name: value.counterparty.name },
+				)}
 			/>
 		)
 	}
@@ -55,7 +64,7 @@ export function CreateRequest({ route }: Props): React.JSX.Element {
 			memo: memo.trim() || undefined,
 		})
 		if (result.ok) {
-			setSent(true)
+			setSent(result.value)
 			return
 		}
 		setFailure(result.error)

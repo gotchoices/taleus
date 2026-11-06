@@ -359,7 +359,7 @@ The mobile client is the **`taleus-app`** package.
 
 ### Delivery of a party's own acts
 
-Each single-row act (a chit, a request, a decline, a close request) is one transaction, and its id comes back with the write. The store keeps a small device-local **write log**: the row's id and its transaction. It is kept in a file in the CLI's party folder and in a key of the phone's session store, never in the strand. The store reads where the transaction stands from the strand (sereus `docs/strands.md`, "A commit's durability" and "Offline mode") and reports it as the entry's **delivery**:
+Each single-row act (a chit, a request, a decline, a close request) is one transaction, and its id comes back with the write. The store keeps a small device-local **write log**: each act's key (`actKey`: a chit's or request's id, `decline:<request id>`, `close:<side>`) and its transaction. It is kept in a file in the CLI's party folder and in a key of the phone's session store, never in the strand. The store reads where the transaction stands from the strand (sereus `docs/strands.md`, "A commit's durability" and "Offline mode") and reports it as the entry's **delivery**:
 
 - `waiting` or `sending`: queued on this device.
 - `here-only`: recorded, not yet held by the counterparty, and followed.

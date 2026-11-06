@@ -35,7 +35,7 @@ const pay: Command = {
 	},
 }
 
-const REQUEST_COLUMNS = ['row', 'id', 'tally', 'direction', 'amount', 'stillAsked', 'state', 'memo'] as const
+const REQUEST_COLUMNS = ['row', 'id', 'tally', 'direction', 'amount', 'stillAsked', 'state', 'delivery', 'memo'] as const
 
 const request: Command = {
 	name: 'request',
@@ -53,6 +53,7 @@ const request: Command = {
 			amount: formatAmount(made.amount.units, unit),
 			stillAsked: formatAmount(made.stillAsked.units, unit),
 			state: made.state,
+			delivery: made.delivery,
 			memo: made.memo,
 		}])
 	},
@@ -78,6 +79,7 @@ const requests: Command = {
 				amount: money(item.amount.units),
 				stillAsked: money(item.stillAsked.units),
 				state: item.state,
+				delivery: item.delivery,
 				memo: item.memo,
 			}
 		}))

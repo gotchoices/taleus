@@ -2,7 +2,7 @@
 import { onWorldChanged, type TallySummary } from 'taleus-model'
 
 import { formatAmount } from '../amount.ts'
-import type { Row } from '../output.ts'
+import type { Pair, Row } from '../output.ts'
 import { CliFailure, EXIT, titleOf, type Session } from '../session.ts'
 import { need, text, usage, type Command } from './command.ts'
 
@@ -34,6 +34,9 @@ const tallies: Command = {
 	},
 }
 
+/** One key/value line of `tally`'s output. */
+const pair = (key: string, value: string): Pair => [key, value]
+
 const tally: Command = {
 	name: 'tally',
 	summary: 'One tally: its terms, balance and who it waits on',
@@ -49,6 +52,9 @@ const tally: Command = {
 			['waitingOn', detail.waitingOn],
 			['balance', money(detail.balance.units)],
 			['perspective', detail.balance.perspective],
+			// What this party gave that the partner does not hold yet; its close request while it travels.
+			...(detail.undelivered ? [pair('undelivered', money(detail.undelivered.units))] : []),
+			...(detail.closing?.delivery ? [pair('closeDelivery', detail.closing.delivery)] : []),
 			['myLimit', money(detail.terms.mine.creditLimit.units)],
 			['myNotice', detail.terms.mine.noticeDays],
 			['theirLimit', money(detail.terms.theirs.creditLimit.units)],

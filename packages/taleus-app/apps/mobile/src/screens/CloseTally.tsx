@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { ScrollView, Text } from 'react-native'
 
-import { Action, Amount, Card, Failed, Loading, Row, amountText } from '../components'
+import { Action, Amount, Card, Failed, Loading, Marks, Row, amountText } from '../components'
 import { readTally, requestClose, type TallyDetail } from '../data/tally'
 import { useLoad } from '../hooks/useLoad'
 import { t } from '../i18n'
@@ -73,6 +73,8 @@ export function CloseTally({ route, navigation }: Props): React.JSX.Element {
 							date: formatInstant(closing.requested),
 						})}
 			</Text>
+			{/* Story 15: this party's close request, until they hold it. */}
+			<Marks act={closing} name={name} />
 
 			<Card footnote={t('screens.close-tally.narrowed')}>
 				{owed ? (

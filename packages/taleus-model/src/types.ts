@@ -139,3 +139,12 @@ export function daysSince(when: Instant, now: number = Date.now()): number {
 
 /** How an amount's unit is written: its own mark, or its code. A party's display preference. */
 export type UnitStyle = 'mark' | 'code'
+
+/**
+ * Where one of this party's own acts stands on its way to the counterparty (story 15;
+ * `design/specs/domain/rules.md` § Delivery): `waiting` (saved on this device, not sent yet),
+ * `sending`, `here-only` (recorded on this device, not yet with them, and followed),
+ * `unconfirmed` (recorded here, and nothing will say when it reaches them), `delivered` (they hold
+ * it), `not-recorded` (refused).
+ */
+export type Delivery = 'waiting' | 'sending' | 'here-only' | 'unconfirmed' | 'delivered' | 'not-recorded'

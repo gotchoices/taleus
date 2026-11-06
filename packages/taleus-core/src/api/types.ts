@@ -323,6 +323,10 @@ export interface TallyView {
 	offer?: { contractCid: string; by: 'me' | 'them' }
 	/** Who has asked to wind the tally down. Absent while nobody has. */
 	closeRequestedBy?: 'me' | 'them' | 'both'
+	/** Where this party's own close request stands on its way to the counterparty, while it travels. */
+	closeDelivery?: Delivery
+	/** While this party's close request waits to be sent: the counterparty could still make it fail. */
+	closeMayFail?: true
 	createdAt: IsoDate
 }
 
@@ -424,6 +428,14 @@ export interface PaymentRequest {
 	state: 'open' | 'paid' | 'declined' | 'expired'
 	reference?: string
 	memo?: string
+	/**
+	 * Where this party's own act on the request stands on its way to the counterparty: the request
+	 * it made, or its decline of theirs. Absent once delivered and forgotten, and for the
+	 * counterparty's acts.
+	 */
+	delivery?: Delivery
+	/** While it waits to be sent: something the counterparty does could still make it fail. */
+	mayFail?: true
 }
 
 export interface HistoryQuery {
@@ -741,14 +753,14 @@ export interface TallyStore {
 	query<T>(sql: string, params?: unknown[]): Promise<T[]>
 	apply(writes: RowWrite[]): Promise<WriteReceipt>
 	/**
-	 * Where a single-row write this device made stands, by its row's `Id`, while the store follows
-	 * it (until it is delivered, or a refusal is acknowledged). Absent on a store with no network.
+	 * Where one of this device's acts stands, by its `actKey`, while the store follows it (until it
+	 * is delivered, or a refusal is acknowledged). Absent on a store with no network.
 	 */
-	writeStatus?(rowId: string): DeliveryStatus | undefined
+	writeStatus?(key: string): DeliveryStatus | undefined
 	/** Every single-row write this device made that the store still follows. */
 	followedWrites?(): FollowedWrite[]
 	/** Stop following a refused write, once its party has seen it. */
-	acknowledge?(rowId: string): void
+	acknowledge?(key: string): void
 	/** Fire when one of those writes changes where it stands. */
 	onDelivery?(listener: () => void): Unsubscribe
 	/**

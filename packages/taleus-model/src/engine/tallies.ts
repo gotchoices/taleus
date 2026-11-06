@@ -154,7 +154,14 @@ export function tallyModel(session: Session): TallyModel {
 			// question, answered by the store.
 			counterpartyReachable: true,
 			...(view.closeRequestedBy
-				? { closing: { requestedBy: view.closeRequestedBy, requested: instantOf(today) } }
+				? {
+						closing: {
+							requestedBy: view.closeRequestedBy,
+							requested: instantOf(today),
+							...(view.closeDelivery ? { delivery: view.closeDelivery } : {}),
+							...(view.closeMayFail ? { mayFail: true as const } : {}),
+						},
+					}
 				: {}),
 		}
 		return ok(value)

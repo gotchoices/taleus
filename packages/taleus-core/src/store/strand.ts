@@ -229,6 +229,42 @@ export function tablesIn(schema: string): string[] {
 	return names
 }
 
+/** The `actKey` of this party's decline of a request. */
+export function declineKey(invoiceId: string): string {
+	return `decline:${invoiceId}`
+}
+
+/** The `actKey` of a side's close request: one per side, so the side names it. */
+export function closeKey(side: string): string {
+	return `close:${side}`
+}
+
+/**
+ * The name a write is followed by, as one of this party's acts -- its delivery, its refusal: a
+ * chit's or a request's own id, `declineKey` for a decline, `closeKey` for a close request.
+ * Undefined for a write that is no act of its own. One definition, so the store that logs a write
+ * and the engine that asks after it cannot name it differently.
+ */
+export function actKey(write: RowWrite): string | undefined {
+	const row = write.row
+	const text = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
+	switch (write.table) {
+		case 'Ledger':
+		case 'Invoice':
+			return text(row.Id)
+		case 'InvoiceDecline': {
+			const invoiceId = text(row.InvoiceId)
+			return invoiceId ? declineKey(invoiceId) : undefined
+		}
+		case 'CloseRequest': {
+			const side = text(row.Requester)
+			return side ? closeKey(side) : undefined
+		}
+		default:
+			return undefined
+	}
+}
+
 /**
  * The app tables a read depends on, as Quereus plans it: through views, down to base tables. A
  * cache can then keep a result no change since could have touched (`SharedReadStore`).

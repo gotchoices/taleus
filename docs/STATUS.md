@@ -293,6 +293,13 @@ module keeps its in-process suite against doubles until direct chits work on a r
   lock, so a statement finishing meanwhile, a read included, commits the same transaction again
   (Node repro on 4.24: one begin, two overlapping commits). The store now runs each strand's
   statements through one lane (offline 6 of 6, online 3 of 3) until quereus#38 is fixed (above).
+  (4b) Every act marked (2026-11-05): requests, declines and close requests are followed
+  like chits, by one `actKey` the store logs and the engine asks after (`PaymentRequest.delivery`,
+  `TallyView.closeDelivery`; a refused one is acknowledged by its key). Shown on TallyHistory's open
+  requests, RequestView, CreateRequest's confirmation, CloseTally, TallyView's closing chip, and
+  TallyList ("$70.00 not yet with them"); a refused act is also an Attention item until seen. CLI:
+  `delivery` on `requests`, `undelivered` and `closeDelivery` on `tally`; the scenarios assert a
+  request, a decline and a close request each reach `delivered`, online and offline (8 of 8 each).
   (4) The mobile marks, the undelivered amount and the refusal card, and (5) story 20 path D (an
   unsent entry waits on the giver's phone; the receiver trusts their own side) and story 24 path F
   (dated ahead): done 2026-11-03. Reviewed in mock (emulator) and in engine mode on S21 + S7

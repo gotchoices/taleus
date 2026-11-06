@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { FlatList, Pressable, Text, View } from 'react-native'
 
-import { Amount, Chip, Empty, Failed, Loading, amountText, directionOf } from '../components'
+import { Amount, Chip, Empty, Failed, Loading, Marks, amountText, directionOf } from '../components'
 import { listEntries, type Entry } from '../data/entries'
 import { listRequests, type PaymentRequest } from '../data/requests'
 import { readTally, type TallyDetail } from '../data/tally'
@@ -11,7 +11,7 @@ import { t } from '../i18n'
 import type { ScreenProps } from '../navigation/routes'
 import { useStyles, spacing, type as typography, type Tokens } from '../theme'
 import { formatInstant } from '../util/date'
-import { entryMarks } from '../util/marks'
+import { actMarks } from '../util/marks'
 
 type Props = ScreenProps<'TallyHistory'>
 
@@ -76,7 +76,7 @@ export function TallyHistory({ route, navigation }: Props): React.JSX.Element {
 			data={entries}
 			keyExtractor={entry => entry.id}
 			ListHeaderComponent={
-				requests.length > 0 ? <Asked requests={requests} unit={tally.unit} /> : undefined
+				requests.length > 0 ? <Asked requests={requests} unit={tally.unit} name={tally.counterparty.name} /> : undefined
 			}
 			renderItem={({ item }) => (
 				<EntryRow
@@ -90,7 +90,7 @@ export function TallyHistory({ route, navigation }: Props): React.JSX.Element {
 	)
 }
 
-function Asked({ requests, unit }: { requests: PaymentRequest[]; unit: Unit }): React.JSX.Element {
+function Asked({ requests, unit, name }: { requests: PaymentRequest[]; unit: Unit; name: string }): React.JSX.Element {
 	const styles = useStyles(make)
 	return (
 		<View style={styles.asked}>
@@ -115,6 +115,7 @@ function Asked({ requests, unit }: { requests: PaymentRequest[]; unit: Unit }): 
 										days: request.outstandingDays,
 									})}
 						</Text>
+						<Marks act={request} name={name} />
 					</View>
 					<Amount value={request.stillAsked} unit={unit} />
 				</View>
@@ -138,7 +139,7 @@ function EntryRow({
 	const styles = useStyles(make)
 	const direction = directionOf(entry.amount)
 	const after = entry.balanceAfter
-	const marks = entryMarks(entry)
+	const marks = actMarks(entry)
 
 	// The row keeps its own layout rather than becoming an `OpenableRow`: what a
 	// reader scans here is the figure and the balance after it, and a chevron

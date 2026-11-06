@@ -28,6 +28,18 @@ async function waitingItems(session: Session): Promise<{ open: Waiting[]; past: 
 		if (view.state === 'closing' && situation.waitingOn !== 'nobody') {
 			open.push({ ...base, id: `closing:${view.ref.id}`, kind: 'closing', waitingOn: situation.waitingOn, waitingSince: today, route: 'TallyView' })
 		}
+		// Story 15 path A: a refused act stays in view until the party has seen it, on the tally.
+		for (const act of await tally.unrecorded()) {
+			open.push({
+				...base,
+				id: `unrecorded:${view.ref.id}:${act.id}`,
+				kind: 'unrecorded',
+				...(act.amount ? { amount: { ...amount(act.amount.units, unit), denom: unit.denom, divisor: unit.divisor } } : {}),
+				waitingOn: 'me',
+				waitingSince: today,
+				route: 'TallyView',
+			})
+		}
 		for (const request of requests) {
 			const item = {
 				...base,

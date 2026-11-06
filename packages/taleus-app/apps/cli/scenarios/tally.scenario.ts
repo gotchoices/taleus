@@ -67,6 +67,9 @@ void describe('a tally between two parties', { timeout: 30 * 60_000 }, () => {
 	void it('answers a request: the payment names it, and it reads answered on both sides', { timeout: STEP_MS }, async () => {
 		const [asked] = await jan.ok('request Sam 20 delivery')
 		const id = String(asked?.id)
+		// Story 15: the request is Jan's act, followed like a payment until Sam holds it.
+		assert.ok(asked?.delivery !== undefined, 'a request is followed')
+		await jan.until('requests', rows => rows.some(row => row.id === id && row.delivery === 'delivered'), STEP_MS)
 		await sam.until('requests', rows => rows.some(row => row.id === id && row.state === 'waiting'), STEP_MS)
 		await sam.ok(`pay Jan 20 --answers ${id} delivery`)
 		await jan.until('requests', rows => rows.some(row => row.id === id && row.state === 'answered'), STEP_MS)
@@ -78,6 +81,8 @@ void describe('a tally between two parties', { timeout: 30 * 60_000 }, () => {
 		const id = String(asked?.id)
 		await sam.until('requests', rows => rows.some(row => row.id === id && row.state === 'waiting'), STEP_MS)
 		await sam.ok(`decline ${id} no`)
+		// Sam's decline is his act on Jan's request: followed under it until Jan holds it.
+		await sam.until('requests', rows => rows.some(row => row.id === id && row.delivery === 'delivered'), STEP_MS)
 		await jan.until('requests', rows => rows.some(row => row.id === id && row.state === 'refused'), STEP_MS)
 		const [janSide] = await jan.ok('tallies')
 		assert.equal(janSide?.balance, '540.00 USD')
@@ -110,6 +115,7 @@ void describe('a tally between two parties', { timeout: 30 * 60_000 }, () => {
 
 	void it('closes: chits either way while closing, closed at zero, then nothing more', { timeout: STEP_MS * 2 }, async () => {
 		await jan.ok('close Sam')
+		await jan.until('tally Sam', rows => rows.some(row => row.closeDelivery === 'delivered'), STEP_MS)
 		await sam.until('tallies', inState('Closing'), STEP_MS)
 		// Closing gates lifts, never a direct chit: Sam may still add to what he owes.
 		await sam.ok('pay Jan 50 one more')

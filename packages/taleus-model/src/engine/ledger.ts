@@ -115,6 +115,8 @@ export function requestsModel(session: Session): RequestsModel {
 			applied: amount(answered ? request.amount.units : 0, unit),
 			stillAsked: amount(answered ? 0 : request.amount.units, unit),
 			state,
+			...(request.delivery ? { delivery: request.delivery } : {}),
+			...(request.mayFail ? { mayFail: true as const } : {}),
 		}
 	}
 

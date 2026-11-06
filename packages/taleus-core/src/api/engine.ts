@@ -1,7 +1,7 @@
 import { sign as signBytes } from '../crypto/index.js'
 import { bytesToHex, fromText, toText } from '../lift/digest.js'
 import { newInvitation, newKey, sidFor, signText, type KeyPairText } from '../store/index.js'
-import type { RowWrite } from '../store/strand.js'
+import { actKey, closeKey, declineKey, type RowWrite } from '../store/strand.js'
 import { publishCertificate } from '../tally/certificates.js'
 import { chitDelta, issueChit } from '../tally/chits.js'
 import { requestClose as closeRow } from '../tally/close.js'
@@ -271,11 +271,25 @@ class TallyEngine implements Tally {
 		return { offer: { contractCid: proposal.ContractCid, by: proposal.Proposer === this.side ? 'me' : 'them' } }
 	}
 
-	private async closeView(): Promise<Pick<TallyView, 'closeRequestedBy'>> {
+	private async closeView(): Promise<Pick<TallyView, 'closeRequestedBy' | 'closeDelivery' | 'closeMayFail'>> {
 		const rows = await this.store.query<{ Requester: Side }>('select Requester from App.CloseRequest')
 		if (rows.length === 0) return {}
-		if (rows.length > 1) return { closeRequestedBy: 'both' }
-		return { closeRequestedBy: rows[0].Requester === this.side ? 'me' : 'them' }
+		const mine = this.deliveryOf(closeKey(this.side))
+		const marks = {
+			...(mine.delivery ? { closeDelivery: mine.delivery } : {}),
+			...(mine.mayFail ? { closeMayFail: true as const } : {}),
+		}
+		if (rows.length > 1) return { closeRequestedBy: 'both', ...marks }
+		return { closeRequestedBy: rows[0].Requester === this.side ? 'me' : 'them', ...marks }
+	}
+
+	/** Where one of this party's acts stands on its way to the counterparty, by its `actKey`. */
+	private deliveryOf(key: string): { delivery?: Delivery; mayFail?: true } {
+		const status = this.store.writeStatus(key)
+		return {
+			...(status ? { delivery: status.state } : {}),
+			...(status?.mayFail ? { mayFail: true as const } : {}),
+		}
 	}
 
 	private async termsOf(sid: string, denomination: string): Promise<CreditTerms | undefined> {
@@ -486,11 +500,9 @@ class TallyEngine implements Tally {
 		const sign = this.role === 'stock' ? 1 : -1
 		// Only this party's own direct chits travel from here; the counterparty's arrived.
 		const mineToSend = r.Issuer === this.side && r.Kind !== 'lift'
-		const status = mineToSend ? this.store.writeStatus(r.Id) : undefined
 		const datedAhead = !mineToSend && r.Kind !== 'lift' && r.At !== null && aheadOf(r.At, this.instant())
 		return {
-			...(status ? { delivery: status.state } : {}),
-			...(status?.mayFail ? { mayFail: true as const } : {}),
+			...(mineToSend ? this.deliveryOf(r.Id) : {}),
 			...(r.At ? { madeAt: r.At } : {}),
 			...(datedAhead ? { datedAhead: true as const } : {}),
 			id: r.Id,
@@ -515,14 +527,19 @@ class TallyEngine implements Tally {
 			ExpiryDate: string | null
 			State: PaymentRequest['state']
 		}>('select Id, Requester, Units, Date, ExpiryDate, State from App.InvoiceState')
-		return rows.map(r => ({
-			id: r.Id,
-			from: r.Requester === this.side ? 'me' : 'counterparty',
-			amount: amount(r.Units, code),
-			requestedOn: r.Date,
-			...(r.ExpiryDate ? { expiresOn: r.ExpiryDate } : {}),
-			state: r.State,
-		}))
+		return rows.map(r => {
+			const mine = r.Requester === this.side
+			return {
+				id: r.Id,
+				from: mine ? 'me' : 'counterparty',
+				amount: amount(r.Units, code),
+				requestedOn: r.Date,
+				...(r.ExpiryDate ? { expiresOn: r.ExpiryDate } : {}),
+				state: r.State,
+				// This party's act on it: the request it made, or its decline of theirs.
+				...this.deliveryOf(mine ? r.Id : declineKey(r.Id)),
+			}
+		})
 	}
 
 	async keys(): Promise<KeyRecord[]> {
@@ -1121,8 +1138,8 @@ function sameRequest(stored: InvoiceRow, side: Side, draft: PaymentRequestDraft)
 /** A refused write, as the act it was. Undefined for a row no act of this party's makes alone. */
 function unrecordedAct(write: RowWrite, reason: string, code: string): UnrecordedAct | undefined {
 	const row = write.row
-	const key = row.Id ?? row.InvoiceId
-	const id = typeof key === 'string' ? key : ''
+	// Named as the store follows it, so `acknowledge(id)` finds it.
+	const id = actKey(write) ?? ''
 	const memo = typeof row.Memo === 'string' && row.Memo ? { memo: row.Memo } : {}
 	switch (write.table) {
 		case 'Ledger':

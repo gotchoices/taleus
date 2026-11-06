@@ -9,6 +9,7 @@ export type {
 	CivilDate,
 	Counterparty,
 	DataError,
+	Delivery,
 	Instant,
 	Perspective,
 	Result,

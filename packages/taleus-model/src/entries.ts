@@ -1,5 +1,5 @@
 /** entries: shapes and policy shared by every implementation of the model. */
-import type { Amount, Balance, Instant, Result } from './types.js'
+import type { Amount, Balance, Delivery, Instant, Result } from './types.js'
 
 export interface Entry {
 	id: string
@@ -20,14 +20,8 @@ export interface Entry {
 	answers?: string[]
 	/** True while a routed payment has not committed (story 24 path A). */
 	unsettled?: boolean
-	/**
-	 * Where this party's own entry stands on its way to the counterparty, when known:
-	 * `waiting` (saved on this device, not sent yet), `sending`, `here-only` (recorded on this
-	 * device, not yet with them, and followed), `unconfirmed` (recorded here, and nothing will say
-	 * when it reaches them), `delivered` (they hold it).
-	 * Absent for their entries, and for one this session did not write.
-	 */
-	delivery?: 'waiting' | 'sending' | 'here-only' | 'unconfirmed' | 'delivered' | 'not-recorded'
+	/** Where this party's own entry stands on its way to them; absent for theirs, and once forgotten. */
+	delivery?: Delivery
 	/** While it waits to be sent: something the counterparty does could still make it fail. */
 	mayFail?: true
 	/**

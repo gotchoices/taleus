@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Text, TextInput } from 'react-native'
 
-import { Action, Amount, amountText, Card, Chip, Failed, FormScroll, Loading, Row } from '../components'
+import { Action, Amount, amountText, Card, Chip, Failed, FormScroll, Loading, Marks, Row } from '../components'
 import { declineRequest, readRequest, withdrawRequest, type PaymentRequest } from '../data/requests'
 import { readTally } from '../data/tally'
 import type { Result, Unit } from '../data/types'
@@ -74,6 +74,8 @@ export function RequestView({ route, navigation }: Props): React.JSX.Element {
 				{t(`screens.request-view.${request.direction}`, { name: counterparty })}
 			</Text>
 			<Amount value={request.stillAsked} unit={unit} size="display" />
+			{/* Story 15: this party's own act on it -- its request, or its refusal -- until they hold it. */}
+			<Marks act={request} name={counterparty} />
 
 			<Card>
 				<Row label={t('screens.request-view.for')} value={request.memo ?? '—'} />

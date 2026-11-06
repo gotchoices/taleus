@@ -15,7 +15,8 @@
       "stillAsked": {
         "units": 6000
       },
-      "state": "waiting"
+      "state": "waiting",
+      "delivery": "here-only"
     },
     {
       "id": "request:jan-sam-40",

@@ -8,7 +8,7 @@ import { publishCertificate } from '../tally/certificates.js'
 import { CONTRACT_DOCUMENT } from '../tally/test-harness.js'
 import { MemoryFabric } from './store-memory.js'
 import { createPartyIdentity, localSigner, openTaleus } from './engine.js'
-import { registerCrypto, row, type RowWrite } from '../store/strand.js'
+import { actKey, registerCrypto, row, type RowWrite } from '../store/strand.js'
 import type { Amount, DeliveryStatus, FollowedWrite, Result, StoreProvider, Taleus, Tally, TallyStore, WriteReceipt } from './types.js'
 
 /**
@@ -679,8 +679,9 @@ describe('where this party’s own entries stand', () => {
 			query: (sql, params) => store.query(sql, params),
 			apply: async rows => {
 				const receipt = await store.apply(rows)
-				const id = rows.length === 1 ? rows[0].row.Id : undefined
-				if (typeof id === 'string') writes.set(id, { write: rows[0], status: { state: 'waiting' } })
+				// Followed by its act key, as the cadre store does.
+				const id = rows.length === 1 ? actKey(rows[0]) : undefined
+				if (id) writes.set(id, { write: rows[0], status: { state: 'waiting' } })
 				return receipt
 			},
 			writeStatus: id => writes.get(id)?.status,
@@ -736,6 +737,42 @@ describe('where this party’s own entries stand', () => {
 		// Refused, so not travelling: nothing of it is counted as on its way.
 		expect((await samTally.balances()).undelivered).toEqual(usd(0))
 		samTally.acknowledge('chit:late')
+		expect(await samTally.unrecorded()).toEqual([])
+	})
+
+	it('follows a request this party made, and its decline of theirs', async () => {
+		let moves: ReturnType<typeof following> | undefined
+		const world = await twoParties({ sam: store => (moves = following(store)).wrapped })
+		const { janTally, samTally } = await opened(world)
+		const asked = must(await samTally.requestPayment({ amount: usd(500), id: 'req:tools' }))
+		const mine = async () => (await samTally.requests()).find(r => r.id === asked.id)
+		expect((await mine())?.delivery).toBe('waiting')
+		moves!.move(asked.id, { state: 'here-only' })
+		expect((await mine())?.delivery).toBe('here-only')
+
+		// Jan asks; Sam declines. Sam's decline is his act, followed under its own key.
+		const theirs = must(await janTally.requestPayment({ amount: usd(900), id: 'req:much' }))
+		must(await samTally.declinePayment(theirs.id))
+		const declined = (await samTally.requests()).find(r => r.id === theirs.id)
+		expect(declined?.state).toBe('declined')
+		expect(declined?.delivery).toBe('waiting')
+		// The counterparty's request carries no mark on their side for Sam's decline.
+		expect((await janTally.requests()).find(r => r.id === theirs.id)?.delivery).toBeUndefined()
+	})
+
+	it('follows a close request, and names a refused one so it can be acknowledged', async () => {
+		let moves: ReturnType<typeof following> | undefined
+		const world = await twoParties({ sam: store => (moves = following(store)).wrapped })
+		const { samTally } = await opened(world)
+		must(await samTally.requestClose())
+		const view = await samTally.read()
+		expect(view.closeRequestedBy).toBe('me')
+		expect(view.closeDelivery).toBe('waiting')
+
+		const key = view.role === 'stock' ? 'close:S' : 'close:F'
+		moves!.move(key, { state: 'not-recorded', reason: 'rejected' })
+		expect(await samTally.unrecorded()).toEqual([{ id: key, kind: 'close', reason: 'rejected' }])
+		samTally.acknowledge(key)
 		expect(await samTally.unrecorded()).toEqual([])
 	})
 

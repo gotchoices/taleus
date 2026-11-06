@@ -32,7 +32,7 @@ import type {
 } from '@serfab/cadre-core'
 import type { Database } from '@quereus/quereus'
 import type { DeliveryStatus, FollowedWrite, InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe, WriteReceipt } from 'taleus-core'
-import { insertReturningTransaction, tablesIn, tablesReadBy, transactionBatch, watchTables, type RowWrite } from 'taleus-core/host'
+import { actKey, insertReturningTransaction, tablesIn, tablesReadBy, transactionBatch, watchTables, type RowWrite } from 'taleus-core/host'
 
 /**
  * What the store asks of the app's running node: these methods of `CadreNode`, and nothing else.
@@ -422,8 +422,9 @@ class CadreTallyStore implements TallyStore {
 			const { sql, params } = insertReturningTransaction(writes[0])
 			let transactionId: string | undefined
 			for await (const row of db.eval(sql, params as never)) transactionId ??= typeof row.Tx === 'string' ? row.Tx : undefined
-			const rowId = writes[0].row.Id
-			if (transactionId && typeof rowId === 'string') this.log.record(rowId, { transactionId, write: writes[0] })
+			// Followed by its act key -- a chit, a request, a decline, a close request alike.
+			const key = actKey(writes[0])
+			if (transactionId && key) this.log.record(key, { transactionId, write: writes[0] })
 			return transactionId ? { transactionId } : {}
 		}
 		const { sql, params } = transactionBatch(writes)
@@ -439,35 +440,35 @@ class CadreTallyStore implements TallyStore {
 	 * A write delivered, or one nothing can account for any more (committed in an earlier run, online),
 	 * stops being followed; a refusal stays until it is acknowledged.
 	 */
-	writeStatus(rowId: string): DeliveryStatus | undefined {
-		if (this.log.delivered(rowId)) return { state: 'delivered' }
-		const logged = this.log.get(rowId)
+	writeStatus(key: string): DeliveryStatus | undefined {
+		if (this.log.delivered(key)) return { state: 'delivered' }
+		const logged = this.log.get(key)
 		if (!logged) return undefined
 		const database = this.node.getStrands().get(this.strandId)?.database
 		// Not running yet (a restart, before its first sync): nothing to judge by, so keep it.
 		if (!database) return undefined
 		const status = statusOf(database, logged.transactionId)
-		if (status?.state === 'delivered') this.log.settle(rowId)
-		else if (!status) this.log.forget(rowId)
+		if (status?.state === 'delivered') this.log.settle(key)
+		else if (!status) this.log.forget(key)
 		return status
 	}
 
 	followedWrites(): FollowedWrite[] {
 		const followed: FollowedWrite[] = []
-		for (const [rowId, logged] of this.log.entries()) {
-			const status = this.writeStatus(rowId)
+		for (const [key, logged] of this.log.entries()) {
+			const status = this.writeStatus(key)
 			if (status) followed.push({ write: logged.write, status })
 		}
 		return followed
 	}
 
 	/** The party has seen a refusal: forget it here, and in the queue's retained outcomes. */
-	acknowledge(rowId: string): void {
-		const logged = this.log.get(rowId)
+	acknowledge(key: string): void {
+		const logged = this.log.get(key)
 		if (!logged) return
 		const queue = this.node.getStrands().get(this.strandId)?.database?.offline
 		if (queue?.status(logged.transactionId)?.kind === 'failed') queue.acknowledge(logged.transactionId)
-		this.log.forget(rowId)
+		this.log.forget(key)
 	}
 
 	/** The queue's statuses, and `strand:commit-held` once every member holds a followed commit. */

@@ -1,5 +1,5 @@
 /** requests: shapes and policy shared by every implementation of the model. */
-import type { Amount, Instant, Result } from './types.js'
+import type { Amount, Delivery, Instant, Result } from './types.js'
 
 /** Which way a request runs, from the reading party's side (story 21). */
 export type RequestDirection = 'asked-of-me' | 'asked-by-me'
@@ -21,6 +21,10 @@ export interface PaymentRequest {
 	applied: Amount
 	stillAsked: Amount
 	state: 'waiting' | 'part-answered' | 'answered' | 'refused' | 'withdrawn'
+	/** Where this party's own act on it stands on its way to them: its request, or its refusal of theirs. */
+	delivery?: Delivery
+	/** While that act waits to be sent: something they do could still make it fail. */
+	mayFail?: true
 }
 
 /** What a screen can read and do about requests. Both the mock and the engine implement it. */

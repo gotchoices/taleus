@@ -303,7 +303,8 @@
       },
       "closing": {
         "requestedBy": "me",
-        "requested": "2026-09-07T09:00:00Z"
+        "requested": "2026-09-07T09:00:00Z",
+        "delivery": "waiting"
       }
     },
     "tally:lee-closed": {

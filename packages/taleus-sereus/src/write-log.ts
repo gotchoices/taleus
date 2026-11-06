@@ -1,5 +1,5 @@
 /**
- * The single-row writes this device made on one tally's strand, by the written row's `Id`, with
+ * The single-row writes this device made on one tally's strand, by their act key (`actKey`), with
  * the transaction each committed or queued in -- so a store can say where one of this party's own
  * entries stands (`writeStatus`) after a restart as well as before it. The stack reports where a
  * transaction stands by its id (sereus `docs/strands.md`, "A commit's durability" and "Offline

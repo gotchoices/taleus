@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { ScrollView, Text, View } from 'react-native'
 
-import { Action, Amount, Card, Chip, Failed, Loading, Row } from '../components'
+import { Action, Amount, Card, Chip, Failed, Loading, Marks, Row } from '../components'
 import { listRequests, type PaymentRequest } from '../data/requests'
 import { acknowledgeUnrecorded, listUnrecorded, readTally, type TallyDetail, type UnrecordedAct } from '../data/tally'
 import type { Result } from '../data/types'
@@ -114,6 +114,7 @@ export function TallyView({ route, navigation }: Props): React.JSX.Element {
 			{tally.state !== 'Open' ? (
 				<View style={styles.chipRow}>
 					<Chip label={t(`screens.tally-view.state-${tally.state.toLowerCase()}`)} urgent={tally.waitingOn === 'me'} />
+					{tally.closing ? <Marks act={tally.closing} name={tally.counterparty.name} /> : null}
 				</View>
 			) : null}
 
@@ -233,7 +234,7 @@ const make = (tokens: Tokens) => ({
 	balanceLabel: { ...typography.body, color: tokens.textSecondary },
 	undelivered: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 3, flexWrap: 'wrap' as const, justifyContent: 'center' as const },
 	unrecorded: { gap: spacing[1] },
-	chipRow: { flexDirection: 'row' as const },
+	chipRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing[1] },
 	body: { ...typography.body, color: tokens.textPrimary },
 	caption: { ...typography.caption, color: tokens.textSecondary },
 	centredCaption: {
