@@ -89,12 +89,11 @@ export interface CadreStoreOptions {
 	onStatement?: (statement: StatementTiming) => void
 }
 
-/** One statement a store ran: how long it waited behind the strand's others, and how long it took. */
+/** One statement a store ran, and how long it took. */
 export interface StatementTiming {
 	strandId: string
 	sql: string
 	kind: 'read' | 'write'
-	waitedMs: number
 	ranMs: number
 	rows: number
 	failed?: true
@@ -112,8 +111,6 @@ class CadreStoreProvider implements StoreProvider {
 	private readonly attaching = new Map<string, Promise<StrandInstance>>()
 	/** One write log per strand, shared by every store opened on it, so no store saves over another's. */
 	private readonly logs = new Map<string, Promise<WriteLog>>()
-	/** One statement lane per strand database, shared likewise: see {@link StatementLane}. */
-	private readonly lanes = new Map<string, StatementLane>()
 	/** Callers waiting for a strand that has not been offered yet. */
 	private readonly awaited = new Map<string, ((instance: Promise<StrandInstance>) => void)[]>()
 
@@ -269,18 +266,8 @@ class CadreStoreProvider implements StoreProvider {
 			this.options.pollMs ?? 600_000,
 			this.options.firstSyncPatienceMs ?? 240_000,
 			await this.logFor(instance.strandId),
-			this.laneFor(instance.strandId),
 			this.options.onStatement,
 		)
-	}
-
-	private laneFor(strandId: string): StatementLane {
-		let lane = this.lanes.get(strandId)
-		if (!lane) {
-			lane = new StatementLane()
-			this.lanes.set(strandId, lane)
-		}
-		return lane
 	}
 
 	private logFor(strandId: string): Promise<WriteLog> {
@@ -316,24 +303,6 @@ const WRITE_RETRY_MS = 3_000
  * a wake from hibernation) and closes the old one, so a handle that kept the first would read a
  * closed database ever after.
  */
-/**
- * A strand database's statements, one at a time. Quereus commits a statement's implicit transaction
- * after releasing its own lock, so a statement that finishes meanwhile -- a read included -- commits
- * that same transaction again (gotchoices/quereus#38); in offline mode the second commit throws
- * "entry … is already sealed". Waiting for each statement, its commit included, before the next
- * keeps this store's own statements from overlapping. Statements sereus runs itself are not covered.
- * Back out once quereus#38 ships (docs/STATUS.md, "Workaround to back out").
- */
-class StatementLane {
-	private last: Promise<unknown> = Promise.resolve()
-
-	run<T>(statement: () => Promise<T>): Promise<T> {
-		const next = this.last.then(statement, statement)
-		this.last = next.catch(() => undefined)
-		return next
-	}
-}
-
 class CadreTallyStore implements TallyStore {
 	constructor(
 		private readonly node: StrandNode,
@@ -342,25 +311,20 @@ class CadreTallyStore implements TallyStore {
 		private readonly pollMs: number,
 		private readonly patienceMs: number,
 		private readonly log: WriteLog,
-		private readonly lane: StatementLane,
 		private readonly onStatement?: (statement: StatementTiming) => void,
 	) {}
 
-	/** Run one statement in the lane, timing it for `onStatement` when there is one. */
+	/** Run one statement, timing it for `onStatement` when there is one. */
 	private async timed<T>(sql: string, kind: StatementTiming['kind'], run: () => Promise<{ value: T; rows: number }>): Promise<T> {
 		const report = this.onStatement
-		if (!report) return (await this.lane.run(run)).value
-		const queued = Date.now()
-		let started = queued
+		if (!report) return (await run()).value
+		const started = Date.now()
 		try {
-			const { value, rows } = await this.lane.run(() => {
-				started = Date.now()
-				return run()
-			})
-			report({ strandId: this.strandId, sql, kind, waitedMs: started - queued, ranMs: Date.now() - started, rows })
+			const { value, rows } = await run()
+			report({ strandId: this.strandId, sql, kind, ranMs: Date.now() - started, rows })
 			return value
 		} catch (error) {
-			report({ strandId: this.strandId, sql, kind, waitedMs: started - queued, ranMs: Date.now() - started, rows: 0, failed: true })
+			report({ strandId: this.strandId, sql, kind, ranMs: Date.now() - started, rows: 0, failed: true })
 			throw error
 		}
 	}
@@ -374,7 +338,7 @@ class CadreTallyStore implements TallyStore {
 		return instance.database.getDatabase()
 	}
 
-	/** What `sql` reads, as Quereus plans it -- planning only, so it needs no turn in the lane. */
+	/** What `sql` reads, as Quereus plans it -- planning only. */
 	async tablesRead(sql: string): Promise<readonly string[]> {
 		return await tablesReadBy(await this.db(), sql)
 	}

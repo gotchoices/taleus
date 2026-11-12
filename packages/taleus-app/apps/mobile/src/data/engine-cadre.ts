@@ -12,7 +12,7 @@ import { LevelDB, LevelDBWriteBatch } from 'rn-leveldb'
 import { LevelDBKVStore, openOptimysticRNDb } from '@optimystic/db-p2p-storage-rn'
 import { createBackgroundRunner, phoneNodeLifecycle } from '@serfab/cadre-rn/lifecycle'
 import { kvStoreSlot, secureStoreSlot } from '@serfab/cadre-rn/node-local'
-import { buildNoiseCrypto, DEFAULT_NOISE_CRYPTO_MODE } from '@serfab/cadre-rn/noise-crypto'
+import { buildNoiseCrypto } from '@serfab/cadre-rn/noise-crypto'
 import { createPhoneNode, type PhoneNodeOptions } from '@serfab/cadre-rn/phone-node'
 import type { TaleusModel } from 'taleus-model'
 import { cadreStoreProvider, taleusSApp } from 'taleus-sereus'
@@ -51,13 +51,19 @@ const IDENTITY_SLOT = 'taleus.identity'
 /** The format of the data this build writes, reported back by the next start's saved record. */
 const DATA_VERSION = '1'
 
+/**
+ * Noise in native code, the handshake's X25519 included (`full`): on an S7 the handshake's pure-JS
+ * X25519 cost 1.2-1.3 s of a cold start. Usable from cadre-rn 1.22 (gotchoices/sereus#58).
+ */
+const NOISE_CRYPTO_MODE = 'full' as const
+
 const phone = createPhoneNode({
 	secureStore: keychainSecureStore,
 	leveldb,
 	names: NAMES,
 	dataVersion: DATA_VERSION,
 	// Noise's per-frame crypto in native code (react-native-quick-crypto) rather than pure JS.
-	noiseCrypto: { build: buildNoiseCrypto, defaultMode: DEFAULT_NOISE_CRYPTO_MODE },
+	noiseCrypto: { build: buildNoiseCrypto, defaultMode: NOISE_CRYPTO_MODE },
 	configure: config => ({
 		...config,
 		// The tally sApp is unsigned until Taleus signs it at release (`taleusSApp`).
@@ -86,7 +92,8 @@ export async function startCadreEngine(relayAddrs: readonly string[]): Promise<T
 		relayAddrs: [...relayAddrs],
 		strandOfflineMode: STRAND_OFFLINE_MODE,
 	}
-	const node = await phone.start(options)
+	// A saved start keeps the Noise mode it was first saved with, so the mode is passed every time.
+	const node = await phone.start({ ...options, noiseCryptoMode: NOISE_CRYPTO_MODE })
 	createBackgroundRunner({ ...phoneNodeLifecycle(phone), appState: AppState }).start()
 
 	const session = new LevelDBKVStore(openOptimysticRNDb({ ...leveldb, name: SESSION_DB }), 'taleus:session:')

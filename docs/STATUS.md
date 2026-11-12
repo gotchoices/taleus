@@ -54,14 +54,22 @@ citations) is prepared separately for transmission to Nathan; this is the digest
      and note a saved start keeps its first `noiseCryptoMode`, so pass the mode explicitly (or use
      `setNoiseCryptoMode`) rather than changing `defaultMode`. The S7's dead tally is gone
      (`forgetJoinedStrand`, via the dev bridge's new `leaveStrand`); it did not return on restart.
-- [ ] **Workaround to back out: quereus#38.** Quereus commits an implicit transaction after
-  releasing its lock, so a statement finishing meanwhile commits it again; in offline mode that
-  throws "entry … is already sealed". `StatementLane` in `packages/taleus-sereus/src/store.ts` runs
-  each strand's statements one at a time until the fix ships. To back out on the fixed release: drop
-  `StatementLane`, `laneFor` and the `lanes` map, call `db.eval` directly in `query` and `applyOnce`,
-  and run the CLI scenarios with `TALEUS_SCENARIO_OFFLINE=1` a few times (without the lane, about
-  half failed). Repro: quereus#38's script.
-- [ ] **Stack: on Sereus 1.20 / Optimystic 1.24 / Quereus 4.24.0 / FRET 1.3.0, one copy each.**
+- [x] **Workaround backed out: quereus#38** (2026-11-11). Fixed in Quereus 4.26; on 5.4 the repro
+  shows one commit for an overlapping read. `StatementLane` is gone from `taleus-sereus/src/store.ts`
+  (and `StatementTiming.waitedMs` with it); offline scenarios 6 of 6 without it, no "already sealed".
+- [ ] **Stack: on Sereus 1.22 / Optimystic 1.27 / Quereus 5.4.0 / FRET 1.3.0, one copy each** (both
+  lockfiles; 2026-11-11). Brings every fix we filed: optimystic#55 and #57 (1.26), #56 (1.27: a node
+  connected to every member of an all-must-agree cohort no longer re-consults a held block every
+  10 s; again after a reconnect, a pending change, or every `readRepairQuietWindowMs`, 5 min);
+  quereus#38 (4.26) and #39 (5.0: views ordered by dependency; a view a CHECK reads can be
+  redefined -- our real schemas now migrate across `TallyClosed`, 24 steps); sereus#57
+  (`AppSchemaRefusedError`, one attempt) and #58 (`full` Noise mode starts). API changes that touch
+  us: none needed (our `db.watch` handler is synchronous; no `limit null`; sums are over integers).
+  All suites pass (core 331, model 60, sereus 7, mobile 216); scenarios 8 of 8 online and offline.
+  CLI per payment: 19 statements and 0.4 partner consults (was 4.6; 8.8 before the read cuts); idle
+  still 0. The phone now passes `noiseCryptoMode: 'full'` on every start (a saved start keeps its
+  first mode); device checks pending.
+- [x] **Stack: on Sereus 1.20 / Optimystic 1.24 / Quereus 4.24.0 / FRET 1.3.0, one copy each** (superseded by 1.22, above).
   Sereus 1.20 (2026-11-02) carries Optimystic 1.21-1.24: cohort gossip and notifications only on change
   plus a 30 s refresh (Optimystic#49), one read check in ten for an idle watched table (#48), the
   peer-record rewrite throttled (#40), partial indexes hold only admitted rows (#42), `cid()` takes
