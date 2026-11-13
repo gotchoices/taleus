@@ -14,7 +14,8 @@
 		"start": "node src/main.ts",
 		"typecheck": "tsc --noEmit",
 		"test": "node --test 'src/**/*.test.ts'",
-		"scenarios": "node --test --test-concurrency=1 'scenarios/**/*.scenario.ts'"
+		"scenarios": "node --test --test-concurrency=1 'scenarios/**/*.scenario.ts'",
+		"scenarios:loop": "bash ./scripts/scenario-loop.sh"
 	},
 	"dependencies": {
 		"taleus-core": "link:../../../taleus-core",

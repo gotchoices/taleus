@@ -77,6 +77,13 @@ citations) is prepared separately for transmission to Nathan; this is the digest
   (decided 2026-11-12: offline always on the phone; online stays the CLI's default, for measuring
   writes; no phone switch), since the S7's party predated offline mode and its saved start had kept
   online mode (a payment from it returned `delivered` after ~15 s).
+- [x] **Stack regression check** (2026-11-13): `apps/cli/scenarios/stack.scenario.ts` (restart right
+  after a write, three rounds; reads overlapping a write, five times) and `yarn scenarios:loop`
+  (`scripts/scenario-loop.sh`: every scenario file N times in each mode). Baseline on 1.22: 2 of 2
+  online, 2 of 2 offline, both files. It guards outcomes, not the old causes: with block stores again
+  left open on stop it still passed 4 of 4 (optimystic 1.26 clears a node's own previous-run
+  reservations, #54), and the overlap fault is fixed upstream, so neither test can be shown to fail
+  on the current stack.
 - [x] **Stack: on Sereus 1.20 / Optimystic 1.24 / Quereus 4.24.0 / FRET 1.3.0, one copy each** (superseded by 1.22, above).
   Sereus 1.20 (2026-11-02) carries Optimystic 1.21-1.24: cohort gossip and notifications only on change
   plus a 30 s refresh (Optimystic#49), one read check in ten for an idle watched table (#48), the
@@ -333,8 +340,11 @@ module keeps its in-process suite against doubles until direct chits work on a r
   replication. No index would help yet: every "latest/newest" read is a scan + sort until
   optimystic#52 (and quereus#32) land; the declared descending indexes then apply. A balance over
   years of chits (~9 us/chit in Node) wants a materialized `SettledBalance` -- quereus maintains a
-  single-source aggregate per insert -- once Sereus confirms such a view stays correct under
-  replicated commits. The S7's "idle" 43% busy was a partner's restart: settled, the S7
+  single-source aggregate per insert -- but not yet: on Optimystic a materialized view is maintained
+  only for local writes (optimystic#58; checked 2026-11-13 on 1.27 / quereus 5.4, two CLI parties and
+  a bare two-`Database` repro). A partner's chits never reach it, and quereus then answers matching
+  reads of `Ledger` itself (the body, or a rollup such as `sum(Units)`) from the stale view, until
+  `refresh`. No materialized view over a strand table until #58 is fixed. The S7's "idle" 43% busy was a partner's restart: settled, the S7
   runs ~22% (cohort-topic bursts every 30 s); for ~60 s after the S21 restarts it serves a steady ~5
   inbound `db-p2p/sync` requests at a time over the relay (each local read on the restarted side
   checks every collection's latest revision with the partner), ~10 s of it at 100%. In the CLI the

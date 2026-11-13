@@ -13,6 +13,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { TaleusModel } from 'taleus-model'
 import { openParty, partyDirs, saveConfig, startLocalRelay, type LocalRelay } from 'taleus-sereus/node'
 
 import { runCommands } from '../src/commands/index.ts'
@@ -48,6 +49,8 @@ export interface ScenarioParty {
 	ok(line: string): Promise<Record<string, unknown>[]>
 	/** Run `line` until `test` passes on its rows, or fail after `timeoutMs`. */
 	until(line: string, test: (rows: Record<string, unknown>[]) => boolean, timeoutMs?: number): Promise<Record<string, unknown>[]>
+	/** The party's model, as a screen calls it -- for driving calls at once, which `run` cannot. */
+	readonly model: TaleusModel
 	/** Stop the party and start it again from its folder. */
 	restart(): Promise<void>
 	stop(): Promise<void>
@@ -123,6 +126,10 @@ async function startParty(home: string, name: string, relay: string): Promise<Sc
 	const self: ScenarioParty = {
 		name,
 		run,
+		get model() {
+			if (!running) throw new Error(`${name} is not running`)
+			return running.party.model
+		},
 		async ok(line) {
 			const ran = await run(line)
 			if (ran.code !== EXIT.ok) throw new Error(`${name}: \`${line}\` exited ${ran.code}: ${ran.notes.join(' | ')}`)

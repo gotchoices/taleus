@@ -49,6 +49,21 @@ TALEUS_SCENARIO_DELAY_MS=44 yarn scenarios               # local relay, 44 ms ea
 Run it after any stack upgrade: it is the quickest way to tell a release that works from one that
 does not, before a phone is involved.
 
+`scenarios/stack.scenario.ts` holds the stack faults that showed only in some runs -- a party
+restarted right after a write, reads overlapping a write -- so a stack upgrade is judged by the
+loop, which runs the scenario files several times in each strand mode and counts what passed:
+
+```sh
+bash scripts/scenario-loop.sh                            # 3 runs each, online and offline, every file
+bash scripts/scenario-loop.sh 5 offline                  # 5 offline runs
+bash scripts/scenario-loop.sh 3 "online offline" scenarios/stack.scenario.ts
+```
+
+Other settings: `TALEUS_SCENARIO_OFFLINE=1` (strand offline mode, as the phone runs),
+`TALEUS_SCENARIO_POLL_MS` (how often `until` re-asks), `TALEUS_SCENARIO_BACKSTOP_S` (the store's
+backstop poll; 0 turns it off), `TALEUS_SCENARIO_TRACE=1` (each command's time on stderr), and
+`TALEUS_STATEMENTS=<file>` (every store statement and its time, as JSON lines).
+
 ## Profiling the stack
 
 `scripts/` runs a whole formation between two CLI parties and says where the time went:
