@@ -37,6 +37,8 @@ Typical session:
 
 ```sh
 yarn start             # Metro on METRO_PORT
+yarn metro_loop        # the same, started again whenever it exits (Ctrl-C ends the loop)
+yarn metro_restart     # restart the looped Metro: --reset-cache for a clean cache once
 yarn android           # build, install to every device in DEVICES, launch on each
 yarn android:emu       # same, building only the ABIs those devices need (faster)
 yarn emulator          # boot AVD_NAME on EMULATOR_PORT by hand (optional)

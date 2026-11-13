@@ -19,6 +19,8 @@
     "preview": "sh -c '. ./env-defaults.sh && ../../appeus/scripts/preview-scenarios.sh --target mobile --device \"$DEVICE_SERIAL\" --port \"$PREVIEW_PORT\" \"$@\"' --",
     "publish:scenarios": "sh ./scripts/publish-scenarios.sh",
     "start": "yarn model:build && sh -c '. ./env-defaults.sh && react-native start --port \"$METRO_PORT\"'",
+    "metro_loop": "sh ./scripts/metro-loop.sh",
+    "metro_restart": "sh ./scripts/metro-restart.sh",
     "test": "yarn model:build && jest",
     "model:build": "yarn --cwd ../../../taleus-core build && yarn --cwd ../../../taleus-model build && yarn --cwd ../../../taleus-sereus build"
   },

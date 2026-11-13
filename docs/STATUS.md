@@ -67,8 +67,16 @@ citations) is prepared separately for transmission to Nathan; this is the digest
   us: none needed (our `db.watch` handler is synchronous; no `limit null`; sums are over integers).
   All suites pass (core 331, model 60, sereus 7, mobile 216); scenarios 8 of 8 online and offline.
   CLI per payment: 19 statements and 0.4 partner consults (was 4.6; 8.8 before the read cuts); idle
-  still 0. The phone now passes `noiseCryptoMode: 'full'` on every start (a saved start keeps its
-  first mode); device checks pending.
+  still 0. The phone passes `noiseCryptoMode: 'full'` on every start (a saved start keeps its first
+  mode). Devices (2026-11-12): `full` starts and trades both ways on the S7 and S21; an S7 cold start
+  to an active strand 39.3 s with 32.1 s of JS in the first 60 s (37.3 s before) and no pure-JS
+  X25519 left (was 1.2-1.3 s). Production bundles, settled: S7 15.4% busy (was 23%), S21 5.1% (was
+  5.8%); noble ed25519 (#55) and the tail rehash (#57) no longer appear; what is left is mostly the
+  native Noise cipher on traffic. S7 through a partner restart: 31% over 90 s (37% last week on a
+  dev bundle), one ~7 s burst. The phone now passes `strandOfflineMode: 'offline'` on every start too
+  (decided 2026-11-12: offline always on the phone; online stays the CLI's default, for measuring
+  writes; no phone switch), since the S7's party predated offline mode and its saved start had kept
+  online mode (a payment from it returned `delivered` after ~15 s).
 - [x] **Stack: on Sereus 1.20 / Optimystic 1.24 / Quereus 4.24.0 / FRET 1.3.0, one copy each** (superseded by 1.22, above).
   Sereus 1.20 (2026-11-02) carries Optimystic 1.21-1.24: cohort gossip and notifications only on change
   plus a 30 s refresh (Optimystic#49), one read check in ten for an idle watched table (#48), the
@@ -289,7 +297,7 @@ module keeps its in-process suite against doubles until direct chits work on a r
   queue still knows the transaction; `waiting` / `sending` / `not-recorded` and `mayFail` come from
   `StrandDatabase.offline`; `balances.undelivered`, `unrecorded()` / `acknowledge()` in the engine and
   `TallyModel.listUnrecorded` / `acknowledgeUnrecorded` in the model (the mock records everything).
-  The phone starts in offline mode; the CLI with `--offline` (scenarios: `TALEUS_SCENARIO_OFFLINE=1`,
+  The phone always runs in offline mode; the CLI with `--offline` (scenarios: `TALEUS_SCENARIO_OFFLINE=1`,
   8 of 8, and 8 of 8 online). Offline is not slower: a pay returns in ~150 ms (online 200-430) and
   the partner has it ~500 ms later (online by the first poll), so ~400 ms more end to end
   (`TALEUS_SCENARIO_POLL_MS=50` measures it). Fixed 2026-11-03: the Node host never closed its block

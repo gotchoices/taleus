@@ -84,16 +84,15 @@ const phone = createPhoneNode({
 export async function startCadreEngine(relayAddrs: readonly string[]): Promise<TaleusModel> {
 	const saved = await phone.loadSavedStart()
 	// Strand offline mode (sereus docs/strands.md, "Offline mode"): an act returns once it is saved on
-	// this phone and is sent to the counterparty after, each entry marked until they hold it. A fresh
-	// party starts in it; a saved start keeps the mode it last ran with (the developer switch sets it).
+	// this phone and is sent to the counterparty after, each act marked until they hold it. The phone
+	// always runs in it (the CLI is where online writes are measured).
 	const options: PhoneNodeOptions = saved?.options ?? {
 		partyId: `taleus-${randomId()}`,
 		bootstrapAddrs: [],
 		relayAddrs: [...relayAddrs],
-		strandOfflineMode: STRAND_OFFLINE_MODE,
 	}
-	// A saved start keeps the Noise mode it was first saved with, so the mode is passed every time.
-	const node = await phone.start({ ...options, noiseCryptoMode: NOISE_CRYPTO_MODE })
+	// A saved start keeps the modes it was first saved with, so both are passed every time.
+	const node = await phone.start({ ...options, strandOfflineMode: STRAND_OFFLINE_MODE, noiseCryptoMode: NOISE_CRYPTO_MODE })
 	createBackgroundRunner({ ...phoneNodeLifecycle(phone), appState: AppState }).start()
 
 	const session = new LevelDBKVStore(openOptimysticRNDb({ ...leveldb, name: SESSION_DB }), 'taleus:session:')
