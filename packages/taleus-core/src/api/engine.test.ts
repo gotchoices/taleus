@@ -9,7 +9,7 @@ import { CONTRACT_DOCUMENT } from '../tally/test-harness.js'
 import { MemoryFabric } from './store-memory.js'
 import { createPartyIdentity, localSigner, openTaleus } from './engine.js'
 import { actKey, registerCrypto, row, type RowWrite } from '../store/strand.js'
-import type { Amount, DeliveryStatus, FollowedWrite, Result, StoreProvider, Taleus, Tally, TallyStore, WriteReceipt } from './types.js'
+import type { Amount, DeliveryStatus, FollowedWrite, Result, StoreProvider, Taleus, Tally, TallyRef, TallyStore, WriteReceipt } from './types.js'
 
 /**
  * The API, driven the way a consumer drives it: two parties, two engines, no shared secrets.
@@ -934,6 +934,38 @@ describe('watching', () => {
 		stop()
 
 		expect(seen).toEqual(['terms', 'request', 'close'])
+	})
+
+	it('watches a tally that becomes readable after watching began, and says so', async () => {
+		// A restart: the node offers its strands after the engine has started watching.
+		const world = await twoParties()
+		const { samTally } = await opened(world)
+		const provider = world.fabric.provider('jan')
+		let announce: ((ref: TallyRef) => void) | undefined
+		const restarted = await openTaleus({
+			store: {
+				list: async () => [],
+				open: ref => provider.open(ref),
+				create: request => provider.create(request),
+				join: ticket => provider.join(ticket),
+				onReadable: listener => {
+					announce = listener
+					return () => (announce = undefined)
+				},
+			},
+			signer: world.janSigner,
+			sid: world.janSid,
+			now: () => TODAY,
+		})
+		const seen: string[] = []
+		const stop = restarted.watch(change => seen.push(change.kind))
+		announce?.(samTally.ref)
+		for (let i = 0; i < 100 && !seen.includes('readable'); i++) await new Promise(resolve => setTimeout(resolve, 10))
+
+		must(await samTally.pay({ amount: usd(1000) }))
+		stop()
+		expect(seen).toEqual(['readable', 'balance'])
+		expect(announce).toBeUndefined()
 	})
 
 	it('reports across every tally a party holds, from the engine', async () => {

@@ -544,6 +544,53 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
     a missing tally; the CLI's `tallies` `unreadable` column.
   - Model test covers syncing and missing. Not yet seen on a device.
 - [ ] **S7 frame volume:** the ~7 s burst on the S7 after a partner restarts (see the 1.22 stack entry).
+  Diagnosed 2026-11-13. Two CLI parties, Sam restarted while Jan stays up:
+  - Jan serves **105 `db-p2p/sync` "latest" requests in the first 5 s**, one per block, then nothing
+    more. Of them, 93 are App table and index collections, 11 Strand tables, and 1 the schema.
+  - Sam's own reads after the restart add only 3.
+  - The cause is cadre-core's first-sync gate (`strand-first-sync-gate.ts`). It probes every Strand
+    and App table on every launch, restarts included, with serialized reads, and each serialized
+    read refreshes its tree from the partner. A machine that already holds everything still pays one
+    consult per collection.
+  - On the S7 that is ~65 ms of Noise, yamux and JS per request: the 7 s burst.
+  - It scales with the schema's table count, not with what changed, and every strand start pays it:
+    a phone with N tallies starting asks N × ~105.
+  - Not yet measured: what it costs the restarting phone's own cold start over a relay. 105 serial
+    round trips at relay latency may be most of the S7's 39 s.
+
+  **Filed sereus#60** (2026-11-13), with a Node repro on the released packages: restarting a strand
+  costs the partner about 33 + 3 requests per table (45 at 4 tables, 129 at 32, 227 at 64), each
+  block once and almost all before the strand is writable again. Suggested fixes: on a restart,
+  check that each collection is held locally instead of asking the partner; or one batched
+  latest-revision request per peer. Building Sereus master against its linked siblings failed
+  (optimystic HEAD needs a newer FRET), so the repro uses cadre-core 1.22.
+
+  **S7 cold start against a CLI partner over relay.sereus.org** (2026-11-13, dev bundle, three
+  runs):
+  - JS up at 35-61 s, the tally readable 15-22 s after that.
+  - The CLI served only 17-32 sync requests, mostly after the tally was readable.
+  - Offline mode is not the reason: the CLI restart scenario in offline mode still serves 108.
+    Likely the partner is not yet connected over the relay when the gate probes, so the reads are
+    answered locally.
+  - So the probe is not what makes the S7's cold start slow. Added to sereus#60.
+- [x] **The inviter's agent missed the seat after a restart** (found forming the S7-to-CLI tally,
+  2026-11-13). The tally sat `Forming` until a 10-minute backstop poll. Three causes, all fixed:
+  - `engine.watch()` subscribed only to tallies listed when it was called. After a restart the
+    node offers its strands later, so no tally was watched, the agent never ran, and screens got no
+    change events. Now `StoreProvider.onReadable` (cadre's `strand:started` with a database, and
+    `strand:writable`) subscribes them as they come, with a `readable` change.
+  - The agent ran only on changes, never at start. Now it runs once when the session starts.
+  - The session kept each opened Tally, and one opened before its seats were written kept a guessed
+    role (`foil`). So the stock side never established, which broke the real-strand tests once
+    `readable` fired during founding. Now only formation's tallies are kept.
+  - A fourth followed from the first fix: `readable` fires while a tally is being founded, so a
+    watch opened a store before `invite`/`accept` adopted their own. The replaced store's backstop
+    poll was never closed, and the CLI scenarios ran to the end, then never exited. `adopt()` now
+    keeps the store already open, and closes the spare.
+  - Test: core 339, model 61, sereus 11.
+  - Measured: the S7 joined, the CLI established and offered within ~30 s of starting, and the S7
+    accepted.
+
 - [ ] **`RecoverySetup`** (stories 12, 50: protection against losing every device): deferred until
   off-device key custody is decided upstream.
 

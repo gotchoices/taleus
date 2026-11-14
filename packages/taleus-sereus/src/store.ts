@@ -148,6 +148,24 @@ class CadreStoreProvider implements StoreProvider {
 	}
 
 	/**
+	 * A tally becoming readable: a strand started with its database (a founder's, or one synced
+	 * before -- every strand after a restart), or one that started `syncing` becoming writable.
+	 */
+	onReadable(listener: (ref: TallyRef) => void): Unsubscribe {
+		const { node } = this.options
+		const started = ({ strandId }: { strandId: string }) => {
+			if (node.getStrands().get(strandId)?.database) listener({ id: strandId })
+		}
+		const writable = ({ strandId }: { strandId: string }) => listener({ id: strandId })
+		node.on('strand:started', started)
+		node.on('strand:writable', writable)
+		return () => {
+			node.off('strand:started', started)
+			node.off('strand:writable', writable)
+		}
+	}
+
+	/**
 	 * Where the tally's strand stands on this node, without waiting. `syncing` is cadre-core's status
 	 * for a strand with no `Strand.Header` yet; any other strand not yet readable -- launching, being
 	 * attached, offered and not yet attached, or claimed and between launch retries (its sApp config

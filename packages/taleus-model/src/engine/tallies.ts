@@ -103,7 +103,6 @@ export async function summaryOf(session: Session, tally: Tally, view: TallyView)
 	}
 }
 
-/** Keep the summaries just read as the last known, saving only when one changed. */
 /**
  * Whether their side answers, and what of this party's is still on its way to them. A store that
  * cannot say (in memory, with the simulated counterparty) is always within reach.
@@ -121,6 +120,7 @@ function reachOf(view: TallyView): Pick<TallyDetail, 'counterpartyReachable' | '
 	}
 }
 
+/** Keep the summaries just read as the last known, saving only when one changed. */
 function remember(session: Session, summaries: TallySummary[]): void {
 	const kept = session.local.lastSummaries
 	let changed = false

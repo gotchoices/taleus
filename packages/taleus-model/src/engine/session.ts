@@ -220,6 +220,9 @@ export class Session {
 			void this.advance()
 			notifyWorldChanged()
 		})
+		// And once now: a step may have become due while this party was not running (an invitee
+		// seated while the inviter was away), and nothing will announce it again.
+		void this.advance()
 	}
 
 	async createIdentity(): Promise<PartyIdentity> {
@@ -287,9 +290,10 @@ export class Session {
 		const known = id in this.local.lastSummaries || (await this.options.store.list()).some(ref => ref.id === id)
 		if (!known) return undefined
 		await this.mustBeReadable(id)
-		const opened = await this.engine.open({ id })
-		this.tallies.set(id, opened)
-		return opened
+		// Opened afresh each time, not kept: a tally opened before its seats are written (a strand
+		// announced readable while it is being founded) takes its role on a guess, and a kept one
+		// would act on that guess for good. The store and its reads are shared, so this is cheap.
+		return await this.engine.open({ id })
 	}
 
 	/**

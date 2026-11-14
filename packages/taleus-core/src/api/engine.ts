@@ -1261,8 +1261,21 @@ class TaleusEngine implements Taleus {
 		return store
 	}
 
-	/** Keep a store the provider has just made (`create`, `join`) as the tally's shared one. */
-	private adopt(ref: TallyRef, store: TallyStore): SharedReadStore {
+	/**
+	 * Keep a store the provider has just made (`create`, `join`) as the tally's shared one -- unless
+	 * one is open for it already (the tally was announced readable while it was being made, and a
+	 * watch opened it): that one stays, so nothing watching it is left on a store nobody closes,
+	 * and the spare is closed.
+	 */
+	private async adopt(ref: TallyRef, store: TallyStore): Promise<SharedReadStore> {
+		const existing = this.stores.get(ref.id)
+		if (existing) {
+			const kept = await existing.catch(() => undefined)
+			if (kept) {
+				await store.close()
+				return kept
+			}
+		}
 		const shared = this.share(store)
 		this.stores.set(ref.id, Promise.resolve(shared))
 		return shared
@@ -1305,7 +1318,7 @@ class TaleusEngine implements Taleus {
 	async invite(request: InviteRequest): Promise<Result<PendingInvitation>> {
 		const created = await this.env.store.create({ denomination: request.denomination })
 		const { ref } = created
-		const store = this.adopt(ref, created.store)
+		const store = await this.adopt(ref, created.store)
 		await this.attach(ref)
 		const invitation = newKeyPair()
 		const on = request.on ?? this.now()
@@ -1332,7 +1345,7 @@ class TaleusEngine implements Taleus {
 		if (!decoded) return no(locally('not-found', 'that invitation cannot be read'))
 		const joined = await this.env.store.join(ticket)
 		const { ref } = joined
-		const store = this.adopt(ref, joined.store)
+		const store = await this.adopt(ref, joined.store)
 		await this.attach(ref)
 		const seat = decoded.role === 'stock' ? seatStock : seatFoil
 		const signer = asPair(request?.signer ?? this.env.signer)
@@ -1363,6 +1376,11 @@ class TaleusEngine implements Taleus {
 		const subscriptions = new Map<string, Unsubscribe>()
 		this.listeners.set(listener, subscriptions)
 		let live = true
+		// A tally readable only after the listing -- every tally, after a restart -- is watched then,
+		// and announced: whatever was due on it meanwhile was announced to nobody.
+		const stopReadable = this.env.store.onReadable?.(ref => {
+			if (live && !subscriptions.has(ref.id)) void this.watchReadable(listener, subscriptions, ref)
+		})
 		void this.env.store.list().then(
 			refs => {
 				for (const ref of refs) {
@@ -1373,6 +1391,7 @@ class TaleusEngine implements Taleus {
 		)
 		return () => {
 			live = false
+			stopReadable?.()
 			this.listeners.delete(listener)
 			for (const stop of subscriptions.values()) stop()
 			subscriptions.clear()
@@ -1384,6 +1403,16 @@ class TaleusEngine implements Taleus {
 		for (const [listener, subscriptions] of this.listeners) {
 			await this.subscribe(listener, subscriptions, ref)
 		}
+	}
+
+	/** Watch a tally that has just become readable, then say so. */
+	private async watchReadable(
+		listener: (change: Change) => void,
+		subscriptions: Map<string, Unsubscribe>,
+		ref: TallyRef,
+	): Promise<void> {
+		await this.subscribeLogged(listener, subscriptions, ref)
+		if (subscriptions.has(ref.id)) listener({ tally: ref, kind: 'readable', at: this.now() })
 	}
 
 	/** `subscribe`, where one tally that cannot be opened is reported and never stops the rest. */

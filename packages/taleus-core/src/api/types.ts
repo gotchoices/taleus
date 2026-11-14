@@ -610,7 +610,7 @@ export interface AcceptRequest extends ActOptions {
 
 export type Unsubscribe = () => void
 
-export type ChangeKind = 'balance' | 'terms' | 'contract' | 'request' | 'keys' | 'close' | 'lift' | 'delivery'
+export type ChangeKind = 'balance' | 'terms' | 'contract' | 'request' | 'keys' | 'close' | 'lift' | 'delivery' | 'readable'
 
 /**
  * Something moved. Deliberately thin -- it says *that* a tally changed and roughly where, not
@@ -848,6 +848,11 @@ export interface StoreProvider {
 	 * readable.
 	 */
 	condition?(ref: TallyRef): Promise<TallyCondition>
+	/**
+	 * Fire when a tally becomes readable after `list` was asked: a node starts its strands after
+	 * the app has started, and a joiner's first sync lands later still. Absent: `list` is complete.
+	 */
+	onReadable?(listener: (ref: TallyRef) => void): Unsubscribe
 	/** Form a new strand, seat the creator, and return a store bound to it. */
 	create(request: { denomination: string }): Promise<{ ref: TallyRef; store: TallyStore }>
 	/** Redeem an invitation: join the strand and return a store bound to it. */
