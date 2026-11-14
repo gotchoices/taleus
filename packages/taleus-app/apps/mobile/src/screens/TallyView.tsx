@@ -3,6 +3,7 @@ import { ScrollView, Text, View } from 'react-native'
 
 import { Action, Amount, Card, Chip, Failed, Loading, Marks, Row } from '../components'
 import { listRequests, type PaymentRequest } from '../data/requests'
+import { forgetTally } from '../data/tallies'
 import { acknowledgeUnrecorded, listUnrecorded, readTally, type TallyDetail, type UnrecordedAct } from '../data/tally'
 import type { Result } from '../data/types'
 import { useLoad } from '../hooks/useLoad'
@@ -50,6 +51,11 @@ export function TallyView({ route, navigation }: Props): React.JSX.Element {
 
 	const { state, value, error, reload } = useLoad(load)
 
+	const forget = useCallback(async () => {
+		const forgotten = await forgetTally(tallyId)
+		if (forgotten.ok) navigation.goBack()
+	}, [tallyId, navigation])
+
 	const seen = useCallback(
 		async (actId: string) => {
 			await acknowledgeUnrecorded(tallyId, actId)
@@ -62,7 +68,12 @@ export function TallyView({ route, navigation }: Props): React.JSX.Element {
 		return <Loading />
 	}
 	if (state === 'failed' || !value) {
-		return <Failed title={t('screens.tally-view.unreadable-title')} error={error} onRetry={reload} />
+		return (
+			<Failed title={t('screens.tally-view.unreadable-title')} error={error} onRetry={reload}>
+				{/* A tally this phone no longer holds can leave the list; nothing else can. */}
+				{error?.kind === 'tally-missing' ? <Action label={t('screens.tally-view.forget')} onPress={forget} secondary /> : null}
+			</Failed>
+		)
 	}
 
 	const { tally, requests, unrecorded } = value

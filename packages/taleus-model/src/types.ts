@@ -114,7 +114,15 @@ export interface TallySummary {
 	 * counterparty to name, so the party's own note (who it is for) stands in.
 	 */
 	invitation?: { note?: string }
+	/**
+	 * Set when the tally could not be read just now, so it is listed as it was last read: `starting`
+	 * (being opened on this device), `syncing` (waiting for its first copy from their side), `failed` (this device could not start it),
+	 * `missing` (this device no longer holds it), `unreachable` (its data could not be reached).
+	 */
+	unreadable?: Unreadable
 }
+
+export type Unreadable = 'starting' | 'syncing' | 'failed' | 'missing' | 'unreachable'
 
 /** Anything an adapter could not answer, said plainly rather than thrown away. */
 export interface DataError {

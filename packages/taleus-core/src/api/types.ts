@@ -759,6 +759,8 @@ export interface Taleus {
 
 	tallies(): Promise<TallySummary[]>
 	open(ref: TallyRef): Promise<Tally>
+	/** Whether a tally can be read now, without waiting for it (`StoreProvider.condition`). */
+	condition(ref: TallyRef): Promise<TallyCondition>
 
 	/** Form a new tally and hold a seat open for someone. */
 	invite(request: InviteRequest): Promise<Result<PendingInvitation>>
@@ -817,6 +819,21 @@ export interface TallyStore {
 	close(): Promise<void>
 }
 
+/**
+ * Whether a tally can be read now, said without waiting:
+ * - `readable`: its data is on this device.
+ * - `starting`: on this device, and being opened (a node starting, a strand woken or rebuilt).
+ * - `syncing`: joined, and waiting for its first copy from the counterparty's side.
+ * - `failed`: this device holds it but could not start it, with the platform's reason.
+ * - `missing`: this device holds no such tally (any more).
+ */
+export type TallyCondition =
+	| { kind: 'readable' }
+	| { kind: 'starting' }
+	| { kind: 'syncing' }
+	| { kind: 'failed'; reason: string }
+	| { kind: 'missing' }
+
 export interface StoreProvider {
 	/**
 	 * The tallies this party can read now. A strand still waiting for its first sync is left out
@@ -825,6 +842,12 @@ export interface StoreProvider {
 	 */
 	list(): Promise<TallyRef[]>
 	open(ref: TallyRef): Promise<TallyStore>
+	/**
+	 * Whether a tally can be read now, answered without waiting for it: `open` on one that cannot
+	 * waits for it (a first sync), or forever (a tally this device no longer holds). Absent: always
+	 * readable.
+	 */
+	condition?(ref: TallyRef): Promise<TallyCondition>
 	/** Form a new strand, seat the creator, and return a store bound to it. */
 	create(request: { denomination: string }): Promise<{ ref: TallyRef; store: TallyStore }>
 	/** Redeem an invitation: join the strand and return a store bound to it. */

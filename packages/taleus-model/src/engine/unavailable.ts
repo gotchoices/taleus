@@ -5,7 +5,7 @@
  * offers to try again, a CLI command reports exit 3, and nothing dies uncaught. Anything else still
  * throws.
  */
-import type { Result } from '../types.js'
+import type { Result, Unreadable } from '../types.js'
 import { failed } from './translate.js'
 
 const UNAVAILABLE_NAMES = new Set(['BlockUnavailableError', 'StrandAwaitingFirstSyncError'])
@@ -17,6 +17,23 @@ export function storeUnavailable(error: unknown): boolean {
 		if (at instanceof Error && (UNAVAILABLE_NAMES.has(at.name) || UNAVAILABLE_TEXT.test(at.message))) return true
 	}
 	return false
+}
+
+/** A tally that cannot be read now, said at once rather than waited for (`Taleus.condition`). */
+export class TallyUnreadableError extends Error {
+	constructor(
+		readonly tallyId: string,
+		readonly unreadable: Extract<Unreadable, 'missing' | 'failed'>,
+		reason?: string,
+	) {
+		super(`tally ${tallyId} cannot be read: ${reason ?? unreadable}`)
+		this.name = 'TallyUnreadableError'
+	}
+}
+
+/** The failure a screen shows for an unreadable tally: kind `tally-<why>`; retry helps unless it is gone. */
+function unreadableFailure(error: TallyUnreadableError): Result<never> {
+	return failed(`tally-${error.unreadable}`, error.message, error.unreadable !== 'missing')
 }
 
 type Method = (...args: never[]) => unknown
@@ -34,6 +51,7 @@ export function guarded<T extends object>(namespace: T): T {
 			const result = method.apply(namespace, args)
 			if (!(result instanceof Promise)) return result
 			return result.catch((error: unknown): Result<never> => {
+				if (error instanceof TallyUnreadableError) return unreadableFailure(error)
 				if (!storeUnavailable(error)) throw error
 				return failed('store-unavailable', `the tally's data cannot be reached right now: ${(error as Error).message}`, true)
 			})

@@ -526,8 +526,23 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   - on the S7: `partner-away` with its pending entry, which delivered once Sol's S21 came online.
 
   A real stall has not been seen yet. TallyView's offline and stalled cards have no mock variant yet.
-- [ ] **A tally that cannot load:** the app shows it blank indefinitely; give it a path (say what is
-  missing, retry, leave the tally).
+- [x] **A tally that cannot load** (2026-11-13). It used to show blank forever: opening a tally whose
+  strand the node no longer holds waited on it indefinitely (`whenAttached`), one on its first sync
+  waited up to 240 s, and one unreadable tally failed the whole list, attention and position.
+  - **Fix:** `StoreProvider.condition` (readable, starting, syncing, failed, missing) answered at once.
+    `Session.tally` refuses a `missing` or `failed` tally (`TallyUnreadableError` → failure kind
+    `tally-<why>`) and still waits for one starting or syncing; `views()` skips a tally it can't read.
+    A first try failed fast on every unreadable kind, and the restart scenarios then failed: right
+    after a restart a strand reads `syncing`, and between a failed launch and its retry it is in none
+    of the node's maps. A node just restarted has offered nothing, and its control database reads
+    empty for a moment, without an error. So `missing` needs both: the store up a minute
+    (`missingAfterMs`), then no control row (a failed read counts as present). The CLI's `settle()`
+    reads the same empty rows (`heldStrandIds`), so it can return before the strands are offered.
+    `open()` used to hide that by waiting. The list shows such a tally as last
+    read, flagged `unreadable`. A missing tally can be removed from the list (`forgetTally`).
+  - **Shown:** TallyList chips; TallyView's error text, with retry, or "Remove from your list" for
+    a missing tally; the CLI's `tallies` `unreadable` column.
+  - Model test covers syncing and missing. Not yet seen on a device.
 - [ ] **S7 frame volume:** the ~7 s burst on the S7 after a partner restarts (see the 1.22 stack entry).
 - [ ] **`RecoverySetup`** (stories 12, 50: protection against losing every device): deferred until
   off-device key custody is decided upstream.

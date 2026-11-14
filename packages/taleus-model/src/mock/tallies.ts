@@ -22,6 +22,11 @@ export async function listTallies(): Promise<Result<TallySummary[]>> {
 	return { ok: true, value: data.tallies ?? [] }
 }
 
+/** In the mock, any tally can be removed from the list; nothing is held anyway. */
+export async function forgetTally(_tallyId: string): Promise<Result<void>> {
+	return { ok: true, value: undefined }
+}
+
 function fixtureFor(variant: string): TalliesFixture {
 	switch (variant) {
 		case 'empty':

@@ -7,7 +7,7 @@ import type { Pair, Row } from '../output.ts'
 import { CliFailure, EXIT, titleOf, type Session } from '../session.ts'
 import { need, text, usage, type Command } from './command.ts'
 
-const TALLY_COLUMNS = ['row', 'id', 'counterparty', 'balance', 'perspective', 'state', 'waitingOn', 'lastActivity'] as const
+const TALLY_COLUMNS = ['row', 'id', 'counterparty', 'balance', 'perspective', 'state', 'waitingOn', 'lastActivity', 'unreadable'] as const
 
 export function tallyRow(tally: TallySummary, row?: number): Row {
 	return {
@@ -19,6 +19,8 @@ export function tallyRow(tally: TallySummary, row?: number): Row {
 		state: tally.invitation ? 'Invited' : tally.state,
 		waitingOn: tally.waitingOn,
 		lastActivity: tally.lastActivity,
+		// Set when the tally is listed as last read: `syncing`, `failed`, `missing` or `unreachable`.
+		unreadable: tally.unreadable,
 	}
 }
 

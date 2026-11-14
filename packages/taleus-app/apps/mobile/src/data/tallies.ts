@@ -6,3 +6,6 @@ export * from 'taleus-model/tallies'
 
 export const listTallies = (...args: Parameters<TalliesModel['listTallies']>): ReturnType<TalliesModel['listTallies']> =>
 	getModel().tallies.listTallies(...args)
+
+export const forgetTally = (...args: Parameters<TalliesModel['forgetTally']>): ReturnType<TalliesModel['forgetTally']> =>
+	getModel().tallies.forgetTally(...args)

@@ -10,4 +10,9 @@ export interface TalliesModel {
 	 * is a state the screen shows, not a crash.
 	 */
 	listTallies(): Promise<Result<TallySummary[]>>
+	/**
+	 * Stop listing a tally this device no longer holds (`unreadable: 'missing'`). Refused for any
+	 * other tally: one that is only slow or failing is still this party's record.
+	 */
+	forgetTally(tallyId: string): Promise<Result<void>>
 }

@@ -62,6 +62,7 @@ import type {
 	Tally,
 	TallyRef,
 	TallyState,
+	TallyCondition,
 	TallyStore,
 	TallySummary,
 	TallyView,
@@ -1278,6 +1279,10 @@ class TaleusEngine implements Taleus {
 			signer: this.env.signer,
 			sid: this.env.sid,
 		})
+	}
+
+	async condition(ref: TallyRef): Promise<TallyCondition> {
+		return (await this.env.store.condition?.(ref)) ?? { kind: 'readable' }
 	}
 
 	async tallies(): Promise<TallySummary[]> {

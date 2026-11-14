@@ -1,6 +1,6 @@
 import type { Rate } from '../rates.js'
 import type { Result } from '../types.js'
-import { MemoryFabric } from 'taleus-core'
+import { MemoryFabric, type StoreProvider, type TallyCondition } from 'taleus-core'
 import tallySchema from 'taleus-core/schema-text/draft1'
 
 import { createEngineModel, createLocalWorld, type DurableText } from './index.js'
@@ -200,9 +200,59 @@ describe('a session kept across restarts', () => {
 		expect(must(await second.model.devices.listDevices())[0].name).toBe('Pixel')
 	})
 
+	it('lists a tally it cannot read as last read, says why at once, and forgets only one gone', async () => {
+		const fabric = new MemoryFabric(tallySchema)
+		const storage = { state: memorySlot(), identity: memorySlot() }
+		const first = await createEngineModel({ store: fabric.provider('me'), now: NOW, storage, documents: CONTRACT.cache(), fetch: offline })
+		must(await first.model.party.createIdentity())
+		must(
+			await first.model.invitations.createInvitation({
+				unit: USD,
+				creditLimit: usd(50000),
+				noticeDays: 21,
+				agreementId: CONTRACT.cid,
+				goodForDays: 7,
+				note: 'bike',
+			}),
+		)
+		const [listed] = must(await first.model.tallies.listTallies())
+		await first.stop()
+
+		const restart = async (condition: TallyCondition) =>
+			await createEngineModel({ store: unreadable(fabric.provider('me'), condition), now: NOW, storage, documents: CONTRACT.cache(), fetch: offline })
+
+		const syncing = await restart({ kind: 'syncing' })
+		expect(must(await syncing.model.tallies.listTallies())).toEqual([expect.objectContaining({ id: listed.id, unreadable: 'syncing' })])
+		expect((await syncing.model.tallies.forgetTally(listed.id)).ok).toBe(false)
+		await syncing.stop()
+
+		const broken = await restart({ kind: 'failed', reason: 'launch refused' })
+		const failing = await broken.model.tally.readTally(listed.id)
+		expect(failing.ok ? undefined : failing.error).toMatchObject({ kind: 'tally-failed', retryable: true })
+		await broken.stop()
+
+		const gone = await restart({ kind: 'missing' })
+		const missing = await gone.model.tally.readTally(listed.id)
+		expect(missing.ok ? undefined : missing.error).toMatchObject({ kind: 'tally-missing', retryable: false })
+		must(await gone.model.tallies.forgetTally(listed.id))
+		expect(must(await gone.model.tallies.listTallies())).toEqual([])
+		await gone.stop()
+	})
+
 	it('refuses to start over a kept identity it cannot read, rather than minting another', async () => {
 		const storage = { state: memorySlot(), identity: memorySlot() }
 		storage.identity.text = '{"v":2}'
 		await expect(createEngineModel({ store: new MemoryFabric(tallySchema).provider('me'), storage })).rejects.toThrow(/kept identity/)
 	})
 })
+
+/** `provider`, holding no tally it can read, and saying `condition` of every tally. */
+function unreadable(provider: StoreProvider, condition: TallyCondition): StoreProvider {
+	return {
+		list: async () => [],
+		open: ref => provider.open(ref),
+		create: request => provider.create(request),
+		join: ticket => provider.join(ticket),
+		condition: async () => condition,
+	}
+}

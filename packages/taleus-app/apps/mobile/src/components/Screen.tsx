@@ -31,10 +31,13 @@ export function Failed({
 	title,
 	error,
 	onRetry,
+	children,
 }: {
 	title: string
 	error?: DataError
 	onRetry?: () => void
+	/** Further ways out, after the retry. */
+	children?: React.ReactNode
 }): React.JSX.Element {
 	const styles = useStyles(make)
 	return (
@@ -44,6 +47,7 @@ export function Failed({
 				{error?.message ? <Text style={styles.caption}>{errorText(error)}</Text> : null}
 			</View>
 			{error?.retryable && onRetry ? <Action label={t('common.retry')} onPress={onRetry} /> : null}
+			{children}
 		</View>
 	)
 }

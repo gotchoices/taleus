@@ -32,7 +32,7 @@ import type {
 	StrandRow,
 } from '@serfab/cadre-core'
 import type { Database } from '@quereus/quereus'
-import type { DeliveryStatus, FollowedWrite, InvitationTicket, Reach, StoreProvider, TallyRef, TallyStore, Unsubscribe, WriteReceipt } from 'taleus-core'
+import type { DeliveryStatus, FollowedWrite, InvitationTicket, Reach, StoreProvider, TallyCondition, TallyRef, TallyStore, Unsubscribe, WriteReceipt } from 'taleus-core'
 import { actKey, insertReturningTransaction, tablesIn, tablesReadBy, transactionBatch, watchTables, type RowWrite } from 'taleus-core/host'
 
 /**
@@ -45,7 +45,9 @@ export type StrandNode = Pick<
 	| 'addStrand'
 	| 'createOpenInvitation'
 	| 'foundStrand'
+	| 'getControlDatabase'
 	| 'getDiscoveredStrands'
+	| 'getSAppConfig'
 	| 'getStrands'
 	| 'off'
 	| 'on'
@@ -69,6 +71,11 @@ export interface CadreStoreOptions {
 	 * that outlasts cadre-core's own budget is progress, not failure.
 	 */
 	firstSyncPatienceMs?: number
+	/**
+	 * How long after this store starts a tally the node knows nothing of may still be on its way
+	 * rather than `missing` (`condition`). Default 60 s.
+	 */
+	missingAfterMs?: number
 	/**
 	 * How long `join` waits for the inviter's side to answer before failing. The party keeps
 	 * asking after that, and the strand is attached when it arrives. Default 120 s.
@@ -112,6 +119,8 @@ class CadreStoreProvider implements StoreProvider {
 	private readonly attaching = new Map<string, Promise<StrandInstance>>()
 	/** One write log per strand, shared by every store opened on it, so no store saves over another's. */
 	private readonly logs = new Map<string, Promise<WriteLog>>()
+	/** When this store began: what a strand's absence is judged against (`condition`). */
+	private readonly startedAt = Date.now()
 	/** Callers waiting for a strand that has not been offered yet. */
 	private readonly awaited = new Map<string, ((instance: Promise<StrandInstance>) => void)[]>()
 
@@ -133,7 +142,49 @@ class CadreStoreProvider implements StoreProvider {
 	}
 
 	async open(ref: TallyRef): Promise<TallyStore> {
+		// Waiting for a strand this node does not hold would wait forever.
+		if ((await this.condition(ref)).kind === 'missing') throw new Error(`this device holds no tally ${ref.id}`)
 		return await this.storeFor(await this.whenAttached(ref.id))
+	}
+
+	/**
+	 * Where the tally's strand stands on this node, without waiting. `syncing` is cadre-core's status
+	 * for a strand with no `Strand.Header` yet; any other strand not yet readable -- launching, being
+	 * attached, offered and not yet attached, or claimed and between launch retries (its sApp config
+	 * outlives a failed launch) -- is `starting`. A strand none of that knows of is `missing` only
+	 * once this store has been up `missingAfterMs` and the party's control database has no row for
+	 * it: just after a start the node has offered nothing yet, and its control database reads
+	 * empty for a moment too (no error), so neither can say sooner.
+	 */
+	async condition(ref: TallyRef): Promise<TallyCondition> {
+		const { node } = this.options
+		const strand = node.getStrands().get(ref.id)
+		if (strand) {
+			if (readable(strand)) return { kind: 'readable' }
+			if (strand.status === 'error') return { kind: 'failed', reason: strand.error ?? 'the strand stopped on an error' }
+			return { kind: strand.status === 'syncing' ? 'syncing' : 'starting' }
+		}
+		if (this.attaching.has(ref.id) || node.getDiscoveredStrands().has(ref.id) || node.getSAppConfig(ref.id)) {
+			return { kind: 'starting' }
+		}
+		if (Date.now() - this.startedAt < (this.options.missingAfterMs ?? 60_000)) return { kind: 'starting' }
+		return (await this.recorded(ref.id)) ? { kind: 'starting' } : { kind: 'missing' }
+	}
+
+	/**
+	 * Whether the party's control database records the strand, founded or joined. Unknown counts as
+	 * recorded -- no control database yet, or a read that failed -- so nothing is called missing on
+	 * a guess.
+	 */
+	private async recorded(strandId: string): Promise<boolean> {
+		const control = this.options.node.getControlDatabase()
+		if (!control) return true
+		try {
+			return Boolean((await control.queryStrand(strandId)) ?? (await control.queryJoinedStrand(strandId)))
+		} catch (error) {
+			console.warn(`taleus-sereus: could not tell whether ${strandId} is recorded:`, describeThrown(error))
+			return true
+		}
 	}
 
 	/**

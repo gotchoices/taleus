@@ -104,6 +104,10 @@ function TallyRow({ tally, onOpen }: { tally: TallySummary; onOpen: () => void }
 				) : null}
 			</View>
 			<View style={styles.rowMeta}>
+				{/* A tally that could not be read now is listed as last read, saying why. */}
+				{tally.unreadable ? (
+					<Chip label={t(`screens.tally-list.unreadable-${tally.unreadable}`)} urgent={tally.unreadable !== 'unreachable' && tally.unreadable !== 'starting'} />
+				) : null}
 				{tally.waitingOn === 'me' ? <Chip label={t('screens.tally-list.waiting-on-me')} urgent /> : null}
 				{/* Story 15 step 3: the balance includes what the counterparty does not hold yet. */}
 				{tally.undelivered ? (

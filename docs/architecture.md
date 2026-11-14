@@ -357,6 +357,19 @@ The mobile client is the **`taleus-app`** package.
 - Storage on device via Quereus's NativeScript plugin (`quereus-plugin-nativescript-sqlite`); the `taleus-core` library itself is platform-neutral and also runs in Node (the `taleus-node` headless agent) and the browser.
 - App surfaces: tally list + balances (per denomination), formation (QR invite/scan), negotiation (certificates, contract, terms), payments/invoices, lift activity, and cadre management (delegated to Sereus UX patterns).
 
+### A tally that cannot be read
+
+The store provider tells, without waiting, whether a tally can be read now (`StoreProvider.condition`):
+- `readable`;
+- `starting`: being opened (a node starting, a strand woken or rebuilt);
+- `syncing`: joined, awaiting its first copy from the partner;
+- `failed`: the node could not start the strand;
+- `missing`: the node knows nothing of it a minute after starting, and the party's control database has no row for it, founded or joined. Sooner, or while a launch is retried, it is still `starting`. Just after a start the node has offered no strand yet, and its control database briefly reads empty.
+
+A tally that is not readable is listed as last read, flagged with why, and so is one whose data cannot be reached just now (`unreachable`). One such tally never fails the list, the attention list or the position.
+
+Opening a `missing` or `failed` tally fails at once, since waiting would never bring it. One `starting` or `syncing` is waited for, within the store's patience, so an act right after a restart still goes through. Only a `missing` tally can be removed from the list.
+
 ### Delivery of a party's own acts
 
 Each single-row act (a chit, a request, a decline, a close request) is one transaction, and its id comes back with the write. The store keeps a small device-local **write log**: each act's key (`actKey`: a chit's or request's id, `decline:<request id>`, `close:<side>`) and its transaction. It is kept in a file in the CLI's party folder and in a key of the phone's session store, never in the strand. The store reads where the transaction stands from the strand (sereus `docs/strands.md`, "A commit's durability" and "Offline mode") and reports it as the entry's **delivery**:

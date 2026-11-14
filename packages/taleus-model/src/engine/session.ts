@@ -16,13 +16,15 @@ import {
 import type { NotificationSettings } from '../notifications.js'
 import type { Rate } from '../rates.js'
 import type { Settings } from '../settings.js'
-import type { Amount, TallySummary, Unit } from '../types.js'
+import type { Amount, TallySummary, Unit, Unreadable } from '../types.js'
 import { notifyWorldChanged } from '../world.js'
 import { BUILT_IN_PUBLISHER } from '../agreement.js'
 import type { AgreementContext } from '../contracts/agreements.js'
 import { ContractLibrary, platformFetch, type DocumentCache, type Fetch } from '../contracts/library.js'
 import { StandingChecker, type Trusted } from '../contracts/standing.js'
 import type { Envelope } from './envelope.js'
+import { storeUnavailable, TallyUnreadableError } from './unavailable.js'
+import { describeThrown } from '../thrown.js'
 
 export interface PartyIdentity {
 	sid: string
@@ -284,20 +286,53 @@ export class Session {
 		// (the node starting, a strand rebuilt); opening it waits for the strand.
 		const known = id in this.local.lastSummaries || (await this.options.store.list()).some(ref => ref.id === id)
 		if (!known) return undefined
+		await this.mustBeReadable(id)
 		const opened = await this.engine.open({ id })
 		this.tallies.set(id, opened)
 		return opened
 	}
 
-	/** Every tally, read. */
+	/**
+	 * Throw `TallyUnreadableError` for a tally waiting would never bring: one this device no longer
+	 * holds, or one it could not start. One starting or on its first sync is waited for, as the
+	 * store does (bounded by its patience): an act right after a restart should go through.
+	 */
+	private async mustBeReadable(id: string): Promise<void> {
+		const condition = await this.engine?.condition({ id })
+		if (condition?.kind === 'missing') throw new TallyUnreadableError(id, 'missing')
+		if (condition?.kind === 'failed') throw new TallyUnreadableError(id, 'failed', condition.reason)
+	}
+
+	/** Why a tally cannot be read now, or nothing when it can (as far as can be said without reading it). */
+	async unreadable(id: string): Promise<Unreadable | undefined> {
+		const condition = await this.engine?.condition({ id })
+		return condition && condition.kind !== 'readable' ? condition.kind : undefined
+	}
+
+	/**
+	 * Every tally that can be read, read. One that cannot -- its data out of reach just now, or not
+	 * readable at all -- is left out rather than failing the rest; the list shows it as last read.
+	 */
 	async views(): Promise<{ tally: Tally; view: TallyView }[]> {
 		if (!this.engine) return []
 		const out: { tally: Tally; view: TallyView }[] = []
-		for (const summary of await this.engine.tallies()) {
-			const tally = await this.tally(summary.ref.id)
-			if (tally) out.push({ tally, view: await tally.read() })
+		for (const ref of await this.options.store.list()) {
+			const read = await this.readable(ref.id)
+			if (read) out.push(read)
 		}
 		return out
+	}
+
+	/** One tally and its view, or nothing when it cannot be read now (logged). */
+	private async readable(id: string): Promise<{ tally: Tally; view: TallyView } | undefined> {
+		try {
+			const tally = await this.tally(id)
+			return tally ? { tally, view: await tally.read() } : undefined
+		} catch (error) {
+			if (!(error instanceof TallyUnreadableError) && !storeUnavailable(error)) throw error
+			console.warn(`taleus-model: tally ${id} is not readable just now:`, describeThrown(error))
+			return undefined
+		}
 	}
 
 	remember(id: string, tally: Tally): void {

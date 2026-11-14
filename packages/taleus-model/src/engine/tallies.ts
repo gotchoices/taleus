@@ -139,10 +139,25 @@ export function talliesModel(session: Session): TalliesModel {
 			for (const { tally, view } of await session.views()) out.push(await summaryOf(session, tally, view))
 			remember(session, out)
 			const read = new Set(out.map(summary => summary.id))
-			// A tally whose strand is not readable just now -- the node starting, a strand rebuilt --
-			// is listed as it was last read, not dropped: no tally is ever removed.
-			const unread = Object.values(session.local.lastSummaries).filter(summary => !read.has(summary.id))
+			// A tally that could not be read just now is listed as it was last read, saying why: no
+			// tally leaves the list unless the party removes one this device no longer holds.
+			const unread = await Promise.all(
+				Object.values(session.local.lastSummaries)
+					.filter(summary => !read.has(summary.id))
+					.map(async summary => ({ ...summary, unreadable: (await session.unreadable(summary.id)) ?? ('unreachable' as const) })),
+			)
 			return ok([...out, ...unread].sort((a, b) => b.lastActivity.localeCompare(a.lastActivity)))
+		},
+
+		async forgetTally(tallyId) {
+			const why = await session.unreadable(tallyId)
+			if (why !== 'missing') {
+				return failed<void>('still-held', `tally ${tallyId} is still on this device (${why ?? 'readable'}); it stays listed`)
+			}
+			const { [tallyId]: _forgotten, ...kept } = session.local.lastSummaries
+			session.local.lastSummaries = kept
+			session.changed()
+			return ok(undefined)
 		},
 	}
 }
