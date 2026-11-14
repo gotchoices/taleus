@@ -1,5 +1,5 @@
 import type { RowWrite } from '../store/strand.js'
-import type { DeliveryStatus, FollowedWrite, TallyStore, Unsubscribe, WriteReceipt } from './types.js'
+import type { DeliveryStatus, FollowedWrite, Reach, TallyStore, Unsubscribe, WriteReceipt } from './types.js'
 
 /**
  * A tally's store, with identical reads shared.
@@ -72,6 +72,10 @@ export class SharedReadStore implements TallyStore {
 
 	followedWrites(): FollowedWrite[] {
 		return this.store.followedWrites?.() ?? []
+	}
+
+	reach(): Reach | undefined {
+		return this.store.reach?.()
 	}
 
 	acknowledge(rowId: string): void {

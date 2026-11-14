@@ -118,14 +118,15 @@ export function TallyView({ route, navigation }: Props): React.JSX.Element {
 				</View>
 			) : null}
 
-			{!tally.counterpartyReachable ? (
-				<Card title={t('screens.tally-view.unreachable-title')}>
-					<Text style={styles.caption}>{t('screens.tally-view.unreachable-body')}</Text>
-					{(tally.pending ?? []).map(item => (
+			{travellingCard(tally) ? (
+				<Card title={t(`screens.tally-view.${travellingCard(tally)}-title`)}>
+					<Text style={styles.caption}>{t(`screens.tally-view.${travellingCard(tally)}-body`)}</Text>
+					{(tally.pending ?? []).map((item, i) => (
 						<Row
-							key={`${item.kind}-${item.since}`}
+							key={`${item.kind}-${item.since ?? i}`}
 							label={t(`screens.tally-view.pending-${item.kind}`)}
-							note={t('screens.tally-view.pending-since', { date: formatInstant(item.since) })}
+							{...(item.since ? { note: t('screens.tally-view.pending-since', { date: formatInstant(item.since) }) } : {})}
+							{...(item.stalled ? { value: <Chip label={t('marks.stalled')} urgent /> } : {})}
 						/>
 					))}
 				</Card>
@@ -244,3 +245,14 @@ const make = (tokens: Tokens) => ({
 	},
 	meta: { ...typography.small, color: tokens.textSecondary },
 })
+
+/**
+ * Why what this party did is not with them yet, when it matters (story 15): this phone is offline,
+ * their side is not answering, or -- the one fault -- their side answers and something is stuck.
+ */
+function travellingCard(tally: TallyDetail): 'offline' | 'unreachable' | 'stalled' | undefined {
+	if (tally.deviceOffline) return 'offline'
+	if (!tally.counterpartyReachable) return 'unreachable'
+	if (tally.pending?.some(item => item.stalled)) return 'stalled'
+	return undefined
+}

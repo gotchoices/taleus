@@ -40,6 +40,18 @@ async function waitingItems(session: Session): Promise<{ open: Waiting[]; past: 
 				route: 'TallyView',
 			})
 		}
+		// Story 15: acts still not with them after a while connected to them.
+		const stalled = (view.travelling ?? []).filter(act => act.stalled)
+		if (stalled.length > 0) {
+			open.push({
+				...base,
+				id: `stalled:${view.ref.id}`,
+				kind: 'stalled',
+				waitingOn: 'me',
+				waitingSince: stalled[0].since ?? today,
+				route: 'TallyView',
+			})
+		}
 		for (const request of requests) {
 			const item = {
 				...base,

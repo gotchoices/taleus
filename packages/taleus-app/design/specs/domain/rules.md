@@ -88,6 +88,12 @@ never computes:
 | not-recorded | leaves the record; listed with its reason until the party has seen it |
 
 - States only move forward.
+- Waiting while their side cannot be reached is normal and says only that. The tally says why: this
+  device is offline ("This phone is offline"), or nothing of theirs answers ("Not reachable just
+  now"). Neither is an alarm.
+- An act still waiting, sending or here-only after a while (three minutes) with their side
+  *reachable* is "Not getting through": marked on the act and the tally, and listed for attention.
+  Only connected time counts toward it.
 - The counterparty's acts carry no state; they appear when they arrive.
 - An amount that the counterparty does not hold yet is stated on its own, as movement ("$70.00 you
   gave is not yet with Mara"), never as a part of the balance owed.

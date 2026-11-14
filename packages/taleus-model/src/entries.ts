@@ -24,6 +24,8 @@ export interface Entry {
 	delivery?: Delivery
 	/** While it waits to be sent: something the counterparty does could still make it fail. */
 	mayFail?: true
+	/** Still unresolved after a while connected to them: something is wrong on the way (story 15). */
+	stalled?: true
 	/**
 	 * Their entry, dated ahead of this device's clock by more than clock drift explains. Recorded
 	 * either way; the app says so, so the reader can judge it (docs/timestamps.md).

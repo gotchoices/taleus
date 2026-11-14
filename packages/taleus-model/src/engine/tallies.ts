@@ -6,7 +6,7 @@ import type { CreditTerms, PaymentRequest as CorePaymentRequest, Tally, TallyVie
 import { agreementDocumentOf, agreementOf, agreementToDecide } from '../contracts/index.js'
 import type { Offer, OffersModel } from '../offers.js'
 import type { TalliesModel } from '../tallies.js'
-import type { Terms, TallyDetail, TallyModel, TermsRecord, UnrecordedAct } from '../tally.js'
+import type { PendingWork, Terms, TallyDetail, TallyModel, TermsRecord, UnrecordedAct } from '../tally.js'
 import type { Amount, TallySummary, Unit, WaitingOn } from '../types.js'
 import type { MadeInvitation, Session } from './session.js'
 import {
@@ -104,6 +104,23 @@ export async function summaryOf(session: Session, tally: Tally, view: TallyView)
 }
 
 /** Keep the summaries just read as the last known, saving only when one changed. */
+/**
+ * Whether their side answers, and what of this party's is still on its way to them. A store that
+ * cannot say (in memory, with the simulated counterparty) is always within reach.
+ */
+function reachOf(view: TallyView): Pick<TallyDetail, 'counterpartyReachable' | 'deviceOffline' | 'pending'> {
+	const pending: PendingWork[] = (view.travelling ?? []).map(act => ({
+		kind: act.kind,
+		...(act.since ? { since: act.since } : {}),
+		...(act.stalled ? { stalled: true as const } : {}),
+	}))
+	return {
+		counterpartyReachable: view.reach === undefined || view.reach === 'connected',
+		...(view.reach === 'no-network' ? { deviceOffline: true as const } : {}),
+		...(pending.length > 0 ? { pending } : {}),
+	}
+}
+
 function remember(session: Session, summaries: TallySummary[]): void {
 	const kept = session.local.lastSummaries
 	let changed = false
@@ -150,9 +167,7 @@ export function tallyModel(session: Session): TallyModel {
 			agreement: await agreementOf(session.agreements, view.contract?.cid ?? view.offer?.contractCid ?? '', tally),
 			terms: { mine: termsOf(view.terms.mine, unit, today), theirs: termsOf(view.terms.theirs, unit, today) },
 			roomToSpend: fromCore(view.balances.capacity.canSend, unit),
-			// In memory, the counterparty is always here. Over a network this becomes a real
-			// question, answered by the store.
-			counterpartyReachable: true,
+			...reachOf(view),
 			...(view.closeRequestedBy
 				? {
 						closing: {
@@ -160,6 +175,7 @@ export function tallyModel(session: Session): TallyModel {
 							requested: instantOf(today),
 							...(view.closeDelivery ? { delivery: view.closeDelivery } : {}),
 							...(view.closeMayFail ? { mayFail: true as const } : {}),
+							...(view.closeStalled ? { stalled: true as const } : {}),
 						},
 					}
 				: {}),

@@ -8,6 +8,8 @@
  *   closed on stop; fixed in `stopPartyNode`, optimystic#54 is the same class).
  * - A read finishing while a write commits must not commit that write a second time: in offline mode
  *   that threw "entry … is already sealed" (quereus#38, fixed in 4.26).
+ * - A party tells its partner's side gone from there (`reach`, from the strand's live connections),
+ *   which is what the delivery watchdog counts stalls by.
  *
  * Amounts are in USD. Jan lets Sam owe him up to 500; Sam extends Jan nothing.
  */
@@ -75,5 +77,14 @@ void describe('the stack under two parties', { timeout: 30 * 60_000 }, () => {
 			for (const read of reads) assert.ok(read.ok, read.ok ? '' : read.error.message)
 		}
 		await jan.until('tallies', balanced('6.00 USD', 'owed-to-me'), STEP_MS)
+	})
+
+	void it('sees the partner go away and come back', { timeout: STEP_MS * 2 }, async () => {
+		const reach = (value: string) => (rows: Record<string, unknown>[]) => only(rows)?.reach === value
+		await jan.until('tally Sam', reach('connected'), STEP_MS)
+		await sam.stop()
+		await jan.until('tally Sam', reach('partner-away'), STEP_MS)
+		await sam.restart()
+		await jan.until('tally Sam', reach('connected'), STEP_MS)
 	})
 })

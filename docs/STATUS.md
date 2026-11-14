@@ -512,6 +512,25 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
 - [ ] **Run a cadre node for Taleus.** Not done: being prepared in a separate effort. The phone
   app's Mode C (below) runs a phone node through `@serfab/cadre-rn`; an always-on cadre node serving
   a party's tallies (and `taleus-node`, `feat-taleus-node-service`) is the part still to come.
+- [x] **Delivery watchdog** (2026-11-13; story 15 paths D and E): `taleus-sereus` `reach.ts` says
+  whether a tally's strand node reaches the partner's side (`no-network`, `partner-away`,
+  `connected`, from its live connections; relays told apart by circuit addresses), and `DeliveryWatch`
+  (taleus-core) marks an act `stalled` after 3 min of *connected* time unresolved. That reaches the
+  model (`counterpartyReachable` is now real, plus `deviceOffline`, `pending` with `since`, `stalled` on
+  entries, requests and closing, attention kind `stalled`), the phone (a "Not getting through" mark,
+  and TallyView's card in offline, unreachable or stalled form) and the CLI (`tally` prints `reach`
+  and `stalled`). Checked:
+  - unit tests (core 338, sereus 11), model 60, mobile 216;
+  - a scenario where Sam stops and returns: Jan reads `partner-away` at once, then `connected`;
+  - scenarios 1/1 in each mode;
+  - on the S7: `partner-away` with its pending entry, which delivered once Sol's S21 came online.
+
+  A real stall has not been seen yet. TallyView's offline and stalled cards have no mock variant yet.
+- [ ] **A tally that cannot load:** the app shows it blank indefinitely; give it a path (say what is
+  missing, retry, leave the tally).
+- [ ] **S7 frame volume:** the ~7 s burst on the S7 after a partner restarts (see the 1.22 stack entry).
+- [ ] **`RecoverySetup`** (stories 12, 50: protection against losing every device): deferred until
+  off-device key custody is decided upstream.
 
 (The `feat-taleus-app-shell` ticket has been retired — the app is scaffolded and now evolves through
 the appeus design/generation cycle. Toolchain decisions live in `design/specs/project.md`.)
@@ -558,7 +577,7 @@ without the UI.
   relay connection when its strand becomes writable commits with a cohort of itself
   (`commit:solo-cohort`, `quorum: 'local'`), reports success, and the rows are lost if it stops.
   Sereus scenario `joiner-first-commit-over-slow-relay` (branch
-  `test/joiner-first-commit-over-slow-relay`, worktree `ser/sereus-wt-repro`), 3 of 3 runs on a
+  `test/joiner-first-commit-over-slow-relay`), 3 of 3 runs on a
   20 ms serial frame cap with a 70%-busy event loop; loopback and 100 ms pass.
 - [ ] **Upstream, once Taleus's own volume is cut:** phone transport cost (per-frame cipher objects in
   `@serfab/cadre-rn/noise-crypto`, libp2p peer-store churn), with the S7 profile as evidence.

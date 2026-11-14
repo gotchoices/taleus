@@ -40,6 +40,17 @@ terms. Their partner's acts simply appear when they arrive.
 2.1. Sometimes Mara's phone cannot follow a change all the way to her partner.
 2.2. The app says it is recorded on her side and not confirmed delivered. It never calls it stuck.
 
+### Alternative Path D: her own phone is offline
+2.1. Mara is on a flight. What she records is saved on her phone.
+2.2. The tally says her phone is offline, so the wait is hers, not her partner's. Nothing is flagged
+     for her attention: it goes when she lands.
+
+### Alternative Path E: something is not getting through
+2.1. Mara's partner's side has been reachable for a few minutes, yet a payment she made still has
+     not reached them.
+2.2. The app marks it "Not getting through" and lists the tally for her attention. Time her phone or
+     her partner's was away does not count toward it.
+
 ## Acceptance Criteria
 
 - [ ] Every act of the party's own shows whether the partner holds it yet, until they do
@@ -47,6 +58,8 @@ terms. Their partner's acts simply appear when they arrive.
 - [ ] A figure that includes something the partner does not hold yet says how much
 - [ ] A refused act is reported with its reason until the party has seen it, and can be redone
 - [ ] An act that may still be refused says so while it waits
+- [ ] Waiting while either side is offline is never an alarm; the tally says whose side is away
+- [ ] An act unresolved for minutes while the partner's side is reachable is flagged for attention
 - [ ] The party is never required to understand the network; an explanation is available to those
       who want it
 

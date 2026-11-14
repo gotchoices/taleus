@@ -25,6 +25,8 @@ export interface PaymentRequest {
 	delivery?: Delivery
 	/** While that act waits to be sent: something they do could still make it fail. */
 	mayFail?: true
+	/** Still unresolved after a while connected to them: something is wrong on the way (story 15). */
+	stalled?: true
 }
 
 /** What a screen can read and do about requests. Both the mock and the engine implement it. */

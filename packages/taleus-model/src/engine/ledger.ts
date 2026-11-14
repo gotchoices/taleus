@@ -36,6 +36,7 @@ function entryOf(entry: CoreEntry, unit: Unit): Entry {
 		...(entry.requestId ? { answers: [entry.requestId] } : {}),
 		...(entry.delivery ? { delivery: entry.delivery } : {}),
 		...(entry.mayFail ? { mayFail: true as const } : {}),
+		...(entry.stalled ? { stalled: true as const } : {}),
 		...(entry.datedAhead ? { datedAhead: true as const } : {}),
 	}
 }
@@ -117,6 +118,7 @@ export function requestsModel(session: Session): RequestsModel {
 			state,
 			...(request.delivery ? { delivery: request.delivery } : {}),
 			...(request.mayFail ? { mayFail: true as const } : {}),
+			...(request.stalled ? { stalled: true as const } : {}),
 		}
 	}
 

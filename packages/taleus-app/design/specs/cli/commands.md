@@ -125,9 +125,11 @@ has taken up shows its note as the counterparty.
 
 ### `tally <tally>`
 Key/value: `id`, `counterparty`, `state`, `waitingOn`, `balance`, `perspective`, `myLimit`,
-`myNotice`, `theirLimit`, `theirNotice`, `roomToSpend`, `agreement`, `opened`; and, while they apply,
-`undelivered` (what this party gave that the partner does not hold yet) and `closeDelivery` (where
-this party's close request stands, as `delivery` does for an entry).
+`myNotice`, `theirLimit`, `theirNotice`, `roomToSpend`, `agreement`, `opened`, `reach` (`connected`,
+`partner-away`, or `no-network` for this party); and, while they apply, `undelivered` (what this
+party gave that the partner does not hold yet), `closeDelivery` (where this party's close request
+stands, as `delivery` does for an entry) and `stalled` (repeated: the kind of each act still not with
+the partner after minutes connected to them -- `entry`, `request`, `decline`, `close`).
 
 ### `offer <tally> [accept]`
 Shows the terms proposed on a tally (key/value: `waitingOn`, `myLimit`, `myNotice`, `theirLimit`,

@@ -327,7 +327,30 @@ export interface TallyView {
 	closeDelivery?: Delivery
 	/** While this party's close request waits to be sent: the counterparty could still make it fail. */
 	closeMayFail?: true
+	/** This party's close request has gone unresolved through a stall (`DeliveryStatus.stalled`). */
+	closeStalled?: true
+	/** Whether this side can reach the counterparty's now, when the store can say. */
+	reach?: Reach
+	/** This party's acts on their way to the counterparty, oldest first. Absent when none travel. */
+	travelling?: TravellingAct[]
 	createdAt: IsoDate
+}
+
+/**
+ * Whether this side can reach the counterparty's: `no-network` (this device reaches nobody, not
+ * even a relay), `partner-away` (it reaches the network, but nothing of the counterparty's
+ * answers), `connected`. Waiting while not `connected` is the normal life of a phone-to-phone
+ * tally, not a fault.
+ */
+export type Reach = 'no-network' | 'partner-away' | 'connected'
+
+/** One of this party's acts still on its way to the counterparty. */
+export interface TravellingAct {
+	kind: 'entry' | 'request' | 'decline' | 'close'
+	state: Delivery
+	/** When it was made, when the store knows. */
+	since?: string
+	stalled?: true
 }
 
 /** A tally in a list, without the cost of reading all of it. */
@@ -372,6 +395,8 @@ export interface Entry {
 	delivery?: Delivery
 	/** Set while it waits to be sent and something the counterparty does could still refuse it. */
 	mayFail?: true
+	/** Unresolved through a stall: see `DeliveryStatus.stalled`. */
+	stalled?: true
 }
 
 /**
@@ -391,12 +416,20 @@ export interface DeliveryStatus {
 	mayFail?: true
 	/** `not-recorded` only: why (the queue's reason: `constraint`, `rejected`, `expired`, ...). */
 	reason?: string
+	/**
+	 * Still `waiting`, `sending` or `here-only` after this side has been connected to the
+	 * counterparty's (`Reach`) for a while (`DeliveryWatch`): not the wait of a partner who is away,
+	 * but something wrong on the way.
+	 */
+	stalled?: true
 }
 
 /** One of this device's own single-row writes that a store follows, with where it stands. */
 export interface FollowedWrite {
 	write: RowWrite
 	status: DeliveryStatus
+	/** When this device made it, when the store recorded that. */
+	since?: string
 }
 
 /** What a store says about a write it applied. */
@@ -436,6 +469,8 @@ export interface PaymentRequest {
 	delivery?: Delivery
 	/** While it waits to be sent: something the counterparty does could still make it fail. */
 	mayFail?: true
+	/** Unresolved through a stall: see `DeliveryStatus.stalled`. */
+	stalled?: true
 }
 
 export interface HistoryQuery {
@@ -763,6 +798,8 @@ export interface TallyStore {
 	acknowledge?(key: string): void
 	/** Fire when one of those writes changes where it stands. */
 	onDelivery?(listener: () => void): Unsubscribe
+	/** Whether this side can reach the counterparty's now. Absent on a store with no network. */
+	reach?(): Reach | undefined
 	/**
 	 * Fire after a transaction commits on **this replica**, naming the tables it touched.
 	 *

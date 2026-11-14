@@ -19,6 +19,7 @@
 
 import { describeThrown, generateStrandMemberKey, StrandAwaitingFirstSyncError } from '@serfab/cadre-core'
 import { decodeStrandAddress, encodeStrandAddress } from './address.js'
+import { reachOf } from './reach.js'
 import { WriteLog } from './write-log.js'
 import type {
 	CadreNode,
@@ -31,7 +32,7 @@ import type {
 	StrandRow,
 } from '@serfab/cadre-core'
 import type { Database } from '@quereus/quereus'
-import type { DeliveryStatus, FollowedWrite, InvitationTicket, StoreProvider, TallyRef, TallyStore, Unsubscribe, WriteReceipt } from 'taleus-core'
+import type { DeliveryStatus, FollowedWrite, InvitationTicket, Reach, StoreProvider, TallyRef, TallyStore, Unsubscribe, WriteReceipt } from 'taleus-core'
 import { actKey, insertReturningTransaction, tablesIn, tablesReadBy, transactionBatch, watchTables, type RowWrite } from 'taleus-core/host'
 
 /**
@@ -388,7 +389,7 @@ class CadreTallyStore implements TallyStore {
 			for await (const row of db.eval(sql, params as never)) transactionId ??= typeof row.Tx === 'string' ? row.Tx : undefined
 			// Followed by its act key -- a chit, a request, a decline, a close request alike.
 			const key = actKey(writes[0])
-			if (transactionId && key) this.log.record(key, { transactionId, write: writes[0] })
+			if (transactionId && key) this.log.record(key, { transactionId, write: writes[0], at: new Date().toISOString() })
 			return transactionId ? { transactionId } : {}
 		}
 		const { sql, params } = transactionBatch(writes)
@@ -421,9 +422,18 @@ class CadreTallyStore implements TallyStore {
 		const followed: FollowedWrite[] = []
 		for (const [key, logged] of this.log.entries()) {
 			const status = this.writeStatus(key)
-			if (status) followed.push({ write: logged.write, status })
+			if (status) followed.push({ write: logged.write, status, ...(logged.at ? { since: logged.at } : {}) })
 		}
 		return followed
+	}
+
+	/**
+	 * Whether the strand's node reaches the counterparty's side now (`reach.ts`). Unknown while the
+	 * strand has no node running: before its first start, or hibernating with the app away.
+	 */
+	reach(): Reach | undefined {
+		const node = this.node.getStrands().get(this.strandId)?.libp2pNode
+		return node ? reachOf(node) : undefined
 	}
 
 	/** The party has seen a refusal: forget it here, and in the queue's retained outcomes. */

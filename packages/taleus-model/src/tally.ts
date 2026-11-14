@@ -87,12 +87,17 @@ export interface Closing {
 	delivery?: Delivery
 	/** While it waits to be sent: something they do could still make it fail. */
 	mayFail?: true
+	/** Still unresolved after a while connected to them: something is wrong on the way (story 15). */
+	stalled?: true
 }
 
-/** Work that needs the counterparty and has not reached them yet (story 04 path C). */
+/** Work that needs the counterparty and has not reached them yet (story 04 path C; story 15). */
 export interface PendingWork {
-	kind: 'terms' | 'entry' | 'close'
-	since: Instant
+	kind: 'terms' | 'entry' | 'request' | 'decline' | 'close'
+	/** When it was made, when known. */
+	since?: Instant
+	/** Still unresolved after a while connected to them: something is wrong on the way (story 15). */
+	stalled?: true
 }
 
 export interface TallyDetail {
@@ -118,6 +123,8 @@ export interface TallyDetail {
 	 * reads — it is this party's record too — and `pending` says what is stuck.
 	 */
 	counterpartyReachable: boolean
+	/** Set while this device reaches nobody at all: the wait is this side's, not theirs. */
+	deviceOffline?: true
 	pending?: PendingWork[]
 	closing?: Closing
 }

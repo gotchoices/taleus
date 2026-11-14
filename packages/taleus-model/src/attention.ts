@@ -8,8 +8,11 @@ import type { Instant, Result, UnitAmount } from './types.js'
  */
 export interface AttentionItem {
 	id: string
-	/** `unrecorded`: an act of this party's that left this device and was refused (story 15 path A). */
-	kind: 'offer' | 'request' | 'closing' | 'invitation' | 'unrecorded'
+	/**
+	 * `unrecorded`: an act of this party's that left this device and was refused (story 15 path A).
+	 * `stalled`: acts of this party's still not with them after a while connected to them.
+	 */
+	kind: 'offer' | 'request' | 'closing' | 'invitation' | 'unrecorded' | 'stalled'
 	tallyId: string
 	counterparty: { name: string }
 	/** Carries its own unit; an amount with no unit is an adapter bug. */

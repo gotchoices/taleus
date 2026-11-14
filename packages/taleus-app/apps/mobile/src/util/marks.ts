@@ -2,7 +2,7 @@ import type { Delivery } from '../data/types'
 
 export interface ActMark {
 	/** Its string, under `marks.<key>`, with a longer `marks.<key>-note`. */
-	key: 'waiting' | 'sending' | 'here-only' | 'unconfirmed' | 'may-fail' | 'dated-ahead'
+	key: 'waiting' | 'sending' | 'here-only' | 'unconfirmed' | 'may-fail' | 'stalled' | 'dated-ahead'
 	urgent?: true
 }
 
@@ -10,6 +10,7 @@ export interface ActMark {
 export interface Marked {
 	delivery?: Delivery
 	mayFail?: true
+	stalled?: true
 	datedAhead?: true
 }
 
@@ -24,6 +25,7 @@ export function actMarks(act: Marked): ActMark[] {
 	const delivery = act.delivery
 	if (delivery && delivery !== 'delivered' && delivery !== 'not-recorded') marks.push({ key: delivery })
 	if (act.mayFail) marks.push({ key: 'may-fail', urgent: true })
+	if (act.stalled) marks.push({ key: 'stalled', urgent: true })
 	if (act.datedAhead) marks.push({ key: 'dated-ahead', urgent: true })
 	return marks
 }

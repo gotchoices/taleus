@@ -22,6 +22,7 @@ import {
 	type Side,
 } from '../tally/negotiation.js'
 import { attempt, locally, no, ok, uniqueViolation } from './refusal.js'
+import { DeliveryWatch } from './delivery-watch.js'
 import { SharedReadStore } from './shared-reads.js'
 import type {
 	AcceptRequest,
@@ -64,6 +65,7 @@ import type {
 	TallyStore,
 	TallySummary,
 	TallyView,
+	TravellingAct,
 	TradingPolicy,
 	TradingPolicyChange,
 	Unsubscribe,
@@ -243,8 +245,34 @@ class TallyEngine implements Tally {
 			...contract,
 			...offer,
 			...close,
+			...this.reachView(),
 			createdAt: core?.CreatedAt ?? '',
 		}
+	}
+
+	/** Whether the counterparty's side answers, and what of this party's is still on its way to it. */
+	private reachView(): Pick<TallyView, 'reach' | 'travelling'> {
+		const reach = this.store.reach()
+		const travelling = this.travelling()
+		return {
+			...(reach ? { reach } : {}),
+			...(travelling.length ? { travelling } : {}),
+		}
+	}
+
+	private travelling(): TravellingAct[] {
+		const acts: TravellingAct[] = []
+		for (const { write, status, since } of this.store.followedWrites()) {
+			const kind = TRAVELLING_KINDS[write.table]
+			if (!kind || status.state === 'delivered' || status.state === 'not-recorded') continue
+			acts.push({
+				kind,
+				state: status.state,
+				...(since ? { since } : {}),
+				...(status.stalled ? { stalled: true as const } : {}),
+			})
+		}
+		return acts.sort((a, b) => (a.since ?? '').localeCompare(b.since ?? ''))
 	}
 
 	async document(cid: string): Promise<StoredDocument | undefined> {
@@ -271,24 +299,28 @@ class TallyEngine implements Tally {
 		return { offer: { contractCid: proposal.ContractCid, by: proposal.Proposer === this.side ? 'me' : 'them' } }
 	}
 
-	private async closeView(): Promise<Pick<TallyView, 'closeRequestedBy' | 'closeDelivery' | 'closeMayFail'>> {
+	private async closeView(): Promise<
+		Pick<TallyView, 'closeRequestedBy' | 'closeDelivery' | 'closeMayFail' | 'closeStalled'>
+	> {
 		const rows = await this.store.query<{ Requester: Side }>('select Requester from App.CloseRequest')
 		if (rows.length === 0) return {}
 		const mine = this.deliveryOf(closeKey(this.side))
 		const marks = {
 			...(mine.delivery ? { closeDelivery: mine.delivery } : {}),
 			...(mine.mayFail ? { closeMayFail: true as const } : {}),
+			...(mine.stalled ? { closeStalled: true as const } : {}),
 		}
 		if (rows.length > 1) return { closeRequestedBy: 'both', ...marks }
 		return { closeRequestedBy: rows[0].Requester === this.side ? 'me' : 'them', ...marks }
 	}
 
 	/** Where one of this party's acts stands on its way to the counterparty, by its `actKey`. */
-	private deliveryOf(key: string): { delivery?: Delivery; mayFail?: true } {
+	private deliveryOf(key: string): { delivery?: Delivery; mayFail?: true; stalled?: true } {
 		const status = this.store.writeStatus(key)
 		return {
 			...(status ? { delivery: status.state } : {}),
 			...(status?.mayFail ? { mayFail: true as const } : {}),
+			...(status?.stalled ? { stalled: true as const } : {}),
 		}
 	}
 
@@ -1187,6 +1219,14 @@ class NotOpen extends Error {}
  */
 const SHARED_READ_MS = 600_000
 
+/** What each followed table's act is, to a reader. */
+const TRAVELLING_KINDS: Partial<Record<string, TravellingAct['kind']>> = {
+	Ledger: 'entry',
+	Invoice: 'request',
+	InvoiceDecline: 'decline',
+	CloseRequest: 'close',
+}
+
 class TaleusEngine implements Taleus {
 	readonly identity: { sid: string }
 	/** Each engine-level listener, with its per-tally subscriptions keyed by tally id. */
@@ -1228,7 +1268,7 @@ class TaleusEngine implements Taleus {
 	}
 
 	private share(store: TallyStore): SharedReadStore {
-		return new SharedReadStore(store, SHARED_READ_MS)
+		return new SharedReadStore(new DeliveryWatch(store), SHARED_READ_MS)
 	}
 
 	async open(ref: TallyRef): Promise<Tally> {

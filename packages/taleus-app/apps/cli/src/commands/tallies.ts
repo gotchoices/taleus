@@ -1,5 +1,6 @@
 /** Tallies: `tallies`, `tally`, `history`, `attention`, `watch`, `wait`, `close`. */
 import { onWorldChanged, type TallySummary } from 'taleus-model'
+import type { TallyDetail } from 'taleus-model/tally'
 
 import { formatAmount } from '../amount.ts'
 import type { Pair, Row } from '../output.ts'
@@ -34,6 +35,12 @@ const tallies: Command = {
 	},
 }
 
+/** Whether the partner's side answers: `connected`, `partner-away`, or `no-network` for this device. */
+function reachOf(detail: TallyDetail): string {
+	if (detail.deviceOffline) return 'no-network'
+	return detail.counterpartyReachable ? 'connected' : 'partner-away'
+}
+
 /** One key/value line of `tally`'s output. */
 const pair = (key: string, value: string): Pair => [key, value]
 
@@ -55,6 +62,9 @@ const tally: Command = {
 			// What this party gave that the partner does not hold yet; its close request while it travels.
 			...(detail.undelivered ? [pair('undelivered', money(detail.undelivered.units))] : []),
 			...(detail.closing?.delivery ? [pair('closeDelivery', detail.closing.delivery)] : []),
+			['reach', reachOf(detail)],
+			// Acts still on their way that have stalled: unresolved a while with the partner connected.
+			...(detail.pending ?? []).filter(item => item.stalled).map(item => pair('stalled', item.kind)),
 			['myLimit', money(detail.terms.mine.creditLimit.units)],
 			['myNotice', detail.terms.mine.noticeDays],
 			['theirLimit', money(detail.terms.theirs.creditLimit.units)],

@@ -18,6 +18,8 @@ import type { RowWrite } from 'taleus-core/host'
 export interface LoggedWrite {
 	transactionId: string
 	write: RowWrite
+	/** When this device made it (ISO instant). */
+	at?: string
 }
 
 export class WriteLog {

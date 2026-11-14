@@ -369,6 +369,13 @@ Each single-row act (a chit, a request, a decline, a close request) is one trans
 
 A queued write the counterparty could still make fail is marked `mayFail`. The tally's `undelivered` amount is what this party's travelling chits gave: movement the counterparty does not hold yet, not a part of the balance owed. A refused act stays listed (`unrecorded`) until the party acknowledges it.
 
+Waiting is normal, so it is not an alarm by itself. The store also says whether this side **reaches** the counterparty's, from the strand node's live connections (`taleus-sereus` `reach.ts`):
+- `no-network`: no connection at all.
+- `partner-away`: only relays.
+- `connected`: any other peer, direct or through a relay's circuit.
+
+A watchdog over each tally's store (`DeliveryWatch`, taleus-core) counts only connected time. An act still `waiting`, `sending` or `here-only` after three minutes of it is **stalled**: something is wrong on the way. The stalled act goes on the attention list. The clock samples reach every 15 s, but only while an act travels and someone is watching.
+
 The phone runs the strand in **offline mode**: a write returns once it is saved on the device. The CLI stays synchronous by default, so the stack's latency stays measurable; `--offline` opts in. A chit is the issuer's own promise, keyed by a fresh id, and no other chit has to come before it. So a queued chit is assured, unless it answers a request.
 
 ## Tally Lifecycle
