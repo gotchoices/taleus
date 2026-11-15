@@ -1,6 +1,6 @@
 import type { Rate } from '../rates.js'
 import type { Result } from '../types.js'
-import { MemoryFabric, type StoreProvider, type TallyCondition } from 'taleus-core'
+import { MemoryFabric, type InvitationTicket, type StoreProvider, type TallyCondition, type TallyRef } from 'taleus-core'
 import tallySchema from 'taleus-core/schema-text/draft1'
 
 import { createEngineModel, createLocalWorld, type DurableText } from './index.js'
@@ -160,6 +160,47 @@ function memorySlot(): DurableText & { text?: string } {
 	return slot
 }
 
+describe('an acceptance the inviter has not answered yet', () => {
+	it('answers waiting, then finishes on its own once the tally arrives', async () => {
+		const fabric = new MemoryFabric(tallySchema)
+		const jan = await createEngineModel({ store: fabric.provider('jan'), now: NOW, documents: CONTRACT.cache(), fetch: offline })
+		must(await jan.model.party.createIdentity())
+		must(await jan.model.party.setDisplayName('Jan'))
+		const invitation = must(
+			await jan.model.invitations.createInvitation({
+				unit: USD,
+				creditLimit: usd(50000),
+				noticeDays: 21,
+				agreementId: CONTRACT.cid,
+				goodForDays: 7,
+			}),
+		)
+
+		// Sam's first join outlasts the store's patience; the request stands, and the store says so.
+		const late = lateJoin(fabric.provider('sam'))
+		const sam = await createEngineModel({ store: late.provider, now: NOW, documents: CONTRACT.cache(), fetch: offline })
+		must(await sam.model.party.createIdentity())
+		const answer = must(
+			await sam.model.invitations.respondToInvitation(invitation.token, 'accept', { disclose: { name: 'Sam' }, creditLimit: usd(0), noticeDays: 21 }),
+		)
+		expect(answer).toBe('waiting')
+		expect(sam.model.invitations.answerTo(invitation.token)).toBe('waiting')
+
+		// Jan's side answers: the tally arrives at Sam's node, and the agent takes the seat.
+		await late.answered()
+		for (let i = 0; i < 100 && sam.model.invitations.answerTo(invitation.token) !== 'accepted'; i++) {
+			await new Promise(resolve => setTimeout(resolve, 10))
+		}
+		await sam.settled()
+		await jan.settled()
+		expect(sam.model.invitations.answerTo(invitation.token)).toBe('accepted')
+		const [tally] = must(await sam.model.tallies.listTallies())
+		expect(tally.counterparty.name).toBe('Jan')
+		await sam.stop()
+		await jan.stop()
+	})
+})
+
 describe('a session kept across restarts', () => {
 	it('comes back as the same party, with its device-local choices', async () => {
 		const fabric = new MemoryFabric(tallySchema)
@@ -254,5 +295,39 @@ function unreadable(provider: StoreProvider, condition: TallyCondition): StorePr
 		create: request => provider.create(request),
 		join: ticket => provider.join(ticket),
 		condition: async () => condition,
+	}
+}
+
+/**
+ * `provider`, whose first `join` the inviter's side has not answered: it fails as the cadre store
+ * does (`JoinPendingError`). `answered` completes the join the way the node does once the inviter
+ * answers, and announces the tally readable; a later `join` finds it joined, as the cadre store's
+ * does.
+ */
+function lateJoin(provider: StoreProvider): { provider: StoreProvider; answered: () => Promise<void> } {
+	let joined: Awaited<ReturnType<StoreProvider['join']>> | undefined
+	let announce: ((ref: TallyRef) => void) | undefined
+	let asked: InvitationTicket | undefined
+	return {
+		provider: {
+			list: async () => (joined ? [{ id: joined.ref.id }] : []),
+			open: ref => provider.open(ref),
+			create: request => provider.create(request),
+			join: async ticket => {
+				asked = ticket
+				if (!joined) throw Object.assign(new Error('the inviter has not answered'), { name: 'JoinPendingError' })
+				return joined
+			},
+			condition: async () => (joined ? { kind: 'readable' } : { kind: 'starting' }),
+			onReadable: listener => {
+				announce = listener
+				return () => (announce = undefined)
+			},
+		},
+		answered: async () => {
+			if (!asked) throw new Error('nothing asked to join')
+			joined = await provider.join(asked)
+			announce?.({ id: joined.ref.id })
+		},
 	}
 }

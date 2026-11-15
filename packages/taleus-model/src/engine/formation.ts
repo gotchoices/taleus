@@ -1,12 +1,13 @@
 /**
  * The party, and the invitations that make tallies: who this party is, and how a tally begins.
  */
+import type { InvitationTicket } from 'taleus-core'
 import { agreementOf, agreementToDecide, documentLink, offerableAgreements, publisherDomainOf } from '../contracts/index.js'
 import type { Ask, ImportedAgreement, InvitationsModel, Invitation, OpenInvitation } from '../invitations.js'
 import type { Party, PartyModel } from '../party.js'
 import type { Result } from '../types.js'
 import { decodeEnvelope, encodeEnvelope, type Envelope } from './envelope.js'
-import type { Session } from './session.js'
+import type { IntendedTerms, Session } from './session.js'
 import { failed, ok, refused, unsupported } from './translate.js'
 import { describeThrown } from '../thrown.js'
 
@@ -169,34 +170,92 @@ export function invitationsModel(session: Session): InvitationsModel {
 				return failed('agreement-unreadable', 'the agreement this invitation names cannot be read in full')
 			}
 			Object.assign(session.local.disclosed, response.disclose)
-			const ticket = {
-				ref: { id: envelope.ticket.ref, ...(envelope.ticket.address ? { address: envelope.ticket.address } : {}) },
-				encoded: envelope.ticket.encoded,
-			}
-			let accepted: Awaited<ReturnType<typeof engine.accept>>
+			const terms = { creditLimit: response.creditLimit, noticeDays: response.noticeDays }
 			try {
-				accepted = await engine.accept(ticket, { certificate: session.certificate() })
+				const accepted = await acceptInvitation(session, token, envelope, terms)
+				// The agent takes the protocol steps that follow. Not from inside a step: the agent
+				// calls `acceptInvitation` too (`finishPendingAccepts`), and would wait on itself.
+				if (accepted.ok) await session.advance()
+				return accepted
 			} catch (error) {
-				// Joining the strand failed -- the inviter's side unreachable or slow to answer. A
-				// network failure, not a refusal: the party may keep asking, and the person can retry.
+				if (joinPending(error)) {
+					// The request stands and the party keeps asking; the agent finishes the acceptance
+					// once the tally arrives (`finishPendingAccepts`).
+					session.local.pendingAccepts[token] = terms
+					session.local.answeredInvitations[token] = 'waiting'
+					session.changed()
+					return ok('waiting' as const)
+				}
+				// Joining the strand failed -- the inviter's side unreachable. A network failure, not
+				// a refusal: the person can retry.
 				console.warn('taleus-model: joining the invitation\'s strand failed:', error)
 				return failed('unreachable', describeThrown(error), true)
 			}
-			if (!accepted.ok) return refused(accepted.refusal)
-			const tallyId = accepted.value.ref.id
-			session.remember(tallyId, accepted.value)
-			session.local.intended[tallyId] = { creditLimit: response.creditLimit, noticeDays: response.noticeDays }
-			session.local.units[tallyId] = envelope.unit
-			session.local.answeredInvitations[token] = 'accepted'
-			session.changed()
-			await session.advance()
-			return ok('accepted' as const)
 		},
 
 		answerTo(token) {
 			return session.local.answeredInvitations[token]
 		},
 	}
+}
+
+/**
+ * Take the seat an invitation offers, and keep what this party chose for the tally. Throws when
+ * joining the strand fails; a refusal is a result. Runs no agent step itself (see the callers).
+ */
+async function acceptInvitation(
+	session: Session,
+	token: string,
+	envelope: Envelope,
+	terms: IntendedTerms,
+): Promise<Result<'accepted'>> {
+	const engine = session.engine
+	if (!engine) return failed('no-identity', 'create an identity before accepting an invitation')
+	const accepted = await engine.accept(ticketOf(envelope), { certificate: session.certificate() })
+	if (!accepted.ok) return refused(accepted.refusal)
+	const tallyId = accepted.value.ref.id
+	session.remember(tallyId, accepted.value)
+	session.local.intended[tallyId] = terms
+	session.local.units[tallyId] = envelope.unit
+	session.local.answeredInvitations[token] = 'accepted'
+	delete session.local.pendingAccepts[token]
+	session.changed()
+	return ok('accepted' as const)
+}
+
+/**
+ * The agent's part: finish each acceptance whose join had not been answered, once its tally is
+ * readable here. Left for a later run while it is not, or when finishing fails for a reason that
+ * may pass; dropped, and logged, on a refusal.
+ */
+export async function finishPendingAccepts(session: Session): Promise<void> {
+	for (const [token, terms] of Object.entries(session.local.pendingAccepts)) {
+		const envelope = decodeEnvelope(token)
+		if (!envelope || !session.engine) continue
+		if ((await session.engine.condition({ id: envelope.ticket.ref })).kind !== 'readable') continue
+		try {
+			const result = await acceptInvitation(session, token, envelope, terms)
+			if (!result.ok) {
+				console.warn(`taleus-model: finishing the acceptance of ${envelope.ticket.ref} was refused: ${result.error.message}`)
+				delete session.local.pendingAccepts[token]
+				session.changed()
+			}
+		} catch (error) {
+			console.warn(`taleus-model: finishing the acceptance of ${envelope.ticket.ref} failed; trying again later:`, describeThrown(error))
+		}
+	}
+}
+
+function ticketOf(envelope: Envelope): InvitationTicket {
+	return {
+		ref: { id: envelope.ticket.ref, ...(envelope.ticket.address ? { address: envelope.ticket.address } : {}) },
+		encoded: envelope.ticket.encoded,
+	}
+}
+
+/** The store's word that the inviter's side has not answered the join yet (taleus-sereus `JoinPendingError`). */
+function joinPending(error: unknown): boolean {
+	return error instanceof Error && error.name === 'JoinPendingError'
 }
 
 /** Standing invitations need one invitation many can take up, which Sereus does not offer yet. */

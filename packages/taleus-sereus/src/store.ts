@@ -109,6 +109,22 @@ export interface StatementTiming {
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
+/**
+ * A join the inviter's side has not answered within `joinPatienceMs`. Not a failure: the request
+ * stands, the party keeps asking, and the strand is offered (`strand:discovered`) once it is
+ * answered, so an app can finish the acceptance then. Named, so a layer that cannot import this
+ * package can still tell it apart.
+ */
+export class JoinPendingError extends Error {
+	constructor(
+		readonly joinId: string,
+		readonly patienceMs: number,
+	) {
+		super(`the inviter's side has not answered after ${patienceMs / 1000} s; this party keeps asking`)
+		this.name = 'JoinPendingError'
+	}
+}
+
 export function cadreStoreProvider(options: CadreStoreOptions): StoreProvider {
 	return new CadreStoreProvider(options)
 }
@@ -261,7 +277,7 @@ class CadreStoreProvider implements StoreProvider {
 		return new Promise<PendingJoinStatus>((resolve, reject) => {
 			const timer = setTimeout(() => {
 				unsubscribe()
-				reject(new Error(`the inviter's side has not answered after ${patienceMs / 1000} s; this party keeps asking`))
+				reject(new JoinPendingError(first.id, patienceMs))
 			}, patienceMs)
 			const unsubscribe = this.onPendingJoin(first.id, status => {
 				if (!settled(status)) return

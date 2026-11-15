@@ -17,6 +17,7 @@ import {
 import type { NotificationSettings } from '../notifications.js'
 import type { Rate } from '../rates.js'
 import type { Settings } from '../settings.js'
+import type { InvitationAnswer } from '../invitations.js'
 import type { Amount, TallySummary, Unit, Unreadable } from '../types.js'
 import { notifyWorldChanged } from '../world.js'
 import { BUILT_IN_PUBLISHER } from '../agreement.js'
@@ -24,6 +25,7 @@ import type { AgreementContext } from '../contracts/agreements.js'
 import { ContractLibrary, platformFetch, type DocumentCache, type Fetch } from '../contracts/library.js'
 import { StandingChecker, type Trusted } from '../contracts/standing.js'
 import type { Envelope } from './envelope.js'
+import { finishPendingAccepts } from './formation.js'
 import { storeUnavailable, TallyUnreadableError } from './unavailable.js'
 import { describeThrown } from '../thrown.js'
 
@@ -59,8 +61,13 @@ export interface LocalState {
 	displayName: string
 	disclosed: Record<string, string>
 	madeInvitations: MadeInvitation[]
-	answeredInvitations: Record<string, 'accepted' | 'refused'>
+	answeredInvitations: Record<string, InvitationAnswer>
 	intended: Record<string, IntendedTerms>
+	/**
+	 * Acceptances whose join the inviter's side had not answered yet, by invitation token, with the
+	 * terms chosen: the agent finishes each once its tally is readable here.
+	 */
+	pendingAccepts: Record<string, IntendedTerms>
 	/**
 	 * The unit each forming tally is meant to be in. The core learns a tally's denomination from
 	 * its contract, so until one is proposed it reports the default (`CHIP`); the invitation said
@@ -110,6 +117,7 @@ export function initialLocalState(): LocalState {
 		madeInvitations: [],
 		answeredInvitations: {},
 		intended: {},
+		pendingAccepts: {},
 		units: {},
 		setAside: {},
 		settings: {
@@ -407,6 +415,7 @@ export class Session {
 	 * agent stops there -- the offer waits for a person.
 	 */
 	private async step(): Promise<void> {
+		await finishPendingAccepts(this)
 		for (const { tally, view } of await this.views()) {
 			if (view.counterparty.sid === '') {
 				// Nobody has taken the other seat yet -- or they have, and only the stock party

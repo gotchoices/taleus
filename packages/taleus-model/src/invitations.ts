@@ -53,6 +53,8 @@ export interface Response {
 }
 
 /** What a screen can read and do about invitations. Both the mock and the engine implement it. */
+export type InvitationAnswer = 'accepted' | 'refused' | 'waiting'
+
 export interface InvitationsModel {
 	listInvitations(): Promise<Result<Invitation[]>>
 	/** The agreements this party can offer: its trusted publishers' tally contracts, and any it trusts alone. */
@@ -80,8 +82,10 @@ export interface InvitationsModel {
 	readInvitation(token: string): Promise<Result<OpenInvitation>>
 	/**
 	 * Accept or refuse. Story 02 path B: a refusal reaches the inviter and cannot be
-	 * revived; a fresh offer on new terms can always be made.
+	 * revived; a fresh offer on new terms can always be made. `waiting`: accepted, but the
+	 * inviter's side has not answered yet; this device keeps asking and finishes the acceptance
+	 * on its own once it does.
 	 */
-	respondToInvitation(token: string, answer: 'accept' | 'refuse', _response?: Response): Promise<Result<'accepted' | 'refused'>>
-	answerTo(token: string): 'accepted' | 'refused' | undefined
+	respondToInvitation(token: string, answer: 'accept' | 'refuse', _response?: Response): Promise<Result<InvitationAnswer>>
+	answerTo(token: string): InvitationAnswer | undefined
 }

@@ -193,7 +193,11 @@ citations) is prepared separately for transmission to Nathan; this is the digest
     8 rows** (a first), 8 rounds 443-445 s (1.16: 603-1056 s), seated 220 s, FRET peer never marked
     dead, 0 stream resets, 1 commit retry, 19.9k frames (chat run: 91.9k). The `it.fails` still fails
     only on the DEBUG fault count: 106 "cohort silent", equal to the 106 "consult held" (background
-    held-block checks). CPU load looks decisive. Not posted yet.
+    held-block checks). CPU load looks decisive. Posted 2026-10-27. Maintainer (10-30): the 106 are
+    read-repair consults below the link's deadline (optimystic#56 since stopped those while
+    connected), and they are measuring the ~220 s seating. A rerun on 1.23 / Optimystic 1.27 is
+    ready in `ser/sereus-wt-123` (resolutions on the published packages), waiting for a quiet
+    machine: under load the arm fails regardless.
   - gotchoices/Optimystic#42 (2026-10-19) -- a write pays 4 `cluster` requests per index (4(k+1) for k
     indexes; a Ledger payment 24) though one commit's trees are one batch; a partial index costs rows
     it excludes. Suggests carrying one commit's trees together per member per phase, deriving
@@ -647,11 +651,30 @@ Where it stands (Sereus 1.22–1.23, 2026-11-13/14):
   - sereus#60, the per-collection cost of a strand start.
   - Per-frame cipher objects in `@serfab/cadre-rn/noise-crypto` are not filed: the Node-style API
     needs one per nonce.
-- [ ] **A signed tally sApp.** The sApp is unsigned, so every node runs with
-  `requireSignedSchemas: false` (`taleus-sereus/src/sapp.ts`).
-- [ ] **Accept outlasting `joinPatienceMs`** (120 s): the store reports it and the party keeps asking.
-  Not yet seen through on a device: what the app shows, and that the tally arrives once the inviter
-  answers.
+- [ ] **A signed tally sApp** (deferred until the app is readied for the app stores). The sApp is
+  unsigned, so every node runs with `requireSignedSchemas: false` (`taleus-sereus/src/sapp.ts`).
+- [x] **Accept outlasting `joinPatienceMs`** (120 s; 2026-11-14, S7 accepting a stopped CLI party's
+  invitation). Seen on the device:
+  - For 120 s the screen did not change and Accept stayed tappable.
+  - Then it showed the store's English text in red as a failure.
+  - The strand arrived ~200 s after the CLI came back, but the S7 never took its seat, so the tally
+    sat `Forming` for good.
+
+  Now:
+  - The store throws `JoinPendingError`, and the model answers `waiting`. It keeps the acceptance
+    (`pendingAccepts`), and the agent finishes it once the tally is readable (`finishPendingAccepts`).
+  - The screen says it's asking, disables its buttons, then shows "Accepted. Waiting for their side".
+  - Accepting the same invitation again seats a tally already joined.
+
+  Checked: a model test (a late join answered `waiting`, then accepted with the seat), and on the
+  S7 the re-accept of the stuck tally seated it. The fresh path (`waiting` on screen, then the seat
+  taken on its own) is not yet seen on a device.
+- [ ] **Change notifications missing for a tally that arrived by a late join** (2026-11-14). After the
+  re-accept above, every formation step reached the S7 only when its 10-minute read cache expired:
+  the counterparty at 40 s, the offer at 645 s. The database itself held the rows: a raw `sql` read
+  showed `TallyCore` while the engine's view did not. The S7's other tally (Cliff) gets a partner's
+  payment within 20 s. Not yet diagnosed: whether this tally's store watches a superseded database,
+  or was opened outside the engine's watch.
 
 ## Contracts (Stroc)
 

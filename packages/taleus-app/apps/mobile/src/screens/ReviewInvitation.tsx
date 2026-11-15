@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { Text, TextInput, View } from 'react-native'
 
 import { Action, Amount, Card, Empty, Failed, FormScroll, Loading, OpenableRow, Options, PublisherNote, Row, unitNamesFor } from '../components'
-import { DEFAULT_NOTICE_DAYS, readInvitation, respondToInvitation, type OpenInvitation } from '../data/invitations'
+import { DEFAULT_NOTICE_DAYS, readInvitation, respondToInvitation, type InvitationAnswer, type OpenInvitation } from '../data/invitations'
 import { trustAgreement, trustPublisher } from '../data/publishers'
 import { useLoad } from '../hooks/useLoad'
 import { errorText, t } from '../i18n'
@@ -32,7 +32,9 @@ export function ReviewInvitation({ route, navigation }: Props): React.JSX.Elemen
 	const [disclosed, setDisclosed] = useState<Record<string, string>>({})
 	const [limit, setLimit] = useState('0')
 	const [notice, setNotice] = useState(String(DEFAULT_NOTICE_DAYS))
-	const [outcome, setOutcome] = useState<'accepted' | 'refused' | undefined>()
+	const [outcome, setOutcome] = useState<InvitationAnswer | undefined>()
+	// Accepting asks the inviter's side, which can take minutes on a phone's link.
+	const [busy, setBusy] = useState(false)
 	const [trust, setTrust] = useState<TrustChoice>('neither')
 	const [problem, setProblem] = useState<string | undefined>()
 
@@ -59,7 +61,7 @@ export function ReviewInvitation({ route, navigation }: Props): React.JSX.Elemen
 		return (
 			<Empty
 				title={t(`screens.review-invitation.${outcome}`)}
-				body={outcome === 'refused' ? t('screens.review-invitation.refused-onward') : undefined}
+				body={outcomeBody(outcome, inviterName(value))}
 			/>
 		)
 	}
@@ -73,11 +75,12 @@ export function ReviewInvitation({ route, navigation }: Props): React.JSX.Elemen
 	const askTrust = readable && agreement.standing?.trust === 'none' && agreement.standing.publisherConfirms !== 'no'
 	const respond = async (answer: 'accept' | 'refuse') => {
 		setProblem(undefined)
+		setBusy(true)
 		const result = await respondToInvitation(token, answer, {
 			disclose: disclosed,
 			creditLimit: { units: Math.round(Number(limit || '0') * value.unit.divisor) },
 			noticeDays: Number(notice || '0'),
-		})
+		}).finally(() => setBusy(false))
 		if (!result.ok) {
 			setProblem(errorText(result.error))
 			return
@@ -189,14 +192,16 @@ export function ReviewInvitation({ route, navigation }: Props): React.JSX.Elemen
 			{problem ? <Text style={styles.warn}>{problem}</Text> : null}
 			<Action
 				label={t('screens.review-invitation.accept')}
-				onPress={name && readable ? () => void respond('accept') : undefined}
+				onPress={name && readable && !busy ? () => void respond('accept') : undefined}
 			/>
-			{!readable ? (
+			{busy ? (
+				<Text style={styles.caption}>{t('screens.review-invitation.asking', { name: inviterName(value) })}</Text>
+			) : !readable ? (
 				<Text style={styles.caption}>{t('screens.review-invitation.cannot-accept')}</Text>
 			) : name ? null : (
 				<Text style={styles.caption}>{t('screens.review-invitation.name-needed')}</Text>
 			)}
-			<Action label={t('screens.review-invitation.refuse')} onPress={() => void respond('refuse')} secondary />
+			<Action label={t('screens.review-invitation.refuse')} onPress={busy ? undefined : () => void respond('refuse')} secondary />
 		</FormScroll>
 	)
 }
@@ -246,3 +251,10 @@ const make = (tokens: Tokens) => ({
 		paddingHorizontal: spacing[2],
 	},
 })
+
+/** What follows the outcome's own line: a refusal's way onward, or why a waiting acceptance needs nothing more. */
+function outcomeBody(outcome: InvitationAnswer, name: string): string | undefined {
+	if (outcome === 'refused') return t('screens.review-invitation.refused-onward')
+	if (outcome === 'waiting') return t('screens.review-invitation.waiting-body', { name })
+	return undefined
+}
