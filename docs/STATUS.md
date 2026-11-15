@@ -12,7 +12,7 @@ and existence-constraints on every write. The following are **not** Taleus bugs 
 dependencies to confirm or harden in the sibling repos. A fuller write-up (with file:line
 citations) is prepared separately for transmission to Nathan; this is the digest.
 
-- [ ] **Stack evaluation follow-ups (Sereus 1.20 / Optimystic 1.24 / Quereus 4.24), in order.**
+- [x] **Stack evaluation follow-ups (Sereus 1.20 / Optimystic 1.24 / Quereus 4.24), in order.**
   1. [x] Idle profile of a production bundle (2026-11-04; Metro serving `dev=false&minify=true` to the
      debug app via its `js_dev_mode_debug` pref; symbolicate frames with Metro's `/symbolicate`).
      Settled, the S21 runs 5.8% busy (dev bundle ~30% on the S7); the S7 23%, a ~10 s burst of it
@@ -63,7 +63,7 @@ citations) is prepared separately for transmission to Nathan; this is the digest
   run an always-on node), key-rotation `sealedTo`, a NativeScript decoder fix. Core 339, model 61,
   sereus 11, mobile 216; scenarios 2/2 in each mode. On the S7, a CLI partner's payment reached the
   open list by itself.
-- [ ] **Stack: on Sereus 1.22 / Optimystic 1.27 / Quereus 5.4.0 / FRET 1.3.0, one copy each** (both
+- [x] **Stack: on Sereus 1.22 / Optimystic 1.27 / Quereus 5.4.0 / FRET 1.3.0, one copy each** (superseded by 1.23, above; both
   lockfiles; 2026-11-11). Brings every fix we filed: optimystic#55 and #57 (1.26), #56 (1.27: a node
   connected to every member of an all-must-agree cohort no longer re-consults a held block every
   10 s; again after a reconnect, a pending change, or every `readRepairQuietWindowMs`, 5 min);
@@ -297,7 +297,7 @@ module keeps its in-process suite against doubles until direct chits work on a r
 
 - [ ] **Rename `chipnet` → `tallyNet`** (or similar): branding sweep across docs, code (`src/lift/`,
   `src/transport/`, `/taleus/chipnet/1.0.0`), and tickets. (Noted in `docs/index.md`; sweep not yet done.)
-- [ ] **Offline mode (plan in order; the CLI stays synchronous).** (1) Ledger as a set: done, below.
+- [x] **Offline mode (plan in order; the CLI stays synchronous).** (1) Ledger as a set: done, below.
   (2) **Delivery marks, done (2026-11-03):** a single-row act runs as one `insert ... returning
   StampId() as Tx`; the store reports `delivery(tx)` from `commitDurability` (`here-only` /
   `unconfirmed` / `delivered`) and `onDelivery` from `strand:commit-held`; the engine marks this
@@ -406,7 +406,7 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
   with a simulated counterparty for one-device use -- and one contract suite run against both. The
   app's data layer forwards to it, so screens see no backend at all. Wiring engine mode into the app
   is next -- `feat-engine-run-modes` § Progress.
-- [ ] **A CLI client (`taleus-app/apps/cli`), as sereus chat has.** A second host over the same
+- [x] **A CLI client (`taleus-app/apps/cli`), as sereus chat has.** A second host over the same
   model: a counterparty for phone tests, a scripted scenario suite over a relay, a debugging tool,
   and the Node host `taleus-node` will reuse. Steps: (1) the Sereus binding as its own package --
   **done**, `taleus-sereus`; (2) a Node host -- **done**, `taleus-sereus/node` (a party's
@@ -616,56 +616,42 @@ the appeus design/generation cycle. Toolchain decisions live in `design/specs/pr
 
 ## Mode C: the phone app over a real cadre (`feat-engine-cadre-mode`)
 
-Runs on an emulator and a Galaxy S7 against the public relay (`relay.sereus.org`): onboarding,
-invitation, acceptance and trading work, but slowly. Measured on Sereus 1.12 / Optimystic 1.10.1:
-invite 29 s (S7) to 71 s (emulator); accept 256 s (join about 3 min, seating 44 s); reads 9–70 s or
-more, and the tally list times out. The dev bridge (`apps/mobile/scripts/dev-drive.mjs`) drives it
-without the UI.
+The app's normal run (`USE_ENGINE`/`USE_CADRE` true; mocks only for a temporary need): each tally a
+strand on the phone's own cadre node, reaching its partner through `relay.sereus.org`. The dev
+bridge (`apps/mobile/scripts/dev-drive.mjs`) drives it without the UI.
 
-- [x] **Upgraded to Sereus 1.14 / Optimystic 1.12.1 / Quereus 4.20.2 / FRET 1.0.2** (2026-10-08); core
-  301 and model 35 tests pass; the phone runs `strandReactivity` again. A device's control store from
-  1.12 does not open under 1.14 (Sereus's documented no-migration policy: the party is recreated).
-- [ ] **Re-measured on 1.14 (emulator accepts the S7's invitation): still failing.** Invite 28 s on
-  the S7. Accept: the first strand start failed after 173 s (`optimystic/schema` unavailable,
-  `claimed-elsewhere`), the automatic retry started it in 24 s; a second accept waited 245 s for the
-  first sync; a third got the strand writable and then failed after 235 s reading
-  `PartyKeyRevocation` (`cohort-unreachable`), with the two strand nodes connected through the relay.
-  Meanwhile the S7's agent runs a step every 10 s (the backstop poll) costing about 2.7 s each.
-- [ ] **Second run (backstop poll at 120 s, both parties fresh, 2026-10-09): the accept completes the
-  join but seating never lands** — strand first sync 222 s, then reads of 168–226 s, then the
-  three-row seating transaction 300 s; both sides still show the tally Forming. An S7 CPU profile
-  over the first sync: busy 168 of 240 s, almost all in the network stack (libp2p streams, Noise,
-  WebSockets, yamux, circuit relay, peer-store; cadre-rn's Noise crypto 27 s, a third of it creating
-  a quick-crypto cipher object per frame; peer-store address sorting with `localeCompare` 8 s);
-  Quereus and Taleus code barely register. After seating, the emulator issued 149 slow reads in a
-  minute, mostly repeats (`TallyCore` 30 times).
-- [x] **Shared reads** (`taleus-core` `SharedReadStore`, 2026-10-09): one store per tally in the engine;
-  identical reads in flight or answered since the tally last changed share one query (held at most
-  5 s); a write or any change heard drops them.
-- [ ] **Third run (shared reads, gate log on): the accept completed, 540 s** — strand database
-  initialize 135 s; the first-sync probe 155 s, failing at `App.CloseRequest` (a table nobody had
-  written: `cohort-unreachable`, "could not determine whether it exists"); re-probes 51 s; the
-  three-row seating transaction 128 s. **Then the inviter never saw the seat:** 28 minutes later,
-  and after a restart, the S7 answered `select Sid from App.Foil` empty in 87 ms, so its agent
-  could not establish the tally. Not yet confirmed what the joiner holds (the emulator stopped
-  loading its bundle under host load). Candidate upstream issues: a joiner's rows in a table the
-  founder never wrote stay invisible to the founder; and the first-sync gate reads the App tables
-  one by one and restarts from the first on any failure (`strand-first-sync-gate.ts`
-  `appTablesReadable`), so its cost grows with the table count and the slowest peer.
-- [ ] **Reproduced in Node, filed as gotchoices/sereus#44:** a joiner's strand node holding only the
-  relay connection when its strand becomes writable commits with a cohort of itself
-  (`commit:solo-cohort`, `quorum: 'local'`), reports success, and the rows are lost if it stops.
-  Sereus scenario `joiner-first-commit-over-slow-relay` (branch
-  `test/joiner-first-commit-over-slow-relay`), 3 of 3 runs on a
-  20 ms serial frame cap with a 70%-busy event loop; loopback and 100 ms pass.
-- [ ] **Upstream, once Taleus's own volume is cut:** phone transport cost (per-frame cipher objects in
-  `@serfab/cadre-rn/noise-crypto`, libp2p peer-store churn), with the S7 profile as evidence.
-- [ ] **Held, pending the re-measure:** a joiner's first write failing to get a super-majority
-  (retried today); a restarted joiner not syncing (seen with a local relay only); an untraced
-  uncaught "Database is closed".
-- [ ] An acceptance that outlives `joinPatienceMs`; reads failing while the counterparty is offline;
-  half-committed seating; a signed tally sApp; verify on two phones (all in the ticket).
-- `USE_ENGINE`/`USE_CADRE` stay true: Mode C is the app's normal run; mocks only for a temporary need.
+Where it stands (Sereus 1.22–1.23, 2026-11-13/14):
+- The S7 trades both ways with the S21.
+- The S7 accepted a CLI party's invitation over the relay in 25 s. The tally was established and
+  offered ~30 s after the inviter's agent ran, and the S7 accepted the terms.
+- A cold start reaches a readable tally 15–22 s after JS is up.
+- A partner's payment reaches the open list by itself within 20 s.
+- Phones run in offline mode.
+
+- [x] **The 1.12–1.14 runs that failed** (2026-10-08/09: accepts of 4–9 min, seating that never
+  landed, reads of minutes, an inviter that never saw the seat) are superseded by the above. What
+  they turned up was fixed upstream or here:
+  - the joiner's solo-cohort commit (gotchoices/sereus#44, closed 2026-10-30);
+  - the read volume (shared reads, the backstop poll at 10 min, optimystic#56/#57);
+  - the network-stack cost (Noise `full` mode, #55);
+  - the unseen seat (the agent now runs at start and watches tallies that become readable later,
+    2026-11-14).
+- [x] **Held items from those runs, closed:**
+  - A restarted joiner syncs: the restart scenarios pass in both modes.
+  - The uncaught "Database is closed" was a stopped party's agent, now stopped with it.
+  - A first write lacking a super-majority is still retried (`WRITE_ATTEMPTS`) and hasn't been seen
+    since 1.14.
+- [ ] **Upstream, open:**
+  - optimystic#40, peer-store churn (`findCluster` reads every candidate's record per call).
+  - sereus#48, steady work on a phone-shaped link.
+  - sereus#60, the per-collection cost of a strand start.
+  - Per-frame cipher objects in `@serfab/cadre-rn/noise-crypto` are not filed: the Node-style API
+    needs one per nonce.
+- [ ] **A signed tally sApp.** The sApp is unsigned, so every node runs with
+  `requireSignedSchemas: false` (`taleus-sereus/src/sapp.ts`).
+- [ ] **Accept outlasting `joinPatienceMs`** (120 s): the store reports it and the party keeps asking.
+  Not yet seen through on a device: what the app shows, and that the tally arrives once the inviter
+  answers.
 
 ## Contracts (Stroc)
 
