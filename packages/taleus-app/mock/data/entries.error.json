@@ -80,8 +80,8 @@
         "answers": [
           "request:mara-95"
         ],
-        "delivery": "waiting",
-        "mayFail": true
+        "delivery": "sending",
+        "stalled": true
       },
       {
         "id": "entry:0100",

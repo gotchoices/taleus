@@ -13,7 +13,7 @@ and should not acquire one.
 |-------------|-------|-----------|---------|----------|--------|
 | Welcome | Welcome | — | 10 | first-run | generated |
 | Choose name | ChooseName | — | 10, 11 | naming | generated |
-| Tally list | TallyList | tally-list.md | 06, 04 | happy, empty, error | generated |
+| Tally list | TallyList | tally-list.md | 06, 04 | happy, empty, error, unreadable | generated |
 | Tally view | TallyView | tally-view.md | 04, 07 | happy, error | generated |
 | Tally history | TallyHistory | — | 24 | happy, empty, error | generated |
 | Entry detail | EntryDetail | — | 24 | happy, error | generated |

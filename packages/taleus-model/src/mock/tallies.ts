@@ -33,6 +33,8 @@ function fixtureFor(variant: string): TalliesFixture {
 			return fixture('tallies.empty') as TalliesFixture
 		case 'error':
 			return fixture('tallies.error') as TalliesFixture
+		case 'unreadable':
+			return fixture('tallies.unreadable') as TalliesFixture
 		default:
 			return fixture('tallies.happy') as TalliesFixture
 	}

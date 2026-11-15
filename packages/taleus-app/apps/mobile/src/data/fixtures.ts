@@ -44,6 +44,7 @@ const FIXTURES: Record<string, () => unknown> = {
 	'tallies.empty': () => require('../../mock/data/tallies.empty.json'),
 	'tallies.error': () => require('../../mock/data/tallies.error.json'),
 	'tallies.happy': () => require('../../mock/data/tallies.happy.json'),
+	'tallies.unreadable': () => require('../../mock/data/tallies.unreadable.json'),
 	'tally.closing': () => require('../../mock/data/tally.closing.json'),
 	'tally.error': () => require('../../mock/data/tally.error.json'),
 	'tally.happy': () => require('../../mock/data/tally.happy.json'),

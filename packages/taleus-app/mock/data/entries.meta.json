@@ -12,6 +12,7 @@
     "balanceAfter states its perspective \u2014 story 24 step 4",
     "`error` is the happy history with one routed entry that has not committed \u2014 story 24 path A. It is the only fixture that makes `unsettled` true, and the balance it carries is the prospective one, not a settled figure",
     "`delivery` marks the party's own entries not yet with the counterparty: happy has one `here-only` (Mara's tally); error has one `waiting` that `mayFail`. Delivered entries carry no mark",
-    "`datedAhead` (error, entry:0006 on Sam's tally): their entry is dated past this device's clock. The flag is the engine's judgement; the fixture's date does not have to agree with today"
+    "`datedAhead` (error, entry:0006 on Sam's tally): their entry is dated past this device's clock. The flag is the engine's judgement; the fixture's date does not have to agree with today",
+    "error: Mara's entry:0101 is `sending` and `stalled` (story 15 path E), matching tally.error"
   ]
 }

@@ -13,7 +13,14 @@ import type { AgreementDocument, TermsChange, TermsProposal, TermsRecord, Closin
  */
 export async function readTally(tallyId: string): Promise<Result<TallyDetail>> {
 
-	const found = fixtureFor(getVariant()).tallies[tallyId]
+	const data = fixtureFor(getVariant())
+	if (data.missing?.includes(tallyId)) {
+		return {
+			ok: false,
+			error: { kind: 'tally-missing', message: `This device holds no tally ${tallyId}.`, retryable: false },
+		}
+	}
+	const found = data.tallies[tallyId]
 	if (!found) {
 		return {
 			ok: false,
@@ -162,15 +169,19 @@ function unrecordedFor(variant: string): Record<string, UnrecordedAct[]> {
 	return (fixture('tally.error') as { unrecorded?: Record<string, UnrecordedAct[]> }).unrecorded ?? {}
 }
 
-function fixtureFor(variant: string): { tallies: Record<string, TallyDetail> } {
+interface TallyFixture {
+	tallies: Record<string, TallyDetail>
+	/** Tallies this phone no longer holds: read as the engine answers one (`tally-missing`). */
+	missing?: string[]
+}
+
+function fixtureFor(variant: string): TallyFixture {
 	switch (variant) {
 		case 'closing':
-			return fixture('tally.closing') as {
-				tallies: Record<string, TallyDetail>
-			}
+			return fixture('tally.closing') as TallyFixture
 		case 'error':
-			return fixture('tally.error') as { tallies: Record<string, TallyDetail> }
+			return fixture('tally.error') as TallyFixture
 		default:
-			return fixture('tally.happy') as { tallies: Record<string, TallyDetail> }
+			return fixture('tally.happy') as TallyFixture
 	}
 }

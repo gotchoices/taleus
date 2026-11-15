@@ -103,7 +103,71 @@
       },
       "undelivered": {
         "units": 7000
-      }
+      },
+      "pending": [
+        {
+          "kind": "entry",
+          "since": "2026-09-06T09:02:00Z",
+          "stalled": true
+        }
+      ]
+    },
+    "tally:dave-hours": {
+      "id": "tally:dave-hours",
+      "counterparty": {
+        "sid": "sid:dave-2b77",
+        "name": "Dave Lin",
+        "disclosed": {
+          "name": "Dave Lin"
+        }
+      },
+      "unit": {
+        "denom": "cid:bafy-dave-hours",
+        "divisor": 60,
+        "code": "DVH",
+        "mark": "DH",
+        "label": "Dave-hours"
+      },
+      "balance": {
+        "units": 367,
+        "perspective": "owed-to-me"
+      },
+      "state": "Open",
+      "waitingOn": "nobody",
+      "counterpartyReachable": false,
+      "opened": "2026-02-11T09:00:00Z",
+      "agreement": {
+        "id": "cid:bafy-standard-tally-v1",
+        "title": "Standard Tally Agreement",
+        "publisher": "taleus.org",
+        "language": "en"
+      },
+      "terms": {
+        "mine": {
+          "creditLimit": {
+            "units": 1200
+          },
+          "noticeDays": 14,
+          "effective": "2026-02-11"
+        },
+        "theirs": {
+          "creditLimit": {
+            "units": 0
+          },
+          "noticeDays": 14,
+          "effective": "2026-02-11"
+        }
+      },
+      "roomToSpend": {
+        "units": 0
+      },
+      "deviceOffline": true,
+      "pending": [
+        {
+          "kind": "entry",
+          "since": "2026-09-06T08:15:00Z"
+        }
+      ]
     }
   },
   "unrecorded": {
@@ -118,5 +182,8 @@
         "reason": "the tally was closed before it arrived"
       }
     ]
-  }
+  },
+  "missing": [
+    "tally:supplier-parts"
+  ]
 }

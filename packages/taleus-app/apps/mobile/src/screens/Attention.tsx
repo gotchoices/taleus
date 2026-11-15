@@ -169,8 +169,12 @@ function Item({
 	)
 }
 
-function Deadline({ item }: { item: AttentionItem }): React.JSX.Element {
+/** Kinds that report something rather than ask for an answer: no deadline to state, not even "none". */
+const REPORTS: readonly AttentionItem['kind'][] = ['unrecorded', 'stalled']
+
+function Deadline({ item }: { item: AttentionItem }): React.JSX.Element | null {
 	const styles = useStyles(make)
+	if (REPORTS.includes(item.kind)) return null
 	if (item.daysLeft === undefined) {
 		return <Text style={styles.meta}>{t('screens.attention.open-ended')}</Text>
 	}

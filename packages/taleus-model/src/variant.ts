@@ -14,14 +14,17 @@ import { notifyWorldChanged } from './world.js'
  * only way a link can land there. It is deliberately not
  * `empty`: a variant name applies to every namespace at once, and a party with
  * no identity gates the whole app into onboarding — so `?variant=empty` meant
- * to show one screen's empty state would have shown first run instead.
+ * to show one screen's empty state would have shown first run instead. `unreadable` is the
+ * tally list with tallies listed as last read.
  */
-export type Variant = 'happy' | 'empty' | 'error' | 'first-run' | 'naming' | 'expired' | 'superseded' | 'closing'
+const VARIANTS = ['happy', 'empty', 'error', 'first-run', 'naming', 'expired', 'superseded', 'closing', 'unreadable'] as const
+
+export type Variant = (typeof VARIANTS)[number]
 
 export const defaultVariant: Variant = 'happy'
 
 export function isVariant(value: string): value is Variant {
-	return value === 'happy' || value === 'empty' || value === 'error' || value === 'first-run' || value === 'naming' || value === 'expired' || value === 'superseded' || value === 'closing'
+	return (VARIANTS as readonly string[]).includes(value)
 }
 
 let current: Variant = defaultVariant

@@ -45,6 +45,17 @@
       "waitingOn": "them",
       "waitingSince": "2026-08-28T09:15:00Z",
       "route": "TallyView"
+    },
+    {
+      "id": "att:stalled-mara",
+      "kind": "stalled",
+      "tallyId": "tally:mara-shop",
+      "counterparty": {
+        "name": "Mara's Bike Shop"
+      },
+      "waitingSince": "2026-09-06T09:02:00Z",
+      "route": "TallyView",
+      "waitingOn": "me"
     }
   ],
   "past": [

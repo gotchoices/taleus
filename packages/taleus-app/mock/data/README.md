@@ -12,8 +12,8 @@ layer move together.
 | Namespace | Serves | Variants |
 |-----------|--------|----------|
 | `party` | who I am, my display unit, my devices | happy |
-| `tallies` | the tally list | happy, empty, error |
-| `tally` | one tally: terms, agreement, counterparty | happy, error |
+| `tallies` | the tally list | happy, empty, error, unreadable |
+| `tally` | one tally: terms, agreement, counterparty | happy, error, closing |
 | `entries` | a tally's signed entries, with running balance | happy, empty |
 | `requests` | outstanding and part-answered requests | happy, empty |
 | `attention` | what is waiting on this party, across tallies | happy, empty |
