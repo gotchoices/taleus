@@ -666,15 +666,26 @@ Where it stands (Sereus 1.22–1.23, 2026-11-13/14):
   - The screen says it's asking, disables its buttons, then shows "Accepted. Waiting for their side".
   - Accepting the same invitation again seats a tally already joined.
 
-  Checked: a model test (a late join answered `waiting`, then accepted with the seat), and on the
-  S7 the re-accept of the stuck tally seated it. The fresh path (`waiting` on screen, then the seat
-  taken on its own) is not yet seen on a device.
-- [ ] **Change notifications missing for a tally that arrived by a late join** (2026-11-14). After the
+  Checked:
+  - A model test.
+  - A real-strand test (`taleus-sereus` strands, backstop poll off): a join that comes back pending
+    answers `waiting`, the tally then opens on both sides, and the inviter's entry reaches the joiner.
+  - On the S7, the re-accept of the stuck tally seated it.
+  - The fresh path on the S7, CLI party stopped: "Asking Cliff's side…", then "Accepted. Waiting for
+    their side". With the CLI started, the tally arrived at 296 s (most of it the S7's join being
+    retried until the CLI answered), the seat was taken by itself, the CLI named the tally 78 s later,
+    and it was Offered 36 s after that.
+- [x] **Change notifications missing for a tally that arrived by a late join** (2026-11-14). After the
   re-accept above, every formation step reached the S7 only when its 10-minute read cache expired:
-  the counterparty at 40 s, the offer at 645 s. The database itself held the rows: a raw `sql` read
-  showed `TallyCore` while the engine's view did not. The S7's other tally (Cliff) gets a partner's
-  payment within 20 s. Not yet diagnosed: whether this tally's store watches a superseded database,
-  or was opened outside the engine's watch.
+  the counterparty at 40 s, the offer at 645 s. The database itself held the rows (a raw `sql` read
+  showed `TallyCore`; the engine's view did not).
+
+  Not reproduced:
+  - In a fresh app process, a CLI payment on that same tally reached the S7 in 5 s.
+  - The new late-join path hears both ways, in Node with the poll off and on the S7.
+
+  It was confined to the process where the old code had left the tally unseated and it was then
+  re-accepted. Reopen if a tally is ever seen moving only every ten minutes.
 
 ## Contracts (Stroc)
 

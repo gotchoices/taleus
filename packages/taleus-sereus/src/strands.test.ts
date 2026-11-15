@@ -116,10 +116,19 @@ function controlAddrs(node: CadreNode): string[] {
 }
 
 /** A party's engine model over the cadre store, keeping the identity it creates. */
-async function engineOn(node: CadreNode, options: { acceptOffers?: boolean; identity?: PartyIdentity; holdsContract?: boolean } = {}) {
+async function engineOn(
+	node: CadreNode,
+	options: { acceptOffers?: boolean; identity?: PartyIdentity; holdsContract?: boolean; joinPatienceMs?: number; slowJoins?: boolean } = {},
+) {
 	let identity = options.identity
 	const engine = await createEngineModel({
-		store: cadreStoreProvider({ node, sApp: TALEUS_SAPP, pollMs: 0, disclosure: { purpose: 'tally' } }),
+		store: cadreStoreProvider({
+			node: options.slowJoins ? slowJoins(node) : node,
+			sApp: TALEUS_SAPP,
+			pollMs: 0,
+			disclosure: { purpose: 'tally' },
+			...(options.joinPatienceMs === undefined ? {} : { joinPatienceMs: options.joinPatienceMs }),
+		}),
 		// Only the inviter holds the contract. The invitee reads it from its publisher before
 		// accepting (the invitation's hint), and from the tally itself once seated.
 		documents: options.holdsContract ? CONTRACT.cache() : undefined,
@@ -131,6 +140,23 @@ async function engineOn(node: CadreNode, options: { acceptOffers?: boolean; iden
 		},
 	})
 	return { engine, identity: () => identity }
+}
+
+/**
+ * `node`, whose join requests come back still pending even when the inviter answered at once: on
+ * loopback the answer beats any patience, and a phone's link is not loopback. The join itself goes
+ * ahead as it would.
+ */
+function slowJoins(node: CadreNode): CadreNode {
+	return new Proxy(node, {
+		get(target, key, receiver) {
+			if (key !== 'requestJoin') {
+				const value: unknown = Reflect.get(target, key, receiver)
+				return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value
+			}
+			return async (...args: Parameters<CadreNode['requestJoin']>) => ({ ...(await target.requestJoin(...args)), state: 'pending' })
+		},
+	})
 }
 
 /** Invite, accept, and wait until the tally is open on both sides; returns its id. */
@@ -204,6 +230,46 @@ describe('a tally formed through the engine, on real strands', () => {
 
 		must(await me.model.entries.recordEntry(tallyId, { actId: 'act:2', amount: usd(500), memo: 'Refund' }))
 		await waitUntil('a new entry reaches the restarted invitee', async () => (await balanceOf(again)) === 1300)
+	}, LIFECYCLE_MS * 3)
+
+	it('finishes an acceptance the inviter answers late, and hears the inviter after', async () => {
+		const tag = Date.now()
+		const inviter = await new Device(`taleus-slow-${tag}`).start()
+		const invitee = await new Device(`taleus-eager-${tag}`).start(controlAddrs(inviter))
+		nodes.push(inviter, invitee)
+
+		const me = (await engineOn(inviter, { holdsContract: true })).engine
+		// The inviter has not answered by the time the store stops waiting; the join lands moments later.
+		const them = (await engineOn(invitee, { acceptOffers: true, joinPatienceMs: 1, slowJoins: true })).engine
+		engines.push(me, them)
+		must(await me.model.party.createIdentity())
+		must(await me.model.party.setDisplayName('Jan'))
+		must(await them.model.party.createIdentity())
+		must(await them.model.party.setDisplayName('Sam'))
+		const invitation = must(
+			await me.model.invitations.createInvitation({
+				unit: USD,
+				creditLimit: usd(50000),
+				noticeDays: 21,
+				agreementId: CONTRACT.cid,
+				goodForDays: 7,
+			}),
+		)
+		const answer = must(
+			await them.model.invitations.respondToInvitation(invitation.token, 'accept', { disclose: {}, creditLimit: usd(20000), noticeDays: 21 }),
+		)
+		expect(answer).toBe('waiting')
+
+		// With no backstop poll, the tally opens only if each side hears the other's commits.
+		await waitUntil('the tally opens on both sides', async () => {
+			const mine = await me.model.tallies.listTallies()
+			const theirs = await them.model.tallies.listTallies()
+			return mine.ok && theirs.ok && mine.value[0]?.state === 'Open' && theirs.value[0]?.state === 'Open'
+		})
+		expect(them.model.invitations.answerTo(invitation.token)).toBe('accepted')
+		const tallyId = must(await me.model.tallies.listTallies())[0].id
+		must(await me.model.entries.recordEntry(tallyId, { actId: 'act:late-1', amount: usd(700), memo: 'after a late join' }))
+		await waitUntil('the inviter\'s entry reaches the late joiner', async () => (await balanceOf(them)) === 700)
 	}, LIFECYCLE_MS * 3)
 
 	it('answers at once for a tally whose only partner is gone before this machine holds it', async () => {
