@@ -75,6 +75,9 @@ function termsOf(terms: CreditTerms | undefined, unit: Unit, today: string): Ter
 /** When the tally last moved: its latest entry, else its creation, else when this party invited. */
 async function lastActivity(tally: Tally, view: TallyView, invited?: MadeInvitation): Promise<string> {
 	const latest = (await tally.history({ limit: 1 }))[0]
+	// The instant its issuer made it, when signed with one: a day alone reads as its UTC midnight,
+	// which west of Greenwich is the evening before.
+	if (latest?.madeAt) return latest.madeAt
 	const at = latest?.at ?? view.createdAt
 	return at || !invited ? instantOf(at) : invited.created
 }

@@ -57,6 +57,12 @@ citations) is prepared separately for transmission to Nathan; this is the digest
 - [x] **Workaround backed out: quereus#38** (2026-11-11). Fixed in Quereus 4.26; on 5.4 the repro
   shows one commit for an overlapping read. `StatementLane` is gone from `taleus-sereus/src/store.ts`
   (and `StatementTiming.waitedMs` with it); offline scenarios 6 of 6 without it, no "already sealed".
+- [x] **Stack: Sereus 1.23.0 adopted** (2026-11-14; cadre-core and cadre-rn, one copy each in both
+  lockfiles). It requires Optimystic 1.27 / Quereus 5.4, which we already ran. Its own changes don't
+  touch the phone today: a refused app schema no longer breaks a storage replica (matters once we
+  run an always-on node), key-rotation `sealedTo`, a NativeScript decoder fix. Core 339, model 61,
+  sereus 11, mobile 216; scenarios 2/2 in each mode. On the S7, a CLI partner's payment reached the
+  open list by itself.
 - [ ] **Stack: on Sereus 1.22 / Optimystic 1.27 / Quereus 5.4.0 / FRET 1.3.0, one copy each** (both
   lockfiles; 2026-11-11). Brings every fix we filed: optimystic#55 and #57 (1.26), #56 (1.27: a node
   connected to every member of an all-must-agree cohort no longer re-consults a held block every
@@ -536,14 +542,15 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
     after a restart a strand reads `syncing`, and between a failed launch and its retry it is in none
     of the node's maps. A node just restarted has offered nothing, and its control database reads
     empty for a moment, without an error. So `missing` needs both: the store up a minute
-    (`missingAfterMs`), then no control row (a failed read counts as present). The CLI's `settle()`
-    reads the same empty rows (`heldStrandIds`), so it can return before the strands are offered.
-    `open()` used to hide that by waiting. The list shows such a tally as last
+    (`missingAfterMs`), then no control row (a failed read counts as present). The empty reads
+    came from the scenario harness's in-process restart: a fresh CLI process reads its control rows
+    at once, and `settle()` sees its strand launched in ~350 ms (checked 2026-11-14). The list shows such a tally as last
     read, flagged `unreadable`. A missing tally can be removed from the list (`forgetTally`).
   - **Shown:** TallyList chips; TallyView's error text, with retry, or "Remove from your list" for
     a missing tally; the CLI's `tallies` `unreadable` column.
   - Model test covers syncing and missing. Not yet seen on a device.
 - [ ] **S7 frame volume:** the ~7 s burst on the S7 after a partner restarts (see the 1.22 stack entry).
+  Waiting on sereus#60.
   Diagnosed 2026-11-13. Two CLI parties, Sam restarted while Jan stays up:
   - Jan serves **105 `db-p2p/sync` "latest" requests in the first 5 s**, one per block, then nothing
     more. Of them, 93 are App table and index collections, 11 Strand tables, and 1 the schema.
@@ -589,7 +596,17 @@ The engine (Nathan's work) is consumed by apps. Kyle authors these using the **a
     keeps the store already open, and closes the spare.
   - Test: core 339, model 61, sereus 11.
   - Measured: the S7 joined, the CLI established and offered within ~30 s of starting, and the S7
-    accepted.
+    accepted. On the phone after a cold start, a CLI partner's payment now reaches the open tally
+    list by itself within 20 s.
+- [x] **Follow-ups from the same pass** (2026-11-14):
+  - The agent logs any refusal it doesn't expect, where it used to drop them all.
+  - `Session.stop` stops the agent and lets a running step finish before the engine closes. A
+    stopped party's agent used to keep running into "Database is closed".
+  - An `unconfirmed` act is no longer counted as undelivered ("$0.25 not yet with them") or as
+    pending. After a restart an act that was delivered can read `unconfirmed`, since nothing can
+    report its arrival any more.
+  - A tally's last activity is its latest entry's signing instant. The day alone, read as UTC
+    midnight, showed the day before west of Greenwich.
 
 - [ ] **`RecoverySetup`** (stories 12, 50: protection against losing every device): deferred until
   off-device key custody is decided upstream.

@@ -22,7 +22,7 @@ import {
 	type Side,
 } from '../tally/negotiation.js'
 import { attempt, locally, no, ok, uniqueViolation } from './refusal.js'
-import { DeliveryWatch } from './delivery-watch.js'
+import { DeliveryWatch, TRAVELLING } from './delivery-watch.js'
 import { SharedReadStore } from './shared-reads.js'
 import type {
 	AcceptRequest,
@@ -265,7 +265,7 @@ class TallyEngine implements Tally {
 		const acts: TravellingAct[] = []
 		for (const { write, status, since } of this.store.followedWrites()) {
 			const kind = TRAVELLING_KINDS[write.table]
-			if (!kind || status.state === 'delivered' || status.state === 'not-recorded') continue
+			if (!kind || !TRAVELLING.includes(status.state)) continue
 			acts.push({
 				kind,
 				state: status.state,
@@ -494,13 +494,13 @@ class TallyEngine implements Tally {
 
 	/**
 	 * Of the settled balance, what this party's own chits moved that the counterparty does not hold
-	 * yet, from this party's side: each followed chit not yet delivered nor refused.
+	 * yet, from this party's side: each followed chit still on its way. Not an `unconfirmed` one:
+	 * nothing will say whether it arrived, and it may well have.
 	 */
 	private undeliveredUnits(): number {
-		const travelling: Delivery[] = ['waiting', 'sending', 'here-only', 'unconfirmed']
 		let units = 0
 		for (const { write, status } of this.store.followedWrites()) {
-			if (write.table !== 'Ledger' || !travelling.includes(status.state)) continue
+			if (write.table !== 'Ledger' || !TRAVELLING.includes(status.state)) continue
 			// This party's own chit lowers its own balance by what it gives.
 			units -= Number(write.row.Units)
 		}

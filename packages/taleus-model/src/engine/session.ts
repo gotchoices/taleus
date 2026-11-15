@@ -7,6 +7,7 @@ import {
 	localSigner,
 	openTaleus,
 	type LocalSigner,
+	type Result as CoreResult,
 	type StoreProvider,
 	type Taleus,
 	type Tally,
@@ -273,6 +274,9 @@ export class Session {
 
 	async stop(): Promise<void> {
 		this.unwatch?.()
+		// No step starts after this, and one under way finishes before the engine closes under it.
+		this.stopped = true
+		await this.agentRun
 		await this.engine?.close()
 	}
 
@@ -351,6 +355,8 @@ export class Session {
 
 	/** True while a run is queued and has not started: a further request joins it. */
 	private queued = false
+	/** Set by `stop`: the agent takes no further step. */
+	private stopped = false
 
 	/**
 	 * Run the agent once more, after whatever is already running. Serialized, so two changes
@@ -360,13 +366,14 @@ export class Session {
 	 * would grow faster than the agent could drain it.
 	 */
 	advance(): Promise<void> {
+		if (this.stopped) return this.agentRun
 		this.runs++
 		if (this.queued) return this.agentRun
 		this.queued = true
 		this.agentRun = this.agentRun
 			.then(async () => {
 				this.queued = false
-				await this.step()
+				if (!this.stopped) await this.step()
 			})
 			.catch(error => {
 				console.warn('taleus-model agent:', error)
@@ -390,7 +397,7 @@ export class Session {
 			console.warn(`taleus-model: the offer on ${tally.ref.id} names a contract missing ${contract.missing.join(', ')}`)
 			return
 		}
-		if (this.options.acceptOffers) await tally.acceptContract()
+		if (this.options.acceptOffers) noted('accepting the offer', tally.ref.id, await tally.acceptContract())
 	}
 
 	/**
@@ -404,7 +411,8 @@ export class Session {
 			if (view.counterparty.sid === '') {
 				// Nobody has taken the other seat yet -- or they have, and only the stock party
 				// can name the tally. `establish` says which, harmlessly, either way.
-				if (view.role === 'stock') await tally.establish()
+				// "Not seated yet" is the expected answer until the other party takes its seat.
+				if (view.role === 'stock') noted('naming the tally', view.ref.id, await tally.establish(), ['not-found'])
 				continue
 			}
 			if (view.state === 'offered') {
@@ -415,10 +423,11 @@ export class Session {
 			const intended = this.local.intended[view.ref.id]
 			if (!intended) continue
 			if (!view.terms.mine) {
-				await tally.offerCredit({
+				const offered = await tally.offerCredit({
 					limit: { units: intended.creditLimit.units, denomination: view.denomination },
 					callDays: intended.noticeDays,
 				})
+				noted('offering its terms', view.ref.id, offered)
 				continue
 			}
 			if (intended.propose && view.terms.theirs) {
@@ -427,15 +436,26 @@ export class Session {
 					console.warn(`taleus-model: not offering ${view.ref.id}: its contract is missing ${contract.missing.join(', ')}`)
 					continue
 				}
-				await tally.offerContract({
+				const proposed = await tally.offerContract({
 					contractCid: intended.propose.agreementId,
 					documents: contract.documents,
 					denomination: this.local.units[view.ref.id]?.denom ?? view.denomination,
 					denominationDivisor: this.local.units[view.ref.id]?.divisor ?? view.denominationDivisor,
 				})
+				noted('proposing the contract', view.ref.id, proposed)
 			}
 		}
 	}
+}
+
+/**
+ * What became of one of the agent's acts. A refusal is logged unless it is one the step expects
+ * (`expected`): the agent acts again on the next change, but a refusal nobody sees is how a tally
+ * sits unformed with no sign of why.
+ */
+function noted(what: string, tallyId: string, result: CoreResult<unknown>, expected: readonly string[] = []): void {
+	if (result.ok || expected.includes(result.refusal.code)) return
+	console.warn(`taleus-model agent: ${what} on ${tallyId} was refused (${result.refusal.code}): ${result.refusal.message}`)
 }
 
 /** The identity as kept: its sid (the genesis key's address, which survives a rotation) and current key. */

@@ -6,8 +6,11 @@ export const STALL_MS = 180_000
 /** How often the clock reads `reach()` while an act travels and someone listens. */
 export const SAMPLE_MS = 15_000
 
-/** The states an act passes through on its way: the ones a stall can be judged in. */
-const TRAVELLING: readonly Delivery[] = ['waiting', 'sending', 'here-only']
+/**
+ * Where an act is known to be still on its way: not delivered, not refused, and not `unconfirmed`
+ * (nothing will say whether it arrived, and it may well have). The states a stall is judged in.
+ */
+export const TRAVELLING: readonly Delivery[] = ['waiting', 'sending', 'here-only']
 
 export interface DeliveryWatchOptions {
 	stallMs?: number
