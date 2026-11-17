@@ -195,9 +195,24 @@ citations) is prepared separately for transmission to Nathan; this is the digest
     only on the DEBUG fault count: 106 "cohort silent", equal to the 106 "consult held" (background
     held-block checks). CPU load looks decisive. Posted 2026-10-27. Maintainer (10-30): the 106 are
     read-repair consults below the link's deadline (optimystic#56 since stopped those while
-    connected), and they are measuring the ~220 s seating. A rerun on 1.23 / Optimystic 1.27 is
-    ready in `ser/sereus-wt-123` (resolutions on the published packages), waiting for a quiet
-    machine: under load the arm fails regardless.
+    connected), and they are measuring the ~220 s seating. **Rerun on 1.23 / Optimystic 1.27
+    (2026-11-16, `ser/sereus-wt-123`, quiet: load median 3.6):** the phone arm no longer seats.
+    - Seat attempt 1 fails at 113 s with "super-majority 1/2", where 1.19's committed at 188 s.
+    - Attempt 2 fails at 628 s, and the eight rounds never run.
+    - A loaded run (median 5.6) failed the same way, with near-identical attempt-1 numbers (4.9k
+      frames, a 17.7 s worst send wait), so it isn't load.
+    - Control-node read-repair consults share the capped link (20 in attempt 1, 186 in attempt 2).
+
+    **Isolated** (2026-11-16, bisected on neptune):
+    - The cause is Sereus commit `6c73e360` (1.22.0, party-key rotation via pending-key
+      invitation); its parent is good, and Optimystic and Quereus versions don't matter.
+    - The joiner's membership reconciler now awaits a control-database pending-key read first.
+      That lets the app's seat transaction get ahead of the joiner's own `Member` redemption on
+      the strand database: the membership check waits 115 s behind the seat, and the partner
+      won't approve a non-member's commit.
+    - Confirmed by experiment: the same commit with that read skipped seats on attempt 1.
+
+    **Filed gotchoices/sereus#65** (2026-11-17), with the repro, the trace and the experiment.
   - gotchoices/Optimystic#42 (2026-10-19) -- a write pays 4 `cluster` requests per index (4(k+1) for k
     indexes; a Ledger payment 24) though one commit's trees are one batch; a partial index costs rows
     it excludes. Suggests carrying one commit's trees together per member per phase, deriving
