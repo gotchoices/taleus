@@ -30,6 +30,9 @@ system) and flags its own open questions.
 - **[timestamps.md](timestamps.md)** — why every dated record carries a time its creator asserted and
   signed, what backdating and postdating can buy a byzantine party on a direct chit, and what bounds
   the damage.
+- **[../packages/tallynet/docs/design.md](../packages/tallynet/docs/design.md)** — TallyNet, the in-repo port
+  of ChipNet that runs lift discovery and commit; its boundary with `taleus-core` and the multi-denomination
+  extension. Upstream assessment: [chipnet-review.md](../packages/tallynet/docs/chipnet-review.md).
 - **[concurrency-model.md](concurrency-model.md)** — why a signature-gated, insert-only schema stays safe
   on the Sereus/Optimystic substrate: the CRDT lens and the two load-bearing platform assumptions.
 
