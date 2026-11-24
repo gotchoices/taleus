@@ -1,6 +1,6 @@
 # TallyNet design
 
-TallyNet is Taleus's lift protocol library: **route discovery** across the tally graph and **atomic commit** of a lift across many tally strands. It is a port of [ChipNet](https://github.com/gotchoices/ChipNet), assessed in [chipnet-review.md](chipnet-review.md), extended for tallies kept in different units of account (denominations).
+TallyNet is the lift protocol Taleus uses, and that other tally applications (e.g. a future MyCHIPs) can implement too: **route discovery** across the tally graph and **atomic commit** of a lift across many tally strands. It is a port of [ChipNet](https://github.com/gotchoices/ChipNet), assessed in [chipnet-review.md](chipnet-review.md), extended for tallies kept in different units of account (denominations).
 
 Read first: [`docs/architecture.md`](../../../docs/architecture.md) § *Denominations and Exchange* and § *Lifts and ChipNet*, and [`docs/denominations.md`](../../../docs/denominations.md). Those sections are the system-level design this package serves. Where they say "ChipNet", read "TallyNet".
 
@@ -17,6 +17,7 @@ Three layers. Each depends only on the one above it.
 Rules that keep it that way:
 - `tallynet` does **not** import `taleus-core`. It declares the small ports it needs (hash, sign, verify, random, clock); `taleus-core`'s `CryptoProvider` satisfies them.
 - Terms and payload are type parameters (`<TTerms>`, `<TPayload>`), not `unknown`. TallyNet never inspects them; it hands them to callbacks.
+- **Taleus assumes nothing about the lift protocol.** How many referees, who nominates them, how members identify themselves, how the record propagates and when it settles are TallyNet's to decide. `taleus-core` consumes what TallyNet produces (the record, its referee set and outcome) and its schema verifies that, rather than hard-coding a shape such as one referee per lift.
 - Platform-neutral: no Node `crypto`, `Buffer` or timers left running. Use `@noble/hashes` and `globalThis.crypto.getRandomValues`, as `taleus-core` does. It must run in Node, React Native and the browser.
 
 ## Package conventions
@@ -44,7 +45,7 @@ Amounts and other integers that can exceed 2^53 are `bigint` in memory and **dec
 
 `taleus-core` lift/transport tests (`yarn test src/lift src/transport` in that package, 104 passing at handoff) are the regression floor for the binding step.
 
-The **rename** `chipnet` → `tallynet` (protocol id `/taleus/chipnet/1.0.0` → `/taleus/tallynet/1.0.0`, `ChipNetTransport`, file names, docs, `docs/STATUS.md` item) happens in the binding step, not before, so that the app-side branch keeps building in the meantime.
+The **rename** `chipnet` → `tallynet` (protocol id `/taleus/chipnet/1.0.0` → `/tallynet/1.0.0`, `ChipNetTransport`, file names, docs, `docs/STATUS.md` item) happens in the binding step, not before, so that the app-side branch keeps building in the meantime.
 
 ## Protocol design (carried from ChipNet, with corrections)
 
@@ -61,11 +62,19 @@ The **rename** `chipnet` → `tallynet` (protocol id `/taleus/chipnet/1.0.0` →
 - Every signature covers the canonical digest **and its own signature type**, and verification recomputes exactly that preimage. Every verification is awaited.
 - Decide before holding: `shouldPromise` runs before `promise` holds anything.
 - Expired transaction or session codes always refuse. Missing policy hooks never mean "approve".
-- An empty referee set is invalid at validation time. Ties have a defined outcome (void) and do not satisfy both sides.
+- **Referee sets, as in ChipNet.** Any participant may nominate referees (`dependsOn`, referee-only members); the referee set is every referee member, and a majority settles. An empty referee set is invalid at validation time. Ties have a defined outcome (void) and do not satisfy both sides.
 - A member may appear on more than one link (a circular lift starts and ends at the originator), so "find our member" returns all our links, not one.
 - Terms are checked at promise time: each participant checks its own in/out links against its own policy (that's where Taleus's per-node quote check goes).
 
-**Not in v1** (backlog): bidirectional search; ring/star propagation with a convergence node; pre-promise void on timeout; void-on-timeout and stalled-transaction recovery (coordinate with `feat-lift-timeout-release`); multi-referee (`feat-multi-referee-consensus`); query economics and policing; advertising. v1 is single-referee, unidirectional, push-to-reachable. That matches what `taleus-core` and the schema implement today.
+**Not in v1** (backlog): bidirectional search; ring/star propagation with a convergence node; pre-promise void on timeout; void-on-timeout and stalled-transaction recovery (coordinate with `feat-lift-timeout-release`); query economics and policing; advertising. v1 is unidirectional and push-to-reachable, and supports referee sets. Taleus's schema still holds one referee per edge; `feat-multi-referee-consensus` lifts that limit soon after binding, and until then Taleus's policy hooks refuse plans with more than one referee.
+
+## Member identity and disclosure
+
+The party authorised to act at a link of the route is whoever holds the private key registered there. TallyNet verifies signatures against that key and nothing else; it never asks who is behind it.
+
+- **Neighbours bind the key.** A participant learns the key its neighbour uses for this lift over the tally connection they share, which the tally's own keys authenticate. That is the only place a lift key is tied to a real party. A participant may also tell its own referees who it is (`Member.secret`, encrypted to the referee).
+- **Default (decided):** the whole route is visible to every member: member keys, any published dial addresses, every link's terms. Tally ids appear only as per-session nonces.
+- **Settable, later** (`feat-tallynet-lift-identity-options`): a fresh key per lift instead of the party's stable agent key, and whether to publish a dial address (`Member.physical`). The two go together: a published libp2p address carries a stable peer id that defeats a per-lift key. A member with no dial address is reached through its link neighbours; each referee needs some path to every participant (its own published address, or relay through the member that nominated it).
 
 ## Multiple denominations
 
@@ -83,9 +92,11 @@ What TallyNet must add to make that work:
 3. **Satisfaction is pluggable, not uniform.** Replace `intentsSatisfied` (same query terms against every link) with a host predicate over the whole plan.
 4. **Promise-time check per node.** `shouldPromise` receives our in/out links with their terms; Taleus checks the amounts against its current quote and trading variables there. Each user decides whether to bridge denominations, through whether they keep a quote at all (no quote means no conversion; see the decision ticket).
 
-`taleus-core` today accumulates the conversion at the **originator** in `negotiatePlan`, with each hop advertising its quote in its `L` terms (`src/lift/terms.ts`, `src/lift/discovery.ts` `accumulateRoute`). That discloses every intermediary's rate to the originator, at odds with architecture.md calling quotes private. Moving the conversion into item 2 fixes that, and `accumulateRoute`/`convertBoundary` are reused per hop. Which model to use is an open decision: `tickets/blocked/tallynet-denomination-policy.md`.
+`taleus-core` today accumulates the conversion at the **originator** in `negotiatePlan`, with each hop advertising its quote in its `L` terms (`src/lift/terms.ts`, `src/lift/discovery.ts` `accumulateRoute`). That discloses every intermediary's rate to the originator, at odds with architecture.md calling quotes private. Moving the conversion into item 2 fixes that, and `accumulateRoute`/`convertBoundary` are reused per hop. **Decided:** conversion happens at each converter on the return path (item 2); quotes are never advertised. The participants of a lift can still infer the effective rate it used from the committed amounts, which is accepted (`docs/architecture.md` § Exchange rate quotes).
 
-Routes that change denomination will be rarer, since they need a bridging node with a quote at each boundary. Whether discovery should search them more widely (larger depth or budget) is part of the same decision ticket.
+**The query and per-node search policy (decided).** A search is currency-agnostic unless the caller says otherwise. The query carries the destination, the **landing unit** (denomination + divisor the payment must arrive in), optionally a **landing tally** the recipient names or prefers, the amount in the landing unit, and an optional *same currency only* flag. Each hop states its own edge's unit and capacity in its terms. The search is fully distributed: each node's **propagation policy** (a hook given the current unit, taken from its inbound edge, and the destination) decides whether to continue and through which candidates, or to drop the search. Depth and time budget are per-query parameters; defaults are the same for every query.
+
+Open for the discovery / multi-denomination plans: how a hop beyond a currency boundary checks capacity on the outward pass, before the exact return-pass conversion exists. Either each converter forwards an estimated amount in the new unit (a small extension of the per-lift rate disclosure accepted in `docs/architecture.md` § Exchange rate quotes), or such hops do a coarse check and the real one happens on return.
 
 ## Testing approach
 

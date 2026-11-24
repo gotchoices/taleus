@@ -1,5 +1,5 @@
 description: Let a lift pass through someone who holds credit in two different currencies and is willing to convert between them, with each step of the route quoting and checking its own conversion.
-prereq: tallynet-bind-taleus-core, tallynet-denomination-policy
+prereq: tallynet-bind-taleus-core
 files: packages/tallynet/, packages/tallynet/docs/design.md, packages/taleus-core/src/lift/discovery.ts, packages/taleus-core/src/lift/terms.ts, packages/taleus-core/src/lift/convert.ts, docs/architecture.md, docs/denominations.md, packages/taleus-core/schema/portfolio.qsql
 difficulty: hard
 ----
@@ -8,7 +8,7 @@ Each tally is kept in one denomination (CHIP, a national currency or a custom un
 
 What TallyNet must provide: `packages/tallynet/docs/design.md` § Multiple denominations. Hop-context negotiation, a return-path annotation hook where each bridging node converts with its own quote, a pluggable plan-satisfaction predicate, and a promise-time per-node check. Discovery (`tallynet-discovery`) leaves the hook shapes in place and `tallynet-bind-taleus-core` wires `taleus-core` to TallyNet with the originator-side conversion that exists today; this ticket makes the hooks carry conversion end to end, changing both packages.
 
-**Read the decisions in `tallynet-denomination-policy` first** (it must be out of `blocked/` before this runs). In particular, whether conversion happens at each bridging node on the way back (quotes stay private) or at the originator (today's `taleus-core` `accumulateRoute`, which needs every hop to disclose its quote).
+**Policy decisions (settled 2026-11-24)** are in `docs/architecture.md` § Exchange rate quotes, § Cross-denomination conversion, § Denomination-aware discovery, and `packages/tallynet/docs/design.md` § Member identity and disclosure, § Multiple denominations. In short: each converter converts on the return path and discloses only amounts; a quote per directional currency pair is the only opt-in; a cross-currency circular lift is accepted by its originator when the loop's rate is no worse than its own quote; searches are currency-agnostic, carry a landing unit (and optional landing tally), and each node's policy decides propagation.
 
 ## Design points to settle in this plan
 
@@ -27,4 +27,4 @@ What TallyNet must provide: `packages/tallynet/docs/design.md` § Multiple denom
 - Huge amounts × huge rates (BigInt, no overflow); rate not in lowest terms.
 - Rounding: dust accrues only upstream, to the originator; every intermediary and the payee get at least their exact due.
 - A bridging node lies in its annotation (amounts inconsistent with any rate it could hold): its neighbours can't detect the rate, but the originator sees the total and each edge's counterparty sees its own edge. State what is and isn't checkable.
-- Circular clearing lift whose cycle crosses denominations (per the policy decision).
+- Circular clearing lift whose cycle crosses denominations: the originator holds the directional quote for its own boundary and accepts only when the loop's effective rate, dust included, is no worse than that quote; no quote → route refused. Same rule whether a person or the agent initiates; provide the mechanism (initiation API + acceptance hook), no UI.

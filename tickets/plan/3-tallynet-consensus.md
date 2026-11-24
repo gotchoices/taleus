@@ -10,9 +10,9 @@ How Taleus uses the result: `docs/architecture.md` § *Referee model and the com
 
 ## Design points to settle in this plan
 
-- **Signed preimage.** `digest(kind, record-without-signatures, [promises for commit])` over the canonical encoder from `tallynet-scaffold`, where `kind` ∈ promise / no-promise / commit / no-commit (or void) is inside the signed bytes. Export the record-digest function for `SingleReferee`.
+- **Signed preimage.** `digest(kind, record-without-signatures, [promises for commit])` over the canonical encoder from `tallynet-scaffold`, where `kind` ∈ promise / no-promise / commit / no-commit (or void) is inside the signed bytes. Export the record-digest function for the Taleus referee.
 - **Resource ordering.** `shouldPromise` (policy) runs before `promise` (hold); a refusal never holds. `release(success)` runs exactly once per transaction, idempotently across restarts.
-- **Outcome rules.** Empty referee set: invalid record. Majority threshold and tie handling are explicit and tested (tie → no consensus yet; never both). With v1's single referee, the referee's one signature decides.
+- **Outcome rules.** Empty referee set: invalid record. Majority threshold and tie handling are explicit and tested (tie → no consensus yet; never both). Referee sets as in ChipNet: any participant nominates referees via `dependsOn`; majority of the set settles; test sets of 1, 2 (tie) and 3. Taleus's one-referee limit is its own policy, not TallyNet's.
 - **Membership.** One address may appear on several links (circular lift through the originator); "our links" = all in/out links of our address. Duplicate member entries for one address: invalid.
 - **Reachability.** Push to members with a dialable address plus direct link neighbours, as ChipNet does; skip a peer whose last-acknowledged copy equals ours. Record per-peer push failures (logged once, not twice).
 - **Validation of a new record** (ChipNet's TODOs at `participant.ts:210-212`): codes valid and unexpired; topology well-formed; our in/out links' terms are what we agreed to in discovery (hand them to `shouldPromise`). Stash what's needed from discovery to check that (the nonce→link map).

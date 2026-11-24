@@ -27,4 +27,4 @@ What the service must do:
 
 - **Cadre client API.** Does `@serfab/cadre-core` expose an out-of-process client interface for a non-cadre-member process to read/write strands, or must the service itself be a cadre member (its own node in the party's cadre)? If the latter, "client of the cadre" means "an additional cadre node that also runs the agent," which is still not a plugin. Confirm against `../sereus/packages/cadre-core` and `../sereus/packages/cadre-host`.
 
-Prereq / depends on: `tallynet-bind-taleus-core` (TallyNet, the in-repo port of ChipNet, replaces the unpublished `chipnet` package), a live Quereus runner wiring, and the Sereus cadre-client API above. Parked in backlog until those land. The `/taleus/chipnet/1.0.0` protocol id becomes `/taleus/tallynet/1.0.0` in that ticket.
+Prereq / depends on: `tallynet-bind-taleus-core` (TallyNet, the in-repo port of ChipNet, replaces the unpublished `chipnet` package), a live Quereus runner wiring, and the Sereus cadre-client API above. Parked in backlog until those land. The `/taleus/chipnet/1.0.0` protocol id becomes `/tallynet/1.0.0` in that ticket.
