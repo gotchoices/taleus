@@ -69,6 +69,15 @@ describe('digest rejects values DAG-CBOR cannot represent', () => {
 		expect(() => digest({ s: Symbol('x') } as unknown as DigestValue)).toThrow(/symbol/)
 	})
 
+	it('rejects a hole in a sparse array with its path, like an explicit undefined', () => {
+		// A hole reads as `undefined`; the pre-check must catch it with a path rather than letting
+		// it fall through to the encoder (which `Array.prototype.forEach` skipping holes would allow).
+		const holey = [1]
+		holey[2] = 3 // leaves index 1 a hole
+		expect(() => digest(holey as unknown as DigestValue)).toThrow(/undefined is not encodable at \$\[1\]/)
+		expect(() => digest([1, undefined, 3] as unknown as DigestValue)).toThrow(/\$\[1\]/)
+	})
+
 	it('rejects non-finite numbers', () => {
 		expect(() => digest(NaN)).toThrow(/non-finite/)
 		expect(() => digest(Infinity)).toThrow(/non-finite/)

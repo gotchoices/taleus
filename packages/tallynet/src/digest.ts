@@ -63,7 +63,12 @@ function assertEncodable(value: unknown, path: string): void {
 	switch (typeof value) {
 		case 'boolean':
 		case 'string':
+			return
 		case 'bigint':
+			// NOTE: a bigint outside the 64-bit CBOR integer range is rejected by the dag-cbor
+			// encoder, not by this pre-check, so its error carries no path. Harmless today: amounts
+			// cross TallyNet as decimal strings, never as a bare bigint this large. If a record ever
+			// carries one, add a range guard here so the rejection reports its path like the rest.
 			return
 		case 'number':
 			if (!Number.isFinite(value)) {
@@ -75,7 +80,13 @@ function assertEncodable(value: unknown, path: string): void {
 				return
 			}
 			if (Array.isArray(value)) {
-				(value as readonly unknown[]).forEach((element, index) => assertEncodable(element, `${path}[${index}]`))
+				// Index iteration, not `forEach`: `forEach` skips holes, so a sparse array's holes
+				// (`[1, , 3]`) would slip past this check and throw deep in the encoder instead. An
+				// indexed read surfaces a hole as `undefined` and rejects it here with its path.
+				const elements = value as readonly unknown[]
+				for (let index = 0; index < elements.length; index++) {
+					assertEncodable(elements[index], `${path}[${index}]`)
+				}
 				return
 			}
 			const proto: unknown = Object.getPrototypeOf(value)
