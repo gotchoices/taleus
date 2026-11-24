@@ -57,6 +57,41 @@ citations) is prepared separately for transmission to Nathan; this is the digest
 - [x] **Workaround backed out: quereus#38** (2026-11-11). Fixed in Quereus 4.26; on 5.4 the repro
   shows one commit for an overlapping read. `StatementLane` is gone from `taleus-sereus/src/store.ts`
   (and `StatementTiming.waitedMs` with it); offline scenarios 6 of 6 without it, no "already sealed".
+- [x] **Stack: Sereus 1.24.0 / Optimystic 1.29.1 / Quereus 5.6.1** (2026-11-24; one copy
+  each in both lockfiles).
+
+  What it brings us:
+  - optimystic#58: a materialized view follows the partner's commits. That unparks a materialized
+    `SettledBalance`.
+  - sereus#59: an app older than a strand's schema is refused (`AppSchemaOutdatedError`).
+  - optimystic#60: a commit's proof is stored once per node.
+  - optimystic#61: an oversized transaction is refused early.
+  - sereus#60: confirmed fixed with our probe. A partner now serves 3 requests (4 tables) and 6
+    (32 tables) for a strand restart, where it served 45 and 129; posted on the issue.
+
+  Not in it: sereus#65 (joiner seating) and #48.
+
+  Changes here:
+  - `SAppConfig.schemaVersion` = `TALLY_SCHEMA_VERSION` (taleus-sereus `sapp.ts`). Raise it with
+    every change to `draft1.qsql`.
+  - `profile: 'transaction'` → `nodeClass: 'device'`.
+  - A new tally condition, `outdated`: the store hears `AppSchemaOutdatedError` on `strand:error`.
+    The model fails fast with `tally-outdated`; the phone shows an "Update the app" chip and
+    message; the CLI shows `outdated`.
+  - `stopPartyNode` waits up to 30 s more for a stop that outlasted its patience. Optimystic 1.29
+    refuses a second read cache over a block store whose cache is still registered, and the
+    scenarios' in-process restart hit that once in four runs ("two caches over one backing store").
+
+  Every member of a strand must run 1.24 or later, so the S7, the S21 and the CLI parties move
+  together.
+
+  Checked:
+  - core 339, model 62, sereus 12, mobile 216;
+  - scenarios 3 of 3 in each mode (250-490 s a run, slower than 1.23's 90-250 s: not yet looked
+    into);
+  - on the phones, moved together with a Metro cache reset (no native rebuild needed): every
+    tally on the S7 and the S21 readable within two minutes, including their shared one on its
+    first open under 1.24, and an S7 payment reached the S21 in 28 s.
 - [x] **Stack: Sereus 1.23.0 adopted** (2026-11-14; cadre-core and cadre-rn, one copy each in both
   lockfiles). It requires Optimystic 1.27 / Quereus 5.4, which we already ran. Its own changes don't
   touch the phone today: a refused app schema no longer breaks a storage replica (matters once we

@@ -90,7 +90,7 @@ class Device {
 	async start(bootstrapNodes: string[] = []): Promise<CadreNode> {
 		const node = new CadreNode({
 			controlNetwork: { partyId: this.partyId, bootstrapNodes },
-			profile: 'transaction',
+			nodeClass: 'device',
 			strandFilter: { mode: 'all' },
 			hostUnclaimedStrands: false,
 			storage: { provider: scope => this.storageFor(scope) },

@@ -115,14 +115,18 @@ export interface TallySummary {
 	 */
 	invitation?: { note?: string }
 	/**
-	 * Set when the tally could not be read just now, so it is listed as it was last read: `starting`
-	 * (being opened on this device), `syncing` (waiting for its first copy from their side), `failed` (this device could not start it),
-	 * `missing` (this device no longer holds it), `unreachable` (its data could not be reached).
+	 * Set when the tally could not be read just now, so it is listed as it was last read:
+	 * - `starting`: being opened on this device;
+	 * - `syncing`: waiting for its first copy from their side;
+	 * - `failed`: this device could not start it;
+	 * - `missing`: this device no longer holds it;
+	 * - `outdated`: this app is older than the tally's schema, and an update opens it;
+	 * - `unreachable`: its data could not be reached.
 	 */
 	unreadable?: Unreadable
 }
 
-export type Unreadable = 'starting' | 'syncing' | 'failed' | 'missing' | 'unreachable'
+export type Unreadable = 'starting' | 'syncing' | 'failed' | 'missing' | 'outdated' | 'unreachable'
 
 /** Anything an adapter could not answer, said plainly rather than thrown away. */
 export interface DataError {

@@ -23,7 +23,7 @@ export function storeUnavailable(error: unknown): boolean {
 export class TallyUnreadableError extends Error {
 	constructor(
 		readonly tallyId: string,
-		readonly unreadable: Extract<Unreadable, 'missing' | 'failed'>,
+		readonly unreadable: Extract<Unreadable, 'missing' | 'failed' | 'outdated'>,
 		reason?: string,
 	) {
 		super(`tally ${tallyId} cannot be read: ${reason ?? unreadable}`)
@@ -31,9 +31,9 @@ export class TallyUnreadableError extends Error {
 	}
 }
 
-/** The failure a screen shows for an unreadable tally: kind `tally-<why>`; retry helps unless it is gone. */
+/** The failure a screen shows for an unreadable tally: kind `tally-<why>`; retry helps only a start that failed. */
 function unreadableFailure(error: TallyUnreadableError): Result<never> {
-	return failed(`tally-${error.unreadable}`, error.message, error.unreadable !== 'missing')
+	return failed(`tally-${error.unreadable}`, error.message, error.unreadable === 'failed')
 }
 
 type Method = (...args: never[]) => unknown

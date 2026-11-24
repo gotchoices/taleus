@@ -17,7 +17,7 @@
  * attaches it, once.
  */
 
-import { describeThrown, generateStrandMemberKey, StrandAwaitingFirstSyncError } from '@serfab/cadre-core'
+import { AppSchemaOutdatedError, appSchemaRefusalOf, describeThrown, generateStrandMemberKey, StrandAwaitingFirstSyncError } from '@serfab/cadre-core'
 import { decodeStrandAddress, encodeStrandAddress } from './address.js'
 import { reachOf } from './reach.js'
 import { WriteLog } from './write-log.js'
@@ -135,6 +135,8 @@ class CadreStoreProvider implements StoreProvider {
 	private readonly attaching = new Map<string, Promise<StrandInstance>>()
 	/** One write log per strand, shared by every store opened on it, so no store saves over another's. */
 	private readonly logs = new Map<string, Promise<WriteLog>>()
+	/** Strands refused because this app is older than their schema (`AppSchemaOutdatedError`). */
+	private readonly outdated = new Set<string>()
 	/** When this store began: what a strand's absence is judged against (`condition`). */
 	private readonly startedAt = Date.now()
 	/** Callers waiting for a strand that has not been offered yet. */
@@ -150,6 +152,12 @@ class CadreStoreProvider implements StoreProvider {
 		for (const strand of options.node.getDiscoveredStrands().values()) {
 			void this.attach(strand).catch(err => console.warn(`taleus-sereus: attaching ${strand.Id} failed:`, err))
 		}
+		// A strand refused for an app older than its schema: launching it, or stopped while running.
+		// The node won't relaunch it until the app claims it again; an update is what opens it.
+		options.node.on('strand:error', ({ strandId, error }) => {
+			if (appSchemaRefusalOf(error) instanceof AppSchemaOutdatedError) this.outdated.add(strandId)
+		})
+		options.node.on('strand:started', ({ strandId }) => this.outdated.delete(strandId))
 	}
 
 	list(): Promise<TallyRef[]> {
@@ -192,6 +200,7 @@ class CadreStoreProvider implements StoreProvider {
 	 */
 	async condition(ref: TallyRef): Promise<TallyCondition> {
 		const { node } = this.options
+		if (this.outdated.has(ref.id)) return { kind: 'outdated' }
 		const strand = node.getStrands().get(ref.id)
 		if (strand) {
 			if (readable(strand)) return { kind: 'readable' }

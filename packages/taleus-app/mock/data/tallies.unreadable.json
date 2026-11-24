@@ -100,7 +100,8 @@
       "state": "Offered",
       "waitingOn": "me",
       "waitingReason": "offer",
-      "lastActivity": "2026-09-05T07:30:00Z"
+      "lastActivity": "2026-09-05T07:30:00Z",
+      "unreadable": "outdated"
     },
     {
       "id": "tally:priya-new",

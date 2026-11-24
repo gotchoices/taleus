@@ -10,5 +10,13 @@ import tallySchema from 'taleus-core/schema-text/draft1'
  * a Taleus author key and shipped beside the schema.
  */
 export function taleusSApp(): SAppConfig {
-	return { id: 'taleus-tally', version: '1', schema: tallySchema, latencyHint: 'interactive' }
+	return { id: 'taleus-tally', version: '1', schema: tallySchema, schemaVersion: TALLY_SCHEMA_VERSION, latencyHint: 'interactive' }
 }
+
+/**
+ * The tally schema's version, which Sereus records on each strand (`Strand.AppSchemaVersion`):
+ * a strand refuses an app whose number is lower than the highest any member has applied
+ * (`AppSchemaOutdatedError`), so an older app cannot undo a newer schema's changes. Raise it with
+ * every change to `taleus-core/schema/draft1.qsql`.
+ */
+export const TALLY_SCHEMA_VERSION = 1

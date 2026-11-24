@@ -310,13 +310,14 @@ export class Session {
 
 	/**
 	 * Throw `TallyUnreadableError` for a tally waiting would never bring: one this device no longer
-	 * holds, or one it could not start. One starting or on its first sync is waited for, as the
+	 * holds, one it could not start, or one whose schema is newer than this app. One starting or on its first sync is waited for, as the
 	 * store does (bounded by its patience): an act right after a restart should go through.
 	 */
 	private async mustBeReadable(id: string): Promise<void> {
 		const condition = await this.engine?.condition({ id })
 		if (condition?.kind === 'missing') throw new TallyUnreadableError(id, 'missing')
 		if (condition?.kind === 'failed') throw new TallyUnreadableError(id, 'failed', condition.reason)
+		if (condition?.kind === 'outdated') throw new TallyUnreadableError(id, 'outdated')
 	}
 
 	/** Why a tally cannot be read now, or nothing when it can (as far as can be said without reading it). */

@@ -267,6 +267,12 @@ describe('a session kept across restarts', () => {
 		expect((await syncing.model.tallies.forgetTally(listed.id)).ok).toBe(false)
 		await syncing.stop()
 
+		const old = await restart({ kind: 'outdated' })
+		const outdated = await old.model.tally.readTally(listed.id)
+		expect(outdated.ok ? undefined : outdated.error).toMatchObject({ kind: 'tally-outdated', retryable: false })
+		expect(must(await old.model.tallies.listTallies())).toEqual([expect.objectContaining({ id: listed.id, unreadable: 'outdated' })])
+		await old.stop()
+
 		const broken = await restart({ kind: 'failed', reason: 'launch refused' })
 		const failing = await broken.model.tally.readTally(listed.id)
 		expect(failing.ok ? undefined : failing.error).toMatchObject({ kind: 'tally-failed', retryable: true })

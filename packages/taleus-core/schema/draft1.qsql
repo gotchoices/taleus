@@ -1,5 +1,8 @@
 -- Taleus tally strand -- the two-party sApp schema.
 --
+-- Any change here raises `TALLY_SCHEMA_VERSION` (taleus-sereus `sapp.ts`): Sereus refuses an app
+-- older than the newest schema a strand has applied, so an un-upgraded app cannot undo this one.
+--
 -- An sApp schema BODY, in Sereus's declarative form: bare `table`, `index`, `unique index` and
 -- `view` items, never `create table …`. Sereus wraps the body as `declare schema App { … }` and
 -- applies it, so the tables are `App.Ledger` and so on to everything outside this file. Since

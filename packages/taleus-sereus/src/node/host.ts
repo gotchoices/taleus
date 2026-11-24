@@ -75,20 +75,36 @@ export async function startPartyNode(options: NodeHostOptions): Promise<CadreNod
 /**
  * Stop a node `startPartyNode` started, then close what it opened. Without the close, writes the
  * block stores still hold are lost while their pending records survive, which wedges the strand
- * on the next start (optimystic #54). A stop that hangs on a peer is given `patienceMs`; the stores
- * are closed either way, so an exit after this returns loses nothing it was told.
+ * on the next start (optimystic #54). A stop that hangs on a peer is given `patienceMs`, then the
+ * stores are closed anyway, so an exit after this returns loses nothing it was told.
+ *
+ * A stop that outlasts the patience is still waited for, up to `settleMs` more: the node's read
+ * caches are released only as it finishes stopping, and a node started over the same folder
+ * before then is refused ("two caches over one backing store", Optimystic 1.29).
  */
-export async function stopPartyNode(node: CadreNode, patienceMs = 5_000): Promise<void> {
+export async function stopPartyNode(node: CadreNode, patienceMs = 5_000, settleMs = 30_000): Promise<void> {
+	const stopping = node.stop().then(() => 'stopped' as const)
+	try {
+		if ((await within(stopping, patienceMs)) === 'stopped') return
+		console.warn(`taleus-sereus: the node did not stop within ${patienceMs} ms; closing its stores anyway`)
+	} finally {
+		await closeOpened(node)
+	}
+	if ((await within(stopping, settleMs)) !== 'stopped') {
+		console.warn(`taleus-sereus: the node had still not stopped ${settleMs} ms later; a node started over its folder may be refused`)
+	}
+}
+
+/** `promise`'s outcome, or `'outlasted'` after `ms`. */
+async function within<T>(promise: Promise<T>, ms: number): Promise<T | 'outlasted'> {
 	let timer: ReturnType<typeof setTimeout> | undefined
 	const outlasted = new Promise<'outlasted'>(resolve => {
-		timer = setTimeout(() => resolve('outlasted'), patienceMs)
+		timer = setTimeout(() => resolve('outlasted'), ms)
 	})
 	try {
-		const stopped = await Promise.race([node.stop().then(() => 'stopped' as const), outlasted])
-		if (stopped === 'outlasted') console.warn(`taleus-sereus: the node did not stop within ${patienceMs} ms; closing its stores anyway`)
+		return await Promise.race([promise, outlasted])
 	} finally {
 		clearTimeout(timer)
-		await closeOpened(node)
 	}
 }
 
@@ -109,7 +125,7 @@ async function nodeConfig(
 		keyStore,
 		identityKeyId: DEFAULT_IDENTITY_KEY_ID,
 		controlNetwork: { partyId, bootstrapNodes: [] },
-		profile: 'transaction',
+		nodeClass: 'device',
 		storage: { provider: (scope: string) => storageFor(dirs, scope, opened) },
 		network: {
 			transports: [webSockets(), circuitRelayTransport()] as never,

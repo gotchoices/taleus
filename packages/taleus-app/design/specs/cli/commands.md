@@ -123,9 +123,9 @@ stdin is not a terminal). Prints `answer`.
 `row  id  counterparty  balance  perspective  state  waitingOn  lastActivity  unreadable`. An invitation
 nobody has taken up shows its note as the counterparty. A tally that cannot be read just now is listed
 as last read, with `unreadable` saying why: `starting` (being opened on this party's node), `syncing` (waiting for its first copy from the partner),
-`failed` (this party's node could not start it), `missing` (no longer on this party's node) or
-`unreachable` (its data could not be reached). Commands naming a `failed` tally fail at once
-with exit 3, and a `missing` one with exit 2. A tally `starting` or `syncing` is waited for.
+`failed` (this party's node could not start it), `missing` (no longer on this party's node), `outdated` (this client is older than the
+tally's schema: update it) or `unreachable` (its data could not be reached). Commands naming a `failed` tally fail at once
+with exit 3, and a `missing` or `outdated` one with exit 2. A tally `starting` or `syncing` is waited for.
 
 ### `tally <tally>`
 Key/value: `id`, `counterparty`, `state`, `waitingOn`, `balance`, `perspective`, `myLimit`,

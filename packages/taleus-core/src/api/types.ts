@@ -826,6 +826,8 @@ export interface TallyStore {
  * - `syncing`: joined, and waiting for its first copy from the counterparty's side.
  * - `failed`: this device holds it but could not start it, with the platform's reason.
  * - `missing`: this device holds no such tally (any more).
+ * - `outdated`: this app is older than the tally's schema, which a newer app on the other side
+ *   applied: updating the app opens it, and nothing else will.
  */
 export type TallyCondition =
 	| { kind: 'readable' }
@@ -833,6 +835,7 @@ export type TallyCondition =
 	| { kind: 'syncing' }
 	| { kind: 'failed'; reason: string }
 	| { kind: 'missing' }
+	| { kind: 'outdated' }
 
 export interface StoreProvider {
 	/**
