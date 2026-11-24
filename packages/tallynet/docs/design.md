@@ -28,6 +28,8 @@ Amounts and other integers that can exceed 2^53 are `bigint` in memory and **dec
 
 **Canonical encoding.** Everything signed is hashed over a canonical, typed, delimited encoding of the record, never `JSON.stringify` or ChipNet's `hashDeep` (see review, *Transaction module defects*). Pick one encoding and use it for every digest. Deterministic CBOR (`@ipld/dag-cbor`, from the same IPLD family as the `multiformats` package `taleus-model` already uses) is the default; JCS (RFC 8785) is acceptable. Record the choice in this file when made.
 
+**Decided (scaffold):** deterministic **DAG-CBOR** (`@ipld/dag-cbor` v11, on `cborg`), sha256, in `src/digest.ts`. DAG-CBOR fixes one byte sequence per value — sorted map keys (so property order is irrelevant), shortest-form integers, no indefinite-length items, and it rejects `NaN`/`Infinity`/`undefined` outright. `src/digest.ts` also pre-validates and rejects functions, symbols, and objects with a non-plain prototype (`Date`, `Map`, class instances) with a path to the offending node. One accepted consequence: DAG-CBOR encodes an integer identically whether it arrives as a `number` or a `bigint`, so `digest(1) === digest(1n)`; this is harmless because amounts cross TallyNet as decimal **strings** (bigint only in memory). This digest is distinct from `taleus-core`'s settlement digest (the storage stack's framed tuple encoding, a different format for a different, fixed-shape input); the two share no preimage.
+
 ## The seam taleus-core already defines
 
 `taleus-core` was built against ChipNet's callback shapes, with the ChipNet parts as injected **ports** tested against in-memory doubles, because ChipNet could not be installed. TallyNet's job is to supply real implementations of those ports. Today's state:

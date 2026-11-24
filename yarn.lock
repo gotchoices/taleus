@@ -613,6 +613,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@ipld/dag-cbor@npm:^11.0.0":
+  version: 11.0.0
+  resolution: "@ipld/dag-cbor@npm:11.0.0"
+  dependencies:
+    cborg: "npm:^7.0.0"
+    multiformats: "npm:^14.0.0"
+  checksum: 10c0/991ca9de839aa85187ebe00b29588b116777b1b2797be8f1dff1713cb394ebd82f11f9b3cb8444f19b0d987183fdd7eb0b674aec5a9dc6ca01f61e87cb0b2e8d
+  languageName: node
+  linkType: hard
+
 "@ipld/dag-json@npm:^10.2.0":
   version: 10.2.9
   resolution: "@ipld/dag-json@npm:10.2.9"
@@ -3114,6 +3124,15 @@ __metadata:
   bin:
     cborg: lib/bin.js
   checksum: 10c0/f967c6bcbb7eaeda705c9d21970ba8edeefd70b4c78861540561914a70862a2741ad82db5539676639e26e246974d17a7619e40fc9b840136af6d681cd33ad74
+  languageName: node
+  linkType: hard
+
+"cborg@npm:^7.0.0":
+  version: 7.0.0
+  resolution: "cborg@npm:7.0.0"
+  bin:
+    cborg: lib/bin.js
+  checksum: 10c0/34edf4e2709420408a630050b3f5c6ec820e4a74fdfa3cf4557c34e56e3648b7bb45931e6ba3c014fe116fab3ae047c638d7b5ab3aee9463bae5a80106be99e6
   languageName: node
   linkType: hard
 
@@ -6573,6 +6592,25 @@ __metadata:
   peerDependencies:
     "@serfab/cadre-core": ^1.24.0
     taleus-core: ^0.1.0
+  languageName: unknown
+  linkType: soft
+
+"tallynet@workspace:packages/tallynet":
+  version: 0.0.0-use.local
+  resolution: "tallynet@workspace:packages/tallynet"
+  dependencies:
+    "@eslint/js": "npm:10.0.1"
+    "@ipld/dag-cbor": "npm:^11.0.0"
+    "@noble/hashes": "npm:^2.2.0"
+    "@types/jest": "npm:30.0.0"
+    "@types/node": "npm:26.1.1"
+    cross-env: "npm:7.0.3"
+    eslint: "npm:10.7.0"
+    globals: "npm:17.7.0"
+    jest: "npm:30.4.2"
+    ts-jest: "npm:29.4.11"
+    typescript: "npm:6.0.3"
+    typescript-eslint: "npm:8.63.0"
   languageName: unknown
   linkType: soft
 

@@ -2,7 +2,7 @@
 
 Lift protocol library for Taleus: route discovery across the tally graph and atomic promise/commit of a lift across many tally strands. A port of [ChipNet](https://github.com/gotchoices/ChipNet), extended for tallies kept in different denominations.
 
-**Status:** not yet scaffolded. This folder holds the design handoff; the code is built through the tess tickets named below.
+**Status:** scaffolded. The package builds, tests and lints, and ships the shared primitives the discovery and consensus engines are built on: the crypto ports (`src/crypto.ts`), self-expiring session codes (`src/session-code.ts`), edge nonces (`src/nonce.ts`), the canonical digest (`src/digest.ts`), step sequencing (`src/sequencing.ts`) and the rule engine (`src/rule.ts`). The discovery and consensus engines are built through the later tess tickets below.
 
 - [docs/design.md](docs/design.md): what TallyNet is, its boundaries with `taleus-core`, the changes from ChipNet, the multi-denomination extension, and the testing approach.
 - [docs/chipnet-review.md](docs/chipnet-review.md): the upstream ChipNet (and ChipCrypt, ChipCryptBase, ChipCode) assessment: architecture, data model, verified defects, unbuilt features.
@@ -13,7 +13,7 @@ Tickets live in the repo's [`tickets/`](../../tickets/) folder and are run with 
 
 | Stage | Ticket | What |
 |---|---|---|
-| implement | `1-tallynet-scaffold` | Package skeleton, crypto ports, session codes, canonical digest, sequencing helpers |
+| ✅ done | `1-tallynet-scaffold` | Package skeleton, crypto ports, session codes, nonce, canonical digest, sequencing helpers, rule engine |
 | plan | `2-tallynet-discovery` | Unidirectional discovery port with fixes and durable/in-flight state split |
 | plan | `3-tallynet-consensus` | Promise/commit state machine rewrite |
 | plan | `4-tallynet-bind-taleus-core` | Replace `taleus-core`'s ChipNet stand-ins with TallyNet; rename sweep. Single-denomination lifts work end to end after this |
