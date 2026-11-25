@@ -574,7 +574,9 @@ export function mountLiveControls(host: HTMLElement, liveHost: LiveRunHost): Liv
 
 	function onDone(message: Extract<WorkerToMain, { type: 'done' }>): void {
 		running = false
-		if (materializedNetwork === undefined || runIndex === undefined || runScenario === undefined || runQuerySpec === undefined || keptSnapshot === undefined) {
+		// `view === undefined` means the shell replaced the drawn view mid-run (a file/sample load called
+		// invalidate()); the run is now orphaned, so drop it rather than mount its replay over the new graph.
+		if (view === undefined || materializedNetwork === undefined || runIndex === undefined || runScenario === undefined || runQuerySpec === undefined || keptSnapshot === undefined) {
 			updateButtons()
 			return
 		}
@@ -696,6 +698,8 @@ export function mountLiveControls(host: HTMLElement, liveHost: LiveRunHost): Liv
 		anchor.href = url
 		anchor.download = 'live-run.ndjson'
 		anchor.click()
+		// NOTE: revoke is synchronous after click() — fine in the Chrome dev target; if a browser is ever seen
+		// aborting the download, defer the revoke (e.g. setTimeout) until after the download has started.
 		URL.revokeObjectURL(url)
 	}
 
@@ -703,7 +707,9 @@ export function mountLiveControls(host: HTMLElement, liveHost: LiveRunHost): Liv
 	function updateButtons(): void {
 		const { from, to } = readPicked()
 		const ready = !workerBroken && worker !== undefined
-		generateButton.disabled = !ready || generating
+		// Generate is blocked while a run is in flight: re-generating mid-run would tear down the running
+		// view/replay out from under the still-streaming run (one-run-at-a-time). Cancel first to re-generate.
+		generateButton.disabled = !ready || generating || running
 		runButton.disabled = !ready || !generated || running || from === undefined || to === undefined
 		cancelButton.disabled = !ready || !running
 		downloadButton.disabled = lastRun === undefined

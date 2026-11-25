@@ -161,7 +161,12 @@ export interface LiveRun {
 	runSeed: number
 }
 
-/** Build both halves of a runnable live run at once (the controls call this on Run). */
+/**
+ * Build both halves of a runnable live run at once (a convenience bundle). The panel does not use this on Run —
+ * it calls {@link buildScenario}/{@link buildQuery} separately so it can override `scenario.network` with the
+ * already-generated source and catch a missing-pick error — but it keeps the full form → run mapping in one
+ * tested place.
+ */
 export function buildLiveRun(params: LiveRunParams): LiveRun {
 	return { scenario: buildScenario(params), query: buildQuery(params), runSeed: DEFAULT_RUN_SEED }
 }
