@@ -13,8 +13,23 @@
  *     masquerades as a merely-large finite one (the thickness scale tops out well below it).
  *   - **Highlight** (hover / search selection) is a warm accent that separates from both the blue edges and
  *     the neutral nodes.
- *   - **found** is reserved for the replay ticket's "route found" marks (status green); unused here but part of
- *     the shared palette so replay does not invent a second green.
+ *   - **found** is the replay's "route found" mark (status green); on the shared palette so replay does not
+ *     invent a second green.
+ *
+ * ── What encodes what (replay tier) ────────────────────────────────────────────────────────────────
+ *   - **roundScale** is a sequential, ordinal ramp (~6 steps) for *how far out* the search has reached: a lit
+ *     node/edge is coloured by its round. It is a **warm** ramp (indigo→amber light, violet→yellow dark) on
+ *     purpose — it must separate from the cool-blue capacity edges and neutral nodes it is painted over. Each
+ *     theme has its own steps, chosen for contrast on that surface (the dark steps are brighter, not inverted).
+ *     Rounds past the last step clamp to it.
+ *   - **pruned** is the fade a dropped candidate edge takes — a muted rose, deliberately *not* the blue of a
+ *     never-reached edge, so "explored then discarded" reads differently from "never touched".
+ *   - **sleeping** (a node that never answers) and **late** (a node that answers only after a long delay) are
+ *     two distinct dim marks — slate for asleep, gold for late — so the two conditions are told apart. They are
+ *     markers only; they carry no "the query failed" meaning (a sleeping *target* can still be resolved by a
+ *     neighbour).
+ *   - **dimmed** is the recede colour for everything *outside* a selected (isolated) route — near the surface,
+ *     so the isolated route stands alone.
  *
  * Persistence: the chosen theme is stored in `localStorage` and defaults to the OS `prefers-color-scheme`.
  */
@@ -46,8 +61,21 @@ export interface Palette {
 	edgeUnlimited: string
 	/** Hover / search-selection accent, applied to nodes and edges alike. */
 	highlight: string
-	/** Reserved for the replay ticket's "route found" marks (status good green). */
+	/** The replay's "route found" mark (status good green). */
 	found: string
+	/**
+	 * The replay round ramp: a sequential ordinal scale (~6 steps) a lit node/edge is coloured by its round.
+	 * Warm, so it separates from the blue capacity edges; a round past the last index clamps to the last step.
+	 */
+	roundScale: readonly string[]
+	/** The fade a pruned (dropped) candidate edge takes — distinct from a never-reached (blue) edge. */
+	pruned: string
+	/** A node made to sleep (never answers): a distinct dim mark, told apart from {@link Palette.late}. */
+	sleeping: string
+	/** A node made late (answers only after a long delay): a distinct dim mark, told apart from `sleeping`. */
+	late: string
+	/** The recede colour for items outside a selected (isolated) route, so the route stands alone. */
+	dimmed: string
 }
 
 /** Light theme — validated against the `#ffffff` surface. */
@@ -64,6 +92,12 @@ export const lightPalette: Palette = {
 	edgeUnlimited: '#6a4ce2',
 	highlight: '#f47230',
 	found: '#0aac23',
+	// Warm indigo→amber; all steps clear a legible contrast on white (lightest amber reads as a mark, not text).
+	roundScale: ['#5e1687', '#8c2981', '#b73779', '#d9586b', '#ef7f4f', '#f3a93b'],
+	pruned: '#c49ca2',
+	sleeping: '#8a94a6',
+	late: '#b98f36',
+	dimmed: '#dddddd',
 }
 
 /** Dark theme — its own steps, validated against the `#191919` surface. */
@@ -80,6 +114,12 @@ export const darkPalette: Palette = {
 	edgeUnlimited: '#9887ef',
 	highlight: '#e76624',
 	found: '#0aac23',
+	// Brighter warm violet→yellow; its own steps (not an inversion), all legible on the dark surface.
+	roundScale: ['#9c4bd4', '#c65b9f', '#e36d7b', '#f28a4c', '#f6b73c', '#f5e04a'],
+	pruned: '#6e5156',
+	sleeping: '#6b7585',
+	late: '#b9923f',
+	dimmed: '#333333',
 }
 
 /** The palette for a theme name. */

@@ -178,4 +178,74 @@ html, body, #app {
 	padding: 2rem;
 	color: var(--tsv-text-secondary);
 }
+
+.tsv-replay {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	font-size: 0.85rem;
+}
+
+.tsv-replay-disabled {
+	opacity: 0.55;
+}
+
+.tsv-transport {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	flex-wrap: wrap;
+}
+
+.tsv-replay-scrub {
+	flex: 1 1 100%;
+}
+
+.tsv-replay-time {
+	color: var(--tsv-text-secondary);
+	font-variant-numeric: tabular-nums;
+}
+
+.tsv-replay-sessions {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.tsv-replay-colour {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	color: var(--tsv-text-secondary);
+}
+
+.tsv-replay-found-state {
+	font-weight: 600;
+}
+
+.tsv-replay-routes,
+.tsv-replay-markers {
+	list-style: none;
+	margin: 0.25rem 0 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+#tsv-app .tsv-replay-route {
+	width: 100%;
+	text-align: left;
+}
+
+#tsv-app .tsv-replay-route-active {
+	border-color: var(--tsv-text);
+}
+
+.tsv-replay-note,
+.tsv-replay-hint {
+	color: var(--tsv-text-secondary);
+	font-size: 0.8rem;
+	line-height: 1.4;
+}
 `

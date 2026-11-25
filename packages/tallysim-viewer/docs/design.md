@@ -9,8 +9,9 @@ server**: everything runs in the browser from files a developer loads.
 This document is the canonical design and grows one ticket at a time. It currently covers the **core tier**
 — the platform-neutral, headlessly-tested logic that loads and interprets a recorded run — the **graph tier**
 (the `graphology` model, the seeded worker layout, and the `sigma` renderer), the **app shell** (load a
-network, draw it, search it, switch theme), and the settled **stack decision**. The remaining rendering tiers
-(replay controls, live in-browser runs, sweep charts) extend it as they land.
+network, draw it, search it, switch theme), the **replay tier** (the transport that plays a payment search
+across the graph), and the settled **stack decision**. The remaining rendering tiers (live in-browser runs,
+sweep charts) extend it as they land.
 
 Read first: [`packages/tallysim/docs/design.md`](../../tallysim/docs/design.md) (the simulator whose output
 this viewer reads — especially its *Trace & replay format* and *Discovery simulation* sections) and
@@ -156,6 +157,82 @@ container, and owns the one data path this tier needs: **load a network → draw
 - `styles.ts` is a CSS **string** injected via a `<style>` element (a `.css` import would need a module `.d.ts`
   shim under `NodeNext`). The live-run and sweep source tabs are marked with seam comments for later tickets.
 
+## Replay tier (`src/replay/`)
+
+The replay tier **plays a recorded payment search across the graph**: the frontier lights up round by round,
+pruned branches fade, sleeping/late nodes are marked, and the routes the search found are listed. It splits
+the same way the graph tier does — the logic is pure and tested; only the transport loop and the panel touch
+the browser.
+
+| Module | Responsibility | Tested |
+|---|---|---|
+| `clock.ts` | The pure rAF-clock math: `advanceClock`, `clampToBounds`, `progressFraction`, `timeAtFraction`. | jest |
+| `routes.ts` | Pure found-route reconstruction + the explicit `SessionFoundState` classifier. | jest |
+| `paint.ts` | Pure `ActiveSet` + conditions + isolate → a plain `ReplayOverlay` (round colours, pruned fade, sleeping/late marks). No sigma. | jest |
+| `controls.ts` | The rAF transport + the panel (play/pause/speed/scrub, session picker, colour-by-session, found list). Browser-only. | build + manual |
+
+### One clock, one seek path
+
+`core/timeline.ts` is a pure reducer that owns no clock: it derives the "active set" (lit nodes/edges, pruned
+candidates, found-plan markers) from a `currentTime` by **recomputing from every event with `time ≤ t`**.
+`clock.ts` is the other pure half — given the wall-clock delta between two frames and the speed, it computes
+the next head time. `controls.ts` is the only browser piece: each `requestAnimationFrame` tick it advances the
+clock, seeks the reducer, builds the overlay (`paint.ts`), and hands it to the renderer. Scrubbing feeds the
+*same* seek path (a direct time, not a delta), so backward scrubbing is as correct as forward play — there is
+no incremental cursor to rewind. A playing clock auto-pauses at the end (`advanceClock`'s `atEnd`).
+
+### Precise edge lighting via de-anonymisation
+
+Edge lighting is **precise, never inferred**. Each session gets its own `Timeline`, built with a
+`resolveTally` bound to the whole-network `Deanonymiser` (`deanon.tallyOfNonce(code, nonce)`), so every
+nonce-bearing event resolves to the exact tally edge it touched (see *The de-anonymiser insight*). A
+`late-answer-folded` event re-touches an already-lit edge at a **later** round in place (the reducer keeps the
+max round), and `paint.ts` colours it at that later round — so a folded late answer reads as reaching further
+out, not as a duplicate.
+
+### Overlay + palette (how the paint reaches the screen)
+
+`paint.ts` emits a plain `ReplayOverlay` — `{ nodes: Map<nodeKey,{color?,size?}>, edges:
+Map<edgeKey,{color?,size?,zIndex?,hidden?,note?}>, dim? }` — with **no** sigma import, keyed by the one
+documented conventions (`edgeKeyForTally`, `entityName`). `render.ts` gains `setReplayOverlay(overlay)`; its
+node/edge reducers compose three layers in order: the resting capacity style, then the overlay (the keyed
+style, or the `dim` colour for everything outside a selected route), then the built-in hover/selection accent,
+which **wins on top**. The overlay is a separate channel from sigma's `isHovered`/`isHighlighted` state, so the
+two never collide. `theme.ts` carries the replay colours in the one shared palette: a warm, colour-blind-safe
+`roundScale` (chosen to separate from the cool-blue capacity edges), plus `pruned`, `sleeping`, `late` and
+`dimmed`, each with its own light and dark steps.
+
+### Conditions-derived sleeping / late
+
+A trace does not record which nodes slept — it records the scenario. The viewer recompiles the node conditions
+to recover them: `compileConditions(index.network, header.scenario.conditions ?? {}, header.scenario.conditionsSeed ?? 0)`
+returns `{ conditions, sleeping, late }` (tallysim conditions option **(b)**: the `late` set is returned
+alongside `sleeping` so the viewer can render the two distinctly without re-deriving the per-link map).
+**Seed note:** the CLI `cli/trace.ts` compiles with `conditionsSeed = scenario.conditionsSeed ?? 0` — *without*
+the per-run offset the sweep runner applies — so the viewer must use the same seed to reproduce the exact
+sets. Sleeping and late are **markers only**: a sleeping *target* does not mean the query failed (a neighbour
+can resolve the peer-match); only a sleeping non-target relay actually blocks. The renderer encodes this as
+colour, not as any failure semantics.
+
+### Found routes — and the trace-format gap
+
+The found-routes side list shows each route's hop count and per-link terms, and selecting one **isolates** it
+(`routeEdgeTallies` + the overlay `dim`), dimming everything else. `routes.ts` reconstructs a route's exact
+node path from its **link-nonce path** via the de-anonymiser. The catch: **a recorded trace does not carry
+found-plan paths.** The `tallynet` `plan-found` event is path-less, and `plan-returned` carries only a single
+per-node inbound nonce, so the winning route's ordered path cannot be recovered from the event stream without
+*inferring* it — which would violate the "precise, not inferred" rule. So for a **loaded trace** the panel
+shows the `plan-found` **markers** (finder node + time + count) and the honest `SessionFoundState` (loading /
+searching / no-route / found), plus an explicit note that the exact path is not in the format. The full
+list — with exact-path isolation — lights up only when a `ReplayRouteSource` supplies the link-nonce paths:
+the live-run source (a later ticket, from `QueryOutcome.plans[i].path`) or a test.
+
+**Deferred clean fix:** have the originator's `plan-found` event carry its own plan's path nonces. The
+originator owns the search result, so this discloses nothing a relay could not already infer from its own
+return — unlike relay events, it adds no disclosure. It is a cross-package change (a `tallynet` `TraceEvent`
+additive field, the originator emission, and a `TRACE_FORMAT_VERSION` bump in tallysim), deliberately out of
+the viewer's scope; it is filed as a backlog ticket.
+
 ## Stack decision
 
 Settled here so the rendering tickets do not re-litigate it.
@@ -187,11 +264,13 @@ Settled here so the rendering tickets do not re-litigate it.
 
 ## Testing
 
-- Jest over the headless modules — `src/core/**` (`trace-index`, `deanonymise`, `timeline`, `sweep-data`) and
-  `src/graph/model.ts` — with hand-built fixtures, no browser, no sigma.
+- Jest over the headless modules — `src/core/**` (`trace-index`, `deanonymise`, `timeline`, `sweep-data`),
+  `src/graph/model.ts`, and the pure replay modules `src/replay/{clock,routes,paint}.ts` — with hand-built
+  fixtures, no browser, no sigma.
 - `yarn build` type-checks (`tsc --noEmit`) then produces the static bundle (`vite build`) from the app shell.
-  The renderer (`render.ts`) and the shell (`app/**`) are **browser-only** (WebGL, `document`, a Web Worker);
-  their gate is the build plus a manual interactivity check (`yarn dev` → "Load sample" → pan/zoom/hover/search
-  on ~2–5k nodes), not jest.
+  The renderer (`render.ts`), the replay transport (`replay/controls.ts`) and the shell (`app/**`) are
+  **browser-only** (WebGL, `document`, `requestAnimationFrame`, a Web Worker); their gate is the build plus a
+  manual interactivity check (`yarn dev` → "Load sample" → pan/zoom/hover/search; load a trace → play / scrub /
+  hover a pruned edge / toggle colour-by-session / select a found route), not jest.
 - A **headless-WebGL smoke test** (rendering a trace in a real browser, asserting on the result) is **deferred**
   — it needs Playwright / headless-Chromium and is not reliably agent-runnable; it belongs with CI or a human.

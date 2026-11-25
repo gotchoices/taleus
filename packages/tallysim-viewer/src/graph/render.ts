@@ -22,14 +22,18 @@
  *
  * ── State, not attributes, for interaction ─────────────────────────────────────────────────────────
  * Hover and search selection ride sigma's built-in per-item **state** (`isHovered` / `isHighlighted`), read
- * in the reducers. The replay ticket will add its own *custom* state (the "lit" route) via
- * `customNodeState`/`customEdgeState`; keeping this ticket on the built-in flags leaves those free to compose.
+ * in the reducers. The replay overlay is a separate channel — a plain {@link ReplayOverlay} (keyed by node/edge
+ * key) held in a closure var and read in the same reducers — so the two **compose**: a node/edge takes its
+ * overlay colour (or the dim colour when an isolate is active) at rest, and a hovered/selected item still wins
+ * on top (the `highlight` accent). The overlay is built by the sigma-free `replay/paint.ts`, so the renderer
+ * stays free of replay meaning.
  */
 
 import Sigma from 'sigma'
 import type { EdgeDisplayData, NodeDisplayData } from 'sigma/types'
 import type { TallyGraph, TallyEdgeAttributes, TallyNodeAttributes } from './model.js'
 import type { Palette } from '../app/theme.js'
+import type { ReplayOverlay } from '../replay/paint.js'
 
 /** The interactive view a mounted graph exposes to the shell. */
 export interface GraphView {
@@ -37,6 +41,12 @@ export interface GraphView {
 	readonly webglAvailable: boolean
 	/** Re-theme in place (no layout recompute): swap the palette, repaint the surface, refresh. */
 	setPalette(palette: Palette): void
+	/**
+	 * Apply (or clear, with `undefined`) the replay overlay: per-node/-edge styling the reducers compose with
+	 * the resting capacity style and the built-in hover/selection. Cheap to call every frame (it swaps the
+	 * closure reference and refreshes; no structural recompute).
+	 */
+	setReplayOverlay(overlay: ReplayOverlay | undefined): void
 	/** Highlight + centre the node whose key is `idText` (the entity id as typed). `false` if no such node. */
 	search(idText: string): boolean
 	/** Clear any search highlight. */
@@ -139,36 +149,86 @@ function edgeBaseVisual(
 	}
 }
 
-/** Full edge style: resting visual, the orientation arrowhead, parallel-edge curving, and hover/selection. */
+/**
+ * Full edge style, composing three layers in order: the resting capacity visual, then the replay overlay (the
+ * keyed style, or the dim colour when an isolate is active), then the built-in hover/selection accent — which
+ * wins on top, and never leaves a hovered edge hidden. `head`/`path`/`parallel*` are the fixed orientation and
+ * curving from the graph-view tier.
+ */
 function edgeStyle(
+	key: string,
 	attrs: TallyEdgeAttributes,
 	state: ItemState,
 	palette: Palette,
 	range: CapacityRange | undefined,
+	overlay: ReplayOverlay | undefined,
 ): Partial<EdgeDisplayData> {
 	const base = edgeBaseVisual(attrs, range, palette)
-	const lit = state.isHovered || state.isHighlighted
+	let color = base.color
+	let size = base.size
+	let zIndex = 0
+	let hidden = false
+	if (overlay !== undefined) {
+		const styled = overlay.edges.get(key)
+		if (styled !== undefined) {
+			color = styled.color ?? color
+			size = styled.size ?? size
+			zIndex = styled.zIndex ?? zIndex
+			hidden = styled.hidden ?? false
+		} else if (overlay.dim !== undefined) {
+			color = overlay.dim.edge
+		}
+	}
+	if (state.isHovered || state.isHighlighted) {
+		color = palette.highlight
+		size = base.size + EDGE_SIZE_BOOST
+		zIndex = 1
+		hidden = false // a hovered edge is always shown, even if the overlay hid it.
+	}
 	return {
-		// `head: 'arrow'` draws the arrowhead at the target (the foil) — the fixed stock → foil encoding.
 		head: 'arrow',
-		// Parallel tallies between the same pair curve apart; sigma computes each one's offset from edge state.
 		path: 'straight',
 		parallelPath: 'curved',
 		parallelSpread: 0.35,
-		color: lit ? palette.highlight : base.color,
-		size: lit ? base.size + EDGE_SIZE_BOOST : base.size,
-		zIndex: lit ? 1 : 0,
+		color,
+		size,
+		zIndex,
+		visibility: hidden ? 'hidden' : 'visible',
 	}
 }
 
-/** Full node style: recessive neutral fill + label, with a hover/search highlight override. */
-function nodeStyle(attrs: TallyNodeAttributes, state: ItemState, palette: Palette): Partial<NodeDisplayData> {
+/**
+ * Full node style, composing the same three layers as {@link edgeStyle}: the recessive neutral fill, then the
+ * replay overlay (keyed style or the isolate dim colour), then the hover/search highlight on top.
+ */
+function nodeStyle(
+	key: string,
+	attrs: TallyNodeAttributes,
+	state: ItemState,
+	palette: Palette,
+	overlay: ReplayOverlay | undefined,
+): Partial<NodeDisplayData> {
 	const lit = state.isHovered || state.isHighlighted
+	let color = palette.node
+	let size = NODE_SIZE
+	if (overlay !== undefined) {
+		const styled = overlay.nodes.get(key)
+		if (styled !== undefined) {
+			color = styled.color ?? color
+			size = styled.size ?? size
+		} else if (overlay.dim !== undefined) {
+			color = overlay.dim.node
+		}
+	}
+	if (lit) {
+		color = palette.highlight
+		size = NODE_SIZE_LIT
+	}
 	return {
 		label: attrs.label,
 		labelColor: palette.nodeLabel,
-		color: lit ? palette.highlight : palette.node,
-		size: lit ? NODE_SIZE_LIT : NODE_SIZE,
+		color,
+		size,
 		highlighted: lit,
 		labelVisibility: lit ? 'visible' : 'auto',
 	}
@@ -222,6 +282,7 @@ function stubView(message: HTMLElement): GraphView {
 	return {
 		webglAvailable: false,
 		setPalette(): void {},
+		setReplayOverlay(): void {},
 		search(): boolean {
 			return false
 		},
@@ -247,6 +308,7 @@ export function createGraphView(container: HTMLElement, graph: TallyGraph, initi
 	}
 
 	let palette = initialPalette
+	let overlay: ReplayOverlay | undefined
 	const range = finiteCapacityRange(graph)
 	container.style.background = palette.surface
 
@@ -258,8 +320,8 @@ export function createGraphView(container: HTMLElement, graph: TallyGraph, initi
 			enableEdgeEvents: true,
 			allowInvalidContainer: true,
 		},
-		nodeReducer: (_key, _data, attrs, state) => nodeStyle(attrs, state, palette),
-		edgeReducer: (_key, _data, attrs, state) => edgeStyle(attrs, state, palette, range),
+		nodeReducer: (key, _data, attrs, state) => nodeStyle(key, attrs, state, palette, overlay),
+		edgeReducer: (key, _data, attrs, state) => edgeStyle(key, attrs, state, palette, range, overlay),
 	})
 
 	sigma.on('enterNode', ({ node, event }) => {
@@ -270,12 +332,17 @@ export function createGraphView(container: HTMLElement, graph: TallyGraph, initi
 	})
 	sigma.on('enterEdge', ({ edge, event }) => {
 		const attrs = graph.getEdgeAttributes(edge)
-		const text = [
+		const lines = [
 			`tally ${attrs.tallyIndex}`,
 			`stock ${attrs.stock} → foil ${attrs.foil}`,
 			`cap →foil ${formatCapacity(attrs.capStockToFoil)}  cap →stock ${formatCapacity(attrs.capFoilToStock)}`,
-		].join('\n')
-		showTooltip(tooltip, text, event.x, event.y)
+		]
+		// A replay overlay can attach a note (e.g. the prune reason) to this edge; show it under the capacities.
+		const note = overlay?.edges.get(edge)?.note
+		if (note !== undefined) {
+			lines.push(note)
+		}
+		showTooltip(tooltip, lines.join('\n'), event.x, event.y)
 	})
 	sigma.on('leaveEdge', () => {
 		tooltip.style.display = 'none'
@@ -302,6 +369,10 @@ export function createGraphView(container: HTMLElement, graph: TallyGraph, initi
 		setPalette(next: Palette): void {
 			palette = next
 			container.style.background = next.surface
+			sigma.refresh()
+		},
+		setReplayOverlay(next: ReplayOverlay | undefined): void {
+			overlay = next
 			sigma.refresh()
 		},
 		search(idText: string): boolean {

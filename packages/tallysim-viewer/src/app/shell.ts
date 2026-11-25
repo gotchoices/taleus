@@ -13,11 +13,13 @@
  * do not leak a sigma instance or a running worker.
  */
 
-import type { Network } from 'tallysim'
-import { indexTrace } from '../core/trace-index.js'
+import { compileConditions, type Network } from 'tallysim'
+import { indexTrace, type TraceIndex } from '../core/trace-index.js'
+import { createDeanonymiser, type Deanonymiser } from '../core/deanonymise.js'
 import { buildGraph } from '../graph/model.js'
 import { createGraphView, type GraphView } from '../graph/render.js'
 import { runLayout, type LayoutController } from '../graph/layout.js'
+import { mountDisabledReplayControls, mountReplayControls, type ReplayControls } from '../replay/controls.js'
 import { sampleNetwork } from './sample-network.js'
 import { SHELL_CSS } from './styles.js'
 import { initialTheme, paletteFor, storeTheme, type Palette, type ThemeName } from './theme.js'
@@ -30,11 +32,19 @@ interface NetworkSummary {
 	queryCount: number
 }
 
-/** The shell's live references — the current view and layout, torn down and replaced on each load. */
+/** A loaded trace's replay inputs, assembled once on load and handed to the replay controls. */
+interface TraceContext {
+	index: TraceIndex
+	deanon: Deanonymiser
+	conditions: ReturnType<typeof compileConditions>
+}
+
+/** The shell's live references — the current view, layout and replay, torn down and replaced on each load. */
 interface ShellState {
 	theme: ThemeName
 	view: GraphView | undefined
 	layout: LayoutController | undefined
+	replay: ReplayControls | undefined
 }
 
 /** Create a styled element with an id, in one call. */
@@ -111,7 +121,7 @@ function renderSummary(host: HTMLElement, summary: NetworkSummary): void {
 export function mountShell(root: HTMLElement): void {
 	injectStyles()
 
-	const state: ShellState = { theme: initialTheme(), view: undefined, layout: undefined }
+	const state: ShellState = { theme: initialTheme(), view: undefined, layout: undefined, replay: undefined }
 
 	const app = el('div', 'tsv-app')
 	const topbar = el('div', 'tsv-topbar')
@@ -150,11 +160,17 @@ export function mountShell(root: HTMLElement): void {
 	const searchMiss = el('div', 'tsv-search-miss')
 	searchHost.append(searchInput, searchMiss)
 
+	// ── Replay section: the payment-search transport (disabled until a trace with sessions is loaded). ──
+	const replayHost = panelSection(panel, 'Replay')
+	state.replay = mountDisabledReplayControls(replayHost)
+
 	function setStatus(message: string): void {
 		status.textContent = message
 	}
 
 	function teardown(): void {
+		state.replay?.destroy()
+		state.replay = undefined
 		state.layout?.stop()
 		state.layout = undefined
 		state.view?.destroy()
@@ -162,13 +178,29 @@ export function mountShell(root: HTMLElement): void {
 		graph.textContent = ''
 	}
 
-	function loadNetwork(network: Network, summary: NetworkSummary): void {
+	/**
+	 * Build the graph + renderer, then mount the replay panel: the live transport when a trace with sessions is
+	 * loaded (and WebGL is available to paint the overlay), otherwise the disabled panel (the sample path).
+	 */
+	function loadNetwork(network: Network, summary: NetworkSummary, trace?: TraceContext): void {
 		teardown()
 		const built = buildGraph(network)
 		const view = createGraphView(graph, built, paletteFor(state.theme))
 		state.view = view
 		if (view.webglAvailable) {
 			state.layout = runLayout(built, { seed: network.meta.seed })
+		}
+		if (trace !== undefined && view.webglAvailable) {
+			state.replay = mountReplayControls({
+				host: replayHost,
+				view,
+				index: trace.index,
+				deanon: trace.deanon,
+				conditions: trace.conditions,
+				palette: paletteFor(state.theme),
+			})
+		} else {
+			state.replay = mountDisabledReplayControls(replayHost)
 		}
 		renderSummary(summaryHost, summary)
 		searchInput.value = ''
@@ -179,12 +211,22 @@ export function mountShell(root: HTMLElement): void {
 		try {
 			const index = indexTrace(text.split(/\r?\n/))
 			setStatus('')
-			loadNetwork(index.network, {
-				generator: index.network.meta.generator,
-				entityCount: index.network.entityCount,
-				tallyCount: index.network.tallies.length,
-				queryCount: index.sessions().length,
-			})
+			// Assemble the replay inputs once: the de-anonymiser over the whole network, and the sleeping/late
+			// sets compiled from the scenario's conditions — matching the CLI's seed (no runSeed offset), so the
+			// viewer reproduces the exact sets the trace was recorded under.
+			const deanon = createDeanonymiser(index.network)
+			const scenario = index.header.scenario
+			const conditions = compileConditions(index.network, scenario.conditions ?? {}, scenario.conditionsSeed ?? 0)
+			loadNetwork(
+				index.network,
+				{
+					generator: index.network.meta.generator,
+					entityCount: index.network.entityCount,
+					tallyCount: index.network.tallies.length,
+					queryCount: index.sessions().length,
+				},
+				{ index, deanon, conditions },
+			)
 		} catch (err) {
 			// parseTrace throws a version/format error with a clear message — surface it, don't swallow it.
 			setStatus(errorMessage(err))
@@ -194,6 +236,7 @@ export function mountShell(root: HTMLElement): void {
 	function loadSample(): void {
 		const network = sampleNetwork()
 		setStatus('')
+		// The sample has no trace sessions, so the replay panel mounts disabled (no `trace` argument).
 		loadNetwork(network, {
 			generator: network.meta.generator,
 			entityCount: network.entityCount,
@@ -219,6 +262,7 @@ export function mountShell(root: HTMLElement): void {
 		const palette = paletteFor(next)
 		applyChrome(palette)
 		state.view?.setPalette(palette)
+		state.replay?.setPalette(palette)
 		themeButton.textContent = next === 'dark' ? 'Light theme' : 'Dark theme'
 	}
 
