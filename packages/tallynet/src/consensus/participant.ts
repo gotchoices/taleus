@@ -373,6 +373,26 @@ export class TrxParticipant<TTerms, TPayload> {
 		}
 	}
 
+	/**
+	 * Drain the durable side pool against the store once the promise phase is complete: load it, promote or
+	 * drop each pooled commit ({@link drainPendingCommits}), and persist the emptied pool and the updated
+	 * record. A no-op while the promise phase is incomplete or the pool is empty. Called after we cast our
+	 * own promise — the only point our action can complete the phase; a peer's completing promise is drained
+	 * inline in {@link validateAndMerge}.
+	 */
+	private async drainPendingFromStore(record: TrxRecord<TTerms, TPayload>): Promise<void> {
+		if (!this.promisePhaseComplete(record)) {
+			return
+		}
+		const pending = await this.store.getPendingCommits(record.transactionCode)
+		if (pending.length === 0) {
+			return
+		}
+		await this.drainPendingCommits(record, pending)
+		await this.store.saveRecord(record)
+		await this.store.savePendingCommits(record.transactionCode, pending)
+	}
+
 	/** Trace + log a dropped signature. The record is otherwise unharmed; the merge continues. */
 	private rejectSignature(merged: TrxRecord<TTerms, TPayload>, reason: SignatureRejectReason): void {
 		this.traceSink({ ...this.traceBase(merged), type: 'signature-rejected', transactionCode: merged.transactionCode, reason })
@@ -474,6 +494,12 @@ export class TrxParticipant<TTerms, TPayload> {
 		switch (state) {
 			case 'ourPromiseNeeded': {
 				await this.castPromise(record)
+				// Our own promise may have just completed the promise phase. Commits pooled earlier (held
+				// because they could not be verified while the phase was still open) can now be verified —
+				// drain them before the loop re-classifies, so a commit that arrived before we promised is
+				// counted in THIS update rather than only on some later delivery. (The incoming-promise case —
+				// a peer's promise completing the phase — is drained inline in validateAndMerge.)
+				await this.drainPendingFromStore(record)
 				return true
 			}
 			case 'ourCommitNeeded': {
@@ -795,7 +821,7 @@ const SignatureTypesLocal = { promise: 'P', noPromise: 'NP' } as const satisfies
  * overflow is dropped as `pool-full`. Small by design: a genuine referee contributes at most two faces
  * (`C` and `NC`), so 4 leaves slack for out-of-order re-delivery while denying a peer unbounded growth.
  */
-const MAX_PENDING_COMMITS_PER_REFEREE = 4
+export const MAX_PENDING_COMMITS_PER_REFEREE = 4
 
 /** A shallow copy with copied signature arrays — enough to freeze a push snapshot (the core is immutable). */
 function snapshotRecord<TTerms, TPayload>(record: TrxRecord<TTerms, TPayload>): TrxRecord<TTerms, TPayload> {

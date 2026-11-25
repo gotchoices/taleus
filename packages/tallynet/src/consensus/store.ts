@@ -45,8 +45,8 @@ export interface TrxStore<TTerms, TPayload> {
 	 *
 	 * This is the fix for the forged-commit-shadows-vote defect: an unverified commit must not occupy a
 	 * referee's slot in the authoritative set, where it could block that referee's genuine vote. See
-	 * `participant.ts` (`mergeSignature` + the drain in `validateAndMerge`) and docs/design.md
-	 * § Protocol design (Consensus).
+	 * `participant.ts` (`mergeCommit`, and the drain in `validateAndMerge` for a peer's completing promise /
+	 * in `drainPendingFromStore` for our own) and docs/design.md § Protocol design (Consensus).
 	 */
 	getPendingCommits(transactionCode: string): Promise<Signature[]>
 	/** Persist the pending-commit side pool for `transactionCode` (replacing any prior pool). */

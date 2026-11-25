@@ -7,7 +7,7 @@ import type { TraceEvent } from '../trace.js'
 import { MemberTypes, type DependentMember, type MemberType } from '../discovery/types.js'
 import { signRecord } from './signature.js'
 import { MemoryTrxStore, type TrxStore } from './store.js'
-import { TrxParticipant, type Logger, type UpdatePeerFunc } from './participant.js'
+import { MAX_PENDING_COMMITS_PER_REFEREE, TrxParticipant, type Logger, type UpdatePeerFunc } from './participant.js'
 import type { ResourceContext, TrxParticipantResource } from './resource.js'
 import type { Signature, SignatureType, TrxLink, TrxRecord } from './types.js'
 
@@ -99,6 +99,13 @@ function sign(party: Party, kind: SignatureType, record: TrxRecord<TTerms, TPayl
 function corrupt(signature: Signature): Signature {
 	const bytes = base64urlToBytes(signature.value)
 	bytes[0] ^= 0x01
+	return { ...signature, value: bytesToBase64url(bytes) }
+}
+
+/** Flip the low bit of value byte `index` — distinct `index`es yield distinct garbage values (for the pool cap). */
+function corruptAt(signature: Signature, index: number): Signature {
+	const bytes = base64urlToBytes(signature.value)
+	bytes[index % bytes.length] ^= 0x01
 	return { ...signature, value: bytesToBase64url(bytes) }
 }
 
@@ -607,11 +614,13 @@ describe('TrxParticipant — commit phase and settlement', () => {
 		const r2Commit = await sign(r2, 'C', completePromises) // signed over the full promise set
 
 		const resource = makeResource()
-		const { participant, events } = harness({ self: r1, resource: resource.resource })
+		const { participant, store, events } = harness({ self: r1, resource: resource.resource })
 
-		// Delivery 1: r2's commit arrives before bob has promised — retained by union, NOT rejected, not counted.
+		// Delivery 1: r2's commit arrives before bob has promised — it cannot be verified yet, so it waits in
+		// the side pool (NOT in the counted `commits` set, NOT rejected), where it cannot shadow a genuine vote.
 		const afterFirst = await participant.update({ ...base, promises: [aliceP], commits: [r2Commit] })
-		expect(afterFirst.commits).toHaveLength(1)
+		expect(afterFirst.commits).toHaveLength(0) // pooled, not counted
+		expect(await store.getPendingCommits(base.transactionCode)).toHaveLength(1) // held in the side pool
 		expect(rejectReasons(events)).toEqual([])
 		expect(resource.releaseSuccesses).toEqual([]) // promise phase incomplete → r1 does not even vote
 
@@ -726,6 +735,118 @@ describe('TrxParticipant — equivocation (a referee signs both faces)', () => {
 		await participant.update({ ...base, promises: [aliceP, bobP], commits: [refVoid] })
 		expect(rejectReasons(events)).toContain('equivocation')
 		expect(resource.releaseSuccesses).toEqual([true]) // still exactly one release; the commit outcome stands
+	})
+})
+
+describe('TrxParticipant — commit-phase side pool (forged-commit-shadows-vote)', () => {
+	// A 2-participant, 1-referee lift. A relay observes the merge so the pool→drain transition is visible
+	// without the observer itself promising or voting. With a SOLE referee, a silenced vote would leave the
+	// route at `pending` (no majority) — so a `commit` outcome proves the genuine vote survived.
+	function lift(alice: Party, bob: Party, ref: Party): TrxRecord<TTerms, TPayload> {
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.referee])]
+		return makeRecord(members, { n1: link(alice, bob) })
+	}
+
+	it('a garbage commit pooled before the promise phase completes does not shadow the genuine vote', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const base = lift(alice, bob, ref)
+		const aliceP = await sign(alice, 'P', base)
+		const bobP = await sign(bob, 'P', base)
+		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [aliceP, bobP] }
+		const genuineC = await sign(ref, 'C', complete)
+		const garbage = corrupt(genuineC) // same signer + face, non-verifying value
+
+		const { participant, store, events } = harness({ self: makeParty() }) // a relay observes the merge
+
+		// Pre-promise: the garbage commit cannot be verified yet → it waits in the side pool, never in `commits`.
+		const afterGarbage = await participant.update({ ...base, promises: [], commits: [garbage] })
+		expect(afterGarbage.commits).toEqual([])
+		expect(await store.getPendingCommits(base.transactionCode)).toHaveLength(1)
+		expect(rejectReasons(events)).toEqual([]) // pooled, not yet judged
+
+		// Promises complete and the genuine vote arrives: the garbage drains (forged), the genuine C counts.
+		const settled = await participant.update({ ...base, promises: [aliceP, bobP], commits: [genuineC] })
+		expect(settled.commits).toEqual([genuineC]) // the genuine vote stands
+		expect(await participant.outcome(base.transactionCode)).toBe('commit') // sole referee → strict majority
+		expect(rejectReasons(events)).toContain('forged') // the drained garbage, dropped on verification
+		expect(rejectReasons(events)).not.toContain('changed') // never collided with the genuine vote
+		expect(rejectReasons(events)).not.toContain('equivocation')
+		expect(await store.getPendingCommits(base.transactionCode)).toEqual([]) // pool drained empty
+	})
+
+	it('a garbage opposite-face (NC) commit pooled pre-promise does not collide with the genuine C', async () => {
+		// Under the old (dedupe-before-verify) code a garbage NC occupied the referee's slot first, so the
+		// genuine C collided as `equivocation` and was silenced. Pooled-until-verified, the garbage NC instead
+		// drains as `forged` and the genuine C stands.
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const base = lift(alice, bob, ref)
+		const aliceP = await sign(alice, 'P', base)
+		const bobP = await sign(bob, 'P', base)
+		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [aliceP, bobP] }
+		const genuineC = await sign(ref, 'C', complete)
+		const garbageNC = corrupt(await sign(ref, 'NC', complete))
+
+		const { participant, store, events } = harness({ self: makeParty() })
+		await participant.update({ ...base, promises: [], commits: [garbageNC] })
+		expect(await store.getPendingCommits(base.transactionCode)).toHaveLength(1)
+
+		const settled = await participant.update({ ...base, promises: [aliceP, bobP], commits: [genuineC] })
+		expect(settled.commits).toEqual([genuineC])
+		expect(await participant.outcome(base.transactionCode)).toBe('commit')
+		expect(rejectReasons(events)).toContain('forged')
+		expect(rejectReasons(events)).not.toContain('equivocation')
+	})
+
+	it('caps the pool per referee: overflow drops as pool-full, and a later genuine vote still counts', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const base = lift(alice, bob, ref)
+		const aliceP = await sign(alice, 'P', base)
+		const bobP = await sign(bob, 'P', base)
+		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [aliceP, bobP] }
+		const genuineC = await sign(ref, 'C', complete)
+		// MAX_PENDING_COMMITS_PER_REFEREE + 1 DISTINCT garbage commits for the one referee (distinct values, so
+		// none dedupes): the pool fills at the cap and the final one overflows.
+		const garbage = Array.from({ length: MAX_PENDING_COMMITS_PER_REFEREE + 1 }, (_, i) => corruptAt(genuineC, i))
+
+		const { participant, store, events } = harness({ self: makeParty() })
+		await participant.update({ ...base, promises: [], commits: garbage })
+		expect(await store.getPendingCommits(base.transactionCode)).toHaveLength(MAX_PENDING_COMMITS_PER_REFEREE)
+		expect(rejectReasons(events)).toContain('pool-full') // the overflow was refused, never pooled
+
+		const settled = await participant.update({ ...base, promises: [aliceP, bobP], commits: [genuineC] })
+		expect(settled.commits).toEqual([genuineC]) // the cap never locked out the real vote
+		expect(await participant.outcome(base.transactionCode)).toBe('commit')
+	})
+
+	it('a genuine equivocation pooled pre-promise resolves to the earliest face on drain', async () => {
+		// Both faces verify, both arrive before the promise phase completes, both are pooled. On drain the
+		// insertion-order first face is promoted and the second is refused as `equivocation`.
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const base = lift(alice, bob, ref)
+		const aliceP = await sign(alice, 'P', base)
+		const bobP = await sign(bob, 'P', base)
+		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [aliceP, bobP] }
+		const refCommit = await sign(ref, 'C', complete)
+		const refVoid = await sign(ref, 'NC', complete)
+
+		const { participant, store, events } = harness({ self: makeParty() })
+		// Both genuine faces pooled pre-promise, commit first.
+		await participant.update({ ...base, promises: [], commits: [refCommit, refVoid] })
+		expect(await store.getPendingCommits(base.transactionCode)).toHaveLength(2)
+
+		// Promises complete (the commit is NOT re-carried): the pool drains in insertion order.
+		const settled = await participant.update({ ...base, promises: [aliceP, bobP], commits: [] })
+		expect(settled.commits).toEqual([refCommit]) // the earliest face stands
+		expect(rejectReasons(events)).toContain('equivocation')
+		expect(await participant.outcome(base.transactionCode)).toBe('commit')
 	})
 })
 

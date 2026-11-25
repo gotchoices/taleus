@@ -36,6 +36,7 @@ import type { Signer, Verifier } from '../crypto.js'
 import { generate } from '../session-code.js'
 import type { TraceEvent } from '../trace.js'
 import { signRecord } from '../consensus/signature.js'
+import { MAX_PENDING_COMMITS_PER_REFEREE } from '../consensus/participant.js'
 import type { ResourceContext, TrxParticipantResource } from '../consensus/resource.js'
 import type { Signature, TrxRecord } from '../consensus/types.js'
 import { MemberTypes, type MemberType } from '../discovery/types.js'
@@ -93,6 +94,13 @@ const verifier: Verifier = {
 function corrupt(signature: Signature): Signature {
 	const bytes = base64urlToBytes(signature.value)
 	bytes[0] ^= 0x01
+	return { ...signature, value: bytesToBase64url(bytes) }
+}
+
+/** Flip the low bit of value byte `index` — distinct `index`es yield distinct garbage values (for the pool cap). */
+function corruptAt(signature: Signature, index: number): Signature {
+	const bytes = base64urlToBytes(signature.value)
+	bytes[index % bytes.length] ^= 0x01
 	return { ...signature, value: bytesToBase64url(bytes) }
 }
 
@@ -532,6 +540,126 @@ describe('consensus end to end — adversarial signatures cannot flip a route', 
 		expect(await net.consensusNode('X').outcome(tx)).toBe('commit') // 2 of 3 genuine referees
 		expect(doubles.get('X')!.releaseSuccesses).toEqual([]) // X is a relay — it classifies but never acts
 		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+})
+
+describe('consensus end to end — a forged commit cannot shadow a genuine vote (pre-promise pool)', () => {
+	// An observer X (NOT a member, so it only merges + classifies, never acts) receives a commit-phase
+	// signature BEFORE the promise phase completes — the window the forged-commit-shadows-vote defect lived
+	// in. The fix holds every unverifiable commit in a durable side pool until the promise set is complete,
+	// so a forged (or honestly out-of-order) commit can neither block nor silence the genuine one. R is the
+	// SOLE referee: a silenced vote would leave the route at `pending` (no majority), so `commit` proves it
+	// survived. (Keep the post-commit equivocation test above too — this block exercises the pre-promise path.)
+	const seed = 'pool'
+	const graph = makeGraph(['A', 'B', 'R', 'X'], [['ab', 'A', 'B']])
+	const members: LiftMemberSpec[] = [
+		{ name: 'A', roles: [PART] },
+		{ name: 'B', roles: [PART] },
+		{ name: 'R', roles: [REF] },
+	]
+
+	/** The record with both participant promises merged — the complete set a commit binds and verifies against. */
+	async function completeOf(record: TrxRecord<Terms, Payload>): Promise<TrxRecord<Terms, Payload>> {
+		const promises = [await signRecord(makeSigner(seed, 'A'), 'P', record), await signRecord(makeSigner(seed, 'B'), 'P', record)]
+		return { ...record, promises }
+	}
+
+	it('a garbage C injected before the promises does not silence the genuine vote (headline regression)', async () => {
+		const { net, traces, doubles } = makeNet({ graph, seed })
+		const { record, transactionCode: tx } = net.buildLift({ members, route: ['A', 'B'], payload: PAYLOAD })
+		const complete = await completeOf(record)
+		const genuineC = await signRecord(makeSigner(seed, 'R'), 'C', complete)
+		const garbage = corrupt(genuineC)
+
+		// Delivery 1: the garbage commit arrives with no promises → X pools it (cannot verify it yet).
+		await net.consensusNode('X').update({ ...record, promises: [], commits: [garbage] })
+		await net.clock.runUntilIdle()
+		expect(await net.consensusNode('X').outcome(tx)).toBe('pending') // nothing counted yet
+
+		// Delivery 2: the promises complete and the genuine vote arrives → the garbage drains (forged), the
+		// genuine C verifies and counts → commit. (Under the old code this read `pending`, reject `changed`.)
+		await net.consensusNode('X').update({ ...complete, commits: [genuineC] })
+		await net.clock.runUntilIdle()
+
+		expect(rejectReasons(traces)).toContain('forged')
+		expect(rejectReasons(traces)).not.toContain('changed')
+		expect(rejectReasons(traces)).not.toContain('equivocation')
+		expect(await net.consensusNode('X').outcome(tx)).toBe('commit') // the genuine vote stood
+		expect(doubles.get('X')!.releaseSuccesses).toEqual([]) // X is a relay — it classifies but never acts
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('a garbage opposite-face NC injected before the promises does not collide with the genuine C', async () => {
+		const { net, traces } = makeNet({ graph, seed })
+		const { record, transactionCode: tx } = net.buildLift({ members, route: ['A', 'B'], payload: PAYLOAD })
+		const complete = await completeOf(record)
+		const genuineC = await signRecord(makeSigner(seed, 'R'), 'C', complete)
+		const garbageNC = corrupt(await signRecord(makeSigner(seed, 'R'), 'NC', complete))
+
+		await net.consensusNode('X').update({ ...record, promises: [], commits: [garbageNC] })
+		await net.consensusNode('X').update({ ...complete, commits: [genuineC] })
+		await net.clock.runUntilIdle()
+
+		expect(rejectReasons(traces)).toContain('forged')
+		expect(rejectReasons(traces)).not.toContain('equivocation')
+		expect(await net.consensusNode('X').outcome(tx)).toBe('commit')
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('an honest out-of-order early commit is pooled, then counts once the promises complete', async () => {
+		const { net, traces } = makeNet({ graph, seed })
+		const { record, transactionCode: tx } = net.buildLift({ members, route: ['A', 'B'], payload: PAYLOAD })
+		const complete = await completeOf(record)
+		const genuineC = await signRecord(makeSigner(seed, 'R'), 'C', complete)
+		const aliceP = complete.promises[0] // A's promise only — the set is still incomplete without B's
+
+		// Delivery 1: R's GENUINE commit, but only one promise present → pooled (cannot verify it yet).
+		await net.consensusNode('X').update({ ...record, promises: [aliceP], commits: [genuineC] })
+		expect(await net.consensusNode('X').outcome(tx)).toBe('pending')
+
+		// Delivery 2: the completing promises only — NOT re-carrying the commit → the pooled commit drains,
+		// verifies, and counts.
+		await net.consensusNode('X').update({ ...complete, commits: [] })
+		await net.clock.runUntilIdle()
+
+		expect(rejectReasons(traces)).toEqual([]) // nothing forged; the honest commit simply waited its turn
+		expect(await net.consensusNode('X').outcome(tx)).toBe('commit')
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('a genuine equivocation pooled before the promises resolves to the earliest face on drain', async () => {
+		const { net, traces } = makeNet({ graph, seed })
+		const { record, transactionCode: tx } = net.buildLift({ members, route: ['A', 'B'], payload: PAYLOAD })
+		const complete = await completeOf(record)
+		const refCommit = await signRecord(makeSigner(seed, 'R'), 'C', complete)
+		const refVoid = await signRecord(makeSigner(seed, 'R'), 'NC', complete)
+
+		// Both verifying faces pooled pre-promise, commit first; the promises then complete (commit not re-carried).
+		await net.consensusNode('X').update({ ...record, promises: [], commits: [refCommit, refVoid] })
+		await net.consensusNode('X').update({ ...complete, commits: [] })
+		await net.clock.runUntilIdle()
+
+		expect(rejectReasons(traces)).toContain('equivocation') // the later (second) face is refused on drain
+		expect(await net.consensusNode('X').outcome(tx)).toBe('commit') // the earliest face (C) stands
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('caps the pool per referee: pre-promise overflow drops as pool-full, the genuine vote still counts', async () => {
+		const { net, traces } = makeNet({ graph, seed })
+		const { record, transactionCode: tx } = net.buildLift({ members, route: ['A', 'B'], payload: PAYLOAD })
+		const complete = await completeOf(record)
+		const genuineC = await signRecord(makeSigner(seed, 'R'), 'C', complete)
+		// One past the cap, all DISTINCT (distinct byte flips) for the one referee → the final one overflows.
+		const garbage = Array.from({ length: MAX_PENDING_COMMITS_PER_REFEREE + 1 }, (_, i) => corruptAt(genuineC, i))
+
+		await net.consensusNode('X').update({ ...record, promises: [], commits: garbage })
+		await net.consensusNode('X').update({ ...complete, commits: [genuineC] })
+		await net.clock.runUntilIdle()
+
+		expect(rejectReasons(traces)).toContain('pool-full') // the overflow was refused, never pooled
+		expect(await net.consensusNode('X').outcome(tx)).toBe('commit') // the cap did not lock out the real vote
 		expect(net.deliveryErrors).toEqual([])
 	})
 })

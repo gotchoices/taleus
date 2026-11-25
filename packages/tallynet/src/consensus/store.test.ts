@@ -1,6 +1,6 @@
 import { canonicalEncode, digest, type DigestValue } from '../digest.js'
 import { MemoryTrxStore } from './store.js'
-import type { TrxRecord } from './types.js'
+import type { Signature, TrxRecord } from './types.js'
 
 type TTerms = string
 type TPayload = unknown
@@ -87,5 +87,56 @@ describe('MemoryTrxStore', () => {
 		expect(await store.isReleased('tx-1')).toBe(true)
 		// A different transaction is unaffected.
 		expect(await store.isReleased('tx-2')).toBe(false)
+	})
+})
+
+describe('MemoryTrxStore — pending commits (the forged-commit side pool)', () => {
+	/** A pooled commit-phase signature (the shape the participant holds until it can verify it). */
+	function pooledCommit(address: string, value: string): Signature {
+		return { type: 'C', address, value }
+	}
+
+	it('returns [] for a transaction with no pooled commits', async () => {
+		const store = new MemoryTrxStore<TTerms, TPayload>()
+		expect(await store.getPendingCommits('tx-unseen')).toEqual([])
+	})
+
+	it('round-trips a saved pool', async () => {
+		const store = new MemoryTrxStore<TTerms, TPayload>()
+		const pool = [pooledCommit('r1', 'sigR1'), pooledCommit('r2', 'sigR2')]
+		await store.savePendingCommits('tx-1', pool)
+		expect(await store.getPendingCommits('tx-1')).toEqual(pool)
+	})
+
+	it('keys the pool per transaction (a different transaction is independent)', async () => {
+		const store = new MemoryTrxStore<TTerms, TPayload>()
+		await store.savePendingCommits('tx-1', [pooledCommit('r1', 'sigR1')])
+		expect(await store.getPendingCommits('tx-2')).toEqual([])
+		// And replacing one tx's pool leaves the other untouched.
+		await store.savePendingCommits('tx-2', [pooledCommit('r2', 'sigR2')])
+		expect(await store.getPendingCommits('tx-1')).toEqual([pooledCommit('r1', 'sigR1')])
+	})
+
+	it('returns a copy: mutating the returned array does not change the stored pool', async () => {
+		const store = new MemoryTrxStore<TTerms, TPayload>()
+		await store.savePendingCommits('tx-1', [pooledCommit('r1', 'sigR1')])
+		const got = await store.getPendingCommits('tx-1')
+		got.push(pooledCommit('r2', 'sigR2')) // the participant splices/pushes its working pool freely
+		got.splice(0, got.length)
+		expect(await store.getPendingCommits('tx-1')).toEqual([pooledCommit('r1', 'sigR1')]) // stored pool intact
+	})
+
+	it('stores a copy: mutating the saved array afterward does not change the stored pool', async () => {
+		const store = new MemoryTrxStore<TTerms, TPayload>()
+		const pool = [pooledCommit('r1', 'sigR1')]
+		await store.savePendingCommits('tx-1', pool)
+		pool.push(pooledCommit('r2', 'sigR2')) // mutate the caller's array after saving
+		expect(await store.getPendingCommits('tx-1')).toEqual([pooledCommit('r1', 'sigR1')])
+	})
+
+	it('a pooled commit (with its opaque attachment) is JSON- and DAG-CBOR-round-trippable', () => {
+		const pooled: Signature = { type: 'C', address: 'bob', value: 'sigBobC', attachment: { edgeSignatures: { lift1: 'edgeSigBob' } } }
+		expect(JSON.parse(JSON.stringify(pooled))).toEqual(pooled)
+		expect(() => canonicalEncode([pooled] as unknown as DigestValue)).not.toThrow()
 	})
 })
