@@ -23,8 +23,8 @@ confused with a failure in the other:
 
 | Tier | What it does | Status |
 |---|---|---|
-| **Network model + generators** | Build random tally networks as plain data (this tier). | built |
-| **Oracle** | See the whole graph; answer *does a route exist / how much is payable / can debt clear* by direct search. The **ground truth**. | later (`tallysim-oracle`) |
+| **Network model + generators** | Build random tally networks as plain data. | built |
+| **Oracle** | See the whole graph; answer *does a route exist / how much is payable / can debt clear* by direct search. The **ground truth**. | built |
 | **Runner / experiments** | Sweep a parameter over many generated networks, run the oracle per query, record metrics, check in findings. | later (`tallysim-runner`) |
 | **Discovery / consensus** | Replay the real `tallynet` protocol on the same graphs and compare "found vs. oracle". | later (`tallysim-discovery`, `tallysim-consensus`) |
 
@@ -179,14 +179,108 @@ All iterate deterministically (entity index, then tally-array order).
 
 ## Oracle
 
-*To come — `tallysim-oracle`.* Will compile a `Network` into a directed capacity graph and answer
-route-existence, max-flow and clearing-cycle queries by direct whole-graph search.
+The **oracle** (`src/oracle.ts`) sees the *whole* graph and searches it directly: it is the **ground
+truth** the later discovery tier measures the real `tallynet` routing protocol against ("found vs.
+oracle"). Keeping it independent of the protocol is the point — when a lift fails, the oracle says whether
+the *network* could ever have carried it, separate from whether the *protocol* found it.
+
+### Compiled graph view
+
+The serialisable `Network` is convenient to build and store but slow to search, so the oracle compiles it
+once (`src/graph-view.ts`, `buildGraphView`) into a **directed capacity graph** in CSR (compressed-sparse-
+row) form:
+
+- Each tally becomes **two directed capacity edges** — `stock→foil` with capacity `cap(S→F)` and
+  `foil→stock` with capacity `cap(F→S)` (§ Capacity model). A graph view thus has exactly
+  `2 · tallies.length` directed edges; parallel tallies become parallel directed edges.
+- Stored as three **typed arrays**: `offsets` (`Int32Array`, length `entityCount + 1` — node `u`'s
+  out-edges are the slice `[offsets[u], offsets[u+1])`), `targets` (`Int32Array`), and `capacities`
+  (`Float64Array`, so an unlimited credit limit's `Infinity` is representable directly).
+- **Deterministic build**: edges are emitted in tally order, and within a source's slice the neighbours
+  appear in incident-tally order. Same network ⇒ byte-identical arrays; no result depends on unordered-key
+  iteration.
+
+An `Oracle` wraps one graph view and **reuses scratch buffers** across queries — a generation-stamped
+`visited` array is cleared in O(1) by bumping a counter rather than re-zeroing O(n) per query — so a sweep
+of ~1,000 route-existence queries over a 10,000-entity graph runs in **seconds, not minutes** (the parent
+plan's performance target; guarded by a smoke test).
+
+### Queries
+
+Each algorithm is a small, separately-tested method:
+
+- **Route existence + shortest length** (`routeExistence(from, to, amount, maxDepth)`) — **bounded
+  breadth-first search (BFS)** from `from` over only the directed edges with `capacity ≥ amount`, stopping
+  at `maxDepth`. Returns `{ exists, shortestLength }`, where `shortestLength` is the BFS level at which `to`
+  is first reached (BFS gives the shortest hop count for free). `maxDepth` **counts hops**: a 1-hop path is
+  length 1, and a `to` reachable only at `maxDepth + 1` reports `exists: false`.
+- **Self-payment / circular clearing** (`selfPayment(node, amount, maxDepth)`, and
+  `routeExistence(X, X, …)` which delegates to it) — a payment to oneself is a **cycle**, not a zero-length
+  path. Shortest directed cycle through `node` with every edge `capacity ≥ amount`, bounded by `maxDepth`.
+  Computed as a bounded BFS: the shortest cycle length is `min over u of (dist(node, u) + 1)` across nodes
+  `u` with a qualifying edge back to `node`; BFS processes nodes in increasing distance, so the first edge
+  back is the shortest. The shortest possible cycle is length 2 (`node → v → node`); length 0 is never
+  reported.
+- **Max-flow** (`maxFlow(from, to)`) — maximum value payable, not just whether one unit is, via
+  **Edmonds–Karp** (BFS-augmenting-path Ford–Fulkerson) on the directed capacity graph. Parallel edges
+  add. Returns `Infinity` when an all-unlimited augmenting path exists. This is the **"ignoring depth, how
+  much could flow"** figure, complementary to the depth-aware route-existence query.
+- **Clearing-cycle availability** (`clearingCycles(node, amount, maxDepth, maxCount)`) — how many directed
+  cycles with spare capacity (every edge `capacity ≥ amount`) pass through `node` up to `maxDepth`, via a
+  bounded DFS seeking a return to the start. The count is **capped** at `maxCount` (`capped` reports
+  whether the cap was hit), because cycle counts explode. Also returns the shortest qualifying cycle's
+  length. Cycles are **directed** (the two ways round a loop are two distinct cycles) and counted by
+  distinct edge-sequence, so parallel tallies yield distinct cycles.
+
+### Depth-bounded vs. unbounded
+
+Route existence and the clearing queries are **depth-bounded** (`maxDepth` hops) — a real lift crosses a
+bounded number of tallies. Max-flow is **not depth-bounded**: depth-bounded max-flow is a different, harder
+problem (out of scope). The two are complementary — route existence answers "within `D` hops, can *a* unit
+get through", max-flow answers "ignoring depth, *how much* could flow".
+
+### Amounts
+
+All amounts/capacities compare as the model's integers (stored in `Float64Array`). A non-positive `amount`
+is **rejected** (throws) rather than treated as "any edge qualifies" — asking whether a payment of ≤ 0
+routes is a programming error. With `amount > 0` the `capacity ≥ amount` filter prunes zero-capacity
+directions automatically (an edge with `capacity === amount` qualifies; `capacity === amount − 1` does
+not). `maxFlow(X, X)` has no distinct sink and returns 0 (self-clearing is `clearingCycles`, not an s–t
+max-flow).
+
+### Cost guidance for the runner
+
+- **Max-flow is `O(V·E²)`** — far costlier than BFS. On a 10k-node sweep the runner tier must compute
+  max-flow on a **sampled subset** of query pairs (or only on request), never on every query. Route
+  existence/shortest-path (BFS) is cheap at this scale and can run on every query.
+- **Clearing-cycle enumeration** can explode, hence the `maxCount` cap; the runner picks a cap that bounds
+  per-node work.
+
+### Tripwires
+
+- **Capacities beyond 2^53.** Capacities are `number` (`Float64Array`), so a simulated capacity above 2^53
+  would lose integer precision. Fine for all planned scenarios (simulated units stay small). *If* a
+  scenario ever needs larger capacities, switch the capacity store to `BigInt64Array` and the oracle
+  arithmetic to `bigint`. (Recorded at the `capacities` allocation in `graph-view.ts`.)
+- **Max-flow cost.** As above — `O(V·E²)` means the runner must sample, not run max-flow per query on large
+  graphs. (Recorded on `Oracle.maxFlow` in `oracle.ts`.)
+
+### Verification
+
+The oracle's correctness rests on an **independent exhaustive enumeration** on small graphs
+(`src/oracle-brute-force.test.ts`): every simple path / cycle up to `maxDepth` enumerated directly, and
+max-flow checked against a **min-cut subset enumeration** (a genuinely different computation, via the
+max-flow/min-cut theorem). Existence, shortest length, cycle counts and capacity/depth respect are all
+cross-checked against seeded random small graphs.
 
 ## Metrics
 
-*To come — `tallysim-runner`.* Oracle-level metrics aggregated over a workload: P(route exists),
-path-length distribution, max-flow distribution, largest-connected-component fraction (reusing
-`src/structure.ts`), clearing-cycle availability.
+*To come — `tallysim-runner`.* Oracle-level metrics the runner will aggregate over a workload, all derived
+from the queries above: **P(route exists)** (fraction of payment queries with a route),
+**path-length distribution** (over `shortestLength` of successful queries), **max-flow distribution** (over
+sampled pairs), **largest-connected-component fraction** (reusing `src/structure.ts`), and
+**clearing-cycle availability** (fraction of sampled nodes with ≥ 1 usable cycle, and the cycle-length
+distribution).
 
 ## Runner / experiments
 

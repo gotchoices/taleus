@@ -5,7 +5,7 @@ independent halves: **how connected must a tally network be before a payment can
 through it** (measured by a whole-graph *oracle*), and **does the real `tallynet` routing protocol find the
 routes the oracle proves exist** (measured by replaying the protocol on the same graphs).
 
-**Status:** network-model tier built. The package builds, tests and lints, and ships:
+**Status:** network-model tier **and oracle** built. The package builds, tests and lints, and ships:
 
 - the plain, JSON-serialisable **network data model** (`src/model.ts`) — entities (nodes) joined by tallies
   (edges), with an `Infinity` ↔ `null` serialisation sentinel for unlimited credit limits;
@@ -16,10 +16,14 @@ routes the oracle proves exist** (measured by replaying the protocol on the same
 - four seeded **network generators** (`src/generators/`) — `uniform` (Erdős–Rényi), `scale-free`
   (Barabási–Albert), `clustered` (communities + bridges), `small-world` (Watts–Strogatz);
 - pure **structural utilities** (`src/structure.ts`) — degree histogram / mean degree, and connected
-  components / largest-component fraction via union-find.
+  components / largest-component fraction via union-find;
+- the **compiled directed-capacity graph view** (`src/graph-view.ts`) — a `Network` compiled into CSR typed
+  arrays for fast search;
+- the whole-graph **oracle** (`src/oracle.ts`) — route existence + shortest length (bounded BFS),
+  self-payment / circular-clearing cycles, max-flow (Edmonds–Karp), and capped clearing-cycle availability,
+  anchored by an independent brute-force / min-cut verification harness.
 
-The whole-graph oracle, the experiment runner + CLI, and the protocol-replay tiers come in later tess
-tickets.
+The experiment runner + CLI and the protocol-replay tiers come in later tess tickets.
 
 - [docs/design.md](docs/design.md): the canonical simulator design — tiers, model, capacity model,
   generators, PRNG, and stubs for the later tiers.
