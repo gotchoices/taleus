@@ -13,6 +13,13 @@
  *      then a single `done` carrying the found routes (with their exact paths — see below).
  * Either step may reply `error` instead; the controls surface it rather than hang.
  *
+ * NOTE: the contract is **one run at a time** — these messages carry no run-correlation id, so the controls
+ * must await a run's `done`/`error` before issuing the next `run` (overlapping runs would interleave two
+ * `header`/`event`/`done` streams indistinguishably). The `run` message also re-supplies the full `scenario`
+ * for the header; it must be the **same** scenario the preceding `generate` built the kept network from, or
+ * the header's provenance would not match the network the page drew. If the controls ever need concurrent
+ * runs, add a session/run id to every `run`/`header`/`event`/`done`/`error`.
+ *
  * ── Why `done` carries full `RouteInput`s ──────────────────────────────────────────────────────────
  * A recorded trace file cannot reconstruct a found route's ordered path (`plan-found` is path-less; see
  * `replay/routes.ts`). The live path *drives* the search, so it holds each plan's `QueryOutcome.plans[i]`

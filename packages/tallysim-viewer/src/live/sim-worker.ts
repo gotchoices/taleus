@@ -33,7 +33,6 @@
 
 import {
 	buildSimNetwork,
-	buildTraceHeader,
 	makeNetworkSnapshot,
 	materializeNetwork,
 	runQuery,
@@ -42,18 +41,8 @@ import {
 	type SimScenario,
 } from 'tallysim'
 import type { TraceSink } from 'tallynet'
-import type { RouteInput } from '../replay/routes.js'
+import { buildRunHeader, plansToRoutes } from './sim-run.js'
 import type { MainToWorker, WorkerToMain } from './sim-protocol.js'
-
-/**
- * The viewer's bundled provenance version strings, stamped into the trace header's `tallysimVersion` /
- * `tallynetVersion`.
- *
- * NOTE: these are provenance only — `parseTrace` validates the `traceFormatVersion` envelope and never
- * these two — so they record which viewer build produced the live run, not a contract. Bump them with the
- * viewer's bundled `tallysim`/`tallynet` versions if that provenance is ever wanted exact.
- */
-const VIEWER_VERSIONS = { tallysimVersion: '0.1.0', tallynetVersion: '0.1.0' }
 
 /**
  * A minimal typed view of the worker's global scope. The viewer's tsconfig uses `lib: [ES2022, DOM,
@@ -78,13 +67,7 @@ function errorMessage(error: unknown): string {
 
 /** Build and post the run's header for `sessionCode` (the minted code the events/outcome carry). */
 function postHeader(scenario: SimScenario, sessionCode: string, query: QuerySpec): void {
-	const header = buildTraceHeader({
-		...VIEWER_VERSIONS,
-		scenario,
-		runSeed,
-		queries: [{ sessionCode, ...query }],
-	})
-	ctx.postMessage({ type: 'header', header })
+	ctx.postMessage({ type: 'header', header: buildRunHeader(scenario, runSeed, sessionCode, query) })
 }
 
 /** Phase 1: materialise the network, keep it, and reply with the snapshot the page draws. */
@@ -126,15 +109,9 @@ async function handleRun(message: Extract<MainToWorker, { type: 'run' }>): Promi
 			postHeader(scenario, outcome.sessionCode, query)
 		}
 
-		// Each found plan's path lights the full found-routes list: its ordered link nonces (for exact-path
-		// isolate-on-select) and the per-hop negotiated terms (shown opaquely). A circular loop (self-payment)
-		// rides here too — its path nonces draw the closed loop.
-		const routes: RouteInput[] = outcome.plans.map((plan) => ({
-			from: query.from,
-			to: query.to,
-			linkNonces: plan.path.map((link) => link.nonce),
-			terms: plan.path.map((link) => link.intents),
-		}))
+		// Each found plan's path lights the full found-routes list (see plansToRoutes): ordered link nonces for
+		// exact-path isolate-on-select, plus the opaque per-hop terms. A self-payment's closed loop rides here too.
+		const routes = plansToRoutes(outcome.plans, query.from, query.to)
 		ctx.postMessage({ type: 'done', sessionCode: outcome.sessionCode, found: outcome.found, routes })
 	} catch (error) {
 		ctx.postMessage({ type: 'error', phase: 'run', message: errorMessage(error) })
