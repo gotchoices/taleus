@@ -259,6 +259,9 @@ describe('runSimSweep — concurrent and sequential agree, both deterministic', 
 			}))
 		expect(outcome(concurrent)).toEqual(outcome(sequential))
 		// The full records now match too — roundsUsed and the timing distributions included.
+		// NOTE: byte-equality here is empirical (this scenario + a broad line/seed/latency sweep), not proven.
+		// A config that lands a budget-expiry and a delivery at the exact same virtual instant could still
+		// resolve the tie per-mode and re-diverge; tie analysis lives in fix/tallysim-sim-runner-concurrent-divergence.
 		expect(JSON.stringify(concurrent)).toBe(JSON.stringify(sequential))
 		// Guard that this scenario really does produce non-zero completion times (else the test is vacuous).
 		expect(sequential[0].metrics.timeToCompletionMs.max).toBeGreaterThan(0)
