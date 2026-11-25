@@ -245,7 +245,7 @@ uPlot renderer touch the DOM.
 | Module | Responsibility | Tested |
 |---|---|---|
 | `core/sweep-data.ts` | Read both formats to a `SweepTable`; classify columns; default the pickers; group distribution families; rows → series → mean-per-cell → aligned. | jest |
-| `source.ts` | Detect a file's format (extension, else sniff) and dispatch to the right reader; carry an embedded sample sweep. | jest-adjacent (pure; covered by `sweep-data`'s tests + build) |
+| `source.ts` | Detect a file's format (extension, else sniff) and dispatch to the right reader; carry an embedded sample sweep. | jest (`source.test.ts`) |
 | `chart.ts` | The uPlot line renderer (one line per series, palette colours, gaps, live legend, resize). | build + manual |
 | `view.ts` | The panel (file loader + x / metric / sub-field / series-by pickers) wiring the above to the chart. | build + manual |
 
@@ -329,8 +329,8 @@ Settled here so the rendering tickets do not re-litigate it.
 ## Testing
 
 - Jest over the headless modules — `src/core/**` (`trace-index`, `deanonymise`, `timeline`, `sweep-data`),
-  `src/graph/model.ts`, and the pure replay modules `src/replay/{clock,routes,paint}.ts` — with hand-built
-  fixtures, no browser, no sigma.
+  `src/graph/model.ts`, the pure replay modules `src/replay/{clock,routes,paint}.ts`, and the sweep source
+  loader `src/sweeps/source.ts` — with hand-built fixtures, no browser, no sigma.
 - `yarn build` type-checks (`tsc --noEmit`) then produces the static bundle (`vite build`) from the app shell.
   The renderer (`render.ts`), the replay transport (`replay/controls.ts`), the sweeps chart + view
   (`sweeps/{chart,view}.ts`) and the shell (`app/**`) are **browser-only** (WebGL, `document`,
@@ -338,7 +338,6 @@ Settled here so the rendering tickets do not re-litigate it.
   "Load sample" → pan/zoom/hover/search; load a trace → play / scrub / hover a pruned edge / toggle
   colour-by-session / select a found route; switch to **Sweep** → "Load sample sweep" or a file → change the
   x / metric / sub-field / series-by pickers; confirm the same sweep loaded from `.jsonl` vs `.csv` draws the
-  same lines), not jest. The sweep **source** loader (`sweeps/source.ts`) is pure but thin; its readers are the
-  jest-covered `sweep-data` functions.
+  same lines), not jest.
 - A **headless-WebGL smoke test** (rendering a trace in a real browser, asserting on the result) is **deferred**
   — it needs Playwright / headless-Chromium and is not reliably agent-runnable; it belongs with CI or a human.

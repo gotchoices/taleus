@@ -14,7 +14,7 @@
  */
 
 import uPlot from 'uplot'
-import { alignSeries, type TidySeries } from '../core/sweep-data.js'
+import { alignSeries, type AlignedSeries, type TidySeries } from '../core/sweep-data.js'
 import type { Palette } from '../app/theme.js'
 
 /** The axis titles for a chart: the metric on y, the swept parameter on x. */
@@ -93,8 +93,7 @@ export function createSweepChart(host: HTMLElement, initialPalette: Palette): Sw
 		legendHost.textContent = ''
 	}
 
-	function options(width: number, height: number): uPlot.Options {
-		const aligned = alignSeries(series)
+	function options(aligned: AlignedSeries, width: number, height: number): uPlot.Options {
 		const axisStyle = { stroke: palette.textSecondary, grid: { stroke: palette.border }, ticks: { stroke: palette.border } }
 		return {
 			width,
@@ -120,19 +119,21 @@ export function createSweepChart(host: HTMLElement, initialPalette: Palette): Sw
 	}
 
 	function draw(): void {
-		const { width, height } = measure()
-		if (width <= 0 || height <= 0) {
-			return // hidden (display:none) — a later resize() redraws once it has a size.
-		}
 		destroyPlot()
 		const aligned = alignSeries(series)
 		if (aligned.columns.length === 0 || aligned.x.length === 0) {
 			showEmpty('Nothing to plot — no finite points for this axis / metric choice.')
 			return
 		}
+		// Reveal the plot host *before* measuring: the empty state hides it, so measuring first would read 0 and
+		// wrongly defer, stranding the chart on the empty message once any data arrives.
 		showPlot()
+		const { width, height } = measure()
+		if (width <= 0 || height <= 0) {
+			return // tab hidden (an ancestor is display:none) — a later resize() redraws once it has a size.
+		}
 		const data: uPlot.AlignedData = [aligned.x, ...aligned.columns.map((column) => column.y)]
-		plot = new uPlot(options(width, height), data, plotHost)
+		plot = new uPlot(options(aligned, width, height), data, plotHost)
 	}
 
 	let pending = 0
