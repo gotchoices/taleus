@@ -65,7 +65,7 @@ export const FORMAT_VERSION = 1
  * The on-disk shape of a {@link Tally}: identical except the two credit limits are `number | null`,
  * where `null` is the sentinel for `Infinity` (which `JSON.stringify` cannot represent).
  */
-interface SerializedTally {
+export interface SerializedTally {
 	stock: number
 	foil: number
 	balance: number
@@ -73,7 +73,14 @@ interface SerializedTally {
 	foilCreditLimit: number | null
 }
 
-interface SerializedNetwork {
+/**
+ * The on-disk shape of a {@link Network}: a plain, JSON-safe object (no `Infinity`; credit limits use
+ * the `null` sentinel). This is the object form embedded directly in a trace file's network-snapshot
+ * line — see `sim/trace-format.ts` — so the snapshot reuses this one encoding rather than inventing a
+ * second. {@link serialize} is just `JSON.stringify` of this; {@link networkToSerialized} is the object
+ * step on its own, for callers that embed the snapshot in a larger JSON structure.
+ */
+export interface SerializedNetwork {
 	entityCount: number
 	tallies: SerializedTally[]
 	meta: NetworkMeta
@@ -90,11 +97,12 @@ function limitFromJson(limit: number | null): number {
 }
 
 /**
- * Serialise a network to a JSON string, mapping `Infinity` credit limits to `null` so they survive the
- * round-trip. Fields are written in a fixed order so the output is deterministic for a given network.
+ * Map a {@link Network} to its {@link SerializedNetwork} object (the `Infinity ↔ null` step, without
+ * stringifying). Fields are written in a fixed order so {@link serialize} — and any JSON structure that
+ * embeds this object — is deterministic for a given network.
  */
-export function serialize(network: Network): string {
-	const serialized: SerializedNetwork = {
+export function networkToSerialized(network: Network): SerializedNetwork {
+	return {
 		entityCount: network.entityCount,
 		tallies: network.tallies.map((tally) => ({
 			stock: tally.stock,
@@ -110,18 +118,16 @@ export function serialize(network: Network): string {
 			formatVersion: network.meta.formatVersion,
 		},
 	}
-	return JSON.stringify(serialized)
 }
 
 /**
- * Parse a network from a {@link serialize} string, mapping the `null` credit-limit sentinel back to
- * `Infinity`. Throws if the format version is one this build does not understand.
+ * Rebuild a {@link Network} from its {@link SerializedNetwork} object, mapping the `null` credit-limit
+ * sentinel back to `Infinity`. Throws if the format version is one this build does not understand.
  */
-export function deserialize(text: string): Network {
-	const parsed = JSON.parse(text) as SerializedNetwork
+export function networkFromSerialized(parsed: SerializedNetwork): Network {
 	if (parsed.meta.formatVersion !== FORMAT_VERSION) {
 		throw new Error(
-			`deserialize: unsupported formatVersion ${String(parsed.meta.formatVersion)} (this build reads ${FORMAT_VERSION})`,
+			`networkFromSerialized: unsupported formatVersion ${String(parsed.meta.formatVersion)} (this build reads ${FORMAT_VERSION})`,
 		)
 	}
 	return {
@@ -135,4 +141,20 @@ export function deserialize(text: string): Network {
 		})),
 		meta: parsed.meta,
 	}
+}
+
+/**
+ * Serialise a network to a JSON string, mapping `Infinity` credit limits to `null` so they survive the
+ * round-trip. Fields are written in a fixed order so the output is deterministic for a given network.
+ */
+export function serialize(network: Network): string {
+	return JSON.stringify(networkToSerialized(network))
+}
+
+/**
+ * Parse a network from a {@link serialize} string, mapping the `null` credit-limit sentinel back to
+ * `Infinity`. Throws if the format version is one this build does not understand.
+ */
+export function deserialize(text: string): Network {
+	return networkFromSerialized(JSON.parse(text) as SerializedNetwork)
 }

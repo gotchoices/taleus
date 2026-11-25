@@ -15,6 +15,7 @@
 import type { SeededRandom } from 'tallynet/testing'
 import type { CapacityDistribution } from './distributions.js'
 import type { Network } from './model.js'
+import type { ConditionsSpec } from './sim/conditions.js'
 
 /**
  * Where a scenario's network comes from. **Either** a generator recipe (id + numeric structural params +
@@ -70,6 +71,29 @@ export const DEFAULT_MAX_FLOW_SAMPLES = 32
 export interface ScenarioSpec {
 	network: NetworkSource
 	workload: WorkloadSpec
+}
+
+/**
+ * A discovery-simulation scenario: the same network + workload a {@link ScenarioSpec} carries, plus the
+ * discovery-tier knobs (network conditions, the discovery time budget, and the conditions seed). It is
+ * the full, reproducible description of one run of the real `tallynet` protocol over a simulated network
+ * — enough to rebuild the run from a trace file alone — and is embedded verbatim in a trace file's
+ * header (see `sim/trace-format.ts`).
+ *
+ * Defined here (not in `sim/`) so the oracle scenario model and the sim scenario model live side by
+ * side; the discovery sweep runner (`tallysim-discovery-metrics`) adds its `SimSweepSpec` alongside it.
+ */
+export interface SimScenario {
+	/** Where the network comes from — the same generator-recipe | materialised union the oracle uses. */
+	network: NetworkSource
+	/** The query batch. `kind` must be `'payment'` this tier (clearing discovery is deferred). */
+	workload: WorkloadSpec
+	/** Network conditions (latency, drops, sleeping/late nodes); omitted ⇒ an ideal network. */
+	conditions?: ConditionsSpec
+	/** Discovery time budget mapped onto `OriginatorOptions`; depth rides on {@link WorkloadSpec.depth}. */
+	budget?: { initialBudgetMs?: number; perHopBudgetMs?: number }
+	/** Seed for the conditions stream — independent of the network / workload / economy seeds. */
+	conditionsSeed?: number
 }
 
 /** One varied dimension: a dotted path into the base scenario and the numeric values to step it through. */

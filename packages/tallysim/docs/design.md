@@ -534,4 +534,52 @@ negotiation is later work, so `annotateReturn` / `negotiatePlan` stay identity.
 
 ## Trace & replay format
 
-*To come — `tallysim-discovery`.*
+A simulation run can be recorded to a **versioned, newline-delimited JSON (NDJSON)** trace file — one that
+the viewer animates and the protocol-metrics tier analyses — such that a recorded run **replays
+identically**. The format and its read/write machinery live in `sim/trace-format.ts` and
+`sim/trace-writer.ts`; the Node file driver is `cli/trace.ts`.
+
+**Three line kinds, in this order.** Every line is one JSON object with a `kind` discriminant:
+
+- **line 1 — `header`**: the trace-format version, the tallysim and tallynet package versions, the full
+  `SimScenario` the run was built from (so the run is reproducible from the file alone), the run seed, and
+  one `queries[]` entry per recorded query — `{ sessionCode, from, to, amount, depth }` — so a reader joins
+  any event back to its query by `event.sessionCode` without splitting the stream.
+- **line 2 — `network`**: the serialised `Network`, reusing the model's one `Infinity ↔ null` encoding
+  (`networkToSerialized`/`networkFromSerialized`), so the reader rebuilds a byte-identical graph.
+- **lines 3+ — `event`**: one `tallynet` `TraceEvent` per line, verbatim, in emission order — which is time
+  order, because the `VirtualClock` fires in `(time, seq)` order.
+
+The header and network come first so a streaming reader can set up before the events arrive.
+
+**Versioning.** `traceFormatVersion` is checked on read; any other value is rejected with a message naming
+the found vs the supported version (the viewer relies on this). Bump it only when a **line envelope** above
+changes. The `TraceEvent` union already spans discovery *and* consensus, so the consensus events ticket 3.7
+adds need **no** bump — the writer and reader pass the whole union through unchanged.
+
+**Streaming, both ways.** Writing is append-only: `makeTraceWriter(header, snapshot, out)` emits the header
+and network up front, then serialises each event to one line and hands it to the caller's `LineSink` *as it
+arrives*, never accumulating the event list — so a 10,000-node run stays flat in memory. Its `stats()`
+reports running line and byte counts (each line plus its one newline), so a run can report its trace size
+and a caller can cap recording. Reading is lazy: `parseTrace(lines)` reads the header and network eagerly
+and yields events through a single-pass generator, so a large trace is never fully materialised. The core
+stays platform-neutral (the viewer records runs live in a page); only `cli/trace.ts` touches the filesystem,
+wiring the `LineSink` to a streamed file write.
+
+**Selected-query recording.** `makeTraceWriter`'s `options.sessions` records only a chosen set of session
+codes — a huge run can record just a handful of queries. The header then lists **only** the recorded queries
+(the recorded-only variant), so the file stays self-consistent: every `queries[]` entry has events, and
+every event's session is in `queries[]`.
+
+**Byte-identical determinism.** The same seed + same `SimScenario` produce a byte-identical trace file —
+header, network snapshot, and every event line in the same order. This rests on the `VirtualClock`'s
+`(time, seq)` fire order and deterministic session-code minting (see § Discovery simulation). Because a
+session code is minted *inside* `discover()` and is not knowable until a query has run, the `cli/trace.ts`
+driver runs the batch twice: pass 1 learns the session codes (collecting codes only, so memory stays flat),
+pass 2 rebuilds an identical network and reruns the same queries, streaming their events — the rerun
+reproduces the same codes and events exactly, which is this determinism guarantee in action.
+
+A **late answer** (`late-answer-folded`) appears in the stream at its own clock time with its round, so a
+reader sees it folded into a later round — not dropped, not duplicated. An **empty run** (a query that finds
+nothing, or a run whose queries are all filtered out, or a network of fewer than two entities) still yields a
+valid header + network file.

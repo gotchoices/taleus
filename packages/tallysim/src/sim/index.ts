@@ -9,9 +9,13 @@
  * - `terms.ts` — the discovery link-term type and the capacity-aware node policy (the correctness anchor).
  * - `conditions.ts` — compile a declarative conditions spec into the harness's per-link condition map.
  * - `harness.ts` — build a running discovery network from a `Network` and run one payment query.
+ * - `trace-format.ts` — the versioned NDJSON trace-line union, `serializeTraceLine` and `parseTrace`.
+ * - `trace-writer.ts` — `makeTraceWriter`: stream a header + network + per-event lines to a `LineSink`.
  */
 
 export * from './naming.js'
 export * from './terms.js'
 export * from './conditions.js'
 export * from './harness.js'
+export * from './trace-format.js'
+export * from './trace-writer.js'
