@@ -234,6 +234,18 @@ describe('runSweep — error handling', () => {
 		expect(() => runSweepToArray(spec)).toThrow(/path "network.params.meanDegree"/)
 	})
 
+	it('rejects a vary path reaching into a materialised network (would mutate the shared network)', () => {
+		const spec: SweepSpec = {
+			base: {
+				network: { materialized: isolatedNetwork(3) },
+				workload: { kind: 'payment', queries: 1, amount: { dist: 'constant', params: { value: 1 } }, depth: 1, seed: 1 },
+			},
+			vary: [{ path: 'network.materialized.entityCount', values: [5] }],
+			seeds: [1],
+		}
+		expect(() => runSweepToArray(spec)).toThrow(/must target workload\.\* for a materialized network/)
+	})
+
 	it('rejects an empty seeds array', () => {
 		const spec: SweepSpec = {
 			base: {

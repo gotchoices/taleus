@@ -120,6 +120,10 @@ function runOne(
 
 	const oracle = new Oracle(buildGraphView(network))
 	const structural = structuralMetrics(network)
+	// NOTE: network and workload streams are independent only when the spec gives them distinct base seeds.
+	// If a spec sets network.seed === workload.seed, both SeededRandoms start from the same state and the
+	// draws correlate. Every checked-in spec uses distinct seeds; if that stops holding, offset the network
+	// seed here the way ECONOMY_SEED_OFFSET separates the economy stream.
 	const workloadRng = new SeededRandom(scenario.workload.seed + runSeed)
 	const metrics =
 		scenario.workload.kind === 'payment'
@@ -275,9 +279,16 @@ function validateSweep(spec: SweepSpec): void {
 	if (!Array.isArray(spec.seeds) || spec.seeds.length === 0) {
 		throw new Error('sweep: `seeds` must be a non-empty array')
 	}
+	// A materialised network is shared by reference across cells (cloneScenario does not deep-clone it), so a
+	// vary path reaching into `network.*` would mutate that shared object. Such a scenario must vary only
+	// `workload.*`; reject any other path up front with a clear message rather than corrupting shared state.
+	const materialized = 'materialized' in spec.base.network
 	for (const dim of spec.vary) {
 		if (!Array.isArray(dim.values) || dim.values.length === 0) {
 			throw new Error(`sweep: vary dimension "${dim.path}" must have a non-empty values array`)
+		}
+		if (materialized && !dim.path.startsWith('workload.')) {
+			throw new Error(`sweep: vary path "${dim.path}" must target workload.* for a materialized network`)
 		}
 	}
 }
