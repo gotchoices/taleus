@@ -24,16 +24,21 @@ and lints, and ships:
   self-payment / circular-clearing cycles, max-flow (Edmonds–Karp), and capped clearing-cycle availability,
   anchored by an independent brute-force / min-cut verification harness;
 - the **experiment harness** — the scenario/sweep model (`src/scenario.ts`), the streaming sweep runner
-  (`src/runner.ts`), pure metric aggregation (`src/metrics.ts`), JSON-lines + CSV serialisers
-  (`src/serialize-records.ts`), and the one Node-only file, the CLI (`src/cli/sweep.ts`);
+  (`src/runner.ts`), pure metric aggregation (`src/metrics.ts`), JSON-lines + CSV serialisers generic over the
+  metrics shape (`src/serialize-records.ts` for the oracle sweep, `src/serialize-sim-records.ts` for the
+  discovery sweep), and the Node-only CLIs (`src/cli/sweep.ts`, `src/cli/simulate.ts`, `src/cli/trace.ts`);
 - a first checked-in experiment (`experiments/route-existence/`) measuring P(route exists) vs. connectivity.
 
 The protocol-replay tiers come in later tess tickets.
 
-Run a sweep (reads a `SweepSpec` JSON file, streams JSON-lines, optionally writes a CSV summary):
+Run a sweep (reads a `SweepSpec` JSON file, streams JSON-lines, optionally writes a CSV summary). `sweep` runs
+the whole-graph oracle; `simulate` runs the real `tallynet` discovery protocol over a simulated network, and can
+additionally dump a replayable trace of the sweep's base scenario:
 
 ```
 yarn workspace tallysim sweep <spec.json> [--jsonl <out.jsonl>] [--csv <out.csv>]
+yarn workspace tallysim simulate <spec.json> [--jsonl <out.jsonl>] [--csv <out.csv>] [--concurrent] \
+    [--trace <trace.ndjson> [--query <i> ...] [--seed <n>]]
 ```
 
 - [docs/design.md](docs/design.md): the canonical simulator design — tiers, model, capacity model,

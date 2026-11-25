@@ -35,14 +35,12 @@ import { SeededRandom } from 'tallynet/testing'
 import {
 	buildSimNetwork,
 	buildTraceHeader,
-	drawAmount,
-	drawPaymentPair,
+	drawPaymentQueries,
 	makeNetworkSnapshot,
 	makeTraceWriter,
 	materializeNetwork,
 	runQuery,
 	type LineSink,
-	type QuerySpec,
 	type SimScenario,
 	type TraceQueryEntry,
 } from '../index.js'
@@ -118,29 +116,15 @@ function readVersionAbove(startDir: string, label: string): string {
 	}
 }
 
-/** The tallysim + tallynet package versions, for the trace header. Read lazily so importing this is pure. */
-function packageVersions(): { tallysimVersion: string; tallynetVersion: string } {
+/** The tallysim + tallynet package versions, for the trace header. Read lazily so importing this is pure.
+ * Exported so the sibling `simulate` CLI reuses the same version-resolution (its `--trace` writes the same
+ * header shape). */
+export function packageVersions(): { tallysimVersion: string; tallynetVersion: string } {
 	const require = createRequire(import.meta.url)
 	return {
 		tallysimVersion: readVersionAbove(dirname(fileURLToPath(import.meta.url)), 'tallysim'),
 		tallynetVersion: readVersionAbove(dirname(require.resolve('tallynet')), 'tallynet'),
 	}
-}
-
-/** Draw the scenario's payment queries over an already-materialised network (pair then amount, mirroring
- * the oracle runner's draw order). Returns empty for a sub-two-entity network (no distinct pair exists). */
-function drawQueries(workload: SimScenario['workload'], entityCount: number): QuerySpec[] {
-	if (entityCount < 2) {
-		return [] // no distinct (from, to) pair exists; a valid header+network file with no query events
-	}
-	const rng = new SeededRandom(workload.seed)
-	const queries: QuerySpec[] = []
-	for (let i = 0; i < workload.queries; i++) {
-		const [from, to] = drawPaymentPair(entityCount, rng)
-		const amount = drawAmount(workload.amount, rng)
-		queries.push({ from, to, amount, depth: workload.depth })
-	}
-	return queries
 }
 
 /** The discovery options the scenario's budget maps onto (depth rides on each query's `depth`). */
@@ -165,7 +149,9 @@ export async function recordTrace(
 	const conditions = scenario.conditions ?? {}
 	const conditionsSeed = scenario.conditionsSeed ?? 0
 	const options = budgetOptions(scenario)
-	const queries = drawQueries(scenario.workload, network.entityCount)
+	// Shared draw: pair-then-amount at `workload.seed` (NOT offset by the run seed here — preserving this
+	// CLI's historical behaviour byte-identically; the sim-runner offsets by the run seed, this does not).
+	const queries = drawPaymentQueries(scenario.workload, network.entityCount, new SeededRandom(scenario.workload.seed))
 
 	// Pass 1: learn each query's session code (collect codes only; events are discarded — memory stays flat).
 	const pass1 = buildSimNetwork(network, conditions, conditionsSeed, undefined, options)

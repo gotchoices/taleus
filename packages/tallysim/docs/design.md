@@ -353,23 +353,42 @@ is off.
 
 ### Output serialisation and the CLI
 
-Two **pure, platform-neutral** serialisers (`src/serialize-records.ts`): a record → one **JSON-lines** string
-(the full nested record), and a set of records → a **CSV summary** (one row per run; columns = `generator`,
-`capacity`, the varied param paths, `seed`, then the scalar metrics, each `DistributionSummary` expanded to
-`count/mean/min/max/p50/p90/p99` columns). Non-finite numbers (an unbounded max-flow is `Infinity`) serialise
-as JSON `null` / an empty CSV cell, matching the model's `Infinity ↔ null` convention; finite records
-round-trip through JSON-lines exactly. A streaming `CsvAccumulator` lets the CLI build the CSV on the **same
-pass** it writes JSON-lines, keeping only lightweight per-row scalars rather than the full record set.
+**Pure, platform-neutral** serialisers: a record → one **JSON-lines** string (the full nested record), and a
+set of records → a **CSV summary** (one row per run; columns = `generator`, `capacity`, the varied param paths,
+`seed`, then the scalar metrics, each `DistributionSummary` expanded to `count/mean/min/max/p50/p90/p99`
+columns, each nested numeric object — e.g. the discovery sweep's `pruneReasons` — to `object.key` columns).
+Non-finite numbers (an unbounded max-flow is `Infinity`) serialise as JSON `null` / an empty CSV cell, matching
+the model's `Infinity ↔ null` convention; finite records round-trip through JSON-lines exactly. A streaming
+`CsvAccumulator` lets the CLI build the CSV on the **same pass** it writes JSON-lines, keeping only lightweight
+per-row scalars rather than the full record set.
 
-The **CLI** (`src/cli/sweep.ts`) is the **one Node-specific file** in the package — it does file I/O, so it
-lives outside the neutral core, is excluded from the `no-node-globals` guard and the neutral
-`tsconfig.build.json`, and is compiled with node types by `tsconfig.cli.json`. It reads a `SweepSpec` JSON
+Both run-record kinds share one provenance shape (`generator`, `capacity`, `params`, `seed`, `metrics`) and
+differ only in the `metrics` payload, so the machinery is **generic over the metrics shape** in
+`serialize-records.ts` (`metricsRecordToJsonLine`, `createSweepCsvAccumulator(metricColumns)`, …). The oracle
+serialiser keeps its `RunRecord`-typed functions (`recordToJsonLine`, `createCsvAccumulator`, …) as thin
+wrappers that pin the oracle's canonical column order — so their byte output is unchanged — and
+`serialize-sim-records.ts` adds the discovery-sweep counterpart (`simRecordToJsonLine`,
+`createSimCsvAccumulator`, …) with its own column order (the found-vs-oracle fields, the six cost/timing
+distributions, then the six prune-reason tallies).
+
+The **CLIs** (`src/cli/`) are the **only Node-specific files** in the package — they do file I/O, so they live
+outside the neutral core, are excluded from the `no-node-globals` guard and the neutral `tsconfig.build.json`,
+and are compiled with node types by `tsconfig.cli.json`. `cli/sweep.ts` drives the oracle sweep; `cli/simulate.ts`
+drives the discovery sweep (iterating the **`async`** `runSimSweep` with `for await`). Each reads its spec JSON
 file, **streams** the JSON-lines records to stdout (or `--jsonl <path>`) as each is produced, and writes the
 CSV summary to `--csv <path>`:
 
 ```
 yarn workspace tallysim sweep <spec.json> [--jsonl <out.jsonl>] [--csv <out.csv>]
+yarn workspace tallysim simulate <spec.json> [--jsonl <out.jsonl>] [--csv <out.csv>] [--concurrent] \
+    [--trace <trace.ndjson> [--query <i> ...] [--seed <n>]]
 ```
+
+`simulate`'s `--concurrent` sets `SimRunnerDeps.concurrent`. Its optional `--trace` dumps one full, replayable
+trace — of the sweep's **unvaried base scenario** (`spec.base`, with `vary` NOT applied) at the `--seed` run
+seed (default 0), for the selected `--query` indices (default all) — by reusing `cli/trace.ts`'s `recordTrace`,
+so that trace is byte-identical to what `cli/trace.js` would write for the same scenario + seed. It is **not** a
+trace of a swept cell; use `cli/trace.js` on a materialised cell scenario for that.
 
 ### The "step the economy" seam
 
@@ -562,7 +581,8 @@ the oracle runner through `sweep-vary.ts` (one copy of `cartesian` / `coordsOf` 
 `requireNonEmptyValues`, so the two runners cannot drift). Unlike the synchronous oracle runner it is an
 **`async` generator** — settling a query awaits `clock.runUntilIdle()` — so `runSimSweep` must be iterated
 with `for await`; `runSimSweepToArray` collects a small sweep. It streams (no record retained) and touches no
-filesystem; the CLI drives it for file output and a browser viewer can drive the same code live.
+filesystem; `cli/simulate.ts` drives it for file output (see § Output serialisation and the CLI) and a browser
+viewer can drive the same code live.
 
 Per run it materialises the network, builds the oracle on the **full, undegraded** network (conditions
 degrade only the protocol run, never ground truth), draws a payment workload with `drawPaymentQueries` (pair
