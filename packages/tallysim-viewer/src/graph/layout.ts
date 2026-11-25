@@ -91,7 +91,9 @@ export function runLayout(
 			clearTimeout(timer)
 			timer = undefined
 		}
-		worker?.stop()
+		// Settle is terminal (budget elapsed, or teardown) — the worker is never resumed, so release its thread
+		// with `kill()`, not `stop()` (which only pauses iteration and would leave an orphaned worker per load).
+		worker?.kill()
 		for (const callback of subscribers.splice(0)) {
 			callback()
 		}
