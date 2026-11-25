@@ -1,0 +1,41 @@
+{
+	"name": "tallysim",
+	"version": "0.1.0",
+	"description": "TallySim: platform-neutral simulator for Taleus tally networks. Seeded generators build random credit-relationship graphs; later tiers add a whole-graph oracle and an experiment runner. Runs in Node and the browser.",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+		"lint": "eslint ./src"
+	},
+	"dependencies": {
+		"tallynet": "workspace:^"
+	},
+	"devDependencies": {
+		"@eslint/js": "10.0.1",
+		"@types/jest": "30.0.0",
+		"@types/node": "26.1.1",
+		"cross-env": "7.0.3",
+		"eslint": "10.7.0",
+		"globals": "17.7.0",
+		"jest": "30.4.2",
+		"ts-jest": "29.4.11",
+		"typescript": "6.0.3",
+		"typescript-eslint": "8.63.0"
+	}
+}
