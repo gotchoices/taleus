@@ -1,0 +1,90 @@
+/**
+ * The per-node consensus bundle. A host constructs one {@link ConsensusNode} per party on a lift
+ * route and uses it in the two roles a lift needs: as the **originator** that seeds the transaction
+ * with its own freshly-built record ({@link ConsensusNode.start}), and as a **participant** that a
+ * peer's `updatePeer` reaches ({@link ConsensusNode.update}). It mirrors discovery's `DiscoveryNode`
+ * (`../discovery/engine.ts`): a thin wrapper over the per-node state machine built from injected ports.
+ *
+ * Unlike discovery, consensus has **no originator round-loop** — it is push-driven. `start` is just
+ * `update` on the originator's own record (all topology, no signatures yet); the state machine casts
+ * our promise, pushes to reachable peers, and the record diffuses until the lift settles everywhere.
+ * {@link ConsensusNode.outcome} reads the settled commit/void (or `pending`) from the stored record,
+ * so a simulator can poll every node and assert the route committed or voided atomically.
+ */
+
+import type { Clock } from '../clock.js'
+import type { Hasher, Signer, Verifier } from '../crypto.js'
+import type { TraceSink } from '../trace.js'
+import type { SessionCodeValidators } from '../discovery/participant.js'
+import type { Address } from '../discovery/types.js'
+import { TrxParticipant, type Logger, type UpdatePeerFunc } from './participant.js'
+import type { TrxParticipantResource } from './resource.js'
+import type { TrxStore } from './store.js'
+import type { TrxRecord } from './types.js'
+
+/** Everything a {@link ConsensusNode} is constructed with. Passed straight through to the state machine. */
+export interface ConsensusNodeDeps<TTerms, TPayload> {
+	/** Our own party: the base64url key that identifies our member in `topology.members`. */
+	self: Address
+	/** Signs our promises/commits. Its `publicKey` must base64url-encode to `self.key`. */
+	signer: Signer
+	/** Verifies every signature we merge. */
+	verifier: Verifier
+	/** Durable record / peer-record / release-flag store (one per node). */
+	store: TrxStore<TTerms, TPayload>
+	/** Host port: holds/releases value, casts the referee vote. */
+	resource: TrxParticipantResource<TTerms, TPayload>
+	/** Host port: send the record to a peer over its transport. */
+	updatePeer: UpdatePeerFunc<TTerms, TPayload>
+	/** Our discovery session's nonce→linkId map; identifies the links we own. */
+	nonceToLinkId: Record<string, string>
+	/** All wall-clock time (for code-expiry checks). */
+	clock: Clock
+	/** sha256, for the canonical digest. Defaults to `@noble/hashes`. */
+	hasher?: Hasher
+	/** Optional trace sink; wrapped so a throw can never break the engine. Default: no-op. */
+	trace?: TraceSink
+	/** Optional logger for refusals, rejections and push failures. Default: no-op. */
+	log?: Logger
+	/** Session-code checks; default wraps `session-code.ts`. */
+	sessionCodes?: SessionCodeValidators
+}
+
+export class ConsensusNode<TTerms, TPayload> {
+	/** Our member key, stamped onto every trace event (`self.key`). */
+	readonly nodeId: string
+	private readonly participant: TrxParticipant<TTerms, TPayload>
+
+	constructor(deps: ConsensusNodeDeps<TTerms, TPayload>) {
+		this.nodeId = deps.self.key
+		this.participant = new TrxParticipant<TTerms, TPayload>({
+			self: deps.self,
+			signer: deps.signer,
+			verifier: deps.verifier,
+			store: deps.store,
+			resource: deps.resource,
+			updatePeer: deps.updatePeer,
+			nonceToLinkId: deps.nonceToLinkId,
+			clock: deps.clock,
+			hasher: deps.hasher,
+			trace: deps.trace,
+			log: deps.log,
+			sessionCodes: deps.sessionCodes,
+		})
+	}
+
+	/** Originator role: seed the transaction with our own freshly-built record (our first update). */
+	start(record: TrxRecord<TTerms, TPayload>): Promise<TrxRecord<TTerms, TPayload>> {
+		return this.participant.update(record)
+	}
+
+	/** Participant role: what a peer's `updatePeer` delivers into us (`from` = the pushing member). */
+	update(record: TrxRecord<TTerms, TPayload>, from?: Address): Promise<TrxRecord<TTerms, TPayload>> {
+		return this.participant.update(record, from)
+	}
+
+	/** Read the settled outcome of a transaction (commit / void / pending) from our store. */
+	outcome(transactionCode: string): Promise<'commit' | 'void' | 'pending'> {
+		return this.participant.outcome(transactionCode)
+	}
+}

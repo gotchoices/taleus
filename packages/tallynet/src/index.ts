@@ -4,7 +4,7 @@
  *
  * This barrel ships the shared building blocks — the crypto ports, self-expiring session codes, edge
  * nonces, the canonical digest, step sequencing, and the rule engine — plus the full route-discovery
- * engine (`discovery/`). The consensus engine remains a later ticket.
+ * engine (`discovery/`) and the atomic promise/commit consensus engine (`consensus/`).
  */
 
 export * from './clock.js'
@@ -16,3 +16,4 @@ export * from './digest.js'
 export * from './sequencing.js'
 export * from './rule.js'
 export * from './discovery/index.js'
+export * from './consensus/index.js'

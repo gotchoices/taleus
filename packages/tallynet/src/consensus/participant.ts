@@ -154,6 +154,23 @@ export class TrxParticipant<TTerms, TPayload> {
 		return merged
 	}
 
+	/**
+	 * The settled outcome of `transactionCode` from our stored record: `'commit'` on a strict commit
+	 * majority, `'void'` on any refusal or strict void majority, `'pending'` otherwise (and when the
+	 * record has never been seen). Reuses the same classifier as the state machine ({@link getRecordState});
+	 * its **terminal** states (`consensus`/`rejected`) are role-independent — they are global properties
+	 * of the record (any `NP`, or a strict commit/void majority) — so a relay, or the simulator polling
+	 * every node, reads the same commit/void a member does.
+	 */
+	async outcome(transactionCode: string): Promise<'commit' | 'void' | 'pending'> {
+		const record = await this.store.getRecord(transactionCode)
+		if (!record) {
+			return 'pending'
+		}
+		const state = await this.getRecordState(record)
+		return state === 'consensus' ? 'commit' : state === 'rejected' ? 'void' : 'pending'
+	}
+
 	/* ── validate + merge ─────────────────────────────────────────────────────────────── */
 
 	/**
@@ -250,6 +267,14 @@ export class TrxParticipant<TTerms, TPayload> {
 				return this.rejectSignature(merged, 'forged')
 			}
 		}
+		// NOTE: liveness edge (safety-preserving). A forged commit carrying a referee's `address` but a
+		// garbage `value`, arriving BEFORE the promise phase completes, is retained unverified here and
+		// occupies that referee's commit slot; the genuine vote then arrives and is refused as
+		// `equivocation`/`changed` (the already-have-one check above), so it is never counted and the
+		// lift STALLS (liveness denial). This is safety-preserving — the forged value never verifies, so
+		// `countVerifiedCommits` never counts it, and no wrong outcome can settle. Not reachable as a
+		// *flip* (the value cannot verify), so not a filed ticket; a propagation timeout
+		// (`feat-tallynet-propagation-timeouts`) would eventually void such a stall.
 
 		merged[bucket] = [...merged[bucket], signature]
 	}
