@@ -32,9 +32,12 @@ export interface TraceIndex {
 	sessions(): readonly TraceQueryEntry[]
 	/** The header entry for one session, or `undefined` if the code is not in the header. */
 	queryFor(sessionCode: string): TraceQueryEntry | undefined
-	/** Events for one session in time order; empty (never `undefined`) for a session with no events. */
+	/**
+	 * Events for one session in arrival order — which is time order for a well-formed trace (the writer emits
+	 * in `(time, seq)` order); the index does not re-sort. Empty (never `undefined`) for a session with no events.
+	 */
 	eventsForSession(sessionCode: string): readonly TraceEvent[]
-	/** Every event across every session, in time order. */
+	/** Every event across every session, in arrival order (= time order for a well-formed trace; not re-sorted). */
 	allEvents(): readonly TraceEvent[]
 	/** The min/max event `time` (playback bounds), or `undefined` when the trace has no events. */
 	timeBounds(): { min: number; max: number } | undefined

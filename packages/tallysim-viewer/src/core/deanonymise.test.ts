@@ -44,6 +44,24 @@ describe('createDeanonymiser', () => {
 		expect(d.nodePathOfPlanPath(SESSION, 0, [])).toEqual([0])
 	})
 
+	it('keeps two tallies on the same node pair distinct (no nonce aliasing)', () => {
+		// Two parallel tallies both joining 0↔1: distinct tally indices → distinct link ids → distinct nonces.
+		const parallel: Network = {
+			entityCount: 2,
+			tallies: [
+				{ stock: 0, foil: 1, balance: 0, stockCreditLimit: 100, foilCreditLimit: 100 },
+				{ stock: 0, foil: 1, balance: 0, stockCreditLimit: 100, foilCreditLimit: 100 },
+			],
+			meta: { generator: 'test', params: {}, seed: 1, formatVersion: FORMAT_VERSION },
+		}
+		const d = createDeanonymiser(parallel)
+		const n0 = makeNonce(SESSION, linkIdForTally(0))
+		const n1 = makeNonce(SESSION, linkIdForTally(1))
+		expect(n0).not.toBe(n1)
+		expect(d.tallyOfNonce(SESSION, n0)).toBe(0)
+		expect(d.tallyOfNonce(SESSION, n1)).toBe(1)
+	})
+
 	it('returns the sentinel when a plan nonce does not resolve or the walk is non-contiguous', () => {
 		const d = createDeanonymiser(network)
 		// tally 1 (1↔2) does not touch the originator 0 — non-contiguous.

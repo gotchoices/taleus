@@ -79,6 +79,9 @@ export function createDeanonymiser(network: Network): Deanonymiser {
 				return undefined
 			}
 			const { stock, foil } = network.tallies[tally]
+			// NOTE: a self-loop tally (stock === foil === current) walks back to the same node, yielding a
+			// repeated entry rather than the sentinel. Generators never emit self-loops; only a hand-built trace
+			// could. If self-loops ever become real, decide here whether that is a route or a sentinel.
 			const next = stock === current ? foil : foil === current ? stock : undefined
 			if (next === undefined) {
 				return undefined

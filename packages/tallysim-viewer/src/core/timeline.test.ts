@@ -75,6 +75,19 @@ describe('createTimeline — active set derivation', () => {
 		expect(set.edges).toHaveLength(3)
 	})
 
+	it('skips an unresolved/empty nonce as a node-only event, not an edge', () => {
+		// The originator's own first query-received carries an empty inbound nonce: it lights the node but no edge.
+		const originatorEvents: TraceEvent[] = [
+			{ time: 1, nodeId: '0', sessionCode: 'S1', type: 'query-received', nonce: '', depth: 1, round: 0 },
+			{ time: 2, nodeId: '0', sessionCode: 'S1', type: 'query-sent', nonce: 'unknown-nonce', depth: 1, round: 1 },
+		]
+		const t = createTimeline({ sessionCode: 'S1', events: originatorEvents, resolveTally })
+		const set = t.deriveActiveSet(2)
+		expect(set.nodes).toEqual([{ node: 0, round: 1, depth: 1 }])
+		// Empty nonce skipped, and a non-empty nonce the decoder cannot resolve is skipped too — no edges.
+		expect(set.edges).toEqual([])
+	})
+
 	it('derives the same set scrubbing backward as forward (recompute is direction-independent)', () => {
 		const forward = timeline.deriveActiveSet(2)
 		timeline.deriveActiveSet(7) // advance...
