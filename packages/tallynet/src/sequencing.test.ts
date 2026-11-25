@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals'
 import { Pending, budgetedStep } from './sequencing.js'
-import { realClock } from './clock.js'
+import { realClock, type Clock } from './clock.js'
 
 afterEach(() => {
 	jest.useRealTimers()
@@ -113,5 +113,22 @@ describe('budgetedStep', () => {
 		jest.useFakeTimers()
 		await budgetedStep(realClock, 100_000, { a: new Pending(new Promise<number>(() => {}), realClock) }, { signal: controller.signal })
 		expect(jest.getTimerCount()).toBe(0)
+	})
+
+	it('arms and fires its budget through an injected virtual clock, with no real time', async () => {
+		// A hand-driven virtual clock: setTimer stashes the callback; the test fires it. No real
+		// timers, no jest fake timers -- proves the budget path runs entirely on injected time.
+		let fire: (() => void) | undefined
+		const virtualClock: Clock = {
+			now: () => 0,
+			setTimer: (fn) => { fire = fn; return 1 },
+			clearTimer: () => { fire = undefined },
+		}
+		const requests = { a: new Pending(new Promise<number>(() => {}), virtualClock) }
+		const step = budgetedStep(virtualClock, 5_000, requests)
+		expect(fire).toBeDefined()
+		fire?.() // the budget "elapses" on virtual time
+		await step // resolves, never rejects, even though the request never settled
+		expect(requests.a.isComplete).toBe(false)
 	})
 })

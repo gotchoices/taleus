@@ -17,9 +17,6 @@
  * `insufficient-capacity`); the two live in different packages and never meet.
  */
 
-/** The narrow `console` slice this module logs through; every target has it. */
-declare const console: { error(...args: unknown[]): void }
-
 /** Common envelope on every trace event: the clock time, the emitting node's own id, the session. */
 export interface TraceBase {
 	time: number
