@@ -251,7 +251,10 @@ export class Participant<TTerms, TPayload> {
 			self: findResult.self,
 			candidates,
 			nonceToLinkId,
-			plans: plans.length ? plans : undefined,
+			// Only set `plans` when non-empty: an explicit `plans: undefined` key is dropped by
+			// `JSON.stringify` but *rejected* by DAG-CBOR `canonicalEncode`, which would break a
+			// SQL-backed store. Everything written here must round-trip through both.
+			...(plans.length ? { plans } : {}),
 			depth: 1,
 			complete: candidates.length === 0,
 		}
@@ -268,7 +271,9 @@ export class Participant<TTerms, TPayload> {
 		const session = query.sessionCode
 		const raw: Plan<TTerms, TPayload>[] = []
 		if (findResult.selfIsMatch) {
-			raw.push({ path: [...plan.path], members: [], payload: findResult.payload })
+			// Omit `payload` when the host supplied none: a bare `payload: undefined` key is not
+			// DAG-CBOR encodable (see createContext's note), and most nodes carry no payload.
+			raw.push({ path: [...plan.path], members: [], ...(findResult.payload !== undefined ? { payload: findResult.payload } : {}) })
 		}
 		for (const peer of findResult.peerMatch ?? []) {
 			const nonce = makeNonce(session, peer.link.id, this.hasher)
@@ -279,7 +284,7 @@ export class Participant<TTerms, TPayload> {
 			const peerPlan: Plan<TTerms, TPayload> = {
 				path: [...plan.path, { nonce, intents }],
 				members: [],
-				payload: findResult.payload,
+				...(findResult.payload !== undefined ? { payload: findResult.payload } : {}),
 			}
 			raw.push(prependMatch(peerPlan, peer.match)) // the target becomes a member first
 		}
@@ -454,7 +459,12 @@ export class Participant<TTerms, TPayload> {
 				)
 			}
 		}
-		context.plans = plans.length ? plans : undefined
+		if (plans.length) {
+			context.plans = plans
+		} else {
+			// Never leave an explicit `plans: undefined` key — it is not DAG-CBOR encodable.
+			delete context.plans
+		}
 	}
 
 	/**
@@ -649,9 +659,12 @@ export class Participant<TTerms, TPayload> {
 				outstanding++
 			}
 		}
+		// Omit absent `plans`/`reentrance` rather than emitting `undefined` keys: a response is sent
+		// over the wire (DAG-CBOR) and may be stored as a candidate's `lastResponse`, both of which
+		// reject `undefined`-valued keys.
 		return {
-			plans: context.plans?.length ? context.plans : undefined,
-			reentrance,
+			...(context.plans?.length ? { plans: context.plans } : {}),
+			...(reentrance ? { reentrance } : {}),
 			stats: { earliest: gross, latest: gross, gross, outstanding },
 		}
 	}
