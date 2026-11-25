@@ -76,6 +76,13 @@ export interface Palette {
 	late: string
 	/** The recede colour for items outside a selected (isolated) route, so the route stands alone. */
 	dimmed: string
+	/**
+	 * The sweep charts' categorical series colours — one per plotted line. The data-viz reference's eight-hue
+	 * categorical set in its validated order (the ordering is the colour-blind-safety mechanism, not cosmetic);
+	 * each theme has its own steps for its surface. More than eight series cycle the set (a dev tool; a line
+	 * chart uses the adjacent-pair gate, which all eight clear).
+	 */
+	seriesScale: readonly string[]
 }
 
 /** Light theme — validated against the `#ffffff` surface. */
@@ -98,6 +105,8 @@ export const lightPalette: Palette = {
 	sleeping: '#8a94a6',
 	late: '#b98f36',
 	dimmed: '#dddddd',
+	// Categorical slots 1–8 (blue, orange, aqua, yellow, magenta, green, violet, red), light column.
+	seriesScale: ['#257de0', '#f47230', '#00b894', '#f2a600', '#ee7fac', '#008a17', '#6a4ce2', '#ec4647'],
 }
 
 /** Dark theme — its own steps, validated against the `#191919` surface. */
@@ -120,6 +129,8 @@ export const darkPalette: Palette = {
 	sleeping: '#6b7585',
 	late: '#b9923f',
 	dimmed: '#333333',
+	// The same eight hues stepped for the dark surface (data-viz reference's dark column).
+	seriesScale: ['#338ced', '#e76624', '#00a888', '#d28e05', '#e24d8b', '#0aac23', '#9887ef', '#eb6263'],
 }
 
 /** The palette for a theme name. */
