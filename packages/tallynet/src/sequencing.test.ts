@@ -118,7 +118,7 @@ describe('budgetedStep', () => {
 	it('arms and fires its budget through an injected virtual clock, with no real time', async () => {
 		// A hand-driven virtual clock: setTimer stashes the callback; the test fires it. No real
 		// timers, no jest fake timers -- proves the budget path runs entirely on injected time.
-		let fire: (() => void) | undefined
+		let fire: (() => void | Promise<void>) | undefined
 		const virtualClock: Clock = {
 			now: () => 0,
 			setTimer: (fn) => { fire = fn; return 1 },
@@ -127,7 +127,7 @@ describe('budgetedStep', () => {
 		const requests = { a: new Pending(new Promise<number>(() => {}), virtualClock) }
 		const step = budgetedStep(virtualClock, 5_000, requests)
 		expect(fire).toBeDefined()
-		fire?.() // the budget "elapses" on virtual time
+		void fire?.() // the budget "elapses" on virtual time
 		await step // resolves, never rejects, even though the request never settled
 		expect(requests.a.isComplete).toBe(false)
 	})

@@ -442,14 +442,23 @@ export class InMemoryNetwork<TTerms, TPayload> {
 				return Promise.resolve() // dropped: schedule no delivery; the record must arrive another way or stall
 			}
 			const fromKey = this.memberKeyFor(fromName)
-			this.clock.setTimer(() => {
-				void this.consensusByName
-					.get(toName)!
-					.update(record, { key: fromKey })
-					.catch((error: unknown) => {
-						this.deliveryErrors.push(error instanceof Error ? error : new Error(String(error)))
-					})
-			}, condition?.latencyMs ?? 0)
+			// The callback RETURNS the receiver's `update` promise so the VirtualClock tracks it in flight
+			// and the drain waits for the whole update (which schedules its own onward pushes only at its
+			// end) before firing the next timer. A receiver-side throw is caught here, never back at the
+			// fire-and-forget sender (see the method doc and VirtualClock's "async timer callbacks" note).
+			this.clock.setTimer(
+				() =>
+					this.consensusByName
+						.get(toName)!
+						.update(record, { key: fromKey })
+						.then(
+							() => {},
+							(error: unknown) => {
+								this.deliveryErrors.push(error instanceof Error ? error : new Error(String(error)))
+							},
+						),
+				condition?.latencyMs ?? 0,
+			)
 			return Promise.resolve()
 		}
 	}

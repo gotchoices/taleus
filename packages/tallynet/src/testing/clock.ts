@@ -25,19 +25,33 @@
  * requests finish before the budget) -- that cascade schedules no new timer but must fully unwind
  * before the next fire, or a to-be-cleared timer fires prematurely and advances `now` wrongly.
  *
- * The gap between a fire and its consequent mutations is ~2-5 microtask hops in this system
+ * For discovery the gap between a fire and its consequent mutations is ~2-5 microtask hops
  * (`findAddress` is a resolved promise -> `issueBatch` schedules delivery timers synchronously ->
- * `await budgetedStep` schedules the budget timer synchronously), so {@link DRAIN_QUIET} = 16 is a
- * wide margin. {@link MAX_DRAIN} is a large safety valve so a pathological chain cannot spin forever.
- * If a future, deeper promise chain ever under-drains, raise `DRAIN_QUIET` (or switch to an explicit
- * quiescence signal). The run always terminates because discovery schedules a bounded number of
- * timers (deliveries fire once; budget timers fire or are cleared; rounds are bounded by `maxDepth`),
- * so the heap strictly drains.
+ * `await budgetedStep` schedules the budget timer synchronously), well under {@link DRAIN_QUIET} = 16.
+ *
+ * ── Async timer callbacks (the consensus case) ───────────────────────────────────────────────────
+ *
+ * Consensus breaks the ~2-5-hop assumption: a pushed record's `update` runs a long await chain
+ * (validate -> merge -> verify every signature -> advance state -> sign) and schedules its onward
+ * pushes only at the very end, far more than {@link DRAIN_QUIET} quiet hops after the fire. A
+ * hop-count heuristic alone would declare the system idle mid-`update`, so the pushes it is about to
+ * schedule would be missed and the echo would stall one hop short. So a timer callback MAY be async:
+ * {@link fire} tracks the promise it returns in {@link pending}, and the drain never quiesces while a
+ * callback is still in flight. The record pushes ride a callback that returns the receiver's `update`
+ * promise, so the drain waits for each delivery to fully settle (and queue its own pushes) before
+ * firing the next. Discovery callbacks return `void`, leave `pending` at 0, and are unaffected.
+ * {@link MAX_DRAIN} is a large safety valve so a pathological chain cannot spin forever. The run
+ * always terminates because both engines schedule a bounded number of timers (consensus signature
+ * sets grow monotonically and an unchanged record is not re-pushed), so the heap strictly drains.
  */
 
 import type { Clock, TimerHandle } from '../clock.js'
 
 /** Consecutive quiet microtask hops (no timer created / cleared / fired) that end one drain. */
+// NOTE: only async timer callbacks (ones returning a promise — consensus pushes) are pending-tracked and
+// awaited regardless of this count; discovery's callbacks return void, so they still rely on their whole
+// query chain fitting inside 16 quiet hops. If discovery ever grows a longer void chain that under-drains,
+// either have its timer callbacks return their promise (as consensus does) or raise DRAIN_QUIET.
 const DRAIN_QUIET = 16
 /** Safety valve: the most microtask hops a single drain will ever take before giving up. */
 const MAX_DRAIN = 100_000
@@ -49,7 +63,7 @@ interface VirtualTimer {
 	time: number
 	/** Monotonic insertion counter; the tie-break when two timers share a `time`. */
 	seq: number
-	fn: () => void
+	fn: () => void | Promise<void>
 	cancelled: boolean
 }
 
@@ -63,6 +77,8 @@ export class VirtualClock implements Clock {
 	private seq = 0
 	/** Bumped on every setTimer, every clearTimer of a live timer, and every fire; drives the drain. */
 	private mutations = 0
+	/** In-flight async timer callbacks (see the class doc). The drain never quiesces while this is > 0. */
+	private pending = 0
 	private readonly heap: VirtualTimer[] = []
 	/** The timers this clock owns, so `clearTimer` safely no-ops a foreign or `undefined` handle. */
 	private readonly own = new WeakSet<object>()
@@ -71,7 +87,7 @@ export class VirtualClock implements Clock {
 		return this.virtualNow
 	}
 
-	setTimer(fn: () => void, ms: number): TimerHandle {
+	setTimer(fn: () => void | Promise<void>, ms: number): TimerHandle {
 		const timer: VirtualTimer = { time: this.virtualNow + Math.max(0, ms), seq: this.seq++, fn, cancelled: false }
 		this.own.add(timer)
 		this.heapPush(timer)
@@ -150,19 +166,35 @@ export class VirtualClock implements Clock {
 		}
 	}
 
-	/** Fire one timer: count it (so the drain keeps running through the fallout), then run it. */
+	/**
+	 * Fire one timer: count it (so the drain keeps running through the fallout), then run it. An async
+	 * callback (one that returns a promise) is tracked in {@link pending} until it settles, so the drain
+	 * waits for the whole `update` — not just its synchronous prefix — before quiescing. See the class doc.
+	 */
 	private fire(timer: VirtualTimer): void {
 		this.mutations++
-		timer.fn()
+		const result = timer.fn()
+		if (result && typeof result.then === 'function') {
+			this.pending++
+			const settle = (): void => {
+				this.pending--
+				this.mutations++ // wake the drain so it re-checks for any timer this callback scheduled at its end
+			}
+			void result.then(settle, settle)
+		}
 	}
 
-	/** Yield to microtasks until no timer mutation for {@link DRAIN_QUIET} consecutive hops. See the class doc. */
+	/**
+	 * Yield to microtasks until, for {@link DRAIN_QUIET} consecutive hops, no timer mutated AND no async
+	 * callback is in flight ({@link pending} === 0). The `pending` guard is what lets a long `update`
+	 * finish and schedule its onward pushes before the next fire. See the class doc.
+	 */
 	private async drainMicrotasks(): Promise<void> {
 		let quiet = 0
 		for (let pass = 0; pass < MAX_DRAIN && quiet < DRAIN_QUIET; pass++) {
 			const mark = this.mutations
 			await Promise.resolve() // one microtask hop -- no global timer, no Node import
-			quiet = this.mutations === mark ? quiet + 1 : 0
+			quiet = this.mutations === mark && this.pending === 0 ? quiet + 1 : 0
 		}
 	}
 

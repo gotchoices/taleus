@@ -28,8 +28,13 @@ export type TimerHandle = unknown
 export interface Clock {
 	/** Milliseconds since the epoch (or any monotonic origin a virtual clock chooses). */
 	now(): number
-	/** Schedule `fn` to run after `ms`. Returns a handle for {@link clearTimer}. */
-	setTimer(fn: () => void, ms: number): TimerHandle
+	/**
+	 * Schedule `fn` to run after `ms`. Returns a handle for {@link clearTimer}. `fn` may be async: a
+	 * virtual clock tracks the returned promise and treats the system as settled only once it resolves
+	 * (so a callback that schedules more timers only at the end of a long await chain is still awaited);
+	 * {@link realClock} ignores the return, exactly as `setTimeout` does.
+	 */
+	setTimer(fn: () => void | Promise<void>, ms: number): TimerHandle
 	/** Cancel a timer scheduled by {@link setTimer}. A handle that already fired or was cleared is a no-op. */
 	clearTimer(handle: TimerHandle): void
 }
@@ -41,6 +46,7 @@ export interface Clock {
  */
 export const realClock: Clock = {
 	now: () => Date.now(),
-	setTimer: (fn, ms) => setTimeout(fn, ms),
+	// `fn` may be async (see the Clock doc); real time just runs it and discards the promise, as setTimeout does.
+	setTimer: (fn, ms) => setTimeout(() => void fn(), ms),
 	clearTimer: (handle) => clearTimeout(handle),
 }
