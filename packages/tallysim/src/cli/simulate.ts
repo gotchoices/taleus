@@ -24,8 +24,9 @@
  *   yarn workspace tallysim simulate <spec.json> ...
  *
  * With no `--jsonl`, JSON-lines stream to stdout. `--csv` writes the summary after the run. `--concurrent`
- * issues every cell's queries before one `runUntilIdle()` (see {@link SimRunnerDeps} — outcome metrics agree
- * with sequential mode, but round/timing metrics do not).
+ * issues every cell's queries before one `runUntilIdle()` (see {@link SimRunnerDeps}); it produces
+ * byte-identical records to sequential mode — outcome, round, and timing metrics alike — by the arm-order
+ * invariant documented on `sim/sim-runner.ts`.
  */
 
 import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from 'node:fs'

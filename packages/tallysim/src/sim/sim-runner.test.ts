@@ -315,6 +315,12 @@ describe('runSimSweep — concurrent and sequential agree, both deterministic', 
 			const sequential = await runSimSweepToArray(guardSpec)
 			const concurrent = await runSimSweepToArray(guardSpec, { concurrent: true })
 			expect(JSON.stringify(concurrent)).toBe(JSON.stringify(sequential))
+			// A latency config must actually spread events over virtual time — else the budget/delivery race
+			// window never opens and byte-equality is vacuous. (No-latency configs legitimately settle at t=0,
+			// so this guard only applies where latency forces non-zero completion for multi-hop found routes.)
+			if (config.latency) {
+				expect(Math.max(...sequential.map((r) => r.metrics.timeToCompletionMs.max))).toBeGreaterThan(0)
+			}
 		},
 	)
 })
