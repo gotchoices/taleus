@@ -1,8 +1,9 @@
 /**
- * The app shell: the top bar, the left control panel, and the graph container, wired to the one data path
- * this ticket owns — **load a network, draw it, search it** — with a light/dark theme toggle. The live-run
- * and sweep source tabs are later tickets; their mount points are marked with seam comments below so they
- * slot in without reshaping this file.
+ * The app shell: the top bar, the left control panel, and the two main views, with a light/dark theme toggle.
+ * A **view-mode toggle** (`Graph | Sweep`) switches between the graph tier (load a network, draw it, search it,
+ * replay a trace) and the sweeps tier (chart a parameter sweep). Each mode shows its own panel-control group and
+ * its own main container; switching to Sweep re-fits the chart (uPlot measures 0×0 while its tab is hidden). The
+ * live-run source tab is still a later ticket — its mount point keeps the seam comment below.
  *
  * ── The load path ──────────────────────────────────────────────────────────────────────────────────
  * A file the developer picks is read as text and handed to {@link indexTrace} (which wraps `tallysim`'s
@@ -20,6 +21,7 @@ import { buildGraph } from '../graph/model.js'
 import { createGraphView, type GraphView } from '../graph/render.js'
 import { runLayout, type LayoutController } from '../graph/layout.js'
 import { mountDisabledReplayControls, mountReplayControls, type ReplayControls } from '../replay/controls.js'
+import { mountSweepView, type SweepView } from '../sweeps/view.js'
 import { sampleNetwork } from './sample-network.js'
 import { SHELL_CSS } from './styles.js'
 import { initialTheme, paletteFor, storeTheme, type Palette, type ThemeName } from './theme.js'
@@ -39,9 +41,13 @@ interface TraceContext {
 	conditions: ReturnType<typeof compileConditions>
 }
 
+/** The viewer's two main modes: the network graph, or the parameter-sweep charts. */
+type ViewMode = 'graph' | 'sweep'
+
 /** The shell's live references — the current view, layout and replay, torn down and replaced on each load. */
 interface ShellState {
 	theme: ThemeName
+	mode: ViewMode
 	view: GraphView | undefined
 	layout: LayoutController | undefined
 	replay: ReplayControls | undefined
@@ -121,24 +127,35 @@ function renderSummary(host: HTMLElement, summary: NetworkSummary): void {
 export function mountShell(root: HTMLElement): void {
 	injectStyles()
 
-	const state: ShellState = { theme: initialTheme(), view: undefined, layout: undefined, replay: undefined }
+	const state: ShellState = { theme: initialTheme(), mode: 'graph', view: undefined, layout: undefined, replay: undefined }
 
 	const app = el('div', 'tsv-app')
 	const topbar = el('div', 'tsv-topbar')
 	const title = el('h1', 'tsv-title')
 	title.textContent = 'TallySim Viewer'
+	const modeToggle = el('div', 'tsv-mode')
+	const graphModeButton = el('button', 'tsv-mode-graph')
+	graphModeButton.textContent = 'Graph'
+	const sweepModeButton = el('button', 'tsv-mode-sweep')
+	sweepModeButton.textContent = 'Sweep'
+	modeToggle.append(graphModeButton, sweepModeButton)
 	const themeButton = el('button', 'tsv-theme')
-	topbar.append(title, themeButton)
+	topbar.append(title, modeToggle, themeButton)
 
 	const body = el('div', 'tsv-body')
 	const panel = el('div', 'tsv-panel')
+	// The panel holds two control groups — one per mode — shown/hidden by the view-mode toggle.
+	const graphControls = el('div', 'tsv-graph-controls')
+	const sweepControls = el('div', 'tsv-sweep-controls')
+	panel.append(graphControls, sweepControls)
 	const graph = el('div', 'tsv-graph')
-	body.append(panel, graph)
+	const chart = el('div', 'tsv-chart')
+	body.append(panel, graph, chart)
 	app.append(topbar, body)
 	root.append(app)
 
 	// ── Source section: load a recorded trace file, or materialise the in-page sample. ──
-	const sourceHost = panelSection(panel, 'Source')
+	const sourceHost = panelSection(graphControls, 'Source')
 	const fileInput = el('input', 'tsv-file')
 	fileInput.type = 'file'
 	fileInput.accept = '.ndjson,.jsonl,.json,.txt,application/json'
@@ -149,11 +166,11 @@ export function mountShell(root: HTMLElement): void {
 	// SEAM: the live-run driver tab and the sweep-source tab mount here in later tickets.
 
 	// ── Summary section: the loaded network at a glance. ──
-	const summaryHost = panelSection(panel, 'Network')
+	const summaryHost = panelSection(graphControls, 'Network')
 	summaryHost.id = 'tsv-summary'
 
 	// ── Search section: highlight + centre a node by entity id. ──
-	const searchHost = panelSection(panel, 'Find entity')
+	const searchHost = panelSection(graphControls, 'Find entity')
 	const searchInput = el('input', 'tsv-search')
 	searchInput.type = 'text'
 	searchInput.placeholder = 'entity id, e.g. 3'
@@ -161,8 +178,11 @@ export function mountShell(root: HTMLElement): void {
 	searchHost.append(searchInput, searchMiss)
 
 	// ── Replay section: the payment-search transport (disabled until a trace with sessions is loaded). ──
-	const replayHost = panelSection(panel, 'Replay')
+	const replayHost = panelSection(graphControls, 'Replay')
 	state.replay = mountDisabledReplayControls(replayHost)
+
+	// ── Sweep view: the parameter-sweep charts (its own panel controls + the chart main container). ──
+	const sweepView: SweepView = mountSweepView({ panelHost: sweepControls, chartHost: chart, palette: paletteFor(state.theme) })
 
 	function setStatus(message: string): void {
 		status.textContent = message
@@ -263,7 +283,27 @@ export function mountShell(root: HTMLElement): void {
 		applyChrome(palette)
 		state.view?.setPalette(palette)
 		state.replay?.setPalette(palette)
+		sweepView.setPalette(palette)
 		themeButton.textContent = next === 'dark' ? 'Light theme' : 'Dark theme'
+	}
+
+	/**
+	 * Switch the main view mode. Each mode shows its own panel-control group and its own main container; the
+	 * other pair is hidden. Switching to Sweep re-fits the chart, because uPlot measured 0×0 while its container
+	 * was `display:none` and only finds its real size once shown.
+	 */
+	function applyMode(next: ViewMode): void {
+		state.mode = next
+		const sweep = next === 'sweep'
+		graphControls.style.display = sweep ? 'none' : ''
+		graph.style.display = sweep ? 'none' : ''
+		sweepControls.style.display = sweep ? '' : 'none'
+		chart.style.display = sweep ? '' : 'none'
+		graphModeButton.classList.toggle('tsv-mode-active', !sweep)
+		sweepModeButton.classList.toggle('tsv-mode-active', sweep)
+		if (sweep) {
+			sweepView.relayout()
+		}
 	}
 
 	fileInput.addEventListener('change', () => {
@@ -290,6 +330,13 @@ export function mountShell(root: HTMLElement): void {
 	themeButton.addEventListener('click', () => {
 		applyTheme(state.theme === 'dark' ? 'light' : 'dark')
 	})
+	graphModeButton.addEventListener('click', () => {
+		applyMode('graph')
+	})
+	sweepModeButton.addEventListener('click', () => {
+		applyMode('sweep')
+	})
 
 	applyTheme(state.theme)
+	applyMode(state.mode)
 }

@@ -4,9 +4,10 @@
  * `import './x.css'` needs a module `.d.ts` shim, and a plain string sidesteps that with no build plumbing.
  *
  * ── Layout ─────────────────────────────────────────────────────────────────────────────────────────
- * A column: a fixed-height top bar over a row of a fixed-width left panel and the graph container, which
- * fills the rest. The graph container is `position: relative` so the renderer's absolutely-positioned
- * tooltip (and the WebGL-missing message) anchor to it.
+ * A column: a fixed-height top bar over a row of a fixed-width left panel and the two main containers — the
+ * graph and the sweep chart — of which the view-mode toggle shows exactly one, filling the rest. Both main
+ * containers are `position: relative` so an absolutely-positioned child (the renderer's tooltip / WebGL-missing
+ * message) anchors to it. The panel likewise holds two control groups, one per mode.
  *
  * ── Theming ────────────────────────────────────────────────────────────────────────────────────────
  * Chrome colours come from CSS custom properties (`--tsv-*`) that the shell sets from the active palette on
@@ -118,6 +119,131 @@ html, body, #app {
 	border: 1px solid var(--tsv-border);
 	border-radius: 4px;
 	padding: 0.35rem 0.5rem;
+}
+
+#tsv-app select {
+	font: inherit;
+	color: var(--tsv-text);
+	background: var(--tsv-surface);
+	border: 1px solid var(--tsv-border);
+	border-radius: 4px;
+	padding: 0.3rem 0.4rem;
+	max-width: 100%;
+}
+
+/* ── View-mode toggle (Graph | Sweep) ── */
+#tsv-mode {
+	display: flex;
+	gap: 0.25rem;
+}
+
+#tsv-app #tsv-mode button.tsv-mode-active {
+	background: var(--tsv-text);
+	color: var(--tsv-surface);
+	border-color: var(--tsv-text);
+}
+
+/* ── Per-mode panel control groups ── */
+#tsv-graph-controls,
+#tsv-sweep-controls {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+/* ── Sweep chart main container ── */
+#tsv-chart {
+	position: relative;
+	flex: 1;
+	min-width: 0;
+	background: var(--tsv-surface);
+}
+
+.tsv-chart-host {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	height: 100%;
+	padding: 0.75rem;
+}
+
+.tsv-chart-plot {
+	flex: 1 1 auto;
+	min-height: 0;
+	min-width: 0;
+}
+
+.tsv-chart-legend {
+	flex: 0 0 auto;
+	max-height: 9rem;
+	overflow-y: auto;
+	margin-top: 0.5rem;
+}
+
+.tsv-chart-empty {
+	flex: 1;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	padding: 2rem;
+	color: var(--tsv-text-secondary);
+}
+
+/* uPlot's legend/axis colours ride the shell theme variables (the chart injects only structural CSS). */
+#tsv-chart .u-legend,
+#tsv-chart .u-legend .u-value {
+	color: var(--tsv-text);
+}
+
+#tsv-chart .u-axis {
+	color: var(--tsv-text-secondary);
+}
+
+/* ── Sweep panel controls ── */
+.tsv-sweep-row {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+}
+
+.tsv-sweep-label {
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--tsv-text-secondary);
+}
+
+.tsv-sweep-control {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.tsv-sweep-series {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+}
+
+.tsv-sweep-check {
+	font-size: 0.85rem;
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+}
+
+.tsv-sweep-note {
+	color: var(--tsv-text-secondary);
+	font-size: 0.8rem;
+	line-height: 1.4;
+}
+
+.tsv-sweep-status {
+	color: #c0392b;
+	font-size: 0.85rem;
+	min-height: 1rem;
+	white-space: pre-wrap;
 }
 
 #tsv-status {

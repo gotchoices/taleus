@@ -8,10 +8,10 @@ server**: everything runs in the browser from files a developer loads.
 
 This document is the canonical design and grows one ticket at a time. It currently covers the **core tier**
 — the platform-neutral, headlessly-tested logic that loads and interprets a recorded run — the **graph tier**
-(the `graphology` model, the seeded worker layout, and the `sigma` renderer), the **app shell** (load a
-network, draw it, search it, switch theme), the **replay tier** (the transport that plays a payment search
-across the graph), and the settled **stack decision**. The remaining rendering tiers (live in-browser runs,
-sweep charts) extend it as they land.
+(the `graphology` model, the seeded worker layout, and the `sigma` renderer), the **app shell** (a `Graph |
+Sweep` view-mode toggle over: load a network, draw it, search it, switch theme), the **replay tier** (the
+transport that plays a payment search across the graph), the **sweeps view** (parameter-sweep charts), and the
+settled **stack decision**. The remaining rendering tier (live in-browser runs) extends it as it lands.
 
 Read first: [`packages/tallysim/docs/design.md`](../../tallysim/docs/design.md) (the simulator whose output
 this viewer reads — especially its *Trace & replay format* and *Discovery simulation* sections) and
@@ -41,7 +41,7 @@ under jest with no DOM. Doing the logic first (TDD) keeps the rendering tickets 
 | `trace-index.ts` | Wrap `parseTrace`; index one trace into per-session, time-ordered event lists + global time bounds. Incremental-friendly (a builder accepts events in chunks for the live-run case). |
 | `deanonymise.ts` | Map an anonymised trace nonce back to the exact tally edge (the load-bearing decoder — see below). |
 | `timeline.ts` | A pure playback state machine: transport reducers + the derived "active set" (lit nodes/edges, pruned candidates, found plans) at any `currentTime`. |
-| `sweep-data.ts` | Parse sweep JSON-lines + CSV into tidy chart series (`{seriesKey, points:{x,y}[]}`), with non-finite values read as absent (never `0`). |
+| `sweep-data.ts` | Read sweep JSON-lines + CSV to a common `SweepTable` (rows + role-classified columns), then to tidy chart series (`{seriesKey, points:{x,y}[]}`) — with non-finite **and** distribution-`count:0` values read as a gap (never `0`), repeated seeds collapsed to a mean per cell, and series aligned onto a shared x-axis. See § Sweeps view. |
 
 ### The de-anonymiser insight
 
@@ -233,6 +233,70 @@ return — unlike relay events, it adds no disclosure. It is a cross-package cha
 additive field, the originator emission, and a `TRACE_FORMAT_VERSION` bump in tallysim), deliberately out of
 the viewer's scope; it is filed as a backlog ticket.
 
+## Sweeps view (`src/sweeps/`)
+
+The sweeps view charts a **parameter sweep**: one measured outcome against one varied parameter, one line per
+series. It answers the question `tallysim` exists to ask — e.g. *how does the chance a payment routes
+(`pRouteExists` / `pFoundGivenExists`) rise as the network grows more connected (`edgesPerNode`, `meanDegree`)?*
+It is the second main mode of the shell, reached by the `Graph | Sweep` toggle. Like the other rendering tiers
+it splits pure-from-browser: the series maths is the tested `core/sweep-data.ts`; only the loader glue and the
+uPlot renderer touch the DOM.
+
+| Module | Responsibility | Tested |
+|---|---|---|
+| `core/sweep-data.ts` | Read both formats to a `SweepTable`; classify columns; default the pickers; group distribution families; rows → series → mean-per-cell → aligned. | jest |
+| `source.ts` | Detect a file's format (extension, else sniff) and dispatch to the right reader; carry an embedded sample sweep. | jest-adjacent (pure; covered by `sweep-data`'s tests + build) |
+| `chart.ts` | The uPlot line renderer (one line per series, palette colours, gaps, live legend, resize). | build + manual |
+| `view.ts` | The panel (file loader + x / metric / sub-field / series-by pickers) wiring the above to the chart. | build + manual |
+
+### Both record kinds, read by the columns present
+
+`tallysim` writes two record shapes and the view reads **whichever columns are present** — it never assumes one:
+
+- an **oracle** `RunRecord` (route-existence experiments): `pRouteExists`, `routeExistsCount`, and a `pathLength`
+  distribution;
+- a **discovery** `SimRunRecord` (found-vs-oracle experiments): `pFoundGivenExists`, `foundCount`, cost
+  distributions (`timeToFirstPlanMs`, `messages`, `nodesTouched`, …), and a `pruneReasons` numeric tally.
+
+Both JSON-lines and the CSV summary flatten to the **same** column vocabulary (`core/sweep-data.ts` flattens the
+nested JSON-lines record exactly as `tallysim`'s `serialize-records.ts` flattens it into the CSV), so a sweep
+loaded from `.jsonl` and from `.csv` yields identical lines — pinned headlessly by `sweep-data.test.ts`. Each
+column is classified as a `dimension` (`generator`/`capacity`), a `param`, the `seed`, or a `metric`, which
+drives the pickers: the **x-axis** offers any numeric column that is not the seed (a swept param, or a headline
+metric like `meanDegree`); the **metric** offers the scalar metrics plus one entry per distribution family; the
+**series-by** offers the dimensions and the other varied params.
+
+### What becomes a gap, and why never `0`
+
+A missing point is always a **line gap**, never a plotted `0` — a `0` would read as a real measurement:
+
+- **Non-finite values** — e.g. an unbounded `maxFlow`, serialised as JSON `null` / an empty CSV cell — are read
+  as *absent* by `sweep-data`, so the point is simply omitted.
+- **A distribution with no samples** is the load-bearing subtle case. `tallysim`'s `summarizeDistribution`
+  reports `count: 0` with *every* scalar a finite **`0`** (not `Infinity`/`NaN`), so plotting `pathLength.mean`
+  where `pathLength.count === 0` would draw a spurious `y = 0`. The view guards this with
+  `SeriesSpec.gapWhenZeroColumn = ${family}.count`, so that cell becomes a gap — **except** when the chosen
+  sub-field *is* `count`, where `0` is a real value and takes no guard.
+
+### Seed handling: mean per cell, not a per-seed scatter
+
+A sweep repeats each `(dimension, param…)` cell over several `seed`s, so a series holds several points at the
+same x. The view **averages them to one mean point per `(series, x)` cell** (`meanPerCell`) and notes this under
+the pickers. It deliberately does **not** scatter the raw per-seed points: uPlot's aligned-data model holds one
+`y` per `x` per series, so coincident-x seeds cannot be shown without faceting, and raw points would clutter a
+multi-series line chart. Aggregating-and-documenting is the chosen trade; if per-seed spread ever matters, a
+min/max band per cell (a second uPlot series) is the natural extension.
+
+### Rendering (uPlot)
+
+`chart.ts` wraps `uPlot` (see § Stack decision). The series it draws are already tidy (`alignSeries`: a shared
+ascending x-axis, `null` for a gap), so it feeds uPlot its `AlignedData` directly. Notes that bit a first
+implementation: uPlot defaults the x scale to **time** (disabled via `scales.x.time = false`, since x is a
+plain swept number); the legend is relocated below the plot (`legend.mount`) so a tall legend never squeezes the
+plot area; `points.show` is on so a single-cell sweep shows its one point; and a `display:none` tab measures
+0×0, so the shell calls `relayout()` (→ `chart.resize()`) when the Sweep tab becomes visible. Series colours are
+the palette's colour-blind-safe `seriesScale`; the legend/axis text re-themes via the shell CSS variables.
+
 ## Stack decision
 
 Settled here so the rendering tickets do not re-litigate it.
@@ -268,9 +332,13 @@ Settled here so the rendering tickets do not re-litigate it.
   `src/graph/model.ts`, and the pure replay modules `src/replay/{clock,routes,paint}.ts` — with hand-built
   fixtures, no browser, no sigma.
 - `yarn build` type-checks (`tsc --noEmit`) then produces the static bundle (`vite build`) from the app shell.
-  The renderer (`render.ts`), the replay transport (`replay/controls.ts`) and the shell (`app/**`) are
-  **browser-only** (WebGL, `document`, `requestAnimationFrame`, a Web Worker); their gate is the build plus a
-  manual interactivity check (`yarn dev` → "Load sample" → pan/zoom/hover/search; load a trace → play / scrub /
-  hover a pruned edge / toggle colour-by-session / select a found route), not jest.
+  The renderer (`render.ts`), the replay transport (`replay/controls.ts`), the sweeps chart + view
+  (`sweeps/{chart,view}.ts`) and the shell (`app/**`) are **browser-only** (WebGL, `document`,
+  `requestAnimationFrame`, a Web Worker); their gate is the build plus a manual interactivity check (`yarn dev` →
+  "Load sample" → pan/zoom/hover/search; load a trace → play / scrub / hover a pruned edge / toggle
+  colour-by-session / select a found route; switch to **Sweep** → "Load sample sweep" or a file → change the
+  x / metric / sub-field / series-by pickers; confirm the same sweep loaded from `.jsonl` vs `.csv` draws the
+  same lines), not jest. The sweep **source** loader (`sweeps/source.ts`) is pure but thin; its readers are the
+  jest-covered `sweep-data` functions.
 - A **headless-WebGL smoke test** (rendering a trace in a real browser, asserting on the result) is **deferred**
   — it needs Playwright / headless-Chromium and is not reliably agent-runnable; it belongs with CI or a human.
