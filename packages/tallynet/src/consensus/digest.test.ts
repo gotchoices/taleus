@@ -77,6 +77,51 @@ describe('recordDigest — payload and topology are covered', () => {
 		const b = sampleRecord({ payload: { memo: 'lunch', amount: '100' } })
 		expect(toHex(recordDigest('P', a))).toBe(toHex(recordDigest('P', b)))
 	})
+
+	it('a changed member yields different bytes (topology is signed)', () => {
+		const a = sampleRecord()
+		const b = sampleRecord({
+			topology: {
+				members: [
+					{ types: ['P'], address: { key: 'alice' } },
+					{ types: ['P', 'R'], address: { key: 'mallory' } }, // bob → mallory
+				],
+				links: { nonce1: { source: 'alice', target: 'bob', intents: { lift: 'termsAB' } } },
+			},
+		})
+		expect(toHex(recordDigest('P', a))).not.toBe(toHex(recordDigest('P', b)))
+	})
+
+	it('a changed link term yields different bytes (topology is signed)', () => {
+		const a = sampleRecord()
+		const b = sampleRecord({
+			topology: {
+				members: a.topology.members,
+				links: { nonce1: { source: 'alice', target: 'bob', intents: { lift: 'termsXY' } } },
+			},
+		})
+		expect(toHex(recordDigest('P', a))).not.toBe(toHex(recordDigest('P', b)))
+	})
+
+	it('the members array is order-sensitive (its order is the immutable core)', () => {
+		const a = sampleRecord()
+		const b = sampleRecord({
+			topology: {
+				members: [a.topology.members[1], a.topology.members[0]], // reversed
+				links: a.topology.links,
+			},
+		})
+		expect(toHex(recordDigest('P', a))).not.toBe(toHex(recordDigest('P', b)))
+	})
+
+	it('the links map is order-independent (keyed by nonce, so insertion order is irrelevant)', () => {
+		const base = sampleRecord()
+		const linkA = { source: 'alice', target: 'bob', intents: { lift: 'termsAB' } }
+		const linkB = { source: 'bob', target: 'alice', intents: { lift: 'termsBA' } }
+		const forward = sampleRecord({ topology: { members: base.topology.members, links: { n1: linkA, n2: linkB } } })
+		const reversed = sampleRecord({ topology: { members: base.topology.members, links: { n2: linkB, n1: linkA } } })
+		expect(toHex(recordDigest('P', forward))).toBe(toHex(recordDigest('P', reversed)))
+	})
 })
 
 describe('recordDigest — the promise set (commit preimage only)', () => {
