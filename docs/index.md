@@ -33,6 +33,10 @@ system) and flags its own open questions.
 - **[../packages/tallynet/docs/design.md](../packages/tallynet/docs/design.md)** — TallyNet, the in-repo port
   of ChipNet that runs lift discovery and commit; its boundary with `taleus-core` and the multi-denomination
   extension. Upstream assessment: [chipnet-review.md](../packages/tallynet/docs/chipnet-review.md).
+- **[../packages/tallysim/docs/design.md](../packages/tallysim/docs/design.md)** — TallySim, the platform-neutral
+  tally-network simulator: seeded network generators, a whole-graph oracle (the routing ground truth), and an
+  experiment runner that sweeps connectivity and records findings (e.g. how connected a network must be before
+  payments usually route).
 - **[concurrency-model.md](concurrency-model.md)** — why a signature-gated, insert-only schema stays safe
   on the Sereus/Optimystic substrate: the CRDT lens and the two load-bearing platform assumptions.
 

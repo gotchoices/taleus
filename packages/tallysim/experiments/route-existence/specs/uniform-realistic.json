@@ -1,0 +1,13 @@
+{
+	"_note": "Route-existence sweep: uniform (Erdos-Renyi) networks, REALISTIC capacity (lognormal mu=3 sigma=1, median limit ~20 units, randomised starting balances). Same grid and amount (10) as uniform-unlimited, so the curves are directly comparable and the only difference is capacity. Randomised balances make a direction's spare capacity uniform over its swing, so a payment of 10 is often blocked even though the topology has a path. See ../README.md and packages/tallysim/docs/design.md.",
+	"base": {
+		"network": { "generator": "uniform", "params": { "entityCount": 100, "meanDegree": 2 }, "capacity": { "kind": "lognormal", "mu": 3, "sigma": 1, "randomizeBalance": true }, "seed": 1000 },
+		"workload": { "kind": "payment", "queries": 100, "amount": { "dist": "constant", "params": { "value": 10 } }, "depth": 4, "seed": 2000 }
+	},
+	"vary": [
+		{ "path": "network.params.meanDegree", "values": [0.5, 1, 1.5, 2, 3, 4, 6] },
+		{ "path": "network.params.entityCount", "values": [100, 1000, 10000] },
+		{ "path": "workload.depth", "values": [4, 6, 8] }
+	],
+	"seeds": [1, 2, 3]
+}

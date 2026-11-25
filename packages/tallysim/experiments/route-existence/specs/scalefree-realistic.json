@@ -1,0 +1,13 @@
+{
+	"_note": "Route-existence sweep: scale-free (Barabasi-Albert) networks, REALISTIC capacity (lognormal mu=3 sigma=1, randomised balances). Same grid and amount (10) as scalefree-unlimited, so the two are directly comparable and the only difference is capacity. See ../README.md and packages/tallysim/docs/design.md.",
+	"base": {
+		"network": { "generator": "scale-free", "params": { "entityCount": 100, "edgesPerNode": 2 }, "capacity": { "kind": "lognormal", "mu": 3, "sigma": 1, "randomizeBalance": true }, "seed": 1000 },
+		"workload": { "kind": "payment", "queries": 100, "amount": { "dist": "constant", "params": { "value": 10 } }, "depth": 4, "seed": 2000 }
+	},
+	"vary": [
+		{ "path": "network.params.edgesPerNode", "values": [1, 2, 3, 4] },
+		{ "path": "network.params.entityCount", "values": [100, 1000, 10000] },
+		{ "path": "workload.depth", "values": [4, 6, 8] }
+	],
+	"seeds": [1, 2, 3]
+}

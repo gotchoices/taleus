@@ -1,6 +1,6 @@
 import { FORMAT_VERSION, type Network, type Tally } from './model.js'
 import { Oracle } from './oracle.js'
-import { runSweep, runSweepToArray, type RunRecord } from './runner.js'
+import { runSweep, runSweepToArray } from './runner.js'
 import type { EconomyStep, ScenarioSpec, SweepSpec } from './scenario.js'
 import { recordsToJsonLines } from './serialize-records.js'
 

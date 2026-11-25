@@ -5,7 +5,8 @@ independent halves: **how connected must a tally network be before a payment can
 through it** (measured by a whole-graph *oracle*), and **does the real `tallynet` routing protocol find the
 routes the oracle proves exist** (measured by replaying the protocol on the same graphs).
 
-**Status:** network-model tier **and oracle** built. The package builds, tests and lints, and ships:
+**Status:** network-model tier, oracle, **and the experiment runner + CLI** built. The package builds, tests
+and lints, and ships:
 
 - the plain, JSON-serialisable **network data model** (`src/model.ts`) — entities (nodes) joined by tallies
   (edges), with an `Infinity` ↔ `null` serialisation sentinel for unlimited credit limits;
@@ -21,14 +22,26 @@ routes the oracle proves exist** (measured by replaying the protocol on the same
   arrays for fast search;
 - the whole-graph **oracle** (`src/oracle.ts`) — route existence + shortest length (bounded BFS),
   self-payment / circular-clearing cycles, max-flow (Edmonds–Karp), and capped clearing-cycle availability,
-  anchored by an independent brute-force / min-cut verification harness.
+  anchored by an independent brute-force / min-cut verification harness;
+- the **experiment harness** — the scenario/sweep model (`src/scenario.ts`), the streaming sweep runner
+  (`src/runner.ts`), pure metric aggregation (`src/metrics.ts`), JSON-lines + CSV serialisers
+  (`src/serialize-records.ts`), and the one Node-only file, the CLI (`src/cli/sweep.ts`);
+- a first checked-in experiment (`experiments/route-existence/`) measuring P(route exists) vs. connectivity.
 
-The experiment runner + CLI and the protocol-replay tiers come in later tess tickets.
+The protocol-replay tiers come in later tess tickets.
+
+Run a sweep (reads a `SweepSpec` JSON file, streams JSON-lines, optionally writes a CSV summary):
+
+```
+yarn workspace tallysim sweep <spec.json> [--jsonl <out.jsonl>] [--csv <out.csv>]
+```
 
 - [docs/design.md](docs/design.md): the canonical simulator design — tiers, model, capacity model,
-  generators, PRNG, and stubs for the later tiers.
+  generators, PRNG, oracle, the runner/experiments tier, and the first experiment's finding.
+- [experiments/route-existence/](experiments/route-existence/): the first checked-in experiment —
+  committed specs, data, and a deterministic `regenerate.sh`.
 
 TallySim reuses `tallynet`'s seeded PRNG (`SeededRandom`, via the `tallynet/testing` subpath export) so a
 single seed replays graph generation and, in later tiers, the protocol's own randomness. The core is
 browser-safe (no Node globals, no `Math.random`, no result depending on unordered-key iteration); the only
-Node-specific file will be the future CLI.
+Node-specific file is the CLI (`src/cli/`).

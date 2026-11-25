@@ -1,0 +1,13 @@
+{
+	"_note": "Route-existence sweep: scale-free (Barabasi-Albert) networks, UNLIMITED capacity. Varies edges-per-new-entity x entity count x depth, over seeds 1-3. Scale-free graphs are always connected (every new entity attaches to the existing graph), so here the interesting variable is DEPTH: can a route be found within D hops, not whether one exists at all. The x-axis mean degree is ~2*edgesPerNode. Amount is a constant 10 (same across all four route-existence specs). See ../README.md and packages/tallysim/docs/design.md.",
+	"base": {
+		"network": { "generator": "scale-free", "params": { "entityCount": 100, "edgesPerNode": 2 }, "capacity": { "kind": "unlimited" }, "seed": 1000 },
+		"workload": { "kind": "payment", "queries": 100, "amount": { "dist": "constant", "params": { "value": 10 } }, "depth": 4, "seed": 2000 }
+	},
+	"vary": [
+		{ "path": "network.params.edgesPerNode", "values": [1, 2, 3, 4] },
+		{ "path": "network.params.entityCount", "values": [100, 1000, 10000] },
+		{ "path": "workload.depth", "values": [4, 6, 8] }
+	],
+	"seeds": [1, 2, 3]
+}

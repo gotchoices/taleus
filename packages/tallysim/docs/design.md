@@ -9,8 +9,10 @@ question in two independent halves:
    oracle proves exist?* This is measured by replaying the protocol on the same networks (later tiers).
 
 The two are kept deliberately apart (see [Tiers](#tiers)). This document is the canonical design; it grows
-one tier at a time. This file currently covers the **network-model tier** — the data model, the capacity
-model, the generators, and the structural utilities. Later tiers fill the stubbed sections.
+one tier at a time. This file currently covers the **network-model tier** (the data model, the capacity
+model, the generators, and the structural utilities), the **oracle**, and the **runner / experiments** tier
+(the scenario/sweep model, the sweep runner, the metrics, the output serialisers, the CLI, and the first
+checked-in experiment). The protocol-replay tiers fill the remaining stubbed section.
 
 Read first: [`docs/architecture.md`](../../../docs/architecture.md) (the Taleus system overview) and
 [`packages/tallynet/docs/design.md`](../../tallynet/docs/design.md) (the lift protocol this simulator
@@ -25,7 +27,7 @@ confused with a failure in the other:
 |---|---|---|
 | **Network model + generators** | Build random tally networks as plain data. | built |
 | **Oracle** | See the whole graph; answer *does a route exist / how much is payable / can debt clear* by direct search. The **ground truth**. | built |
-| **Runner / experiments** | Sweep a parameter over many generated networks, run the oracle per query, record metrics, check in findings. | later (`tallysim-runner`) |
+| **Runner / experiments** | Sweep a parameter over many generated networks, run the oracle per query, record metrics, check in findings. | built |
 | **Discovery / consensus** | Replay the real `tallynet` protocol on the same graphs and compare "found vs. oracle". | later (`tallysim-discovery`, `tallysim-consensus`) |
 
 The oracle answers *could the network ever have carried this lift*; the protocol tiers answer *did the
@@ -275,17 +277,153 @@ cross-checked against seeded random small graphs.
 
 ## Metrics
 
-*To come — `tallysim-runner`.* Oracle-level metrics the runner will aggregate over a workload, all derived
-from the queries above: **P(route exists)** (fraction of payment queries with a route),
-**path-length distribution** (over `shortestLength` of successful queries), **max-flow distribution** (over
-sampled pairs), **largest-connected-component fraction** (reusing `src/structure.ts`), and
-**clearing-cycle availability** (fraction of sampled nodes with ≥ 1 usable cycle, and the cycle-length
-distribution).
+Metric aggregation is a **pure module** (`src/metrics.ts`): raw per-query results in, a run summary out — no
+network, no oracle, no filesystem, so it is testable with hand-built inputs and the browser viewer reuses it
+unchanged. The runner runs the oracle to produce the raw results, then calls one summariser per workload
+kind. A scalar `DistributionSummary` (`count`, `mean`, `min`, `max`, `p50`, `p90`, `p99`, by linear-
+interpolated quantile over the sorted samples) condenses each distribution.
+
+Every run carries two **structural** metrics (one value per network, independent of the workload): the
+network's actual `meanDegree` (`2 · edges / entities` — the headline x-axis, so a combined data file is
+comparable across generators that parameterise degree differently) and its `largestComponentFraction`
+(reusing `src/structure.ts`). A `payment` workload adds:
+
+- **P(route exists)** (`pRouteExists`) — fraction of payment queries with a route within the depth bound;
+  the headline metric, plus the raw `routeExistsCount`.
+- **path-length distribution** (`pathLength`) — a `DistributionSummary` of `shortestLength` over the
+  **successful** queries.
+- **max-flow distribution** (`maxFlow`) — a `DistributionSummary` over the sampled pairs; present only when
+  max-flow was opted into (see the runner).
+
+A `clearing` workload adds `sampledNodeCount`, `clearingAvailability` (fraction of sampled nodes with ≥ 1
+usable cycle), and a `clearingCycleLength` distribution over the nodes that have one.
+
+**Degenerate inputs are guarded, not special-cased by the caller.** A fraction over zero trials is **0, never
+`NaN`**; a distribution over zero samples reports `count: 0` with zeroed scalars rather than throwing. The
+caller distinguishes "no data" by that `count`, never by a `NaN`.
 
 ## Runner / experiments
 
-*To come — `tallysim-runner`.* The sweep runner, CLI, output serialisers, the "step the economy" seam, and
-the first checked-in experiment.
+The runner turns a sweep description into a stream of per-run records; the CLI writes those records to files;
+a first experiment uses the whole pipeline to answer the tier's headline question.
+
+### Scenario and sweep model
+
+Two plain, JSON-serialisable shapes (`src/scenario.ts`) describe an experiment, so a run can be saved,
+shared and replayed:
+
+- A **`ScenarioSpec`** is one network plus one workload. Its `network` (`NetworkSource`) is **either** a
+  generator recipe — `{ generator, params, capacity, seed }` — **or** an already-materialised `Network`
+  (`{ materialized }`); both are valid inputs and the runner materialises the former. The generator variant
+  carries its `CapacityDistribution` explicitly (the generators need it, and it is not a plain number, so it
+  cannot live in the numeric `params` map). The `workload` (`WorkloadSpec`) is a batch of random queries of
+  one `kind` (`payment` or `clearing`), how many (`queries`), an `amount` distribution (`constant` or
+  `uniform`), a depth bound (`depth`), a workload PRNG `seed`, and an optional opt-in `metrics` list.
+- A **`SweepSpec`** is a `base` scenario, a list of `vary` dimensions (`{ path, values }`, each a dotted path
+  into the base and the values to step it through), and a list of `seeds` to repeat every cell over. The
+  runner takes the **cartesian product** of all `vary` dimensions — one record per `(valueA, valueB, …, seed)`
+  cell. One or two dimensions is the readable norm (and what a plot wants); the runner imposes no arity cap,
+  and the checked-in route-existence experiment uses three (degree, entity count, depth).
+
+### Seeds — three independent reproducible streams
+
+Each run derives **three** separate `SeededRandom` streams, every one offset by the run seed (one of
+`spec.seeds`): the **network** seed (graph generation), the **workload** seed (query pairs + amounts), and
+the **economy** seed (the trading seam, below). The network and workload seeds are independent (distinct base
+seeds, distinct derived streams), so a cell repeated at a different run seed draws a genuinely different
+network *and* workload, yet the whole sweep replays byte-for-byte from the spec. The determinism rule from
+the model tier (no `Math.random`, no result depending on unordered-key iteration) holds end to end: **a sweep
+run twice produces byte-identical output.**
+
+### Records and the sweep run
+
+`runSweep(spec)` is a **generator** that touches no filesystem: it yields one `RunRecord` per cell × seed and
+retains none, so a large sweep streams without buffering. A `RunRecord` is `{ generator, capacity, params,
+seed, metrics }` — the generator id and capacity-distribution kind (so a combined file is self-describing),
+the resolved sweep coordinates (`params`, keyed by each `vary` path), the run seed, and the aggregated
+`RunMetrics`. `runSweepToArray` collects a whole sweep for small cases and tests. The browser viewer drives
+the same `runSweep` live in a page; only the CLI adds file I/O.
+
+**Max-flow is opt-in per run** — a workload must list `'max-flow'` in `metrics`, because Edmonds–Karp is
+`O(V·E²)` and far costlier than the BFS route-existence query. When enabled the runner samples a bounded
+subset of the drawn query pairs (`maxFlowSamples`, default 32) rather than running it on every query. Default
+is off.
+
+### Output serialisation and the CLI
+
+Two **pure, platform-neutral** serialisers (`src/serialize-records.ts`): a record → one **JSON-lines** string
+(the full nested record), and a set of records → a **CSV summary** (one row per run; columns = `generator`,
+`capacity`, the varied param paths, `seed`, then the scalar metrics, each `DistributionSummary` expanded to
+`count/mean/min/max/p50/p90/p99` columns). Non-finite numbers (an unbounded max-flow is `Infinity`) serialise
+as JSON `null` / an empty CSV cell, matching the model's `Infinity ↔ null` convention; finite records
+round-trip through JSON-lines exactly. A streaming `CsvAccumulator` lets the CLI build the CSV on the **same
+pass** it writes JSON-lines, keeping only lightweight per-row scalars rather than the full record set.
+
+The **CLI** (`src/cli/sweep.ts`) is the **one Node-specific file** in the package — it does file I/O, so it
+lives outside the neutral core, is excluded from the `no-node-globals` guard and the neutral
+`tsconfig.build.json`, and is compiled with node types by `tsconfig.cli.json`. It reads a `SweepSpec` JSON
+file, **streams** the JSON-lines records to stdout (or `--jsonl <path>`) as each is produced, and writes the
+CSV summary to `--csv <path>`:
+
+```
+yarn workspace tallysim sweep <spec.json> [--jsonl <out.jsonl>] [--csv <out.csv>]
+```
+
+### The "step the economy" seam
+
+A real tally network is not static: entities trade, so credit capacity is consumed in one direction and
+restored (especially by circular lifts) over time. This tier does **not** model that — every tally starts
+square (balance 0) and nothing moves it. The hook is the `EconomyStep { step(network, rng) }` interface; each
+run calls it once, before the graph view is built, on the run's own (economy) `SeededRandom`. The shipped
+default is `noOpEconomyStep` (does nothing). A real implementation — producers/consumers trading, circular
+lifts restoring capacity — is the backlog item **`feat-tallysim-trading-model`**. (A trading model that
+*mutates* a `materialized` network must clone it per run; the no-op default never mutates, so the runner
+returns a materialised input by reference today — see the `NOTE` in `runner.ts`.)
+
+### First experiment — route existence vs. connectivity
+
+`experiments/route-existence/` is the tier's first checked-in result. It asks the headline question —
+**how connected must a tally network be before a payment usually finds a route?** — by sweeping four committed
+specs (`specs/*.json`): the `uniform` (Erdős–Rényi) and `scale-free` (Barabási–Albert) generators, each with
+**unlimited** capacity and then a **realistic** capacity (`lognormal`, `mu=3`, `sigma=1`, randomised balances
+— median credit limit ≈ 20 units). All four hold the payment amount at a constant 10, so the *only* difference
+between the unlimited and realistic runs is capacity. Each sweep varies the degree parameter × entity count
+`N ∈ {100, 1000, 10000}` × depth bound `D ∈ {4, 6, 8}`, over seeds `[1, 2, 3]` (≈ 100 queries per run). The
+whole grid runs in a few seconds (route existence is a cheap BFS), so the seed count is modest only by choice,
+not necessity. `regenerate.sh` rebuilds and reproduces the committed `out/*.{jsonl,csv}` and the combined
+`route-existence.jsonl` **byte-identically**.
+
+**What the data shows.** There are *two distinct thresholds*, and the headline metric tracks the second, not
+the first:
+
+1. **A giant connected component appears at mean degree ≈ 1** — the classic percolation threshold. In the
+   `uniform` data the `largestComponentFraction` jumps from ~0 below degree 1 (0.05 at degree 1) to ~0.57 at
+   1.5, ~0.80 at 2, ~0.94 at 3. So *structural* connectivity turns up right where theory predicts.
+2. **Depth-bounded route existence turns up much later, along `degree^D ≈ N`.** Being in one component is not
+   enough: within `D` hops a BFS reaches only ≈ `degree^D` nodes, so a route to a *random* target exists with
+   useful probability only once `degree^D ≳ N`, i.e. `degree ≳ N^{1/D}`. The data fits this closely — e.g. at
+   `N = 10000`: `D = 4` needs degree ≈ 10 (at degree 6, `6^4 ≈ 1300`, so `P ≈ 0.15`), `D = 6` crosses near
+   degree 4–6 (`P` = 0.34 → 0.93), `D = 8` crosses near degree 3–4 (`P` = 0.47 → 0.92). Smaller `N` and larger
+   `D` both pull the turn-up to lower degree, exactly as `N^{1/D}` says.
+3. **Realistic capacity shifts the route-existence curve up (needs more degree / more depth).** With randomised
+   balances, each tally's spare capacity in a given direction is roughly uniform over its swing, so a payment
+   of 10 clears a single hop only ~¾ of the time; a `D`-hop path needs *every* hop to clear, shrinking the
+   effective reachable set by ≈ `(¾)^D`. At matched `(N, D, degree)` the realistic `P` is consistently below
+   unlimited — e.g. `uniform, N = 10000, D = 6, degree = 6`: `0.93` unlimited → `0.52` realistic; `N = 1000,
+   D = 8, degree = 3`: `0.86 → 0.46`. The structural (`largestComponentFraction`) threshold is unchanged —
+   capacity gates *flow*, not *topology*.
+4. **Scale-free routes far more readily than uniform at the same mean degree.** Its networks are always a
+   single component (`largestComponentFraction` = 1 everywhere — every new entity attaches to the existing
+   graph), so the giant-component threshold is irrelevant; the binding constraint is depth. Hubs keep paths
+   short — mean successful path length ≈ 4 hops even at `N = 10000` for `edgesPerNode = 4` (mean degree ≈ 8),
+   vs ≈ 5.4 hops for `uniform` at mean degree 6 — so `scale-free, N = 10000, D = 6, degree ≈ 4` already routes
+   at `P = 0.96` where the matched `uniform` cell sits at `P = 0.34`. Realistic capacity shifts it down too,
+   but less severely, because the short hub paths cross fewer capacity gates.
+
+The headline for Taleus: **mean degree ~1 buys a connected graph, but usable payment routing needs both
+enough degree and enough hop budget that `degree^D ≳ N`, and real (finite, partly-consumed) capacity raises
+the bar further** — hub-heavy ("scale-free") topologies clear that bar at much lower average connectivity
+than uniform random ones.
 
 ## Trace & replay format
 

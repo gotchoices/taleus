@@ -1,0 +1,13 @@
+{
+	"_note": "Route-existence sweep: uniform (Erdos-Renyi) networks, UNLIMITED capacity. Varies mean tallies per entity x entity count x depth, over seeds 1-3. Amount is a constant 10 (same across all four route-existence specs, so the only difference between unlimited and realistic is capacity). See ../README.md and packages/tallysim/docs/design.md.",
+	"base": {
+		"network": { "generator": "uniform", "params": { "entityCount": 100, "meanDegree": 2 }, "capacity": { "kind": "unlimited" }, "seed": 1000 },
+		"workload": { "kind": "payment", "queries": 100, "amount": { "dist": "constant", "params": { "value": 10 } }, "depth": 4, "seed": 2000 }
+	},
+	"vary": [
+		{ "path": "network.params.meanDegree", "values": [0.5, 1, 1.5, 2, 3, 4, 6] },
+		{ "path": "network.params.entityCount", "values": [100, 1000, 10000] },
+		{ "path": "workload.depth", "values": [4, 6, 8] }
+	],
+	"seeds": [1, 2, 3]
+}
