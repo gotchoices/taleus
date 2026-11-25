@@ -48,7 +48,8 @@ import { drawAmount, drawPaymentPair, materializeNetwork } from './workload.js'
 
 /** One run's result: resolved sweep coordinates, the run seed, provenance labels, and the metrics. */
 export interface RunRecord {
-	/** Generator id (or `'materialized'` for a pre-built network). */
+	/** Generator id — for a materialised network this is its baked `network.meta.generator`, not the literal
+	 * `'materialized'`. (`capacity`, below, *does* report `'materialized'`.) */
 	generator: string
 	/** Capacity-distribution kind (or `'materialized'`), so a combined CSV is self-describing. */
 	capacity: string

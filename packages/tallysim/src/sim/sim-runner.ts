@@ -17,10 +17,14 @@
  *
  * ── Sequential vs concurrent (a runner dep, not a scenario field) ───────────────────────────────────────
  * Sequential (default) issues and settles one query at a time; concurrent issues every query (session codes
- * mint in call order → deterministic) before a single `runUntilIdle()`. Both produce identical per-query
- * metrics for independent queries: the network is static, per-session state is isolated, and every
- * concurrent session starts at the same clock instant while the `VirtualClock` fires each timer at its own
- * scheduled time — so relative timing is identical too. `concurrent` lives on {@link SimRunnerDeps}, never
+ * mint in call order → deterministic) before a single `runUntilIdle()`. Both agree on the **outcome** metrics
+ * (found, messages, nodes-touched, prune reasons, `pFoundGivenExists`) and both are byte-deterministic within
+ * their mode. They do **NOT** agree on `roundsUsed` or the timing distributions: concurrent queries share one
+ * `VirtualClock`, so a round's budget-expiry races a sub-request's delivery at equal timestamps, and the
+ * shared global fire-order counter interleaves across sessions — a late answer that folds into round N
+ * sequentially can fold into round N−1 concurrently, shifting rounds and times. This is a known limitation,
+ * not a measurement artefact fixable here; use sequential mode for round/timing-sensitive metrics. See
+ * `tickets/fix/tallysim-sim-runner-concurrent-divergence`. `concurrent` lives on {@link SimRunnerDeps}, never
  * on {@link SimScenario} (which is embedded verbatim in trace headers).
  */
 
@@ -47,7 +51,8 @@ import {
 
 /** One discovery run's result: resolved sweep coordinates, the run seed, provenance labels, and the metrics. */
 export interface SimRunRecord {
-	/** Generator id (or `'materialized'` for a pre-built network) — same provenance shape as `RunRecord`. */
+	/** Generator id — for a materialised network this is its baked `network.meta.generator`, not the literal
+	 * `'materialized'`. (`capacity`, below, *does* report `'materialized'`.) Same provenance shape as `RunRecord`. */
 	generator: string
 	/** Capacity-distribution kind (or `'materialized'`). */
 	capacity: string
@@ -148,6 +153,11 @@ async function runProtocolQueries(
 	const sim = buildSimNetwork(network, scenario.conditions ?? {}, conditionsSeed, sink, scenario.budget)
 
 	const windows: { outcome: QueryOutcome; startMs: number; endMs: number }[] = []
+	// NOTE: concurrent and sequential modes agree on outcome metrics but NOT on roundsUsed/timing — the
+	// shared clock makes round progression race sub-request delivery (see the module header and
+	// tickets/fix/tallysim-sim-runner-concurrent-divergence). The shared `startMs`/`endMs` here is the window
+	// for a session with zero events; today every session emits ≥ 1 event (the originator's own participant
+	// emits `query-received` on entrance), so analyzeQuery reads each session's own last-event time.
 	if (concurrent) {
 		// One start instant for all queries; issue in query order (session codes mint in call order →
 		// deterministic), settle once, then read a single end instant.

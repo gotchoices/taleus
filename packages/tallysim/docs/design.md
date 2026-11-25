@@ -532,6 +532,53 @@ Scope: **payment route discovery only** this tier (the v1 protocol is unidirecti
 Clearing-availability discovery is deferred (backlog `feat-tallysim-clearing-discovery`); multi-denomination
 negotiation is later work, so `annotateReturn` / `negotiatePlan` stay identity.
 
+### Protocol metrics
+
+`sim/protocol-metrics.ts` is the measurement layer — **recorded run in, metrics out** — pure like the oracle
+tier's `metrics.ts` (no network / oracle / clock / filesystem), so it is testable from hand-built trace
+events and reusable in a browser viewer. `analyzeQuery(events, outcome, routeExists, { startMs, endMs })`
+reduces **one** query to a `ProtocolQueryResult`. It filters `events` by `outcome.sessionCode` internally, so
+it works on one session's events or a whole concurrent batch's. From that session's events it derives:
+`messages` = count of `query-sent` (sub-requests issued, **not** deliveries — a folded late answer adds
+none); `nodesTouched` = distinct emitting node ids; `roundsUsed` = max round over `round-started` + `query-sent`
+(0 if none); `timeToFirstPlanMs` = first `plan-found` time − start (omitted if none); `timeToCompletionMs` =
+last-event time (or `endMs` for a session with no events) − start; and `pruneReasons`, a per-reason count over
+`candidate-pruned`, zero-initialised for all six `PruneReason`s. (`zeroPruneReasons()` is the compile-checked
+source of truth for that reason set; `ALL_PRUNE_REASONS` derives from it, so the mirror of tallynet's
+type-only union cannot silently drift.)
+
+`summarizeProtocolMetrics(results, structural)` aggregates a run into `ProtocolRunMetrics`. The headline is
+**`pFoundGivenExists`** = `foundAndExistsCount / routeExistsCount` — P(found | a route exists), the
+complement of the oracle tier's P(route exists), and **0 (never NaN)** when no route exists. `falseFoundCount`
+(found by the protocol but no oracle route) is the **`found ⊆ oracle` guardrail: it must be 0** — a non-zero
+value is a harness/terms bug, not a metric. Cost distributions reuse `summarizeDistribution` from `metrics.ts`;
+`timeToFirstPlanMs` is distributed over found queries only, the rest over all queries.
+
+### The discovery sweep runner
+
+`sim/sim-runner.ts` mirrors the oracle sweep runner (`runner.ts`): a `SimSweepSpec` (`{ base: SimScenario,
+vary, seeds }`) becomes one `SimRunRecord` per `(cell × seed)`. It shares the cartesian/vary machinery with
+the oracle runner through `sweep-vary.ts` (one copy of `cartesian` / `coordsOf` / `setByPath` /
+`requireNonEmptyValues`, so the two runners cannot drift). Unlike the synchronous oracle runner it is an
+**`async` generator** — settling a query awaits `clock.runUntilIdle()` — so `runSimSweep` must be iterated
+with `for await`; `runSimSweepToArray` collects a small sweep. It streams (no record retained) and touches no
+filesystem; the CLI drives it for file output and a browser viewer can drive the same code live.
+
+Per run it materialises the network, builds the oracle on the **full, undegraded** network (conditions
+degrade only the protocol run, never ground truth), draws a payment workload with `drawPaymentQueries` (pair
+then amount, the same draw order as the oracle runner, so the two consume their seeded streams identically),
+runs each query, and pairs every query's trace + outcome with the oracle's verdict via `analyzeQuery`. The
+three seed streams mirror the oracle runner: network (`network.seed + runSeed`), workload (`workload.seed +
+runSeed`), conditions (`(conditionsSeed ?? 0) + runSeed`). A sub-two-entity network emits `workload.queries`
+degenerate zeroed results, the same guard the oracle runner uses.
+
+`SimRunnerDeps.concurrent` (default sequential) issues every query before a single `runUntilIdle()`, for
+speed. **Caveat:** concurrent and sequential agree on the outcome metrics (found, messages, nodes, prune
+reasons, `pFoundGivenExists`) and each is byte-deterministic, but they do **not** agree on `roundsUsed` or the
+timing distributions — concurrent queries share one `VirtualClock`, so a round's budget-expiry races a
+sub-request's delivery and the shared fire-order counter interleaves across sessions. Use **sequential** for
+round/timing-sensitive metrics until `fix/tallysim-sim-runner-concurrent-divergence` resolves it.
+
 ## Trace & replay format
 
 A simulation run can be recorded to a **versioned, newline-delimited JSON (NDJSON)** trace file — one that

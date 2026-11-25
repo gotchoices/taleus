@@ -203,7 +203,10 @@ describe('runSimSweep — concurrent and sequential agree, both deterministic', 
 		seeds: [1, 2],
 	}
 
-	it('produces identical per-query metrics in both modes (≥ 2 originators)', async () => {
+	it('produces identical per-query metrics in both modes (instant 1-hop, no budget/delivery race)', async () => {
+		// A complete unlimited network resolves every query at round 0 with no latency, so there is no
+		// round-budget-vs-delivery race for the shared clock to reorder — full equality holds here. Once any
+		// multi-hop latency enters, roundsUsed/timing diverge (see the latency test below).
 		const sequential = await runSimSweepToArray(spec)
 		const concurrent = await runSimSweepToArray(spec, { concurrent: true })
 		expect(JSON.stringify(concurrent)).toBe(JSON.stringify(sequential))
@@ -214,6 +217,46 @@ describe('runSimSweep — concurrent and sequential agree, both deterministic', 
 		const first = JSON.stringify(await runSimSweepToArray(spec, { concurrent: true }))
 		const second = JSON.stringify(await runSimSweepToArray(spec, { concurrent: true }))
 		expect(second).toBe(first)
+	})
+
+	it('agrees on outcome metrics under real latency but diverges on round/timing (known limitation)', async () => {
+		// On a multi-hop line with base latency, events spread over non-zero clock times and a round's
+		// budget-expiry races a sub-request's delivery. Because concurrent queries share one VirtualClock, that
+		// race resolves differently than when each query runs alone: the OUTCOME metrics still match exactly,
+		// but roundsUsed and the timing distributions diverge. Characterizes the current behaviour; see
+		// tickets/fix/tallysim-sim-runner-concurrent-divergence. Tighten to full equality once that lands.
+		const latencySpec: SimSweepSpec = {
+			base: {
+				network: { materialized: line(5) },
+				workload: payment({ queries: 12, depth: 8, seed: 11 }),
+				conditions: { latency: { kind: 'uniform', min: 50, max: 400 } },
+				conditionsSeed: 0,
+			},
+			vary: [],
+			seeds: [1, 2],
+		}
+		const sequential = await runSimSweepToArray(latencySpec)
+		const concurrent = await runSimSweepToArray(latencySpec, { concurrent: true })
+
+		/** The mode-invariant outcome metrics (everything except roundsUsed and the timing distributions). */
+		const outcome = (records: typeof sequential) =>
+			records.map(({ metrics: m }) => ({
+				queryCount: m.queryCount,
+				routeExistsCount: m.routeExistsCount,
+				foundCount: m.foundCount,
+				foundAndExistsCount: m.foundAndExistsCount,
+				pFoundGivenExists: m.pFoundGivenExists,
+				falseFoundCount: m.falseFoundCount,
+				messages: m.messages,
+				nodesTouched: m.nodesTouched,
+				plansFound: m.plansFound,
+				pruneReasons: m.pruneReasons,
+			}))
+		expect(outcome(concurrent)).toEqual(outcome(sequential))
+		// But the full records differ: roundsUsed and the timing distributions are mode-dependent today.
+		expect(JSON.stringify(concurrent)).not.toBe(JSON.stringify(sequential))
+		// Guard that this scenario really does produce non-zero completion times (else the test is vacuous).
+		expect(sequential[0].metrics.timeToCompletionMs.max).toBeGreaterThan(0)
 	})
 })
 

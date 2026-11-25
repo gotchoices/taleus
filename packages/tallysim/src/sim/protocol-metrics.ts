@@ -26,27 +26,29 @@ import { type DistributionSummary, summarizeDistribution, type StructuralMetrics
 import type { QueryOutcome } from './harness.js'
 
 /**
- * The six discovery {@link PruneReason} values, as a literal list so a record can be zero-initialised over
- * all of them. (`PruneReason` is a type-only export from tallynet — this is the value-level mirror; a
- * compile error here if the two ever drift.) Distinct from taleus-core's accumulator `PruneReason`.
+ * A fresh prune-reason tally with every reason zeroed — the starting point for a query or a run. The object
+ * literal is the single source of truth for the reason set: it must name **every** key of
+ * `Record<PruneReason, number>`, so adding a {@link PruneReason} in tallynet without adding it here is a
+ * compile error (missing property), and a stray key not in the union is a compile error too. (`PruneReason`
+ * is a type-only export from tallynet — this is its value-level mirror; distinct from taleus-core's
+ * accumulator `PruneReason`.)
  */
-export const ALL_PRUNE_REASONS: readonly PruneReason[] = [
-	'cycle',
-	'failed',
-	'timed-out',
-	'max-depth',
-	'expired',
-	'no-reentrance',
-]
-
-/** A fresh prune-reason tally with every reason zeroed — the starting point for a query or a run. */
 export function zeroPruneReasons(): Record<PruneReason, number> {
-	const record = {} as Record<PruneReason, number>
-	for (const reason of ALL_PRUNE_REASONS) {
-		record[reason] = 0
+	return {
+		cycle: 0,
+		failed: 0,
+		'timed-out': 0,
+		'max-depth': 0,
+		expired: 0,
+		'no-reentrance': 0,
 	}
-	return record
 }
+
+/**
+ * The discovery {@link PruneReason} values, derived from {@link zeroPruneReasons} so the two can never drift:
+ * the compile-checked literal there is the source of truth, and this is just its key list.
+ */
+export const ALL_PRUNE_REASONS: readonly PruneReason[] = Object.keys(zeroPruneReasons()) as PruneReason[]
 
 /** One query's protocol result: the oracle ground truth paired with what the protocol actually did. */
 export interface ProtocolQueryResult {
