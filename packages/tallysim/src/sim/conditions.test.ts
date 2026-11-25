@@ -18,13 +18,14 @@ function incident(network: Network, index: number, entity: number): boolean {
 }
 
 describe('compileConditions — determinism', () => {
-	it('same (network, spec, seed) ⇒ identical conditions and sleeping set', () => {
+	it('same (network, spec, seed) ⇒ identical conditions and sleeping/late sets', () => {
 		const network = lineNetwork(10)
 		const spec: ConditionsSpec = { latency: { kind: 'uniform', min: 10, max: 50 }, sleepingFraction: 0.3, lateFraction: 0.2, lateLatencyMs: 5000, dropFraction: 0.2 }
 		const a = compileConditions(network, spec, 42)
 		const b = compileConditions(network, spec, 42)
 		expect(a.conditions).toEqual(b.conditions)
 		expect([...a.sleeping].sort((x, y) => x - y)).toEqual([...b.sleeping].sort((x, y) => x - y))
+		expect([...a.late].sort((x, y) => x - y)).toEqual([...b.late].sort((x, y) => x - y))
 	})
 
 	it('a different seed generally changes the selection', () => {
@@ -43,6 +44,16 @@ describe('compileConditions — count-based selection', () => {
 		expect(compileConditions(network, { sleepingFraction: 0.25 }, 7).sleeping.size).toBe(3) // round(2.5) → 3
 		expect(compileConditions(network, { sleepingFraction: 0 }, 7).sleeping.size).toBe(0)
 		expect(compileConditions(network, { sleepingFraction: 1 }, 7).sleeping.size).toBe(10)
+	})
+
+	it('selects exactly round(fraction · entityCount) late nodes, independently of sleeping', () => {
+		const network = lineNetwork(10)
+		expect(compileConditions(network, { lateFraction: 0.2, lateLatencyMs: 5000 }, 7).late.size).toBe(2) // round(2.0)
+		expect(compileConditions(network, { lateFraction: 0.25, lateLatencyMs: 5000 }, 7).late.size).toBe(3) // round(2.5) → 3
+		expect(compileConditions(network, { lateFraction: 0 }, 7).late.size).toBe(0)
+		// Drawn over all entities independently of sleeping — a full late fraction selects every node even when
+		// some are also sleeping (resolution lets sleeping win per link, but the late SET still reports them).
+		expect(compileConditions(network, { sleepingFraction: 0.5, lateFraction: 1, lateLatencyMs: 5000 }, 7).late.size).toBe(10)
 	})
 })
 

@@ -1,7 +1,7 @@
 /**
  * The network-conditions compiler: turns a declarative {@link ConditionsSpec} (latency, dropped links,
  * sleeping and late nodes) into the static per-link {@link LinkCondition} map the `tallynet` harness
- * consumes, plus the set of entities made asleep. Everything is drawn from a **dedicated**
+ * consumes, plus the sets of entities made asleep and made late. Everything is drawn from a **dedicated**
  * {@link SeededRandom} stream (the "conditions" seed, independent of the network/workload/economy seeds),
  * so a scenario's conditions replay exactly and — crucially — never perturb the harness's shared random,
  * which mints session codes. See `docs/design.md` § Discovery simulation.
@@ -54,12 +54,19 @@ export interface ConditionsSpec {
 	lateLatencyMs?: number
 }
 
-/** The compiled result: the per-link condition map for the harness, and which entities were made asleep. */
+/** The compiled result: the per-link condition map for the harness, and which entities were made asleep/late. */
 export interface CompiledConditions {
 	/** Per-link conditions keyed by `linkIdForTally(i)`. A link with no entry delivers instantly and reliably. */
 	conditions: Record<string, LinkCondition>
 	/** The entities made asleep (so metrics and tests can see which nodes contributed nothing). */
 	sleeping: Set<number>
+	/**
+	 * The entities made **late** (their incident links carry {@link ConditionsSpec.lateLatencyMs}). Drawn
+	 * independently of {@link CompiledConditions.sleeping}; a node may appear in both, but at resolution a
+	 * sleeping node's links drop (sleeping wins), so a both-sleeping-and-late node answers nothing. Exposed so
+	 * a viewer can render late nodes distinctly from asleep ones without re-deriving the per-link map.
+	 */
+	late: Set<number>
 }
 
 /** `[0, 1, …, n - 1]`. */
@@ -115,7 +122,7 @@ function drawLatency(dist: LatencyDistribution | undefined, rng: SeededRandom): 
 }
 
 /**
- * Compile `spec` against `network` into the harness's per-link conditions and the sleeping-node set,
+ * Compile `spec` against `network` into the harness's per-link conditions and the sleeping/late node sets,
  * drawing every random choice from a fresh `SeededRandom(seed)` — the dedicated conditions stream.
  *
  * Draw order (so a seed replays exactly): sleeping entities, then late entities, then the dropped-link
@@ -158,5 +165,5 @@ export function compileConditions(network: Network, spec: ConditionsSpec, seed: 
 			}
 		}
 	}
-	return { conditions, sleeping }
+	return { conditions, sleeping, late }
 }
