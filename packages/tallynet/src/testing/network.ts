@@ -153,6 +153,14 @@ export interface LiftSpec<TPayload> {
 	members: LiftMemberSpec[]
 	/** Ordered node names; each consecutive pair is one lift link. The originator is `route[0]`. */
 	route: string[]
+	/**
+	 * Optional exact link id per **route** hop, in order — length `route.length - 1` (throws on mismatch).
+	 * Each consecutive route pair then resolves to the graph edge carrying this id (the neighbour is still
+	 * checked), so a lift over **parallel tallies** between the same pair picks the intended tally rather
+	 * than whichever edge is found first. Omit for the default (first edge to the named neighbour).
+	 * `extraLinks` always use the name-pair fallback.
+	 */
+	routeLinkIds?: string[]
 	/** Further links beyond the route path, as node-name pairs (e.g. a diamond's other arm). */
 	extraLinks?: Array<[string, string]>
 	/** The opaque Taleus value carried end to end. */
@@ -388,14 +396,14 @@ export class InMemoryNetwork<TTerms, TPayload> {
 		}))
 
 		const links: Record<string, TrxLink<TTerms>> = {}
-		const pairs: Array<[string, string]> = []
+		const hopCount = Math.max(spec.route.length - 1, 0)
+		if (spec.routeLinkIds && spec.routeLinkIds.length !== hopCount) {
+			throw new Error(`buildLift: routeLinkIds has ${spec.routeLinkIds.length} ids but the route has ${hopCount} hops`)
+		}
 		for (let i = 0; i + 1 < spec.route.length; i++) {
-			pairs.push([spec.route[i], spec.route[i + 1]])
+			this.addLiftLink(links, sessionCode, spec.route[i], spec.route[i + 1], spec.routeLinkIds?.[i])
 		}
-		for (const pair of spec.extraLinks ?? []) {
-			pairs.push(pair)
-		}
-		for (const [a, b] of pairs) {
+		for (const [a, b] of spec.extraLinks ?? []) {
 			this.addLiftLink(links, sessionCode, a, b)
 		}
 
@@ -410,11 +418,23 @@ export class InMemoryNetwork<TTerms, TPayload> {
 		return { record, sessionCode, transactionCode }
 	}
 
-	/** Resolve one lift link to its graph edge, key it by nonce, and record the nonce→linkId both ends own. */
-	private addLiftLink(links: Record<string, TrxLink<TTerms>>, sessionCode: string, a: string, b: string): void {
-		const edge = (this.adjacency.get(a) ?? []).find((candidate) => candidate.neighbour === b)
+	/**
+	 * Resolve one lift link to its graph edge, key it by nonce, and record the nonce→linkId both ends own.
+	 * With `linkId` the edge must match both that id **and** the neighbour `b` (so a stale/foreign id throws
+	 * rather than silently selecting a parallel tally); without it, the first edge to `b` is taken.
+	 */
+	private addLiftLink(links: Record<string, TrxLink<TTerms>>, sessionCode: string, a: string, b: string, linkId?: string): void {
+		const adjacency = this.adjacency.get(a) ?? []
+		const edge =
+			linkId !== undefined
+				? adjacency.find((candidate) => candidate.id === linkId && candidate.neighbour === b)
+				: adjacency.find((candidate) => candidate.neighbour === b)
 		if (!edge) {
-			throw new Error(`buildLift: no graph link between ${a} and ${b}`)
+			throw new Error(
+				linkId !== undefined
+					? `buildLift: no graph link ${linkId} between ${a} and ${b}`
+					: `buildLift: no graph link between ${a} and ${b}`,
+			)
 		}
 		const nonce = makeNonce(sessionCode, edge.id, this.hasher)
 		links[nonce] = { source: this.memberKeyFor(a), target: this.memberKeyFor(b), intents: edge.terms }

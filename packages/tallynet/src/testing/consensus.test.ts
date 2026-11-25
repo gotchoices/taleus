@@ -33,6 +33,7 @@ import { ed25519 } from '@noble/curves/ed25519.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { base64urlToBytes, bytesToBase64url } from '../base64url.js'
 import type { Signer, Verifier } from '../crypto.js'
+import { makeNonce } from '../nonce.js'
 import { generate } from '../session-code.js'
 import type { TraceEvent } from '../trace.js'
 import { signRecord } from '../consensus/signature.js'
@@ -661,6 +662,49 @@ describe('consensus end to end — a forged commit cannot shadow a genuine vote 
 		expect(rejectReasons(traces)).toContain('pool-full') // the overflow was refused, never pooled
 		expect(await net.consensusNode('X').outcome(tx)).toBe('commit') // the cap did not lock out the real vote
 		expect(net.deliveryErrors).toEqual([])
+	})
+})
+
+describe('buildLift — routeLinkIds disambiguates parallel tallies', () => {
+	// Two parallel edges between A and B carrying DISTINCT link terms. Without routeLinkIds the first edge
+	// (ab1) is taken; with routeLinkIds: ['ab2'] the second one is, proving the exact-tally selection the
+	// simulator needs when a pair holds more than one tally.
+	const members: LiftMemberSpec[] = [
+		{ name: 'A', roles: [PART] },
+		{ name: 'B', roles: [PART, REF] },
+	]
+	const parallel: NetworkGraph<Terms> = {
+		nodes: ['A', 'B'],
+		links: [
+			{ id: 'ab1', node1: 'A', node2: 'B', intents: { L: { balance: 11 } } },
+			{ id: 'ab2', node1: 'A', node2: 'B', intents: { L: { balance: 22 } } },
+		],
+	}
+
+	it('selects the named parallel edge (ab2), not the first (ab1)', () => {
+		const { net } = makeNet({ graph: parallel })
+		const { record, sessionCode } = net.buildLift({ members, route: ['A', 'B'], routeLinkIds: ['ab2'], payload: PAYLOAD })
+		const nonce = makeNonce(sessionCode, 'ab2')
+		expect(Object.keys(record.topology.links)).toEqual([nonce])
+		expect(record.topology.links[nonce].intents.L.balance).toBe(22) // ab2's terms, not ab1's 11
+	})
+
+	it('without routeLinkIds, the first edge to the neighbour (ab1) is taken — behaviour unchanged', () => {
+		const { net } = makeNet({ graph: parallel })
+		const { record, sessionCode } = net.buildLift({ members, route: ['A', 'B'], payload: PAYLOAD })
+		const nonce = makeNonce(sessionCode, 'ab1')
+		expect(Object.keys(record.topology.links)).toEqual([nonce])
+		expect(record.topology.links[nonce].intents.L.balance).toBe(11)
+	})
+
+	it('throws when routeLinkIds length does not match the number of route hops', () => {
+		const { net } = makeNet({ graph: parallel })
+		expect(() => net.buildLift({ members, route: ['A', 'B'], routeLinkIds: ['ab1', 'ab2'], payload: PAYLOAD })).toThrow(/routeLinkIds/)
+	})
+
+	it('throws when a routeLinkId does not name an edge to the given neighbour', () => {
+		const { net } = makeNet({ graph: parallel })
+		expect(() => net.buildLift({ members, route: ['A', 'B'], routeLinkIds: ['nope'], payload: PAYLOAD })).toThrow(/no graph link nope/)
 	})
 })
 

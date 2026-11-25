@@ -8,7 +8,9 @@
  * - `naming.ts` — the node↔entity bijection and the tally→link-id naming shared by harness and conditions.
  * - `terms.ts` — the discovery link-term type and the capacity-aware node policy (the correctness anchor).
  * - `conditions.ts` — compile a declarative conditions spec into the harness's per-link condition map.
- * - `harness.ts` — build a running discovery network from a `Network` and run one payment query.
+ * - `identity.ts` — the deterministic signer/verifier layer that gives consensus nodes reproducible keys.
+ * - `consensus-resource.ts` — failure-injecting consensus resource ports (keyed by entity id) for tests.
+ * - `harness.ts` — build a running discovery (and optionally consensus) network from a `Network`.
  * - `trace-format.ts` — the versioned NDJSON trace-line union, `serializeTraceLine` and `parseTrace`.
  * - `trace-writer.ts` — `makeTraceWriter`: stream a header + network + per-event lines to a `LineSink`.
  * - `protocol-metrics.ts` — pure measurement: trace + outcome + oracle verdict → per-query / per-run metrics.
@@ -18,6 +20,8 @@
 export * from './naming.js'
 export * from './terms.js'
 export * from './conditions.js'
+export * from './identity.js'
+export * from './consensus-resource.js'
 export * from './harness.js'
 export * from './trace-format.js'
 export * from './trace-writer.js'

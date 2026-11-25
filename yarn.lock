@@ -7287,6 +7287,7 @@ __metadata:
   resolution: "tallysim@workspace:packages/tallysim"
   dependencies:
     "@eslint/js": "npm:10.0.1"
+    "@noble/curves": "npm:^2.4.0"
     "@types/jest": "npm:30.0.0"
     "@types/node": "npm:26.1.1"
     cross-env: "npm:7.0.3"

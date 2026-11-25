@@ -29,15 +29,17 @@ import {
 	InMemoryNetwork,
 	VirtualClock,
 	SeededRandom,
+	type InMemoryNetworkConfig,
 	type NetworkGraph,
 	type NetworkLink,
 } from 'tallynet/testing'
-import type { OriginatorOptions, ParticipantOptions, Plan, TraceSink } from 'tallynet'
+import type { OriginatorOptions, ParticipantOptions, Plan, TraceSink, TrxParticipantResource } from 'tallynet'
 import { capFoilToStock, capStockToFoil } from '../capacity.js'
 import type { Network } from '../model.js'
 import type { WorkloadSpec } from '../scenario.js'
 import { drawAmount, drawPaymentPair } from '../workload.js'
 import { type ConditionsSpec, compileConditions } from './conditions.js'
+import { signerForSeed, simVerifier } from './identity.js'
 import { entityId, entityName, linkIdForTally } from './naming.js'
 import { type LiftTerms, invertLiftTerms, makeCapacityHooks } from './terms.js'
 
@@ -58,6 +60,21 @@ export interface SimNetwork {
 	entityName(id: number): string
 	/** Node name → entity id. */
 	entityId(name: string): number
+}
+
+/**
+ * Turn consensus on for a {@link buildSimNetwork}. When present, the harness builds a {@link ConsensusNode}
+ * per graph node (discovery-only runs stay keygen-free); when absent, the discovery-only path is byte-for-
+ * byte unchanged. `identitySeed` seeds the deterministic signer/verifier layer ({@link signerForSeed}).
+ */
+export interface ConsensusConfig {
+	/** Seeds every node's deterministic ed25519 identity. Two runs with the same seed get the same keys. */
+	identitySeed: number
+	/**
+	 * Failure-injection resource port, keyed by **entity id**. Omit ⇒ the harness's cooperative default
+	 * (promise, release, vote commit; hold nothing). See {@link makeSimResources}.
+	 */
+	resourceFor?: (entityId: number) => TrxParticipantResource<LiftTerms, unknown>
 }
 
 /** One payment query to run: pay `amount` from entity `from` to entity `to`, within `depth` hops. */
@@ -85,6 +102,11 @@ export interface QueryOutcome {
  *
  * `options` tunes the originator/participant for every node (e.g. `sessionTtlMs`, budgets); a per-query
  * `maxDepth` is supplied later by {@link runQuery} and overrides any here.
+ *
+ * `consensus` (optional) turns on the atomic promise/commit engine: the harness builds a consensus node per
+ * graph node with a deterministic identity and (optionally) a failure-injecting resource port. When it is
+ * omitted the discovery-only wiring is **identical** to before — nothing new is passed to the harness, so
+ * the pinned discovery sweep is byte-for-byte unchanged.
  */
 export function buildSimNetwork(
 	network: Network,
@@ -92,6 +114,7 @@ export function buildSimNetwork(
 	conditionsSeed: number,
 	trace?: TraceSink,
 	options?: Partial<OriginatorOptions & ParticipantOptions>,
+	consensus?: ConsensusConfig,
 ): SimNetwork {
 	const nodes: string[] = []
 	for (let id = 0; id < network.entityCount; id++) {
@@ -115,8 +138,29 @@ export function buildSimNetwork(
 		conditions: compiled.conditions,
 		trace,
 		options,
+		...consensusPorts(consensus),
 	})
 	return { net, entityName, entityId }
+}
+
+/**
+ * The harness ports that turn consensus on, or `{}` when `consensus` is omitted. `signerFor` + `verifier`
+ * together switch {@link InMemoryNetwork} from discovery-only to consensus; the entity-id-keyed
+ * `resourceFor` is adapted to the node-name key the harness calls with. Returning `{}` when off keeps the
+ * discovery-only config byte-for-byte unchanged (nothing new is passed to the harness).
+ */
+function consensusPorts(
+	consensus: ConsensusConfig | undefined,
+): Pick<InMemoryNetworkConfig<LiftTerms, unknown>, 'signerFor' | 'verifier' | 'resourceFor'> | Record<string, never> {
+	if (!consensus) {
+		return {}
+	}
+	const resourceFor = consensus.resourceFor
+	return {
+		signerFor: signerForSeed(consensus.identitySeed),
+		verifier: simVerifier,
+		...(resourceFor ? { resourceFor: (name: string) => resourceFor(entityId(name)) } : {}),
+	}
 }
 
 /**

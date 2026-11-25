@@ -129,7 +129,7 @@ Open for the discovery / multi-denomination plans: how a hop beyond a currency b
 ## Testing approach
 
 - **Unit**: nonce and session code; canonical digest (cross-check vectors with `taleus-core`'s `digest.ts` where they overlap); rule sets; budgeted step (fake timers; no leaked timers).
-- **Simulated network**: an in-memory harness of N nodes wiring `queryPeer`/`updatePeer` directly, with injectable latency, drop and sleeping nodes. It should support a seeded random graph with assertions (ChipNet's 10k-node test asserted nothing). It ships as a platform-neutral subpath export, `tallynet/testing`, because the simulator builds on it.
+- **Simulated network**: an in-memory harness of N nodes wiring `queryPeer`/`updatePeer` directly, with injectable latency, drop and sleeping nodes. It should support a seeded random graph with assertions (ChipNet's 10k-node test asserted nothing). It ships as a platform-neutral subpath export, `tallynet/testing`, because the simulator builds on it. The harness's `buildLift` accepts an optional `routeLinkIds` (one exact link id per route hop) so a lift over **parallel tallies** between the same pair selects the intended edge instead of the first one found — a test/sim convenience for disambiguating parallel edges, not a protocol change.
 
 ## Simulation hooks
 
