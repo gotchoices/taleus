@@ -6,9 +6,11 @@
  * (`distributions.ts`), the four seeded network generators (`generators/`), the pure structural graph
  * utilities (`structure.ts`), the compiled directed-capacity graph view (`graph-view.ts`), and the
  * whole-graph oracle (`oracle.ts`), and the experiment harness: the scenario/sweep model (`scenario.ts`),
- * the sweep runner (`runner.ts`), the metric aggregation (`metrics.ts`), and the output serialisers
- * (`serialize-records.ts`). The Node-only CLI (`cli/`) is deliberately **not** exported here — it is the
- * one platform-specific file and ships separately.
+ * the sweep runner (`runner.ts`), the shared workload primitives (`workload.ts`), the metric aggregation
+ * (`metrics.ts`), and the output serialisers (`serialize-records.ts`). It also ships the discovery
+ * simulation tier (`sim/`), which runs the real `tallynet` route-discovery protocol over a simulated
+ * network on compressed time and measures it against the oracle. The Node-only CLI (`cli/`) is deliberately
+ * **not** exported here — it is the one platform-specific file and ships separately.
  */
 
 export * from './model.js'
@@ -21,4 +23,6 @@ export * from './oracle.js'
 export * from './scenario.js'
 export * from './metrics.js'
 export * from './runner.js'
+export * from './workload.js'
 export * from './serialize-records.js'
+export * from './sim/index.js'

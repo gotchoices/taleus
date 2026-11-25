@@ -425,6 +425,111 @@ enough degree and enough hop budget that `degree^D ≳ N`, and real (finite, par
 the bar further** — hub-heavy ("scale-free") topologies clear that bar at much lower average connectivity
 than uniform random ones.
 
+## Discovery simulation
+
+The oracle tier answers *does a route exist* with a god's-eye view of the whole graph. The **discovery
+simulation** tier (`src/sim/`) answers a harder question: does the real decentralised route-discovery
+protocol (`tallynet`), where each node sees only its own tallies, *find* the routes the oracle proves
+exist? It runs the actual `tallynet` protocol over a simulated tally network on compressed, deterministic
+time, so a payment search behaves as it would on a live network — honouring each node's local-only view of
+capacity, plus latency, dropped messages and sleeping nodes — and the experiment measures the gap between
+what the network *could* carry and what the protocol *found*.
+
+The discrete-event machinery is **not** rebuilt here. `tallynet/testing` ships the `VirtualClock` (a
+min-heap of timers; time advances only when a timer fires) and `InMemoryNetwork` (one discovery node per
+graph node, wired over that clock, with per-link `latencyMs`/`drop` conditions and a shared seeded
+random). This tier consumes them; everything simulator-specific lives in `tallysim`.
+
+### Node ↔ entity naming
+
+`tallynet` keys nodes by string name; tallysim entities are integers `0 .. entityCount − 1`. `sim/naming.ts`
+holds the single bijection — `entityName(id) = String(id)`, `entityId = Number` — and `linkIdForTally(i) =
+"T" + i`, shared by the harness (building the graph) and the conditions compiler (keying per-link
+conditions) so the two agree on a link's identity without sharing state. Trace events and metrics map a
+node name back to an entity id through `entityId`.
+
+### Capacity equality with the oracle (the correctness anchor)
+
+Each tally becomes one discovery link with `node1 = entityName(stock)`, `node2 = entityName(foil)`,
+carrying one `'L'` intent whose terms are `{ capFwd: capStockToFoil(t), capBack: capFoilToStock(t),
+amount: 0 }` — computed from the **same** `capacity.ts` helpers the oracle's graph view uses.
+`InMemoryNetwork` produces the reverse (`node2 → node1`) view via `invertLiftTerms` (swap the two directed
+capacities). So a node `u`'s forward view of a link to neighbour `v` has `capFwd = cap(u→v)`, identical to
+the oracle's directed edge `u→v`. The node policy (`sim/terms.ts`, `makeCapacityHooks`) overrides only the
+two capacity checks of `tallynet`'s default hooks: `negotiateIntent` forwards a candidate only when
+`capFwd ≥ amount` (so a node forwards over only its own tallies that can carry the amount — a real node
+acting on its local view, which also keeps the message count honest), and `planSatisfies` re-checks every
+hop (and rejects an empty path — a payment's originator is never the payee here). The required amount
+**rides on the query**, never a closure, so one reused network serves many queries at different amounts.
+
+Because every protocol hop maps onto an oracle directed edge with identical capacity, **every route the
+protocol returns is one the oracle confirms** — `found ⊆ oracle` at matched depth. `Infinity` capacity
+(unlimited credit) compares and inverts correctly and is never serialised here, so CBOR's `Infinity`
+rejection does not apply.
+
+### Rounds ↔ hops: NOT an identity, and reach is ~half the ceiling
+
+The oracle's `maxDepth` counts hops (a 1-hop path is length 1). The protocol's reach is **strictly less**
+than its `maxDepth` for multi-hop routes, so it finds *fewer* routes than the oracle at a given depth —
+that undercount is expected and is part of what the degradation experiment measures. Empirically (every
+target in this tier surfaces as a *peer-match terminus* — a neighbour resolves the target from its own
+adjacency), a route of **L** hops is found only at:
+
+| hops L | 1 | 2 | 3 | 4 | 5 |
+|--------|---|---|---|---|---|
+| min `maxDepth` to find it | 1 | 2 | 4 | 6 | 8 |
+
+i.e. `maxDepth ≥ 2(L − 1)` for `L ≥ 2`, so the effective reach at a ceiling `D` is `⌊D/2⌋ + 1` hops —
+roughly **half** the ceiling. (A single boundary data point, as `tallynet`'s own `maxDepth boundary` test
+checks, cannot tell this apart from `maxDepth − 1`; the longer chains above distinguish them.) The harness
+therefore passes `discover maxDepth = query.depth` and compares the oracle at the *same* depth; the robust,
+always-true guarantee is **`found ⊆ oracle`** (every found `path.length ≤ depth`, every hop `capFwd ≥
+amount`), **never `found iff oracle`**. A depth sweep that expects the protocol to reach the oracle's full
+depth must budget roughly double the hop distance.
+
+### Network conditions
+
+The degrading conditions are the whole point of the experiment, so the **oracle always runs on the full,
+undegraded network**; only the protocol run is degraded. `sim/conditions.ts` compiles a declarative
+`ConditionsSpec` into the harness's static per-link `conditions` map plus a sleeping-node set, drawing every
+choice from a **dedicated** `SeededRandom` stream (a conditions seed, independent of the
+network/workload/economy seeds). It must be precomputed from its own stream because the harness's shared
+random mints session codes: drawing conditions from it would make session codes shift whenever a condition
+changed and break determinism. (Outcomes never depend on session-code *values*, only nonces do, so the
+harness seeds that shared stream from a fixed module constant.)
+
+Selection is **count-based**, not Bernoulli: each fraction picks exactly `round(fraction · poolSize)`
+members via a seeded partial Fisher–Yates shuffle, so a test can assert a precise count. Mapping to the
+per-link surface:
+
+- **Sleeping node** (never answers): both incident links `drop`. A sleeping delivery never resolves (no
+  timer armed), so the sender's budget skips it each round and it is pruned at the depth ceiling. Note that
+  a sleeping *target* does **not** block a route — a neighbour resolves the peer-match from its own
+  adjacency without delivering to the target; only a sleeping non-target **relay** blocks.
+- **Late node**: both incident links carry `lateLatencyMs`, chosen to exceed a round budget; the
+  participant folds the late answer into a later round rather than losing it.
+- **Dropped links**: a `dropFraction` of the links *not* incident to a sleeping/late node `drop`.
+- **Base latency**: every remaining link draws `latencyMs` from the `latency` distribution (omitted ⇒
+  instant).
+- **Precedence** (per link): sleeping (drop) > late (lateLatencyMs) > dropFraction (drop) > base latency.
+
+Sleeping and late are an **undirected approximation** (both incident links carry the condition) — the
+correct "this node contributes nothing / answers late" model for a per-link condition surface, which cannot
+distinguish a tally's two directions and does not need to for this tier.
+
+### Running one query
+
+`buildSimNetwork(network, conditions, conditionsSeed, trace?, options?)` materialises the discovery graph,
+compiles the conditions, and wires an `InMemoryNetwork` over a fresh `VirtualClock`. `runQuery(sim, { from,
+to, amount, depth })` issues `discover`, drives `clock.runUntilIdle()` to settle it, and returns `{
+sessionCode, plans, found }`. It never throws for "not found" (empty plans), for `from === to`, or for a
+network with fewer than two entities. One `InMemoryNetwork` serves every query in a run (no balances move
+in this tier; per-session state lives in per-node stores, so queries do not interfere).
+
+Scope: **payment route discovery only** this tier (the v1 protocol is unidirectional payment search).
+Clearing-availability discovery is deferred (backlog `feat-tallysim-clearing-discovery`); multi-denomination
+negotiation is later work, so `annotateReturn` / `negotiatePlan` stay identity.
+
 ## Trace & replay format
 
 *To come — `tallysim-discovery`.*

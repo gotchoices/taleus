@@ -39,7 +39,7 @@ export type CapacityDistribution =
 	| { kind: 'lognormal'; mu: number; sigma: number; randomizeBalance?: boolean }
 
 /** An integer in `[min, max]` (both inclusive), drawn uniformly. */
-function uniformInt(min: number, max: number, rng: SeededRandom): number {
+export function uniformInt(min: number, max: number, rng: SeededRandom): number {
 	if (!Number.isInteger(min) || !Number.isInteger(max)) {
 		throw new Error(`uniformInt: min and max must be integers, got (${String(min)}, ${String(max)})`)
 	}
@@ -67,7 +67,7 @@ function standardNormal(rng: SeededRandom): number {
 // absorbs almost all drift. If a scenario must reproduce byte-identically across Node and the browser,
 // prefer an integer distribution (constant/uniform) or pin the generating platform.
 /** A lognormal sample: `exp(mu + sigma · Z)` where `Z` is standard normal. Always positive. */
-function lognormalSample(mu: number, sigma: number, rng: SeededRandom): number {
+export function lognormalSample(mu: number, sigma: number, rng: SeededRandom): number {
 	return Math.exp(mu + sigma * standardNormal(rng))
 }
 

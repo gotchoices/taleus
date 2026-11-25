@@ -20,20 +20,6 @@
 
 import { SeededRandom } from 'tallynet/testing'
 import type { CapacityDistribution } from './distributions.js'
-import {
-	clustered,
-	scaleFree,
-	smallWorld,
-	uniform,
-	CLUSTERED_ID,
-	SCALE_FREE_ID,
-	SMALL_WORLD_ID,
-	UNIFORM_ID,
-	type ClusteredParams,
-	type ScaleFreeParams,
-	type SmallWorldParams,
-	type UniformParams,
-} from './generators/index.js'
 import { buildGraphView } from './graph-view.js'
 import {
 	summarizeClearingMetrics,
@@ -50,7 +36,6 @@ import {
 	noOpEconomyStep,
 	DEFAULT_CLEARING_MAX_COUNT,
 	DEFAULT_MAX_FLOW_SAMPLES,
-	type AmountSpec,
 	type EconomyStep,
 	type NetworkSource,
 	type ScenarioSpec,
@@ -59,6 +44,7 @@ import {
 	type WorkloadSpec,
 } from './scenario.js'
 import { connectedComponents, meanDegree } from './structure.js'
+import { drawAmount, drawPaymentPair, materializeNetwork } from './workload.js'
 
 /** One run's result: resolved sweep coordinates, the run seed, provenance labels, and the metrics. */
 export interface RunRecord {
@@ -147,39 +133,6 @@ function structuralMetrics(network: Network): StructuralMetrics {
 	}
 }
 
-/**
- * Materialise a network from a resolved {@link NetworkSource}. The generator variant offsets its seed by the
- * run seed and draws from a fresh {@link SeededRandom}; the materialised variant is returned as-is.
- */
-function materializeNetwork(source: NetworkSource, runSeed: number): Network {
-	if ('materialized' in source) {
-		// NOTE: returned by reference, treated read-only by this tier (the no-op economy step never mutates).
-		// A future trading model that mutates balances must clone per run, or cells would contaminate each
-		// other. Cloning here now would needlessly copy a large network every run, so it is deferred.
-		return source.materialized
-	}
-	const networkSeed = source.seed + runSeed
-	const rng = new SeededRandom(networkSeed)
-	const invocation = { ...source.params, capacity: source.capacity, seed: networkSeed }
-	switch (source.generator) {
-		case UNIFORM_ID: {
-			return uniform(invocation as unknown as UniformParams, rng)
-		}
-		case SCALE_FREE_ID: {
-			return scaleFree(invocation as unknown as ScaleFreeParams, rng)
-		}
-		case CLUSTERED_ID: {
-			return clustered(invocation as unknown as ClusteredParams, rng)
-		}
-		case SMALL_WORLD_ID: {
-			return smallWorld(invocation as unknown as SmallWorldParams, rng)
-		}
-		default: {
-			throw new Error(`runner: unknown generator "${source.generator}"`)
-		}
-	}
-}
-
 /** Draw and run a payment (route-existence) workload; optionally sample max-flow over the drawn pairs. */
 function runPaymentWorkload(
 	oracle: Oracle,
@@ -196,11 +149,7 @@ function runPaymentWorkload(
 			results.push({ exists: false })
 			continue
 		}
-		const from = rng.nextInt(entityCount)
-		let to = rng.nextInt(entityCount)
-		while (to === from) {
-			to = rng.nextInt(entityCount)
-		}
+		const [from, to] = drawPaymentPair(entityCount, rng)
 		const amount = drawAmount(workload.amount, rng)
 		pairs.push([from, to])
 		const result = oracle.routeExistence(from, to, amount, workload.depth)
@@ -245,33 +194,6 @@ function runClearingWorkload(
 /** Whether a workload opted into max-flow. */
 function wantsMaxFlow(workload: WorkloadSpec): boolean {
 	return workload.metrics?.includes(MAX_FLOW_METRIC) ?? false
-}
-
-/**
- * Draw one query amount. `constant` consumes no rng; `uniform` consumes one draw. The draw count depends only
- * on the distribution kind (fixed per sweep), so the stream stays reproducible. Always returns a positive
- * integer (the oracle rejects a non-positive amount).
- */
-function drawAmount(spec: AmountSpec, rng: SeededRandom): number {
-	switch (spec.dist) {
-		case 'constant': {
-			const value = spec.params.value
-			if (!Number.isInteger(value) || value <= 0) {
-				throw new Error(`amount constant: value must be a positive integer, got ${String(value)}`)
-			}
-			return value
-		}
-		case 'uniform': {
-			const { min, max } = spec.params
-			if (!Number.isInteger(min) || !Number.isInteger(max) || min <= 0 || max < min) {
-				throw new Error(`amount uniform: need integers 0 < min <= max, got (${String(min)}, ${String(max)})`)
-			}
-			return min + rng.nextInt(max - min + 1)
-		}
-		default: {
-			throw new Error(`amount: unknown distribution "${spec.dist}"`)
-		}
-	}
 }
 
 /** Light validation so a malformed spec fails fast with a clear message rather than deep in a draw. */
