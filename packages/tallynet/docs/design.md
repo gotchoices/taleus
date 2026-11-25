@@ -91,6 +91,8 @@ This is safe because the per-edge signatures are **self-authenticating at the ho
 
 **Not in v1** (backlog): bidirectional search; ring/star propagation with a convergence node; pre-promise void on timeout; void-on-timeout and stalled-transaction recovery (coordinate with `feat-lift-timeout-release`); query economics and policing; advertising. v1 is unidirectional and push-to-reachable, and supports referee sets. Taleus's schema still holds one referee per edge; `feat-multi-referee-consensus` lifts that limit soon after binding, and until then Taleus's policy hooks refuse plans with more than one referee.
 
+*Implemented in `src/consensus/`: the record data model + opaque commit `attachment` (`types.ts`), the canonical two-phase digest (`digest.ts`), sign/verify (`signature.ts`), the durable record/peer-record/release-flag store (`store.ts`), the host resource port (`resource.ts`), the per-node state machine — validate → merge-by-union → promise/vote → release-once, with `outcome()` reading the settled commit/void (`participant.ts`), and the per-node `ConsensusNode` bundle on the public barrel (`engine.ts`). Atomic settlement across a whole route — commit-everywhere / void-everywhere under dropped pushes, sleeping nodes, referee sets, and equivocating/forged peers — is proven over the in-memory harness (`src/testing/`, driven in `src/testing/consensus.test.ts`). The `taleus-core` binding is `tallynet-bind-taleus-core`.*
+
 ## Member identity and disclosure
 
 The party authorised to act at a link of the route is whoever holds the private key registered there. TallyNet verifies signatures against that key and nothing else; it never asks who is behind it.

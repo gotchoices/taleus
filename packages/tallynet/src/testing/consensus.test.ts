@@ -386,14 +386,14 @@ describe('consensus end to end — a sleeping node', () => {
 
 describe('consensus end to end — referee set sizes', () => {
 	/** Two participants plus `refs` referee-only members, all with a physical address for complete reachability. */
-	function refereeSet(refs: string[], specs: Record<string, ResourceOpts> = {}, conditions?: Record<string, LinkCondition>) {
+	function refereeSet(refs: string[]) {
 		const nodes = ['A', 'B', ...refs]
 		const members: LiftMemberSpec[] = [
 			{ name: 'A', roles: [PART], physical: true },
 			{ name: 'B', roles: [PART], physical: true },
 			...refs.map((name) => ({ name, roles: [REF], physical: true })),
 		]
-		return { nodes, members, graph: makeGraph(nodes, [['ab', 'A', 'B']]), specs, conditions }
+		return { nodes, members, graph: makeGraph(nodes, [['ab', 'A', 'B']]) }
 	}
 
 	it('a set of one commits the route', async () => {
@@ -419,7 +419,7 @@ describe('consensus end to end — referee set sizes', () => {
 	})
 
 	it('a set of two that splits one commit / one void settles neither way (stall)', async () => {
-		const { nodes, members, graph } = refereeSet(['R1', 'R2'], { R2: { shouldCommit: false } })
+		const { nodes, members, graph } = refereeSet(['R1', 'R2'])
 		const { net, doubles } = makeNet({ graph, resourceSpecs: { R2: { shouldCommit: false } } })
 		const tx = await runLift(net, { members, route: ['A', 'B'], payload: PAYLOAD })
 		expect(await outcomes(net, nodes, tx)).toEqual(nodes.map(() => 'pending')) // even split → no strict majority

@@ -78,6 +78,11 @@ export class ConsensusNode<TTerms, TPayload> {
 		return this.participant.update(record)
 	}
 
+	// NOTE: `update` is not re-entrancy-safe per node — it reads the stored record, merges, then saves
+	// across await points, so two deliveries of the SAME transaction arriving concurrently at one node
+	// (a host fanning in pushes without awaiting the first) can lose a first-sight record or duplicate a
+	// signature. The in-memory harness serializes deliveries (one callback at a time off the VirtualClock),
+	// so this never trips in-repo; a real host must serialize update() per transactionCode (a per-tx queue).
 	/** Participant role: what a peer's `updatePeer` delivers into us (`from` = the pushing member). */
 	update(record: TrxRecord<TTerms, TPayload>, from?: Address): Promise<TrxRecord<TTerms, TPayload>> {
 		return this.participant.update(record, from)

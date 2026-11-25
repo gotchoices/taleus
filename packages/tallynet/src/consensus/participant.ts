@@ -4,11 +4,12 @@
  * signature union, advances our own state (promise / vote / release), and pushes the record onward to
  * reachable peers until the lift settles.
  *
- * It is the second of the three `tallynet-consensus` tickets. The record model, the canonical signed
- * preimage, the sign/verify primitives and the durable store are the core ticket (`./types.ts`,
- * `./digest.ts`, `./signature.ts`, `./store.ts`). The network harness and end-to-end multi-node
- * scenarios are the final ticket. Everything here is unit-testable against the in-memory store, an
- * injected signer/verifier, and in-memory {@link TrxParticipantResource} doubles.
+ * The record model, the canonical signed preimage, the sign/verify primitives and the durable store
+ * live alongside it (`./types.ts`, `./digest.ts`, `./signature.ts`, `./store.ts`); the per-node
+ * {@link TrxParticipant} is wrapped for hosts by the `ConsensusNode` bundle (`./engine.ts`), and
+ * end-to-end multi-node scenarios drive it over the in-memory harness (`../testing/`). Everything here
+ * is unit-testable against the in-memory store, an injected signer/verifier, and in-memory
+ * {@link TrxParticipantResource} doubles.
  *
  * Every ChipNet transaction-module defect this chain must close is closed here (docs/chipnet-review.md
  * § Transaction module defects):
