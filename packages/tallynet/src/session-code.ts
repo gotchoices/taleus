@@ -13,11 +13,13 @@
  * The expiry travels inside the code, so any holder can check it without a side channel, and it is
  * covered by the nonce hash, so it cannot be altered without changing every nonce derived from it.
  *
- * Time is injected: `generate` takes the current time (defaulting to `Date.now()`); the validators
- * take `now` as an argument. Nothing here starts a timer.
+ * Time is injected: `generate` takes the current time (defaulting to the real-time clock,
+ * `realClock.now()`); the validators take `now` as an argument. Nothing here reads a real clock
+ * directly or starts a timer.
  */
 
 import { webRandomSource, type RandomSource } from './crypto.js'
+import { realClock } from './clock.js'
 import { base64urlToBytes, bytesToBase64url } from './base64url.js'
 
 /** Total session-code length in raw bytes. */
@@ -38,7 +40,7 @@ export const SESSION_CODE_LENGTH = 43
 export const DEFAULT_MAX_TTL_MS = 3_600_000
 
 export interface GenerateOptions {
-	/** Current time, ms since epoch. Defaults to `Date.now()`. Inject for deterministic tests. */
+	/** Current time, ms since epoch. Defaults to the real-time clock. Inject for deterministic tests. */
 	now?: number
 	/** Random source for the 24 random bytes. Defaults to Web Crypto. */
 	random?: RandomSource
@@ -57,7 +59,7 @@ export function generate(ttlMs: number, options: GenerateOptions = {}): string {
 	if (!Number.isInteger(ttlMs) || ttlMs <= 0) {
 		throw new Error(`session-code generate: ttlMs must be a positive integer, got ${String(ttlMs)}`)
 	}
-	const now = options.now ?? Date.now()
+	const now = options.now ?? realClock.now()
 	const random = options.random ?? webRandomSource
 	const expiry = now + ttlMs
 

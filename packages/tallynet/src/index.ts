@@ -7,6 +7,8 @@
  * digest, step sequencing, and the rule engine.
  */
 
+export * from './clock.js'
+export * from './trace.js'
 export * from './crypto.js'
 export * from './session-code.js'
 export * from './nonce.js'

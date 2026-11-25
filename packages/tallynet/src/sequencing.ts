@@ -7,30 +7,39 @@
  *   - the budget timer is **always cleared** when the step ends early, so no timer outlives the
  *     step (a leaked timer keeps a Node process -- or a jest worker -- alive);
  *   - the step accepts an **abort signal**, so a caller can end it before the budget elapses.
+ *
+ * All time and timers go through an injected {@link Clock} (see `clock.ts`) -- nothing here reads a
+ * real clock or arms a global timer on its own, so a simulator can drive a whole run on virtual
+ * time.
  */
+
+import type { Clock } from './clock.js'
 
 /**
  * A promise with its settlement observable synchronously: whether it has completed, its value or
  * error, and how long it took. Wrapping a request in `Pending` lets {@link budgetedStep} poll
- * "are all of these done?" without re-awaiting each one.
+ * "are all of these done?" without re-awaiting each one. Timestamps come from the injected
+ * {@link Clock}, so `duration` is correct whatever origin a virtual clock counts from (it may start
+ * at 0 rather than the epoch).
  */
 export class Pending<T> {
 	response?: T
 	error?: unknown
 	duration?: number
-	readonly t1: number = Date.now()
+	readonly t1: number
 	private state: 'pending' | 'resolved' | 'rejected' = 'pending'
 
-	constructor(public readonly promise: Promise<T>) {
+	constructor(public readonly promise: Promise<T>, clock: Clock) {
+		this.t1 = clock.now()
 		promise.then(
 			(response) => {
-				this.duration = Date.now() - this.t1
+				this.duration = clock.now() - this.t1
 				this.response = response
 				this.state = 'resolved'
 				return response
 			},
 			(error: unknown) => {
-				this.duration = Date.now() - this.t1
+				this.duration = clock.now() - this.t1
 				this.error = error
 				this.state = 'rejected'
 			},
@@ -73,9 +82,11 @@ export interface BudgetedStepOptions {
  * Wait until every request in `requests` has completed, or `budgetMs` elapses, or `options.signal`
  * aborts -- whichever comes first. Resolves (never rejects) regardless of individual outcomes; a
  * rejected request counts as complete, and the caller inspects each `Pending` afterwards. An empty
- * `requests` set resolves immediately without arming a timer.
+ * `requests` set (or one already fully complete / already aborted) resolves immediately without
+ * arming a timer. All timers come from the injected {@link Clock}.
  */
 export async function budgetedStep<RT>(
+	clock: Clock,
 	budgetMs: number,
 	requests: Record<string, Pending<RT>>,
 	options: BudgetedStepOptions = {},
@@ -99,7 +110,7 @@ export async function budgetedStep<RT>(
 			}
 		}
 
-		timer = setTimeout(finish, budgetMs)
+		timer = clock.setTimer(finish, budgetMs)
 		if (signal) {
 			onAbort = finish
 			signal.addEventListener('abort', onAbort, { once: true })
@@ -108,7 +119,7 @@ export async function budgetedStep<RT>(
 			void p.result().then(checkDone, checkDone)
 		}
 	}).finally(() => {
-		clearTimeout(timer)
+		clock.clearTimer(timer)
 		if (signal && onAbort) {
 			signal.removeEventListener('abort', onAbort)
 		}
