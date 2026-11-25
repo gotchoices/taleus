@@ -10,9 +10,11 @@ question in two independent halves:
 
 The two are kept deliberately apart (see [Tiers](#tiers)). This document is the canonical design; it grows
 one tier at a time. This file currently covers the **network-model tier** (the data model, the capacity
-model, the generators, and the structural utilities), the **oracle**, and the **runner / experiments** tier
+model, the generators, and the structural utilities), the **oracle**, the **runner / experiments** tier
 (the scenario/sweep model, the sweep runner, the metrics, the output serialisers, the CLI, and the first
-checked-in experiment). The protocol-replay tiers fill the remaining stubbed section.
+checked-in experiment), and the **discovery-simulation** tier (the wiring that runs the real `tallynet`
+protocol over a simulated network and runs one payment query to completion). The trace & replay format and
+the protocol metrics / sweep fill the remaining stubbed section.
 
 Read first: [`docs/architecture.md`](../../../docs/architecture.md) (the Taleus system overview) and
 [`packages/tallynet/docs/design.md`](../../tallynet/docs/design.md) (the lift protocol this simulator
