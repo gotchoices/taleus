@@ -14,6 +14,16 @@ Port ChipNet's **unidirectional discovery** (`../chipnet/src/unidirectional/`, p
 - **Time budget.** Use the real per-round budget (ChipNet hardcodes 1000 ms at `participant.ts:102`). Keep the Sparstogram/Pareto originator budgeting or replace it with something simpler and documented. Decide whether `sparstogram` stays as a dependency (check ESM + React Native compatibility) or a minimal histogram is inlined. Validate a peer's reported stats (bounds, monotonicity) before using them.
 - **Engine API** that `taleus-core`'s `DiscoveryEngine.discover(query, callbacks)` port (`src/lift/agent.ts:131`) can wrap without contortion. Don't change taleus-core in this ticket; note the adapter shape for `tallynet-bind-taleus-core`.
 
+## Simulation readiness (required, not optional)
+
+A simulator (`packages/tallysim`, ticket `tallysim-discovery`) will run thousands of TallyNet nodes in one process on simulated time, and a viewer (`packages/tallysim-viewer`) will animate a query spreading through the graph. Both use the engine exactly as shipped, with no test-only forks. So:
+
+- **Clock port.** All time goes through an injected `Clock` (`now(): number`, `setTimer(fn, ms): TimerHandle`, `clearTimer(handle)`), with a real-time default. Retrofit the scaffold's `Pending` and `budgetedStep` (`src/sequencing.ts`, which call `Date.now`/`setTimeout` directly today) to take it. Nothing in `src/` outside the default clock touches global timers or `Date.now`; extend `no-node-globals.test.ts` (or add a test) to enforce that.
+- **Trace port.** An optional injected `TraceSink` (`(event: TraceEvent) => void`, default no-op). `TraceEvent` is an exported, typed discriminated union, each event stamped with clock time, the emitting node's own id as the host gave it, and the session code. Minimum events: query sent / received on a link (nonce, depth, round), candidate pruned (reason: cycle, failed, timed out, max depth, expired, no reentrance), plan returned on a link, plan found at the originator, round started / round budget expired, late answer folded in. A sink that throws must not break the engine: catch the error, log it once per sink, and carry on. Tracing is local instrumentation, so it adds no disclosure: an event holds only what that node already knows.
+- **Determinism.** Given a seeded `RandomSource` and a virtual clock, a run is fully reproducible: no `Math.random`, and no iteration order that depends on anything but inputs (sort where a `Record`'s key order would otherwise decide behaviour).
+- **Reusable in-memory network.** Build the simulated-network harness as a shipped, platform-neutral module behind a subpath export (`tallynet/testing`), not a private test file. It wires each node's `queryPeer` to the others directly, takes the clock, a seeded random source and per-link latency / drop / sleeping-node settings, and its own tests use a virtual clock. `tallysim` builds on it; anything simulator-specific (graph generators, scheduler, metrics) stays in `tallysim`.
+- **Scale.** Nothing per query is O(total nodes). Add a smoke test: a seeded 1,000-node graph completes a search on a virtual clock in a few seconds of wall time.
+
 ## Edge cases & interactions (carry into the implement ticket(s))
 
 - Cycles: a candidate whose nonce is already in the path is removed (ChipNet only reports it).

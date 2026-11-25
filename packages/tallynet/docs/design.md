@@ -103,7 +103,15 @@ Open for the discovery / multi-denomination plans: how a hop beyond a currency b
 ## Testing approach
 
 - **Unit**: nonce and session code; canonical digest (cross-check vectors with `taleus-core`'s `digest.ts` where they overlap); rule sets; budgeted step (fake timers; no leaked timers).
-- **Simulated network**: an in-memory harness of N nodes wiring `queryPeer`/`updatePeer` directly, with injectable latency, drop and sleeping nodes. It should support a seeded random graph with assertions (ChipNet's 10k-node test asserted nothing).
+- **Simulated network**: an in-memory harness of N nodes wiring `queryPeer`/`updatePeer` directly, with injectable latency, drop and sleeping nodes. It should support a seeded random graph with assertions (ChipNet's 10k-node test asserted nothing). It ships as a platform-neutral subpath export, `tallynet/testing`, because the simulator builds on it.
+
+## Simulation hooks
+
+TallyNet is run at scale by `packages/tallysim` (thousands of nodes in one process, on simulated time) and watched through `packages/tallysim-viewer`. The engines serve that unchanged, with no test-only forks:
+
+- **Clock port.** All time goes through an injected `Clock` (`now`, `setTimer`, `clearTimer`); the default is real time. Nothing else in `src/` reads `Date.now` or arms global timers.
+- **Trace port.** An optional `TraceSink` receives typed `TraceEvent`s (query sent/received, candidate pruned with reason, plan returned/found, round budget expired, late answer folded in; record pushed, promise, vote, settle, release). Each event holds only what the emitting node already knows, so tracing adds no disclosure. A throwing sink is logged and ignored.
+- **Determinism.** Under a seeded `RandomSource` and a virtual clock, a run is reproducible: no `Math.random`, and no behaviour that depends on unordered key iteration.
 - **Adversarial consensus**: forged and replayed signatures, signature-type substitution, expired codes, duplicate members, a referee signing both commit and void, out-of-order and duplicated delivery, a node restarting mid-transaction.
 - **Multi-denomination**: a route crossing two boundaries; a missing quote; an expired quote; rounding dust accrues to the originator only; the single-denomination case is unchanged.
 

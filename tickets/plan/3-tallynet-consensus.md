@@ -1,5 +1,5 @@
 description: Rebuild the part of the lift-routing library that gets everyone on a found route to sign on, and a referee to finalize or cancel, so that a lift settles everywhere or nowhere; the original version never actually checks signatures.
-prereq: tallynet-scaffold
+prereq: tallynet-scaffold, tallynet-discovery
 files: packages/tallynet/, packages/tallynet/docs/design.md, packages/tallynet/docs/chipnet-review.md, packages/taleus-core/src/lift/commit.ts, packages/taleus-core/src/lift/referee.ts, packages/taleus-core/src/lift/digest.ts, docs/architecture.md
 difficulty: hard
 ----
@@ -18,6 +18,10 @@ How Taleus uses the result: `docs/architecture.md` § *Referee model and the com
 - **Validation of a new record** (ChipNet's TODOs at `participant.ts:210-212`): codes valid and unexpired; topology well-formed; our in/out links' terms are what we agreed to in discovery (hand them to `shouldPromise`). Stash what's needed from discovery to check that (the nonce→link map).
 - **State port** (`TrxStore`): records, peer copies, released flag, logs. Serialisable for a SQL-backed implementation; in-memory implementation for tests.
 - **Out of scope** (backlog `feat-tallynet-propagation-timeouts`): pre-promise void, void-on-timeout, stalled-transaction recovery, ring/star convergence. Leave a clear extension point (a record "expires at" and a hook for a referee timeout void) and say where it is.
+
+## Simulation readiness (required)
+
+Same contract as `tallynet-discovery` § Simulation readiness, which settles the shapes: all time through the injected `Clock`, an optional `TraceSink` with typed events added to the same exported `TraceEvent` union, deterministic under a seeded random source and virtual clock, and the network harness extended in `tallynet/testing` (pushing records between members) rather than duplicated. Minimum consensus events: record pushed / received (to whom, signature counts), promise and no-promise signed, signature rejected (reason), referee vote, settled (commit or void), resources released. The simulator (`tallysim-consensus`) and its viewer use these to show a found route committing or voiding.
 
 ## Edge cases & interactions (carry into the implement ticket(s))
 
