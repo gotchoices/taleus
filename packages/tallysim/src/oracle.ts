@@ -199,8 +199,13 @@ export class Oracle {
 				}
 				const v = targets[e]
 				if (v === node) {
-					// Closing edge back to the start: BFS order ⇒ this is the shortest cycle.
-					return lu + 1
+					if (lu + 1 >= 2) {
+						// Closing edge back to the start: BFS order ⇒ this is the shortest cycle.
+						return lu + 1
+					}
+					// A self-loop (node → node, length 1) is not a clearing cycle — the shortest cycle is
+					// length 2. Skip it, matching clearingCycles' `len + 1 >= 2` guard and the brute force.
+					continue
 				}
 				if (this.visited[v] !== gen) {
 					this.visited[v] = gen
@@ -333,6 +338,10 @@ export class Oracle {
 		let count = 0
 		let capped = false
 
+		// NOTE (tripwire): maxCount caps the *count*, not the DFS *exploration*. When qualifying cycles are
+		// sparse but the region is deep and high-branching (many simple paths, few that close back to node),
+		// the cap never trips and cost is ~O(degree^maxDepth). maxDepth — not maxCount — is the real cost
+		// bound there; the runner must keep maxDepth modest when sampling clearingCycles on dense graphs.
 		const visit = (u: number, len: number): void => {
 			const end = offsets[u + 1]
 			for (let e = offsets[u]; e < end; e++) {

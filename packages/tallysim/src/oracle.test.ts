@@ -92,6 +92,17 @@ describe('Oracle.selfPayment — circular clearing (X === Y)', () => {
 		const o = Oracle.fromNetwork(net(3, [edge(0, 1, 10), edge(1, 2, 10), edge(2, 0, 10)]))
 		expect(o.routeExistence(0, 0, 5, 3)).toEqual({ exists: true, shortestLength: 3 })
 	})
+
+	it('does not treat a self-loop as a length-1 cycle (consistent with clearingCycles)', () => {
+		// A self-loop tally (stock === foil) is a degenerate, normally-unreachable input, but the oracle
+		// must stay internally consistent on it: the shortest cycle is length 2, so a lone self-loop is
+		// no clearing cycle at all. selfPayment and clearingCycles must agree.
+		const o = Oracle.fromNetwork(
+			net(1, [{ stock: 0, foil: 0, balance: 0, stockCreditLimit: 10, foilCreditLimit: 10 }]),
+		)
+		expect(o.selfPayment(0, 5, 3)).toEqual({ exists: false })
+		expect(o.clearingCycles(0, 5, 3, 100)).toEqual({ count: 0, capped: false })
+	})
 })
 
 describe('Oracle.maxFlow — how much is payable', () => {
