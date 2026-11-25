@@ -37,6 +37,9 @@ system) and flags its own open questions.
   tally-network simulator: seeded network generators, a whole-graph oracle (the routing ground truth), and an
   experiment runner that sweeps connectivity and records findings (e.g. how connected a network must be before
   payments usually route).
+- **[../packages/tallysim-viewer/docs/design.md](../packages/tallysim-viewer/docs/design.md)** — TallySim Viewer,
+  a static, server-less browser dev tool that draws a simulated tally network and animates a payment search
+  spreading across it, lighting up the edges it explores and the routes it finds.
 - **[concurrency-model.md](concurrency-model.md)** — why a signature-gated, insert-only schema stays safe
   on the Sereus/Optimystic substrate: the CRDT lens and the two load-bearing platform assumptions.
 
