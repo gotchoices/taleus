@@ -1,0 +1,12 @@
+{
+	// The Node-only CLI build. The neutral build (tsconfig.build.json) excludes src/cli/**; this config
+	// compiles it *with* node types. It imports the core barrel (../index.js), so tsc also (re)emits the
+	// core here — identical JS, since the core uses no node globals (enforced by no-node-globals.test.ts and
+	// the types:[] neutral build). The redundant emit is the price of keeping the CLI off the neutral build.
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"types": ["node"]
+	},
+	"include": ["src/cli/**/*.ts"],
+	"exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+}

@@ -19,7 +19,8 @@
 		"node": ">=18"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
+		"build": "tsc -p tsconfig.build.json && tsc -p tsconfig.cli.json",
+		"sweep": "node dist/cli/sweep.js",
 		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
 		"lint": "eslint ./src"
 	},

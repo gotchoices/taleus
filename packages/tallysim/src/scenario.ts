@@ -1,0 +1,110 @@
+/**
+ * The experiment scenario and sweep model: plain, JSON-serialisable descriptions of **what to generate
+ * and how to query it** ({@link ScenarioSpec}) and **which parameter(s) to vary over which networks**
+ * ({@link SweepSpec}). The runner (`runner.ts`) consumes these; the CLI (`cli/sweep.ts`) reads a
+ * {@link SweepSpec} from a JSON file. Both are pure data so a scenario can be saved, shared and replayed.
+ *
+ * ── The "step the economy" seam ──────────────────────────────────────────────────────────────────────
+ * A real tally network is not static: entities trade, so credit capacity gets used up in one direction and
+ * restored (especially by circular lifts) over time. This tier does **not** model that — every tally starts
+ * square (balance 0) and nothing moves it. The hook is left here as {@link EconomyStep}; the backlog item
+ * `feat-tallysim-trading-model` supplies a real implementation that mutates balances between query batches.
+ * The default is {@link noOpEconomyStep}. See `docs/design.md` § Runner / experiments.
+ */
+
+import type { SeededRandom } from 'tallynet/testing'
+import type { CapacityDistribution } from './distributions.js'
+import type { Network } from './model.js'
+
+/**
+ * Where a scenario's network comes from. **Either** a generator recipe (id + numeric structural params +
+ * capacity distribution + seed — the runner materialises it) **or** an already-materialised {@link Network}.
+ * Both are valid inputs (the parent plan's "store either; runner materialises" decision).
+ *
+ * The generator variant carries its {@link CapacityDistribution} explicitly: the generators need it and it
+ * is not a plain number, so it cannot live inside the numeric `params` map (an extension of the ticket's
+ * original sketch, which omitted it).
+ */
+export type NetworkSource =
+	| { generator: string; params: Record<string, number>; capacity: CapacityDistribution; seed: number }
+	| { materialized: Network }
+
+/** How amounts are drawn for a workload's queries. `constant` → always `value`; `uniform` → `[min, max]`. */
+export interface AmountSpec {
+	/** Distribution id: `'constant'` or `'uniform'`. */
+	dist: string
+	/** Numeric parameters: `constant` needs `value`; `uniform` needs `min` and `max` (both inclusive). */
+	params: Record<string, number>
+}
+
+/** The metric id that opts a run into max-flow computation (costly; sampled, never run per query). */
+export const MAX_FLOW_METRIC = 'max-flow'
+
+/** What to ask of a network: a batch of random queries of one kind, their amounts, and the depth bound. */
+export interface WorkloadSpec {
+	/** `payment` → route-existence `X → Y` queries; `clearing` → circular-clearing queries at a node. */
+	kind: 'payment' | 'clearing'
+	/** How many random queries to draw. */
+	queries: number
+	/** The amount each query asks to move. */
+	amount: AmountSpec
+	/** Max depth `D` (hop bound) for every query. */
+	depth: number
+	/** Workload PRNG seed — **independent** of the network seed (both are honoured; see the runner). */
+	seed: number
+	/** Opt-in expensive metrics (currently only {@link MAX_FLOW_METRIC}); omitted ⇒ none. */
+	metrics?: string[]
+	/** Cycle-count cap for `clearing` queries (per node); defaults to {@link DEFAULT_CLEARING_MAX_COUNT}. */
+	clearingMaxCount?: number
+	/** How many query pairs to sample for max-flow when enabled; defaults to {@link DEFAULT_MAX_FLOW_SAMPLES}. */
+	maxFlowSamples?: number
+}
+
+/** Default cycle-count cap for clearing queries. Availability needs only ≥ 1, but a small count is useful. */
+export const DEFAULT_CLEARING_MAX_COUNT = 16
+
+/** Default number of query pairs sampled for max-flow (Edmonds–Karp is costly; never run per query). */
+export const DEFAULT_MAX_FLOW_SAMPLES = 32
+
+/** A single scenario: one network and one workload to run against it. */
+export interface ScenarioSpec {
+	network: NetworkSource
+	workload: WorkloadSpec
+}
+
+/** One varied dimension: a dotted path into the base scenario and the numeric values to step it through. */
+export interface VarySpec {
+	/** Dotted path, e.g. `network.params.meanDegree`, `network.params.entityCount`, `workload.depth`. */
+	path: string
+	/** The values to set at `path`, one sweep cell per value (combined cartesian-wise with other dimensions). */
+	values: number[]
+}
+
+/**
+ * A sweep: a base scenario, the parameter(s) to vary, and the seeds to repeat each cell over. The runner
+ * takes the **cartesian product** of every `vary` dimension's values — one record per
+ * `(valueA, valueB, …, seed)` cell. One or two dimensions is the readable norm (and what plots want); the
+ * runner imposes no arity cap, and the checked-in route-existence experiment uses three.
+ */
+export interface SweepSpec {
+	base: ScenarioSpec
+	vary: VarySpec[]
+	seeds: number[]
+}
+
+/**
+ * The "step the economy" seam: advances the economy (mutates balances) before a batch of queries. This tier
+ * ships only the {@link noOpEconomyStep} default — `feat-tallysim-trading-model` supplies a real
+ * implementation (producers/consumers trading, circular lifts restoring capacity). The runner gives it the
+ * run's {@link SeededRandom} so a real model's draws stay on the one reproducible stream.
+ */
+export interface EconomyStep {
+	step(network: Network, rng: SeededRandom): void
+}
+
+/** The default {@link EconomyStep}: does nothing (balances stay as the generator set them). */
+export const noOpEconomyStep: EconomyStep = {
+	step(): void {
+		// Intentionally empty: this tier does not model trading. See feat-tallysim-trading-model.
+	},
+}
