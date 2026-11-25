@@ -1,20 +1,11 @@
 /**
- * App-shell stub. This ticket builds only the headless `core/` logic (trace indexing, nonce
- * de-anonymisation, playback state, sweep parsing); the graph view, replay controls, live-run driver and
- * sweep charts are added by the later rendering tickets, which replace this placeholder with real UI.
- *
- * It intentionally imports nothing from `core/` or the rendering libraries yet — it only proves the Vite
- * build produces a working static shell. Keep browser-only code here and in sibling UI modules; `core/`
- * stays platform-neutral and headlessly testable.
+ * App entry point: mount the viewer shell into `#app`. The shell (`app/shell.ts`) owns the DOM, the
+ * load-a-network-and-draw-it path, search, and the theme toggle; the headless logic it drives lives in
+ * `core/` (trace indexing) and `graph/` (model, layout, renderer). The replay controls, live-run driver and
+ * sweep charts are later tickets that extend the shell's marked seams.
  */
 
-function mountShell(root: HTMLElement): void {
-	const heading = document.createElement('h1')
-	heading.textContent = 'TallySim Viewer'
-	const note = document.createElement('p')
-	note.textContent = 'Core logic scaffolded; graph, replay and sweep views land in later tickets.'
-	root.append(heading, note)
-}
+import { mountShell } from './app/shell.js'
 
 const root = document.querySelector<HTMLElement>('#app')
 if (root) {

@@ -7,9 +7,10 @@ Taleus client (`taleus-app`). It may be published to the web later, so it stays 
 server**: everything runs in the browser from files a developer loads.
 
 This document is the canonical design and grows one ticket at a time. It currently covers the **core tier**
-— the platform-neutral, headlessly-tested logic that loads and interprets a recorded run — plus the settled
-**stack decision**. The rendering tiers (graph view, replay controls, live in-browser runs, sweep charts)
-extend it as they land.
+— the platform-neutral, headlessly-tested logic that loads and interprets a recorded run — the **graph tier**
+(the `graphology` model, the seeded worker layout, and the `sigma` renderer), the **app shell** (load a
+network, draw it, search it, switch theme), and the settled **stack decision**. The remaining rendering tiers
+(replay controls, live in-browser runs, sweep charts) extend it as they land.
 
 Read first: [`packages/tallysim/docs/design.md`](../../tallysim/docs/design.md) (the simulator whose output
 this viewer reads — especially its *Trace & replay format* and *Discovery simulation* sections) and
@@ -73,6 +74,88 @@ kind. A `late-answer-folded` event re-touches an already-lit edge at a later rou
 duplicated. The model emits only plain data (node ids, edge = tally index, rounds, prune reasons); all colour
 and rendering belong to the graph tier.
 
+## Graph tier (`src/graph/`)
+
+The bridge from a loaded `tallysim` `Network` to an interactive WebGL view. Three modules, split so the two
+DOM-free ones stay unit-tested and only the renderer needs a browser:
+
+| Module | Responsibility |
+|---|---|
+| `model.ts` | Build a `graphology` `MultiDirectedGraph` from a `Network` (headless, jest-tested). |
+| `layout.ts` + `layout-worker.ts` | Seed deterministic positions, then relax with ForceAtlas2 in a Web Worker; expose a "settled" signal. |
+| `render.ts` | The `sigma` 4 renderer: reducers for styling, hover tooltips, node search, WebGL-missing fallback (browser-only, not jest-tested). |
+
+### Graph model
+
+One **node per entity**, one **directed edge per tally**. The key conventions are the load-bearing contract
+the later replay ticket relies on, so they live in exactly one place (`model.ts`):
+
+- **Node key** = `entityName(id)` — the entity id as a string (`"0"`, `"1"`, …), the same bijection trace
+  events use. The search box therefore looks a node up by the id the user types, with no extra mapping.
+- **Edge key** = `linkIdForTally(i)` = `"T{i}"` — the *same* id the tally's discovery link carries, so a
+  decoded tally index maps straight to a sigma edge key (no side table).
+- **Orientation** is graphology-directed **stock → foil** (`source = entityName(stock)`,
+  `target = entityName(foil)`). The renderer draws the arrowhead at the target, so an arrow always points from
+  the stock holder to the foil holder — a fixed, readable encoding of a tally's orientation.
+- Each edge carries **both directed capacities** (`capStockToFoil`, `capFoilToStock`) verbatim from
+  `tallysim`'s capacity model — never re-derived here. A direction may be `0` (a valid state: a balance at a
+  credit bound) or `Infinity` (an unlimited limit). Multi-edges (two tallies between one pair) and self-loops
+  are permitted; the renderer curves parallels apart so they stay separable.
+
+### Edge-capacity encoding
+
+The renderer, not the model, maps those capacities to pixels — all of it in a sigma reducer reading a mutable
+`palette` closure var and a capacity range computed **once** at setup, so a theme switch repaints without
+recomputing anything structural:
+
+- **Finite edge** → its **total swing** `capStockToFoil + capFoilToStock` is log-normalised across the finite
+  edges and drives *both* thickness (1…5) and a *sequential* single-hue colour ramp (low → high). Thickness and
+  colour are a deliberate redundant encoding of the same magnitude.
+- **Unlimited edge** (either direction `Infinity`) → a **distinct hue** (`palette.edgeUnlimited`) and a
+  **fixed, moderate thickness that is strictly below the finite maximum**. This is the headline requirement: an
+  `Infinity` tally must never masquerade as a merely-large finite one, so its thickness deliberately does not
+  sit at the top of the finite scale.
+- **Orientation arrowhead**: every edge draws `head: 'arrow'` at the target (the foil) — the stock → foil
+  direction is always visible.
+- **Zero is not missing**: a direction with `0` capacity is still a present edge (drawn with its arrowhead).
+  Absence of a tally is the only thing that removes an edge.
+- **Hover / search** ride sigma's built-in per-item **state** (`isHovered` / `isHighlighted`), not attributes:
+  a lit edge/node switches to `palette.highlight`, thickens, and rises in the depth order. The replay ticket's
+  "lit route" will use *custom* state (`customNodeState` / `customEdgeState`), which composes with this because
+  the two never touch the same flags.
+
+### Worker layout + seeding
+
+ForceAtlas2 is a physics relaxation whose final shape depends on where nodes **start**, and it is O(n log n)
+per iteration — too heavy for the main thread at thousands of nodes. So:
+
+- **Seeded start.** Initial positions are a pure function of the node set and the network's `meta.seed`:
+  `seedPositions` lays nodes on a jittered phyllotaxis spiral driven by a deterministic `mulberry32` PRNG keyed
+  off that seed. The same network therefore always relaxes from the same start to (modulo worker float drift)
+  the same layout — the property that lets a replay of the *same* network line up frame-to-frame.
+- **Off the main thread.** `layout-worker.ts` runs ForceAtlas2 in a `graphology-layout-forceatlas2` Web Worker
+  that streams positions back onto the shared graph; sigma, bound to the same graph, re-renders as they arrive
+  (it listens to graphology's attribute-update events). Pan/zoom stay responsive while the cloud settles.
+- **The "settled" signal.** `runLayout` iterates for a size-scaled, capped wall-clock budget, then stops and
+  fires `onSettled` — the stable-layout signal the replay ticket waits on before animating. An **edgeless graph
+  settles immediately** (no forces to relax, so the worker never starts) and thus can never hang.
+
+## App shell (`src/app/`)
+
+`shell.ts`'s `mountShell` builds a top bar (title + theme toggle), a left control panel, and the graph
+container, and owns the one data path this tier needs: **load a network → draw it → search it**.
+
+- **Source.** A picked file is read as text and handed to `indexTrace` (wrapping `parseTrace`) inside a
+  `try/catch`; a version/format error surfaces in the panel's status area, never the console. A "Load sample"
+  button materialises a ~3000-node scale-free network in-page (`sample-network.ts`) so the view can be
+  exercised without a trace file. Either way the shell tears down any prior view/worker, builds the graph,
+  mounts the renderer, and starts the seeded layout with `network.meta.seed`.
+- **Search** highlights and centres a node by the entity id typed (a `false` return shows a "not found" hint).
+- **Theme** toggles light/dark: `storeTheme` + chrome CSS variables + the renderer's `setPalette` — **no layout
+  recompute**, because positions are theme-independent.
+- `styles.ts` is a CSS **string** injected via a `<style>` element (a `.css` import would need a module `.d.ts`
+  shim under `NodeNext`). The live-run and sweep source tabs are marked with seam comments for later tickets.
+
 ## Stack decision
 
 Settled here so the rendering tickets do not re-litigate it.
@@ -104,9 +187,11 @@ Settled here so the rendering tickets do not re-litigate it.
 
 ## Testing
 
-- Jest over `src/core/**` (`trace-index`, `deanonymise`, `timeline`, `sweep-data`) with hand-built fixtures —
-  no browser, no sigma.
+- Jest over the headless modules — `src/core/**` (`trace-index`, `deanonymise`, `timeline`, `sweep-data`) and
+  `src/graph/model.ts` — with hand-built fixtures, no browser, no sigma.
 - `yarn build` type-checks (`tsc --noEmit`) then produces the static bundle (`vite build`) from the app shell.
-- A **headless-WebGL smoke test** (rendering a trace in a real browser) is **deferred** — it needs
-  Playwright / headless-Chromium and is not reliably agent-runnable; it belongs with CI or a human once the
-  graph tier exists.
+  The renderer (`render.ts`) and the shell (`app/**`) are **browser-only** (WebGL, `document`, a Web Worker);
+  their gate is the build plus a manual interactivity check (`yarn dev` → "Load sample" → pan/zoom/hover/search
+  on ~2–5k nodes), not jest.
+- A **headless-WebGL smoke test** (rendering a trace in a real browser, asserting on the result) is **deferred**
+  — it needs Playwright / headless-Chromium and is not reliably agent-runnable; it belongs with CI or a human.
