@@ -127,17 +127,16 @@ function packageVersions(): { tallysimVersion: string; tallynetVersion: string }
 	}
 }
 
-/** Draw the scenario's payment queries (pair then amount, mirroring the oracle runner's draw order). */
-function drawQueries(scenario: SimScenario, runSeed: number): QuerySpec[] {
-	const network = materializeNetwork(scenario.network, runSeed)
-	const { workload } = scenario
-	if (network.entityCount < 2) {
+/** Draw the scenario's payment queries over an already-materialised network (pair then amount, mirroring
+ * the oracle runner's draw order). Returns empty for a sub-two-entity network (no distinct pair exists). */
+function drawQueries(workload: SimScenario['workload'], entityCount: number): QuerySpec[] {
+	if (entityCount < 2) {
 		return [] // no distinct (from, to) pair exists; a valid header+network file with no query events
 	}
 	const rng = new SeededRandom(workload.seed)
 	const queries: QuerySpec[] = []
 	for (let i = 0; i < workload.queries; i++) {
-		const [from, to] = drawPaymentPair(network.entityCount, rng)
+		const [from, to] = drawPaymentPair(entityCount, rng)
 		const amount = drawAmount(workload.amount, rng)
 		queries.push({ from, to, amount, depth: workload.depth })
 	}
@@ -166,7 +165,7 @@ export async function recordTrace(
 	const conditions = scenario.conditions ?? {}
 	const conditionsSeed = scenario.conditionsSeed ?? 0
 	const options = budgetOptions(scenario)
-	const queries = drawQueries(scenario, runSeed)
+	const queries = drawQueries(scenario.workload, network.entityCount)
 
 	// Pass 1: learn each query's session code (collect codes only; events are discarded — memory stays flat).
 	const pass1 = buildSimNetwork(network, conditions, conditionsSeed, undefined, options)
@@ -177,6 +176,13 @@ export async function recordTrace(
 
 	// Which queries to record: all when no --query was given, else the selected 0-based indices.
 	const selected = args.queries.length > 0 ? new Set(args.queries) : undefined
+	if (selected !== undefined) {
+		for (const index of selected) {
+			if (index >= queries.length) {
+				throw new Error(`--query ${index} is out of range (the scenario draws ${queries.length} queries, 0..${queries.length - 1})`)
+			}
+		}
+	}
 	const recorded = queries
 		.map((query, index) => ({ query, index }))
 		.filter(({ index }) => selected === undefined || selected.has(index))
