@@ -76,6 +76,46 @@ describe('InMemoryNetwork wiring', () => {
 		expect(fromB.plans![0].path[0].intents.L.balance).toBe(-100)
 	})
 
+	it('defers a delivery by exactly its link latency', async () => {
+		const graph: NetworkGraph<Terms> = {
+			nodes: ['A', 'B'],
+			links: [{ id: 'L0', node1: 'A', node2: 'B', intents: { L: { balance: 100 } } }],
+		}
+		const clock = new VirtualClock()
+		const random = new SeededRandom(1)
+		const net = new InMemoryNetwork<Terms, string>({ graph, clock, random, conditions: { L0: { latencyMs: 500 } } })
+		let deliveredAt = -1
+		// The request itself (an empty-path entrance reached over an inbound link) is rejected by the
+		// participant; what this asserts is the *timing* of the hop, so either settlement records when.
+		void net.deliver('A', entrance(newQuery('B', clock.now(), random)), 'L0').then(
+			() => { deliveredAt = clock.now() },
+			() => { deliveredAt = clock.now() },
+		)
+		expect(clock.pendingTimers).toBe(1) // the request-leg timer is queued at +500
+		await clock.advance(499)
+		expect(deliveredAt).toBe(-1) // not yet delivered
+		await clock.advance(1)
+		expect(deliveredAt).toBe(500) // delivered at exactly the latency
+	})
+
+	it('a dropped link arms no timer and never delivers', async () => {
+		const graph: NetworkGraph<Terms> = {
+			nodes: ['A', 'B'],
+			links: [{ id: 'L0', node1: 'A', node2: 'B', intents: { L: { balance: 100 } } }],
+		}
+		const clock = new VirtualClock()
+		const random = new SeededRandom(1)
+		const net = new InMemoryNetwork<Terms, string>({ graph, clock, random, conditions: { L0: { drop: true } } })
+		let settled = false
+		void net.deliver('A', entrance(newQuery('B', clock.now(), random)), 'L0').then(
+			() => { settled = true },
+			() => { settled = true },
+		)
+		expect(clock.pendingTimers).toBe(0) // no delivery timer armed for a dropped link
+		await clock.advance(1_000_000)
+		expect(settled).toBe(false) // an eternally-sleeping delivery: never resolves, never rejects
+	})
+
 	it('drives a one-hop discovery to completion on the virtual clock', async () => {
 		const graph: NetworkGraph<Terms> = {
 			nodes: ['A', 'B', 'C'],
