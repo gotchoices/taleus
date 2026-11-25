@@ -3,6 +3,7 @@ import { buildGraphView } from '../graph-view.js'
 import { FORMAT_VERSION, type Network, type Tally } from '../model.js'
 import { Oracle } from '../oracle.js'
 import type { SimScenario, SimSweepSpec, WorkloadSpec } from '../scenario.js'
+import type { LatencyDistribution } from './conditions.js'
 import { buildSimNetwork, runQuery } from './harness.js'
 import { analyzeQuery } from './protocol-metrics.js'
 import { runSimSweep, runSimSweepToArray } from './sim-runner.js'
@@ -19,6 +20,13 @@ function line(n: number, limit = 1000): Network {
 		tallies.push({ stock: i, foil: i + 1, balance: 0, stockCreditLimit: limit, foilCreditLimit: limit })
 	}
 	return makeNetwork(n, tallies)
+}
+
+/** A ring `0 - 1 - … - (n-1) - 0`: a `line(n)` plus one tally closing the loop. */
+function ring(n: number, limit = 1000): Network {
+	const network = line(n, limit)
+	network.tallies.push({ stock: n - 1, foil: 0, balance: 0, stockCreditLimit: limit, foilCreditLimit: limit })
+	return network
 }
 
 /** Every distinct pair joined by one tally with a symmetric credit limit, square balance. */
@@ -205,8 +213,8 @@ describe('runSimSweep — concurrent and sequential agree, both deterministic', 
 
 	it('produces identical per-query metrics in both modes (instant 1-hop, no budget/delivery race)', async () => {
 		// A complete unlimited network resolves every query at round 0 with no latency, so there is no
-		// round-budget-vs-delivery race for the shared clock to reorder — full equality holds here. Once any
-		// multi-hop latency enters, roundsUsed/timing diverge (see the latency test below).
+		// round-budget-vs-delivery race for the shared clock to reorder — full equality holds trivially here.
+		// The latency test below, and the guard sweep after it, cover the cases where such a race exists.
 		const sequential = await runSimSweepToArray(spec)
 		const concurrent = await runSimSweepToArray(spec, { concurrent: true })
 		expect(JSON.stringify(concurrent)).toBe(JSON.stringify(sequential))
@@ -222,14 +230,9 @@ describe('runSimSweep — concurrent and sequential agree, both deterministic', 
 	it('produces identical full records in both modes under real latency (concurrent == sequential)', async () => {
 		// On a multi-hop line with base latency, events spread over non-zero clock times. Concurrent queries
 		// share one VirtualClock, so a round's budget-expiry timer and a sub-request's delivery can fall at the
-		// same virtual instant. Earlier this diverged between the modes — but that was the VirtualClock
-		// under-draining discovery's completion cascade (DRAIN_QUIET too small), which fired an
-		// about-to-be-cleared budget timer and folded instant answers one round late; the interleaving of
-		// concurrent sessions changed *which* timers fired prematurely. With the clock fixed in
-		// `tallynet-discovery-depth-reach` (DRAIN_QUIET raised), the cascade fully drains and the two modes
-		// produce byte-identical records (verified here and over a broad line/seed/latency sweep). The
-		// keep-vs-drop decision for concurrent mode itself still lives in
-		// tickets/fix/tallysim-sim-runner-concurrent-divergence.
+		// same virtual instant — but the arm-order invariant (module header of sim-runner.ts) resolves that
+		// tie identically in both modes, so the records still match byte-for-byte. The guard sweep below
+		// exercises the known tie instants directly.
 		const latencySpec: SimSweepSpec = {
 			base: {
 				network: { materialized: line(5) },
@@ -258,14 +261,62 @@ describe('runSimSweep — concurrent and sequential agree, both deterministic', 
 				pruneReasons: m.pruneReasons,
 			}))
 		expect(outcome(concurrent)).toEqual(outcome(sequential))
-		// The full records now match too — roundsUsed and the timing distributions included.
-		// NOTE: byte-equality here is empirical (this scenario + a broad line/seed/latency sweep), not proven.
-		// A config that lands a budget-expiry and a delivery at the exact same virtual instant could still
-		// resolve the tie per-mode and re-diverge; tie analysis lives in fix/tallysim-sim-runner-concurrent-divergence.
+		// The full records match too — roundsUsed and the timing distributions included — by the arm-order
+		// invariant, not by chance; see the guard sweep below for configs that land exactly on a tie instant.
 		expect(JSON.stringify(concurrent)).toBe(JSON.stringify(sequential))
 		// Guard that this scenario really does produce non-zero completion times (else the test is vacuous).
 		expect(sequential[0].metrics.timeToCompletionMs.max).toBeGreaterThan(0)
 	})
+
+	interface GuardConfig {
+		label: string
+		network: Network
+		latency?: LatencyDistribution
+		/** Layer lateFraction/lateLatencyMs/dropFraction to exercise the late-answer-fold path under concurrency. */
+		fold?: boolean
+	}
+
+	// 2000 ties the round-0 budget (`initialBudgetMs`); 1750/2500 tie the round-1/round-2 budget at a 2-hop
+	// delivery (`initialBudgetMs + round * perHopBudgetMs`, tallynet `discovery/originator.ts`) — the exact
+	// instants the arm-order invariant (module header of sim-runner.ts) has to resolve identically in both
+	// modes. A future engine change that breaks that invariant should fail one of these, not silently skew a
+	// published sweep.
+	const guardConfigs: GuardConfig[] = [
+		{ label: 'line(5), no latency', network: line(5) },
+		{ label: 'line(5), latency=2000 (round-0 budget tie)', network: line(5), latency: { kind: 'constant', value: 2000 } },
+		{ label: 'line(5), latency=1750 (2-hop round-1 tie)', network: line(5), latency: { kind: 'constant', value: 1750 } },
+		{ label: 'line(5), latency=2500 (2-hop round-2 tie)', network: line(5), latency: { kind: 'constant', value: 2500 } },
+		{ label: 'line(7), uniform 50-400 latency', network: line(7), latency: { kind: 'uniform', min: 50, max: 400 } },
+		{ label: 'line(7), uniform 1000-3000 latency', network: line(7), latency: { kind: 'uniform', min: 1000, max: 3000 } },
+		{ label: 'ring(6), latency=2000 (round-0 budget tie)', network: ring(6), latency: { kind: 'constant', value: 2000 } },
+		{ label: 'ring(6), uniform 50-400 latency', network: ring(6), latency: { kind: 'uniform', min: 50, max: 400 } },
+		{ label: 'line(5), latency=2000, fold path', network: line(5), latency: { kind: 'constant', value: 2000 }, fold: true },
+		{ label: 'line(7), uniform 1000-3000 latency, fold path', network: line(7), latency: { kind: 'uniform', min: 1000, max: 3000 }, fold: true },
+		{ label: 'ring(6), latency=1750, fold path', network: ring(6), latency: { kind: 'constant', value: 1750 }, fold: true },
+		{ label: 'ring(6), no latency, fold path', network: ring(6), fold: true },
+	]
+
+	it.each(guardConfigs.map((config) => [config.label, config] as const))(
+		'stays byte-identical under concurrency: %s',
+		async (_label, config) => {
+			const guardSpec: SimSweepSpec = {
+				base: {
+					network: { materialized: config.network },
+					workload: payment({ queries: 15, depth: 6, seed: 5 }),
+					conditions: {
+						...(config.latency ? { latency: config.latency } : {}),
+						...(config.fold ? { lateFraction: 0.3, lateLatencyMs: 2600, dropFraction: 0.1 } : {}),
+					},
+					conditionsSeed: 0,
+				},
+				vary: [],
+				seeds: [1, 2],
+			}
+			const sequential = await runSimSweepToArray(guardSpec)
+			const concurrent = await runSimSweepToArray(guardSpec, { concurrent: true })
+			expect(JSON.stringify(concurrent)).toBe(JSON.stringify(sequential))
+		},
+	)
 })
 
 describe('runSimSweep — degenerate guards (no NaN, no throw)', () => {

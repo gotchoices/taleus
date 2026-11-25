@@ -19,15 +19,20 @@
  * Sequential (default) issues and settles one query at a time; concurrent issues every query (session codes
  * mint in call order → deterministic) before a single `runUntilIdle()`. Both modes produce **byte-identical**
  * records — outcome metrics (found, messages, nodes-touched, prune reasons, `pFoundGivenExists`), `roundsUsed`
- * and the timing distributions alike. The two modes once diverged on `roundsUsed`/timing, but that was the
- * `tallynet` `VirtualClock` under-draining discovery's completion cascade (its `DRAIN_QUIET` was too small):
- * the drain quiesced mid-cascade and the run loop fired an about-to-be-cleared round budget timer, folding an
- * instant answer one round late — and the interleaving of concurrent sessions changed *which* budget timers
- * fired prematurely, so the two modes diverged. With the clock fixed (`tallynet-discovery-depth-reach` raised
- * `DRAIN_QUIET` past the cascade) the budget timer is always cleared before it can fire, and the schedules
- * coincide. Whether to keep `concurrent` as a feature (it is now equivalent and a touch faster) or drop it is
- * the open call in `tickets/fix/tallysim-sim-runner-concurrent-divergence`. `concurrent` lives on
- * {@link SimRunnerDeps}, never on {@link SimScenario} (which is embedded verbatim in trace headers).
+ * and the timing distributions alike, by an arm-order invariant rather than coincidence: the `tallynet`
+ * `VirtualClock` (`testing/clock.ts`) breaks a same-instant timer tie by `seq`, a monotonic counter bumped on
+ * every `setTimer`. Within one search's own timers, relative arm order is identical in both modes — a round's
+ * outbound delivery timers are armed by `issueBatch` before that round's budget timer by `budgetedStep`
+ * (`discovery/participant.ts` `reenter`), so at an exact tie the round's own delivery always wins; an
+ * answer-delivery back to a node is armed by a downstream reaction caused *after* this node armed its budget,
+ * so at an exact tie the budget always wins there. Concurrent mode interleaves other sessions' timers into
+ * the global `seq` stream, but inserting a foreign timer between a session's own two timers cannot invert
+ * their relative order — and the model has no per-node queueing or contention, so each session's outcome
+ * depends only on its own timers' relative order. Hence the modes coincide even at an exact budget/delivery
+ * tie (`sim-runner.test.ts`'s concurrent/sequential guard sweep exercises the known tie instants). This rests
+ * on the engine's current arm-order discipline and the contention-free model — the guard test is what catches
+ * a future engine change that breaks either. `concurrent` lives on {@link SimRunnerDeps}, never on
+ * {@link SimScenario} (which is embedded verbatim in trace headers).
  */
 
 import { SeededRandom } from 'tallynet/testing'
@@ -155,11 +160,10 @@ async function runProtocolQueries(
 	const sim = buildSimNetwork(network, scenario.conditions ?? {}, conditionsSeed, sink, scenario.budget)
 
 	const windows: { outcome: QueryOutcome; startMs: number; endMs: number }[] = []
-	// NOTE: concurrent and sequential modes now produce identical records (roundsUsed/timing included) — the
-	// shared clock no longer fires a round budget timer prematurely mid-cascade (see the module header and
-	// tickets/fix/tallysim-sim-runner-concurrent-divergence). The shared `startMs`/`endMs` here is the window
-	// for a session with zero events; today every session emits ≥ 1 event (the originator's own participant
-	// emits `query-received` on entrance), so analyzeQuery reads each session's own last-event time.
+	// NOTE: concurrent and sequential modes produce identical records (roundsUsed/timing included) by the
+	// arm-order invariant in the module header, not merely in practice. The shared `startMs`/`endMs` here is
+	// the window for a session with zero events; today every session emits ≥ 1 event (the originator's own
+	// participant emits `query-received` on entrance), so analyzeQuery reads each session's own last-event time.
 	if (concurrent) {
 		// One start instant for all queries; issue in query order (session codes mint in call order →
 		// deterministic), settle once, then read a single end instant.

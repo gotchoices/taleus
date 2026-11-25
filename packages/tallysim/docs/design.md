@@ -596,14 +596,14 @@ runSeed`), conditions (`(conditionsSeed ?? 0) + runSeed`). A sub-two-entity netw
 degenerate zeroed results, the same guard the oracle runner uses.
 
 `SimRunnerDeps.concurrent` (default sequential) issues every query before a single `runUntilIdle()`, for
-speed. Both modes now produce **byte-identical** records — outcome metrics (found, messages, nodes, prune
-reasons, `pFoundGivenExists`), `roundsUsed` and the timing distributions alike. The two once diverged on
-`roundsUsed`/timing, but that was the `tallynet` `VirtualClock` under-draining discovery's completion cascade
-(`DRAIN_QUIET` too small): it fired an about-to-be-cleared round budget timer, folding an instant answer one
-round late, and the interleaving of concurrent sessions changed which budget timers fired prematurely. The
-clock fix in `tallynet-discovery-depth-reach` (raising `DRAIN_QUIET` past the cascade) removed that race, so
-the modes coincide. Whether to keep `concurrent` as a feature or drop it is the open call in
-`fix/tallysim-sim-runner-concurrent-divergence`.
+speed. It is kept: both modes produce **byte-identical** records — outcome metrics (found, messages, nodes,
+prune reasons, `pFoundGivenExists`), `roundsUsed` and the timing distributions alike — by an arm-order
+invariant, not coincidence. The `tallynet` `VirtualClock` breaks a same-instant timer tie by insertion order
+(`seq`); within one search, a round's delivery timers are always armed before that round's budget timer, and
+an answer-delivery back to a node is always caused after that node armed its budget — so an exact
+budget/delivery tie resolves the same way regardless of what other sessions' timers interleave in concurrent
+mode. See `sim/sim-runner.ts`'s module header for the full argument and `sim-runner.test.ts`'s
+concurrent/sequential guard sweep, which pins it against a future engine change.
 
 ### Found vs. oracle — the discovery experiment
 
