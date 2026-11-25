@@ -1,5 +1,5 @@
 description: Swap the temporary stand-ins that Taleus's lift code has been using in place of ChipNet for the real TallyNet library, and rename ChipNet to TallyNet throughout the code and docs.
-prereq: tallynet-discovery, tallynet-consensus
+prereq: tallynet-discovery, tallynet-consensus, debt-tallynet-forged-commit-shadows-vote, tallynet-discovery-depth-reach
 files: packages/taleus-core/src/lift/, packages/taleus-core/src/transport/, packages/taleus-core/package.json, packages/taleus-core/README.md, packages/taleus-core/SPEC.md, packages/taleus-core/schema/draft1.qsql, packages/taleus-node/, docs/architecture.md, docs/index.md, docs/STATUS.md, README.md, AGENTS.md
 difficulty: medium
 ----
