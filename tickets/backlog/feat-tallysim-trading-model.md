@@ -9,4 +9,4 @@ Needs a brainstorm with the developer before planning: which agent behaviours ma
 
 Candidate metrics: lift success rate over time, fraction of trade demand met, credit stuck with no usable capacity, share of debt cleared by circular lifts, how these vary with network growth.
 
-Plugs into the "step the economy" seam left in `tallysim-network-model`.
+Plugs into the "step the economy" seam left in `tallysim-runner` (the tail of the tallysim network-model tier).
