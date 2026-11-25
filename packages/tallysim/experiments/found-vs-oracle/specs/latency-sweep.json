@@ -1,0 +1,14 @@
+{
+	"_note": "Found-vs-oracle LATENCY sweep: scale-free edgesPerNode=3 (mean degree ~6), UNLIMITED capacity, N=100, generous depth D=6, reliability kept IDEAL (no drops/sleeping) so success holds and this sweep isolates COST. conditions.latency is declared as a {kind:constant,value:...} object so setByPath can step conditions.latency.value; the budget (5000ms + 5000ms/round) comfortably exceeds the deepest round-trip at the largest latency, so the budget never binds. Question: how do completion time and rounds grow with per-link latency while P(found) stays pinned at 1? See ../README.md and packages/tallysim/docs/design.md.",
+	"base": {
+		"network": { "generator": "scale-free", "params": { "entityCount": 100, "edgesPerNode": 3 }, "capacity": { "kind": "unlimited" }, "seed": 1000 },
+		"workload": { "kind": "payment", "queries": 50, "amount": { "dist": "constant", "params": { "value": 10 } }, "depth": 6, "seed": 2000 },
+		"conditions": { "latency": { "kind": "constant", "value": 0 } },
+		"budget": { "initialBudgetMs": 5000, "perHopBudgetMs": 5000 },
+		"conditionsSeed": 3000
+	},
+	"vary": [
+		{ "path": "conditions.latency.value", "values": [0, 10, 50, 100, 200] }
+	],
+	"seeds": [1, 2]
+}

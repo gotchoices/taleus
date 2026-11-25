@@ -605,6 +605,58 @@ clock fix in `tallynet-discovery-depth-reach` (raising `DRAIN_QUIET` past the ca
 the modes coincide. Whether to keep `concurrent` as a feature or drop it is the open call in
 `fix/tallysim-sim-runner-concurrent-divergence`.
 
+### Found vs. oracle — the discovery experiment
+
+`experiments/found-vs-oracle/` is this tier's first checked-in result, the discovery counterpart to the oracle
+tier's § *First experiment*. It asks **how close the decentralised protocol gets to the oracle, and what that
+costs**, over three one- or two-dimensional sweeps at one fixed mid-degree topology (`scale-free`,
+`edgesPerNode = 3`, mean degree ≈ 6, **unlimited** capacity so each sweep isolates the swept variable from any
+capacity gating), 50 queries, seeds `[1, 2]`. The headline is `pFoundGivenExists`; every committed record
+satisfies the `falseFoundCount === 0` guardrail (found ⊆ oracle). `regenerate.sh` reproduces the committed
+`out/*.{jsonl,csv}` and the combined `found-vs-oracle.jsonl` byte-identically and runs in well under a minute.
+
+**What the data shows.**
+
+1. **Depth — no reach gap; depth is pure cost.** The sim runner probes the oracle at the protocol's *same*
+   `maxDepth`, and since `tallynet-discovery-depth-reach` the protocol's reach is `maxDepth = L` (one round per
+   level, § "Rounds ↔ hops"), so the comparison is apples-to-apples with **no depth doubling**. Sweeping
+   `D ∈ {2..6}` × `N ∈ {100, 1000}`, `pFoundGivenExists = 1` in **every** cell: the protocol finds every route
+   the oracle sees at matched depth. The depth gap an earlier design feared (reach ≈ `⌊maxDepth/2⌋ + 1`) was a
+   simulator-clock artifact, now gone — so this write-up reports the matched-depth result directly rather than
+   budgeting `maxDepth` at 2× or labelling a cadence cost. Depth instead shows up as **cost**: as `D` rises the
+   oracle's `routeExistsCount` climbs (more targets reachable) and the protocol tracks it exactly, while
+   `messages` grow with depth and `N` (e.g. `N = 1000`: mean ≈ 7 at `D = 2` → ≈ 400 at `D = 4`, plateauing once
+   every query's route is found by `D ≈ 4–5`). `roundsUsed` stays a low single digit (2–4): the originator
+   stops at the first round that yields a satisfying plan, so hub-short paths conclude early.
+
+2. **Sleeping nodes — success falls steadily; the oracle keeps counting the dark relays.** At a generous
+   `D = 6` (so reach is never the binding constraint), sweeping `sleepingFraction ∈ {0..0.5}` drives
+   `pFoundGivenExists` down roughly linearly — ≈ 1.0 → 0.87 → 0.78 → 0.57 → 0.48 → 0.39 as 0 → 50 % of nodes go
+   dark. The oracle always runs on the **full, undegraded** network, so `routeExistsCount` holds at 50 while the
+   protocol loses the relays it needs: each sleeping non-target relay severs the paths through it, and a query
+   fails only when *all* its routes pass through dark nodes — hence the gradual fall, softened by the scale-free
+   redundancy. `nodesTouched` falls monotonically with the shrinking reachable set (≈ 22 → 5); `messages` rise
+   slightly at low sleeping (blocked candidates provoke more exploration) before falling as the reachable graph
+   collapses.
+
+3. **Latency — pure cost, success and rounds unmoved.** With reliability kept ideal (no drops/sleeping) and a
+   budget that never binds, sweeping a constant per-link `latency ∈ {0..200}` ms leaves `pFoundGivenExists`
+   pinned at 1 and `roundsUsed` flat (rounds are depth-bound, not latency-bound), while `timeToCompletionMs`
+   grows **linearly** with latency — mean ≈ 0 → 21 → 106 → 213 → 426 ms, max = latency × 6 for the deepest
+   (3-round) query, i.e. one round-trip (2× latency) per round. Latency buys nothing and costs wall-clock in
+   direct proportion.
+
+The headline for Taleus: at matched depth the greedy distributed search is **not** the bottleneck — it finds
+what the oracle finds — so the real losses come from the network going dark (sleeping relays), and latency is a
+pure time cost that never threatens success. (Realistic finite capacity, degraded further, is the natural next
+sweep; this first cut holds capacity unlimited to keep the variables clean.)
+
+> **Cost-ceiling tripwire.** Route discovery is ~O(network) per query — seconds-scale, far costlier than the
+> oracle's bounded BFS (a `NOTE:` marks this at the sim runner's per-query loop in `src/sim/sim-runner.ts`).
+> Discovery experiment grids must stay modest (small `N`, few seeds, ~50 queries) to keep `regenerate.sh`
+> agent-runnable (well under ~10 min); if a sweep ever needs large `N`, record only sampled queries rather than
+> running every pair.
+
 ## Trace & replay format
 
 A simulation run can be recorded to a **versioned, newline-delimited JSON (NDJSON)** trace file — one that

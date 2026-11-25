@@ -1,0 +1,12 @@
+{
+	"_note": "Found-vs-oracle DEPTH sweep: scale-free (Barabasi-Albert) networks, edgesPerNode=3 (mean degree ~6), UNLIMITED capacity, ideal conditions (no latency/drops/sleeping). Sweeps the depth bound D (= the protocol's maxDepth AND the oracle's depth; the sim runner probes both at the SAME depth) over entityCount N in {100, 1000}. Question: at matched depth, does the decentralised protocol find the routes the oracle sees? Post tallynet-discovery-depth-reach, reach = maxDepth = L (one round per level), so pFoundGivenExists should be ~1 with NO reach-cadence gap — the sweep confirms that and exposes depth as pure cost (messages/rounds grow). See ../README.md and packages/tallysim/docs/design.md.",
+	"base": {
+		"network": { "generator": "scale-free", "params": { "entityCount": 100, "edgesPerNode": 3 }, "capacity": { "kind": "unlimited" }, "seed": 1000 },
+		"workload": { "kind": "payment", "queries": 50, "amount": { "dist": "constant", "params": { "value": 10 } }, "depth": 6, "seed": 2000 }
+	},
+	"vary": [
+		{ "path": "workload.depth", "values": [2, 3, 4, 5, 6] },
+		{ "path": "network.params.entityCount", "values": [100, 1000] }
+	],
+	"seeds": [1, 2]
+}
