@@ -80,6 +80,15 @@ export async function runLiftForOutcome(
 	const { tallyPath, route } = reconstructRoute(network, outcome.sessionCode, q.from, plan)
 	const net = sim.net
 	const voters = new Set(options?.voters ?? [route[0]])
+	const onRoute = new Set(route)
+	for (const voter of voters) {
+		// A voter off the route is never emitted as a member (liftMembers walks the route), so it would
+		// silently carry no referee role — leaving the lift with too few (possibly zero) voters and a
+		// confusing `pending`. Fail loudly instead; the voter set must be a subset of the route.
+		if (!onRoute.has(voter)) {
+			throw new Error(`runLiftForOutcome: voter ${voter} is not on the route [${route.join(', ')}]`)
+		}
+	}
 	const { record, transactionCode } = net.buildLift({
 		members: liftMembers(route, voters),
 		route: route.map(entityName),

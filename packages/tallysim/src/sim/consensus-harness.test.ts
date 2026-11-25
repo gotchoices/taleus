@@ -144,6 +144,33 @@ describe('runLiftForOutcome — discovery + consensus end to end', () => {
 		expect(sim.net.deliveryErrors).toEqual([]) // a refusal is caught and signed NP, not a delivery error
 	})
 
+	it('a split voter set (override) stalls to pending; no money moves and nothing leaks', async () => {
+		// Two voters, 0 and 2, that split 1 commit / 1 void → no strict majority → pending (not void: every
+		// node promised; the stall is in the vote, so balances must stay put). Exercises both options.voters
+		// and the pending branch of the money-move guard end to end.
+		const network = line(3)
+		const { resourceFor } = makeSimResources({ 2: { shouldCommit: false } })
+		const sim = buildSimNetwork(network, {}, 0, undefined, undefined, { ...CONSENSUS, resourceFor })
+		const q: QuerySpec = { from: 0, to: 2, amount: 5, depth: 3 }
+		const outcome = await runQuery(sim, q)
+
+		const result = await runLiftForOutcome(sim, network, outcome, q, { voters: [0, 2] })
+		expect(result?.outcome).toBe('pending') // even split, no strict majority
+		expect(network.tallies[0].balance).toBe(0) // unchanged on a stall
+		expect(network.tallies[1].balance).toBe(0)
+		expect(sim.net.deliveryErrors).toEqual([])
+		expect(sim.net.clock.pendingTimers).toBe(0) // the stall left nothing in flight
+	})
+
+	it('throws when a voter is not on the route (a misconfigured voter set, not a silent zero-referee stall)', async () => {
+		const network = line(3)
+		const sim = buildSimNetwork(network, {}, 0, undefined, undefined, CONSENSUS)
+		const q: QuerySpec = { from: 0, to: 2, amount: 5, depth: 3 }
+		const outcome = await runQuery(sim, q)
+
+		await expect(runLiftForOutcome(sim, network, outcome, q, { voters: [0, 99] })).rejects.toThrow(/voter 99 is not on the route/)
+	})
+
 	it('conservation: only payer and payee change net position; every intermediary nets zero', async () => {
 		const network = line(4)
 		const sim = buildSimNetwork(network, {}, 0, undefined, undefined, CONSENSUS)
