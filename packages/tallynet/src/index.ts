@@ -2,9 +2,9 @@
  * TallyNet: the lift protocol library for Taleus — route discovery across the tally graph and
  * atomic promise/commit of a lift across many tally strands. A port of ChipNet. See docs/design.md.
  *
- * This scaffold ships the shared building blocks the discovery and consensus engines (later
- * tickets) are built on: the crypto ports, self-expiring session codes, edge nonces, the canonical
- * digest, step sequencing, and the rule engine.
+ * This barrel ships the shared building blocks — the crypto ports, self-expiring session codes, edge
+ * nonces, the canonical digest, step sequencing, and the rule engine — plus the full route-discovery
+ * engine (`discovery/`). The consensus engine remains a later ticket.
  */
 
 export * from './clock.js'
