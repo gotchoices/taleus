@@ -11,6 +11,9 @@
  * - `identity.ts` — the deterministic signer/verifier layer that gives consensus nodes reproducible keys.
  * - `consensus-resource.ts` — failure-injecting consensus resource ports (keyed by entity id) for tests.
  * - `harness.ts` — build a running discovery (and optionally consensus) network from a `Network`.
+ * - `plan-select.ts` — the originator's plan-selection policy (shortest-path) over a query's found plans.
+ * - `route.ts` — invert a chosen plan's anonymised nonces back to the concrete tally route it walks.
+ * - `consensus-harness.ts` — drive one found plan through the real sign-and-settle lift; move money on commit.
  * - `trace-format.ts` — the versioned NDJSON trace-line union, `serializeTraceLine` and `parseTrace`.
  * - `trace-writer.ts` — `makeTraceWriter`: stream a header + network + per-event lines to a `LineSink`.
  * - `protocol-metrics.ts` — pure measurement: trace + outcome + oracle verdict → per-query / per-run metrics.
@@ -23,6 +26,9 @@ export * from './conditions.js'
 export * from './identity.js'
 export * from './consensus-resource.js'
 export * from './harness.js'
+export * from './plan-select.js'
+export * from './route.js'
+export * from './consensus-harness.js'
 export * from './trace-format.js'
 export * from './trace-writer.js'
 export * from './protocol-metrics.js'

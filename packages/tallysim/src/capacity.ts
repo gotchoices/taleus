@@ -37,3 +37,21 @@ export function capStockToFoil(tally: Tally): number {
 export function totalSwing(tally: Tally): number {
 	return tally.stockCreditLimit + tally.foilCreditLimit
 }
+
+/**
+ * Move one tally's balance for a committed lift hop, where value flows from one endpoint to the other.
+ * `fromIsStock` says the payer on this hop is the tally's **stock** endpoint:
+ *
+ *   - payer = stock (value flows stock → foil): `b -= amount` — `b` falls toward `-foilCreditLimit`,
+ *     consuming `cap(S→F) = b + foilCreditLimit`.
+ *   - payer = foil (value flows foil → stock): `b += amount` — `b` rises toward `+stockCreditLimit`,
+ *     consuming `cap(F→S) = stockCreditLimit − b`.
+ *
+ * The inverse direction of {@link capStockToFoil} / {@link capFoilToStock}: a lift consumes exactly the
+ * directed capacity it flows across. `Infinity` limits leave `b` finite (plain arithmetic, no CBOR), so an
+ * unlimited edge simply keeps its `Infinity` limit while its balance moves by `amount`. The caller is
+ * responsible for checking the result stays within `[-foilCreditLimit, stockCreditLimit]`.
+ */
+export function applyLiftToBalance(tally: Tally, fromIsStock: boolean, amount: number): void {
+	tally.balance += fromIsStock ? -amount : amount
+}

@@ -14,7 +14,8 @@ model, the generators, and the structural utilities), the **oracle**, the **runn
 (the scenario/sweep model, the sweep runner, the metrics, the output serialisers, the CLI, and the first
 checked-in experiment), and the **discovery-simulation** tier (the wiring that runs the real `tallynet`
 protocol over a simulated network and runs one payment query to completion). The trace & replay format and
-the protocol metrics / sweep fill the remaining stubbed section.
+the protocol metrics / sweep fill the remaining stubbed section. The **consensus-simulation** tier (driving a
+found route through the real sign-and-settle lift and moving money on commit) lands on top of discovery.
 
 Read first: [`docs/architecture.md`](../../../docs/architecture.md) (the Taleus system overview) and
 [`packages/tallynet/docs/design.md`](../../tallynet/docs/design.md) (the lift protocol this simulator
@@ -30,7 +31,7 @@ confused with a failure in the other:
 | **Network model + generators** | Build random tally networks as plain data. | built |
 | **Oracle** | See the whole graph; answer *does a route exist / how much is payable / can debt clear* by direct search. The **ground truth**. | built |
 | **Runner / experiments** | Sweep a parameter over many generated networks, run the oracle per query, record metrics, check in findings. | built |
-| **Discovery / consensus** | Replay the real `tallynet` protocol on the same graphs and compare "found vs. oracle". | later (`tallysim-discovery`, `tallysim-consensus`) |
+| **Discovery / consensus** | Replay the real `tallynet` protocol on the same graphs: discover a route, drive it through sign-and-settle, move money on commit, and compare "found vs. oracle". | built (discovery + consensus drive/settle) |
 
 The oracle answers *could the network ever have carried this lift*; the protocol tiers answer *did the
 protocol find it*. Keeping the oracle independent of the protocol is the whole point — it is the yardstick.
@@ -664,6 +665,92 @@ sweep; this first cut holds capacity unlimited to keep the variables clean.)
 > Discovery experiment grids must stay modest (small `N`, few seeds, ~50 queries) to keep `regenerate.sh`
 > agent-runnable (well under ~10 min); if a sweep ever needs large `N`, record only sampled queries rather than
 > running every pair.
+
+## Consensus simulation
+
+Discovery answers *did the protocol find a route*. The **consensus simulation** tier (`src/sim/plan-select.ts`,
+`route.ts`, `consensus-harness.ts`) answers the next question: *given a found route, does the real
+sign-and-settle lift commit, and what does it do to the network?* It takes a settled `QueryOutcome`, picks one
+plan, drives the actual `tallynet` promise/commit engine over that exact route on the same `VirtualClock`, reads
+commit/void/stall, and — on commit — moves each tally's balance along the route so the next query sees the
+changed capacity. The consensus engine itself is **not** rebuilt here: the prereq wired `buildSimNetwork`'s
+`consensus?: { identitySeed, resourceFor? }` option, which builds one `ConsensusNode` per graph node over the
+existing harness (deterministic ed25519 identities from `sim/identity.ts`; failure-injecting resource ports from
+`sim/consensus-resource.ts`). This tier composes that wiring into one call, `runLiftForOutcome`.
+
+### Picking a plan
+
+Discovery returns *every* satisfying plan; a payment settles exactly one. `sim/plan-select.ts` holds the
+originator's policy. Only **`shortest`** ships (fewest `path.length`, ties broken by first-found — the incumbent
+is replaced only on a strict `<`, so the earliest minimum wins), exposed as a named `PlanPolicy` so a later
+experiment can sweep alternatives. Empty plans ⇒ `undefined`, and the caller skips the consensus phase (nothing
+to settle).
+
+### Reconstructing the exact route
+
+A found plan's `path` is a list of anonymised edge **nonces** (`makeNonce(sessionCode, linkId)`), not link ids —
+a node never reveals a raw link id on the wire. The simulator built the network it is decoding, so it inverts the
+hash: `sim/route.ts` recomputes `makeNonce(sessionCode, linkIdForTally(i))` for every tally `i` to build `nonce →
+tally index`, then walks from the originator across each tally's `{ stock, foil }` endpoints. It returns a
+`LiftRoute = { tallyPath: number[]; route: number[] }` — the tally crossed at each hop, and the entity-id path
+`[from, …, to]`. This is the same inversion the viewer's `deanonymise.ts` does, with one deliberate difference:
+it **throws** on an unresolvable nonce or a non-contiguous walk rather than returning a sentinel. The viewer
+decodes foreign traces (bad input is data); here the sim built the network and ran the discovery, so either is a
+bug in this tier, not an input to tolerate.
+
+### Driving the lift
+
+`runLiftForOutcome(sim, network, outcome, q, options?)` assembles a `LiftSpec` from `tallyPath` + `route` +
+`q.amount` and drives it:
+
+- **Members & voters.** Every distinct entity on the route is a participant (`['P']`); the voter set (default
+  `[route[0]]`, the originator) additionally gets `['R']`, so a default lift settles on the originator's own vote
+  — the "lift voters, not referee" model, a voter set of one. A circular lift (`route[0] === route[last]`) lists
+  the originator **once** in `members` though it sits on two links; `buildLift` resolves the route pairs anyway.
+- **Exact tally selection.** `routeLinkIds: tallyPath.map(linkIdForTally)` picks the *discovery-chosen* tally at
+  each hop, not merely the first edge to the neighbour — essential when a pair holds parallel tallies and only
+  one carried the capacity the search used.
+- **Codes.** The discovery `sessionCode` is reused; `buildLift` mints the transaction code off the shared seeded
+  random, so the whole discovery+consensus pass is deterministic for a given query sequence.
+- **Payload.** `{ amount: String(q.amount) }` — a **string**, because DAG-CBOR rejects a bigint/number caveat on
+  the covered payload.
+- **CBOR-safe link intents (load-bearing).** `recordDigest` DAG-CBOR-encodes `topology.links[*].intents`, and
+  DAG-CBOR **throws on `Infinity`** — which an `unlimited`-capacity tally carries in `capFwd`/`capBack`, the
+  *default* distribution in the committed `found-vs-oracle` experiment. So, after `buildLift` and **before**
+  `start`, each lift record's link intents are rewritten to a finite copy (non-finite → `Number.MAX_SAFE_INTEGER`).
+  TallyNet never interprets terms, every node signs the same sanitised record, and nonces are keyed by
+  `sessionCode`+`linkId` (independent of intent values), so this is safe and leaves settlement unaffected. Only
+  *this* lift record is sanitised — never the shared discovery adjacency, whose terms are pinned byte-identical by
+  the discovery sweep.
+- **Outcome.** `consensusNode(originator).start(record)` then `clock.runUntilIdle()`; the result is read from
+  `outcome(txCode)` as `'commit' | 'void' | 'pending'`. `pending` (a stalled lift — a dropped push or an even
+  voter-set tie; v1 has no timeout) is a **real third outcome**, surfaced, not thrown. A clean run leaves
+  `net.deliveryErrors === []` even when a participant refuses (the engine catches it and signs `NP`).
+
+### Moving money on commit
+
+Only on `commit`. Payment flows originator → target; for each hop `u → v` resolved to tally `t`, value flows
+`u → v`, and `capacity.ts`'s single directed helper `applyLiftToBalance(tally, fromIsStock, amount)` moves the
+balance: `fromIsStock = (tally.stock === u)`. Payer-is-stock (value stock → foil) lowers `b` toward
+`-foilCreditLimit`; payer-is-foil (value foil → stock) raises `b` toward `+stockCreditLimit` — the exact inverse
+of the directed-capacity formulas, so a lift consumes precisely the capacity it flows across. A single lift over
+the found route stays in bounds (discovery already proved `capFwd ≥ amount` each hop); the driver nonetheless
+**asserts** `-foilCreditLimit ≤ balance ≤ stockCreditLimit` after every hop, catching any route-reconstruction or
+direction bug. `Infinity` limits make the bound trivially pass and the balance stays finite (plain arithmetic,
+never CBOR). Conservation follows: each intermediary's net position is unchanged (the signed change on its
+in-tally equals that on its out-tally); only payer and payee see a net move, and a circular lift nets zero at
+every node around the loop.
+
+### Seeing the changed capacity needs a rebuild
+
+`InMemoryNetwork` freezes each link's terms from `network.tallies` at **construction**, so mutating
+`network.tallies[t].balance` afterward does **not** change an already-built sim. For "the next query sees the
+changed capacity," rebuild `buildSimNetwork(network, …)` from the mutated model before the next query. Within one
+run a *sequence* of lifts mutates the one kept network in order. Because the driver mutates the `network` it is
+given, a caller holding a `materialized`-by-reference network must `cloneNetwork(network)` (`model.ts`) per run,
+mirroring the `materializeNetwork` NOTE — otherwise one run's committed lifts would contaminate the next. Same
+`(network, identity, workload, conditions)` seeds ⇒ identical member keys, outcome, and resulting balances; the
+dedicated identity-seed stream is the determinism guard.
 
 ## Trace & replay format
 

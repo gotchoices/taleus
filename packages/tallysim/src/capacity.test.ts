@@ -1,4 +1,4 @@
-import { capFoilToStock, capStockToFoil, totalSwing } from './capacity.js'
+import { applyLiftToBalance, capFoilToStock, capStockToFoil, totalSwing } from './capacity.js'
 import type { Tally } from './model.js'
 
 function tally(balance: number, stockCreditLimit: number, foilCreditLimit: number): Tally {
@@ -41,5 +41,38 @@ describe('capacity model', () => {
 		const t = tally(2, Infinity, 5)
 		expect(capFoilToStock(t)).toBe(Infinity) // Infinity - 2
 		expect(capStockToFoil(t)).toBe(7) // 2 + 5
+	})
+})
+
+describe('applyLiftToBalance', () => {
+	it('stock paying (value stock → foil) lowers the balance by the amount, consuming cap(S→F)', () => {
+		const t = tally(0, 10, 10)
+		const before = capStockToFoil(t) // 10
+		applyLiftToBalance(t, true, 4) // payer is stock
+		expect(t.balance).toBe(-4)
+		expect(capStockToFoil(t)).toBe(before - 4) // exactly the directed capacity it flowed across
+	})
+
+	it('foil paying (value foil → stock) raises the balance by the amount, consuming cap(F→S)', () => {
+		const t = tally(0, 10, 10)
+		const before = capFoilToStock(t) // 10
+		applyLiftToBalance(t, false, 4) // payer is foil
+		expect(t.balance).toBe(4)
+		expect(capFoilToStock(t)).toBe(before - 4)
+	})
+
+	it('is self-inverse: a stock-pay then an equal foil-pay restores the balance', () => {
+		const t = tally(3, 10, 10)
+		applyLiftToBalance(t, true, 6)
+		applyLiftToBalance(t, false, 6)
+		expect(t.balance).toBe(3)
+	})
+
+	it('moves a finite balance across an unlimited tally and leaves the Infinity limit intact', () => {
+		const t = tally(0, Infinity, Infinity)
+		applyLiftToBalance(t, true, 5)
+		expect(t.balance).toBe(-5) // finite; plain arithmetic, no CBOR
+		expect(t.stockCreditLimit).toBe(Infinity)
+		expect(t.foilCreditLimit).toBe(Infinity)
 	})
 })

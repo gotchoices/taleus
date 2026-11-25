@@ -1,4 +1,4 @@
-import { FORMAT_VERSION, type Network, deserialize, serialize } from './model.js'
+import { FORMAT_VERSION, type Network, cloneNetwork, deserialize, serialize } from './model.js'
 
 function networkWith(tallies: Network['tallies'], entityCount: number): Network {
 	return {
@@ -66,5 +66,23 @@ describe('serialize / deserialize', () => {
 		const bumped = JSON.parse(serialize(net)) as { meta: { formatVersion: number } }
 		bumped.meta.formatVersion = FORMAT_VERSION + 1
 		expect(() => deserialize(JSON.stringify(bumped))).toThrow(/formatVersion/)
+	})
+})
+
+describe('cloneNetwork', () => {
+	it('mutating a clone\'s balance never writes back through the original', () => {
+		const net = networkWith([{ stock: 0, foil: 1, balance: 3, stockCreditLimit: 10, foilCreditLimit: 5 }], 2)
+		const clone = cloneNetwork(net)
+		clone.tallies[0].balance = -99
+		expect(net.tallies[0].balance).toBe(3) // the original is untouched
+		expect(clone.tallies[0]).not.toBe(net.tallies[0]) // a fresh tally object, not a shared reference
+	})
+
+	it('is an equal-by-value copy, including Infinity limits and cloned meta', () => {
+		const net = networkWith([{ stock: 0, foil: 1, balance: 0, stockCreditLimit: Infinity, foilCreditLimit: 2 }], 2)
+		const clone = cloneNetwork(net)
+		expect(clone).toEqual(net) // every field copies, Infinity included
+		clone.meta.params.entityCount = 999
+		expect(net.meta.params.entityCount).toBe(2) // meta.params is cloned, not shared
 	})
 })

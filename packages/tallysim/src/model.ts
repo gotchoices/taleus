@@ -86,6 +86,21 @@ export interface SerializedNetwork {
 	meta: NetworkMeta
 }
 
+/**
+ * A deep-enough copy of a network for a tier that mutates balances. The consensus driver moves
+ * `tally.balance` along a committed route; a caller that holds a `materialized`-by-reference network (see
+ * the NOTE in `materializeNetwork`) must clone it per run, or one run's committed lifts would contaminate
+ * the next. Tallies are shallow-cloned (`{ ...t }` — every field is a primitive, `Infinity` copies fine);
+ * `meta` and `meta.params` are cloned so a mutated clone never writes back through the shared provenance.
+ */
+export function cloneNetwork(network: Network): Network {
+	return {
+		entityCount: network.entityCount,
+		tallies: network.tallies.map((tally) => ({ ...tally })),
+		meta: { ...network.meta, params: { ...network.meta.params } },
+	}
+}
+
 /** `Infinity` → `null`; every finite number passes through unchanged. */
 function limitToJson(limit: number): number | null {
 	return limit === Infinity ? null : limit
