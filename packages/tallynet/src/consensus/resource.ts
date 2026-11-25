@@ -84,5 +84,5 @@ export interface TrxParticipantResource<TTerms, TPayload> {
 	 * returns — it travels by union with the signature and is not part of the signed preimage. Default
 	 * when omitted: no attachment.
 	 */
-	resolveAttachment?(decision: 'C' | 'NC', ctx: ResourceContext<TTerms, TPayload>): unknown | Promise<unknown>
+	resolveAttachment?(decision: 'C' | 'NC', ctx: ResourceContext<TTerms, TPayload>): unknown
 }

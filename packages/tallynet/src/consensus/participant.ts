@@ -395,7 +395,7 @@ export class TrxParticipant<TTerms, TPayload> {
 			}
 		}
 		await this.sign(record, decision, 'promises')
-		this.traceSink({ ...this.traceBase(record), type: 'promise-signed', transactionCode: record.transactionCode, signatureType: decision as 'P' | 'NP' })
+		this.traceSink({ ...this.traceBase(record), type: 'promise-signed', transactionCode: record.transactionCode, signatureType: decision })
 	}
 
 	/**
