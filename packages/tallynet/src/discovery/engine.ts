@@ -6,7 +6,7 @@
  * participant from the previous ticket. This is the end-to-end wiring that turns the originator loop
  * and the participant into a working route search.
  *
- * ── Adapter note for `tallynet-bind-taleus-core` (do NOT edit taleus-core here) ──────────────────
+ * ── Adapter note for `feat-tallynet-bind-taleus-core` (do NOT edit taleus-core here) ──────────────────
  *
  * `taleus-core` already defines, as injected ports tested against in-memory doubles:
  *

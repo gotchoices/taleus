@@ -100,7 +100,7 @@ deferred).
 - **B1 — malicious single referee half-commits** (v1): signs commit to some edges, void to others → a
   non-atomic lift → an intermediary can lose value, possibly a **third party** with no contract with the
   referee. The one place the two-party contract backstop does not reach. → *lift domain*;
-  [`feat-multi-referee-consensus`](../tickets/backlog/feat-multi-referee-consensus.md) and (speculative)
+  [`feat-tallynet-bind-taleus-core`](../tickets/backlog/feat-tallynet-bind-taleus-core.md) and (speculative)
   [`feat-lift-healing`](../tickets/backlog/feat-lift-healing.md).
 - **B2 — malicious counterparty unilateral rekey** (total-loss recovery): inherent to a two-party
   human-trust root, documented, out of scope by design. Disputable.

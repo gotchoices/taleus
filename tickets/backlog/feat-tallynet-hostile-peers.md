@@ -12,7 +12,7 @@ TallyNet's protocol rules make sure no unauthenticated input can change a verifi
 - a referee signs both commit and void (equivocation, which *is* provable, since both signatures verify);
 - a node answers discovery with plans it won't honour, or with false terms.
 
-Locally the protocol can only bound the damage (time budgets, `feat-tallynet-propagation-timeouts` to void stalled lifts, per-peer caps). Deterrence has to come from consequences, and those belong in **Taleus**, where each neighbour is a known counterparty authenticated by a shared tally.
+Locally the protocol can only bound the damage (time budgets, `tallynet-propagation-timeouts` to void stalled lifts, per-peer caps). Deterrence has to come from consequences, and those belong in **Taleus**, where each neighbour is a known counterparty authenticated by a shared tally.
 
 ## Questions to settle (needs a brainstorm with the developer)
 
@@ -21,6 +21,6 @@ Locally the protocol can only bound the damage (time budgets, `feat-tallynet-pro
 - **Reputation:** a per-neighbour local score from lift outcomes (timeouts caused, junk relayed, query volume). Inputs, decay, and how it feeds the propagation policy (stop routing through a low-score neighbour).
 - **Expulsion:** stop routing through a neighbour, mark a tally as unavailable for lifts, raise the price (fees), or close the tally. Which are automatic and which need the user.
 - **Referee choice:** how evidence of a bad referee affects which referees a node accepts in future lifts.
-- **Overlap:** `debt-tallynet-query-economics` (pricing queries against flooding), `feat-tallynet-propagation-timeouts`, `feat-tallynet-trust-query`, `feat-lift-timeout-release`.
+- **Overlap:** `debt-tallynet-query-economics` (pricing queries against flooding), `tallynet-propagation-timeouts`, `feat-tallynet-trust-query`, `feat-lift-timeout-release`.
 
 Simulation can measure each policy: add hostile node types to tallysim (stallers, droppers, flooders, equivocating referees) and measure lift success and how fast the network routes around them.

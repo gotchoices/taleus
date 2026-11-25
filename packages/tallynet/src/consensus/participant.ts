@@ -440,7 +440,7 @@ export class TrxParticipant<TTerms, TPayload> {
 			return 'ourCommitNeeded'
 		}
 		// NOTE: a stuck commit phase (a tie, or referees still to vote) stays `propagating` and does NOT
-		// settle in-band — v1 has no timer. This is the seam for `feat-tallynet-propagation-timeouts`: a
+		// settle in-band — v1 has no timer. This is the seam for `tallynet-propagation-timeouts`: a
 		// timeout-triggered referee NC (void-on-timeout) would be injected here, keyed off the record's
 		// deadline `this.sessionCodes.expiresAt(record.transactionCode)`; stalled-transaction recovery
 		// hangs off the same point. Do not add a timer here — the extension owns it.

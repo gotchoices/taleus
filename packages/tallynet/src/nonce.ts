@@ -13,7 +13,7 @@
  * Preimage parity with `taleus-core`: the byte layout here is identical to `computeNonce` in
  * `packages/taleus-core/src/transport/chipnet-protocol.ts`. The **text encoding differs** —
  * TallyNet emits base64url (URL/filename-safe), `taleus-core`'s current `computeNonce` emits
- * standard padded base64. The binding ticket (`4-tallynet-bind-taleus-core`) unifies them by having
+ * standard padded base64. The binding ticket (`feat-tallynet-bind-taleus-core`) unifies them by having
  * the transport import this function; until then the two must not be compared as strings.
  */
 

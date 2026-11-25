@@ -1,5 +1,5 @@
 description: Build the taleus-node always-on trading service — the headless lift agent + /taleus/chipnet/1.0.0 endpoint, run as a client of the party's Sereus cadre. Fills in the scaffolding stub in packages/taleus-node.
-prereq: tallynet-bind-taleus-core
+prereq: feat-tallynet-bind-taleus-core
 files: packages/taleus-node/src/index.ts, packages/taleus-node/src/cli.ts, packages/taleus-node/README.md, docs/architecture.md
 ----
 `packages/taleus-node` exists today as a scaffolding stub (`createTaleusNode` throws, `cli.ts` errors out). This ticket implements it: the always-on process that runs a party's lift agent continuously and serves the ChipNet transport, playing the role MyCHIPs site servers played (design in `docs/architecture.md` § The Stack, § Lifts and ChipNet, § Portfolio).
@@ -27,4 +27,4 @@ What the service must do:
 
 - **Cadre client API.** Does `@serfab/cadre-core` expose an out-of-process client interface for a non-cadre-member process to read/write strands, or must the service itself be a cadre member (its own node in the party's cadre)? If the latter, "client of the cadre" means "an additional cadre node that also runs the agent," which is still not a plugin. Confirm against `../sereus/packages/cadre-core` and `../sereus/packages/cadre-host`.
 
-Prereq / depends on: `tallynet-bind-taleus-core` (TallyNet, the in-repo port of ChipNet, replaces the unpublished `chipnet` package), a live Quereus runner wiring, and the Sereus cadre-client API above. Parked in backlog until those land. The `/taleus/chipnet/1.0.0` protocol id becomes `/tallynet/1.0.0` in that ticket.
+Prereq / depends on: `feat-tallynet-bind-taleus-core` (TallyNet, the in-repo port of ChipNet, replaces the unpublished `chipnet` package), a live Quereus runner wiring, and the Sereus cadre-client API above. Parked in backlog until those land. The `/taleus/chipnet/1.0.0` protocol id becomes `/tallynet/1.0.0` in that ticket.

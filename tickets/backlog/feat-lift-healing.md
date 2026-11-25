@@ -67,7 +67,7 @@ attributable repair.
   gates — a repair must not itself be blockable by the same closing/credit gates that would strand it.
 - The economic/trust model: who insures, who pays, and how insurance is discovered/agreed during route
   formation (this is the tallyNet layer).
-- Interaction with `feat-multi-referee-consensus` (majority voting reduces how often (2) happens) and
+- Interaction with `feat-tallynet-bind-taleus-core` (majority voting reduces how often (2) happens) and
   `feat-lift-timeout-release` (which handles (1)).
 
 ## Not near-term

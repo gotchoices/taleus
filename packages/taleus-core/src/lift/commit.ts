@@ -206,7 +206,7 @@ export type Logger = (message: string, ...args: unknown[]) => void
  *   3. finalize (commit) or void the strand.
  * A contradictory decision (commit after void seen, or vice versa, for one LiftId) is
  * detected-and-logged — the single-referee "lying referee" case; recovery is out of scope
- * (backlog/feat-multi-referee-consensus).
+ * (backlog/feat-tallynet-bind-taleus-core).
  */
 export async function applyResolution(
 	record: LiftRecord,
@@ -256,7 +256,7 @@ async function applyToEdge(
 	// on the second face. `seenDecisions` only ever holds already-verified decisions.
 	const prior = seenDecisions.get(edge.liftId)
 	if (prior !== undefined && prior !== decision) {
-		log('CONTRADICTION: referee signed both %s and %s for LiftId %s (single-referee equivocation; see backlog/feat-multi-referee-consensus)', prior, decision, edge.liftId)
+		log('CONTRADICTION: referee signed both %s and %s for LiftId %s (single-referee equivocation; see backlog/feat-tallynet-bind-taleus-core)', prior, decision, edge.liftId)
 		return { liftId: edge.liftId, applied: 'skipped-contradiction' }
 	}
 	seenDecisions.set(edge.liftId, decision)

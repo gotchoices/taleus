@@ -813,4 +813,4 @@ Filed as tickets from the app design pass:
 - `tickets/backlog/debt-tally-close-no-reopen.md` — terminal close / no reversal of a mistaken final payment.
 - `tickets/backlog/feat-lift-healing.md` — repair a half-broken lift (partition / refuser / silent referee). **Speculative** — needs a dedicated design pass before implementation.
 - Existing, re-scoped by this analysis: `feat-lift-timeout-release.md` (stuck pending lift),
-  `feat-multi-referee-consensus.md` (single-referee third-party value-loss).
+  `feat-tallynet-bind-taleus-core.md` (single-referee third-party value-loss).

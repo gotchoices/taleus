@@ -26,7 +26,7 @@
  * and `void` others, breaking atomicity (ChipNet's "lying referee"), with no majority to
  * outvote it. v1 accepts this — the reference default is the originator's own agent, which
  * has no incentive to equivocate against its own lift. Multi-referee majority is deferred
- * to backlog/feat-multi-referee-consensus (a schema change: `RefereeKey` → set + threshold,
+ * to backlog/feat-tallynet-bind-taleus-core (a schema change: `RefereeKey` → set + threshold,
  * `RefereeSignature` → majority bundle). This module signs every edge with the SAME
  * decision by construction (one `commit`/`void` call over all edges), so an honest referee
  * cannot split a route; contradiction detection for a dishonest one lives on the ingest
