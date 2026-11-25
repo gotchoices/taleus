@@ -11,6 +11,8 @@
  * - `harness.ts` — build a running discovery network from a `Network` and run one payment query.
  * - `trace-format.ts` — the versioned NDJSON trace-line union, `serializeTraceLine` and `parseTrace`.
  * - `trace-writer.ts` — `makeTraceWriter`: stream a header + network + per-event lines to a `LineSink`.
+ * - `protocol-metrics.ts` — pure measurement: trace + outcome + oracle verdict → per-query / per-run metrics.
+ * - `sim-runner.ts` — the discovery sweep runner (mirrors `runner.ts`): one record per (cell × seed).
  */
 
 export * from './naming.js'
@@ -19,3 +21,5 @@ export * from './conditions.js'
 export * from './harness.js'
 export * from './trace-format.js'
 export * from './trace-writer.js'
+export * from './protocol-metrics.js'
+export * from './sim-runner.js'

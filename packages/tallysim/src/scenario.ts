@@ -96,6 +96,18 @@ export interface SimScenario {
 	conditionsSeed?: number
 }
 
+/**
+ * A discovery-simulation sweep: a base {@link SimScenario}, the parameter(s) to vary (same cartesian-product
+ * `vary` dimensions the oracle {@link SweepSpec} uses), and the seeds to repeat each cell over. The sim
+ * runner (`sim/sim-runner.ts`) yields one record per `(cell × seed)`. `concurrent` is a runner dep, **not**
+ * a field here — it must never ride on `SimScenario` (which is embedded verbatim in trace headers).
+ */
+export interface SimSweepSpec {
+	base: SimScenario
+	vary: VarySpec[]
+	seeds: number[]
+}
+
 /** One varied dimension: a dotted path into the base scenario and the numeric values to step it through. */
 export interface VarySpec {
 	/** Dotted path, e.g. `network.params.meanDegree`, `network.params.entityCount`, `workload.depth`. */

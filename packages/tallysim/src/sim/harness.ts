@@ -35,6 +35,8 @@ import {
 import type { OriginatorOptions, ParticipantOptions, Plan, TraceSink } from 'tallynet'
 import { capFoilToStock, capStockToFoil } from '../capacity.js'
 import type { Network } from '../model.js'
+import type { WorkloadSpec } from '../scenario.js'
+import { drawAmount, drawPaymentPair } from '../workload.js'
 import { type ConditionsSpec, compileConditions } from './conditions.js'
 import { entityId, entityName, linkIdForTally } from './naming.js'
 import { type LiftTerms, invertLiftTerms, makeCapacityHooks } from './terms.js'
@@ -118,20 +120,50 @@ export function buildSimNetwork(
 }
 
 /**
- * Run one payment query to completion on simulated time: issue `discover`, drive the clock to idle, and
- * return the outcome. Never throws for "not found" (the originator returns empty plans), nor for
- * `from === to`, nor for a network with fewer than two entities.
+ * Issue one payment query **without driving the clock**: call `discover` (which mints the session code
+ * synchronously and arms round-0 work) and return the pending outcome promise. The caller settles it by
+ * driving `sim.net.clock` — `runQuery` does so immediately; the sim runner's concurrent mode issues many
+ * queries before a single `runUntilIdle()`. This is the one place the `'L'` intent code and target shape
+ * live, so both paths stay in lock-step.
  */
-export async function runQuery(sim: SimNetwork, q: QuerySpec): Promise<QueryOutcome> {
-	// discover() mints the session code synchronously and arms round-0 work; runUntilIdle() then drains
-	// every scheduled delivery/budget timer in virtual time, settling the promise.
+export function issueQuery(sim: SimNetwork, q: QuerySpec): Promise<QueryOutcome> {
 	const pending = sim.net.discover(
 		sim.entityName(q.from),
 		{ address: { key: sim.entityName(q.to) } },
 		{ [LIFT_CODE]: { capFwd: 0, capBack: 0, amount: q.amount } },
 		{ maxDepth: q.depth },
 	)
+	return pending.then(({ sessionCode, plans }) => ({ sessionCode, plans, found: plans.length > 0 }))
+}
+
+/**
+ * Run one payment query to completion on simulated time: issue `discover`, drive the clock to idle, and
+ * return the outcome. Never throws for "not found" (the originator returns empty plans), nor for
+ * `from === to`, nor for a network with fewer than two entities.
+ */
+export async function runQuery(sim: SimNetwork, q: QuerySpec): Promise<QueryOutcome> {
+	// issueQuery() arms round-0 work; runUntilIdle() then drains every scheduled delivery/budget timer in
+	// virtual time, settling the promise. Observable behaviour is identical to issuing + settling inline.
+	const pending = issueQuery(sim, q)
 	await sim.net.clock.runUntilIdle()
-	const { sessionCode, plans } = await pending
-	return { sessionCode, plans, found: plans.length > 0 }
+	return pending
+}
+
+/**
+ * Draw a workload's payment queries over an already-materialised network: `workload.queries` draws of a
+ * distinct `(from, to)` pair then an amount (pair-first, matching the oracle runner's draw order exactly),
+ * each at `workload.depth`. Empty for `entityCount < 2` (no distinct pair exists). The **caller owns the
+ * rng seeding** — pass a {@link SeededRandom} seeded on the workload stream.
+ */
+export function drawPaymentQueries(workload: WorkloadSpec, entityCount: number, rng: SeededRandom): QuerySpec[] {
+	if (entityCount < 2) {
+		return []
+	}
+	const queries: QuerySpec[] = []
+	for (let i = 0; i < workload.queries; i++) {
+		const [from, to] = drawPaymentPair(entityCount, rng)
+		const amount = drawAmount(workload.amount, rng)
+		queries.push({ from, to, amount, depth: workload.depth })
+	}
+	return queries
 }

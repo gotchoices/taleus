@@ -40,10 +40,10 @@ import {
 	type NetworkSource,
 	type ScenarioSpec,
 	type SweepSpec,
-	type VarySpec,
 	type WorkloadSpec,
 } from './scenario.js'
 import { connectedComponents, meanDegree } from './structure.js'
+import { cartesian, coordsOf, requireNonEmptyValues, setByPath, type VaryAssignment } from './sweep-vary.js'
 import { drawAmount, drawPaymentPair, materializeNetwork } from './workload.js'
 
 /** One run's result: resolved sweep coordinates, the run seed, provenance labels, and the metrics. */
@@ -201,46 +201,21 @@ function validateSweep(spec: SweepSpec): void {
 	if (!Array.isArray(spec.seeds) || spec.seeds.length === 0) {
 		throw new Error('sweep: `seeds` must be a non-empty array')
 	}
+	requireNonEmptyValues(spec.vary)
 	// A materialised network is shared by reference across cells (cloneScenario does not deep-clone it), so a
 	// vary path reaching into `network.*` would mutate that shared object. Such a scenario must vary only
 	// `workload.*`; reject any other path up front with a clear message rather than corrupting shared state.
-	const materialized = 'materialized' in spec.base.network
-	for (const dim of spec.vary) {
-		if (!Array.isArray(dim.values) || dim.values.length === 0) {
-			throw new Error(`sweep: vary dimension "${dim.path}" must have a non-empty values array`)
-		}
-		if (materialized && !dim.path.startsWith('workload.')) {
-			throw new Error(`sweep: vary path "${dim.path}" must target workload.* for a materialized network`)
-		}
-	}
-}
-
-/** The cartesian product of every `vary` dimension's values: one assignment list per sweep cell. */
-function cartesian(vary: VarySpec[]): { path: string; value: number }[][] {
-	let cells: { path: string; value: number }[][] = [[]]
-	for (const dim of vary) {
-		const next: { path: string; value: number }[][] = []
-		for (const cell of cells) {
-			for (const value of dim.values) {
-				next.push([...cell, { path: dim.path, value }])
+	if ('materialized' in spec.base.network) {
+		for (const dim of spec.vary) {
+			if (!dim.path.startsWith('workload.')) {
+				throw new Error(`sweep: vary path "${dim.path}" must target workload.* for a materialized network`)
 			}
 		}
-		cells = next
 	}
-	return cells
-}
-
-/** The resolved values of one cell, keyed by path (the record's sweep coordinates). */
-function coordsOf(assignment: { path: string; value: number }[]): Record<string, number> {
-	const coords: Record<string, number> = {}
-	for (const { path, value } of assignment) {
-		coords[path] = value
-	}
-	return coords
 }
 
 /** Clone the base scenario and set each cell's varied values; the clone keeps a materialised network by ref. */
-function applyVary(base: ScenarioSpec, assignment: { path: string; value: number }[]): ScenarioSpec {
+function applyVary(base: ScenarioSpec, assignment: readonly VaryAssignment[]): ScenarioSpec {
 	const scenario = cloneScenario(base)
 	for (const { path, value } of assignment) {
 		setByPath(scenario, path, value)
@@ -293,18 +268,4 @@ function cloneCapacity(cap: CapacityDistribution): CapacityDistribution {
 				: { kind: 'lognormal', mu: cap.mu, sigma: cap.sigma }
 		}
 	}
-}
-
-/** Set a numeric leaf at a dotted `path` on the cloned scenario. Throws if an intermediate is not an object. */
-function setByPath(scenario: ScenarioSpec, path: string, value: number): void {
-	const keys = path.split('.')
-	let cursor: Record<string, unknown> = scenario as unknown as Record<string, unknown>
-	for (let i = 0; i < keys.length - 1; i++) {
-		const next = cursor[keys[i]]
-		if (typeof next !== 'object' || next === null) {
-			throw new Error(`sweep vary: path "${path}" has no object at "${keys[i]}"`)
-		}
-		cursor = next as Record<string, unknown>
-	}
-	cursor[keys[keys.length - 1]] = value
 }
