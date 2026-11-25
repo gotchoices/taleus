@@ -1,0 +1,153 @@
+/**
+ * The originator half of unidirectional discovery: the payer's own node drives a route search. It
+ * mints a session code, builds the {@link UniQuery}, then drives its **own local participant** in
+ * rounds -- an `entrance` first, then the `reentrance` each round returns -- one level deeper each
+ * round, on a per-round time budget, until a plan satisfies the query, the search is exhausted (no
+ * reentrance), or `maxDepth` is reached. The participant half (`participant.ts`) and the data model
+ * (`types.ts`) are the previous ticket's; this module is the originator loop plus the budget rule.
+ *
+ * **Differences from ChipNet's `UniOriginator`** (docs/design.md § Protocol design):
+ *
+ *   - **No histogram budget.** ChipNet grew the per-round budget from peers' reported timing
+ *     histograms (`sparstogram` + a Pareto quantile) with a `validatedStats` TODO that trusted peers
+ *     outright. TallyNet drops that entirely: the budget is `initialBudgetMs + round * perHopBudgetMs`,
+ *     computed solely from the originator's own options -- never from peer-reported stats. Peer
+ *     {@link QueryStats} stay in the protocol as informational only (trace/diagnostics); nothing in
+ *     control flow trusts them, so there is nothing to validate. The adaptive, histogram-based
+ *     budget is parked as backlog `feat-tallynet-adaptive-budget`.
+ *   - **No `UniOriginatorState`.** ChipNet kept a per-originator state that learned a budget growth
+ *     rate across searches. A linear budget needs no history, so there is no originator state object;
+ *     the options fold straight into the constructor.
+ *   - **No target encryption.** ChipNet encrypted `target.unsecret` through an `AsymmetricVault`.
+ *     TallyNet has no asymmetric-encryption port (only hash/sign/verify/random), and {@link Target}'s
+ *     `secret` is already the host-encrypted secret, so the originator passes the `Target` through
+ *     unchanged.
+ *
+ * A partial round is a normal, possibly-empty result -- the originator **never throws for "not
+ * found"**. The final result is `{ sessionCode, plans }` with `plans` possibly empty.
+ */
+
+import type { Clock } from '../clock.js'
+import type { RandomSource } from '../crypto.js'
+import { generate } from '../session-code.js'
+import { noopTraceSink, safeTraceSink, type TraceBase, type TraceSink } from '../trace.js'
+import type { DiscoveryHooks } from './hooks.js'
+import type { Plan, QueryRequest, QueryResponse, Target, UniQuery } from './types.js'
+
+/**
+ * Originator tuning. The whole time budget lives here: a round's budget is
+ * `initialBudgetMs + round * perHopBudgetMs`, so a deeper round -- whose round-trip is longer -- gets
+ * a larger budget. These constants are coarse (there is no adaptive tuning in v1); see
+ * `feat-tallynet-adaptive-budget`.
+ */
+export interface OriginatorOptions {
+	/** Search-depth ceiling: the originator drives at most this many reentrance rounds. Rides on the query. */
+	maxDepth: number
+	/** The round-0 / round-1 budget, in ms. */
+	initialBudgetMs: number
+	/** Added to the budget for each round deeper. */
+	perHopBudgetMs: number
+	/** Lifetime of the session code this search mints, in ms. Must exceed a participant's `minSessionMs`. */
+	sessionTtlMs: number
+}
+
+export const defaultOriginatorOptions: OriginatorOptions = {
+	maxDepth: 7,
+	initialBudgetMs: 2_000,
+	perHopBudgetMs: 1_500,
+	sessionTtlMs: 600_000,
+}
+
+/** The result of a search: the minted session code and the satisfying plans found (possibly empty). */
+export interface DiscoveryResult<TTerms, TPayload> {
+	sessionCode: string
+	plans: Plan<TTerms, TPayload>[]
+}
+
+/**
+ * The originator's one dependency on its node: a function that runs the node's **own** participant
+ * `query` for a request (always with no inbound link -- the originator is the start of the route).
+ * {@link DiscoveryNode} wires this to its local participant.
+ */
+export type LocalQuery<TTerms, TPayload> = (request: QueryRequest<TTerms, TPayload>) => Promise<QueryResponse<TTerms, TPayload>>
+
+export interface OriginatorConfig<TTerms, TPayload> {
+	/** This node's id, stamped onto trace events. */
+	nodeId: string
+	/** All time: used to stamp the session code's mint time and trace events. */
+	clock: Clock
+	/** Randomness for the session code. */
+	random: RandomSource
+	/** Negotiation hooks; the originator reads {@link DiscoveryHooks.planSatisfies} to decide when to stop. */
+	hooks: DiscoveryHooks<TTerms, TPayload>
+	/** Runs the node's own participant query (see {@link LocalQuery}). */
+	localQuery: LocalQuery<TTerms, TPayload>
+	/** Tuning overrides merged over {@link defaultOriginatorOptions}. */
+	options?: Partial<OriginatorOptions>
+	/** Optional trace sink; wrapped so a throw can never break the search. Default: no-op. */
+	trace?: TraceSink
+}
+
+export class UniOriginator<TTerms, TPayload> {
+	readonly options: OriginatorOptions
+	private readonly clock: Clock
+	private readonly random: RandomSource
+	private readonly hooks: DiscoveryHooks<TTerms, TPayload>
+	private readonly localQuery: LocalQuery<TTerms, TPayload>
+	private readonly nodeId: string
+	private readonly traceSink: TraceSink
+
+	constructor(config: OriginatorConfig<TTerms, TPayload>) {
+		this.options = { ...defaultOriginatorOptions, ...config.options }
+		this.clock = config.clock
+		this.random = config.random
+		this.hooks = config.hooks
+		this.localQuery = config.localQuery
+		this.nodeId = config.nodeId
+		this.traceSink = safeTraceSink(config.trace ?? noopTraceSink)
+	}
+
+	/**
+	 * Run one unidirectional search for `target` carrying `intents`. Drives the local participant in
+	 * rounds on the linear time budget; stops at the first round that yields a satisfying plan, when
+	 * the search is exhausted, or at `maxDepth`. Never throws for "not found" -- returns empty plans.
+	 */
+	async discover(
+		target: Target,
+		intents: Record<string, TTerms>,
+		options?: Partial<OriginatorOptions>,
+	): Promise<DiscoveryResult<TTerms, TPayload>> {
+		const opts = options ? { ...this.options, ...options } : this.options
+		const sessionCode = generate(opts.sessionTtlMs, { now: this.clock.now(), random: this.random })
+		const query: UniQuery<TTerms> = { target, sessionCode, intents, maxDepth: opts.maxDepth }
+
+		// Round 0 is the entrance (the local participant enumerates its own links; it ignores the
+		// budget). Every later round feeds back the previous round's reentrance ticket.
+		let request: QueryRequest<TTerms, TPayload> = { entrance: { plan: { path: [], members: [] }, query }, budgetMs: opts.initialBudgetMs }
+
+		for (let round = 0; round <= opts.maxDepth; round++) {
+			const budgetMs = opts.initialBudgetMs + round * opts.perHopBudgetMs
+			if (round > 0) {
+				this.traceSink({ ...this.base(sessionCode), type: 'round-started', round, budgetMs })
+			}
+			const response = await this.localQuery({ ...request, budgetMs })
+
+			const satisfying = (response.plans ?? []).filter((plan) => this.hooks.planSatisfies(query, plan))
+			if (satisfying.length) {
+				for (let i = 0; i < satisfying.length; i++) {
+					this.traceSink({ ...this.base(sessionCode), type: 'plan-found' })
+				}
+				return { sessionCode, plans: satisfying }
+			}
+			if (!response.reentrance) {
+				break // the search is exhausted: no node has a deeper step to take
+			}
+			request = { reentrance: response.reentrance, budgetMs }
+		}
+		return { sessionCode, plans: [] }
+	}
+
+	private base(sessionCode: string): TraceBase {
+		return { time: this.clock.now(), nodeId: this.nodeId, sessionCode }
+	}
+}
