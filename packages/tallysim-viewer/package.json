@@ -13,6 +13,7 @@
 	},
 	"dependencies": {
 		"graphology": "0.26.0",
+		"graphology-layout-forceatlas2": "0.10.1",
 		"graphology-types": "0.24.8",
 		"sigma": "4.0.6",
 		"tallynet": "workspace:^",
