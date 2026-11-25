@@ -543,12 +543,20 @@ distinguish a tally's two directions and does not need to for this tier.
 
 ### Running one query
 
-`buildSimNetwork(network, conditions, conditionsSeed, trace?, options?)` materialises the discovery graph,
-compiles the conditions, and wires an `InMemoryNetwork` over a fresh `VirtualClock`. `runQuery(sim, { from,
-to, amount, depth })` issues `discover`, drives `clock.runUntilIdle()` to settle it, and returns `{
-sessionCode, plans, found }`. It never throws for "not found" (empty plans), for `from === to`, or for a
-network with fewer than two entities. One `InMemoryNetwork` serves every query in a run (no balances move
-in this tier; per-session state lives in per-node stores, so queries do not interfere).
+`buildSimNetwork(network, conditions, conditionsSeed, trace?, options?, consensus?)` materialises the
+discovery graph, compiles the conditions, and wires an `InMemoryNetwork` over a fresh `VirtualClock`.
+`runQuery(sim, { from, to, amount, depth })` issues `discover`, drives `clock.runUntilIdle()` to settle it,
+and returns `{ sessionCode, plans, found }`. It never throws for "not found" (empty plans), for `from ===
+to`, or for a network with fewer than two entities. One `InMemoryNetwork` serves every query in a run (no
+balances move in this tier; per-session state lives in per-node stores, so queries do not interfere).
+
+The optional `consensus?: { identitySeed, resourceFor? }` turns on the atomic promise/commit engine: each
+graph node gets a deterministic ed25519 identity (`sim/identity.ts` — `(identitySeed, name)` ⇒ a
+reproducible key from its own seed stream, never a shared RNG) and, optionally, a failure-injecting resource
+port (`sim/consensus-resource.ts` — `makeSimResources`, keyed by **entity id**, adapted to the harness's
+node-name key at the boundary). Omitting `consensus` leaves the discovery-only wiring byte-for-byte
+unchanged, so the pinned discovery sweeps pay no keygen. This is Phase-1 mechanism only — nothing drives an
+end-to-end payment lift yet (that is `tallysim-consensus-drive-settle`).
 
 Scope: **payment route discovery only** this tier (the v1 protocol is unidirectional payment search).
 Clearing-availability discovery is deferred (backlog `feat-tallysim-clearing-discovery`); multi-denomination
