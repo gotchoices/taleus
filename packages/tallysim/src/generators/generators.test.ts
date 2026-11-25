@@ -50,38 +50,42 @@ function key(a: number, b: number): string {
 
 describe('generators — shared guarantees', () => {
 	const cases = [
-		{ name: UNIFORM_ID, make: () => uniform({ entityCount: 300, meanDegree: 6, seed: 1, capacity: UNLIMITED }) },
-		{ name: SCALE_FREE_ID, make: () => scaleFree({ entityCount: 300, edgesPerNode: 3, seed: 1, capacity: UNLIMITED }) },
+		{ name: UNIFORM_ID, make: (seed: number) => uniform({ entityCount: 300, meanDegree: 6, seed, capacity: UNLIMITED }) },
+		{ name: SCALE_FREE_ID, make: (seed: number) => scaleFree({ entityCount: 300, edgesPerNode: 3, seed, capacity: UNLIMITED }) },
 		{
 			name: CLUSTERED_ID,
-			make: () =>
-				clustered({ entityCount: 300, communityCount: 4, meanIntraDegree: 6, bridgeCount: 10, seed: 1, capacity: UNLIMITED }),
+			make: (seed: number) =>
+				clustered({ entityCount: 300, communityCount: 4, meanIntraDegree: 6, bridgeCount: 10, seed, capacity: UNLIMITED }),
 		},
 		{
 			name: SMALL_WORLD_ID,
-			make: () => smallWorld({ entityCount: 300, neighbors: 6, rewireProbability: 0.1, seed: 1, capacity: UNLIMITED }),
+			make: (seed: number) => smallWorld({ entityCount: 300, neighbors: 6, rewireProbability: 0.1, seed, capacity: UNLIMITED }),
 		},
 	]
 
 	for (const { name, make } of cases) {
 		describe(name, () => {
 			it('produces no self-loops', () => {
-				expect(noSelfLoops(make())).toBe(true)
+				expect(noSelfLoops(make(1))).toBe(true)
 			})
 
 			it('records a stable meta (id, seed, formatVersion)', () => {
-				const net = make()
+				const net = make(1)
 				expect(net.meta.generator).toBe(name)
 				expect(net.meta.seed).toBe(1)
 				expect(net.meta.formatVersion).toBe(FORMAT_VERSION)
 			})
 
 			it('is reproducible — same seed ⇒ deep-equal network', () => {
-				expect(make()).toEqual(make())
+				expect(make(1)).toEqual(make(1))
 			})
 
-			it('assigns both stock/foil orientations across edges (seed is not ignored)', () => {
-				const net = make()
+			it('a different seed yields a different network (seed is not ignored)', () => {
+				expect(make(1)).not.toEqual(make(2))
+			})
+
+			it('assigns both stock/foil orientations across edges', () => {
+				const net = make(1)
 				const stockFirst = net.tallies.filter((t) => t.stock < t.foil).length
 				const foilFirst = net.tallies.filter((t) => t.stock > t.foil).length
 				expect(stockFirst).toBeGreaterThan(0)
@@ -89,12 +93,6 @@ describe('generators — shared guarantees', () => {
 			})
 		})
 	}
-
-	it('a different seed yields a different network', () => {
-		const a = uniform({ entityCount: 300, meanDegree: 6, seed: 1, capacity: UNLIMITED })
-		const b = uniform({ entityCount: 300, meanDegree: 6, seed: 2, capacity: UNLIMITED })
-		expect(a).not.toEqual(b)
-	})
 
 	it('draws capacities from the chosen distribution (unlimited ⇒ Infinity limits)', () => {
 		const net = uniform({ entityCount: 50, meanDegree: 4, seed: 3, capacity: UNLIMITED })
@@ -126,6 +124,22 @@ describe('uniform generator', () => {
 		const net = uniform({ entityCount: 20, meanDegree: 19, seed: 7, capacity: UNLIMITED })
 		expect(noSelfLoops(net)).toBe(true)
 		expect(net.tallies.length).toBeGreaterThan(0)
+	})
+
+	it('threads a randomised-balance distribution end-to-end into the tallies', () => {
+		const net = uniform({
+			entityCount: 500,
+			meanDegree: 6,
+			seed: 7,
+			capacity: { kind: 'uniform', min: 1, max: 20, randomizeBalance: true },
+		})
+		// Non-zero starting balances actually appear across a generated network ...
+		expect(net.tallies.some((t) => t.balance !== 0)).toBe(true)
+		// ... and every one stays within its tally's own credit bounds.
+		for (const t of net.tallies) {
+			expect(t.balance).toBeGreaterThanOrEqual(-t.foilCreditLimit)
+			expect(t.balance).toBeLessThanOrEqual(t.stockCreditLimit)
+		}
 	})
 })
 

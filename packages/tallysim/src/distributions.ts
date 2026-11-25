@@ -62,6 +62,10 @@ function standardNormal(rng: SeededRandom): number {
 	return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
 }
 
+// NOTE: lognormal/Box–Muller uses Math.log/cos/sqrt/exp, whose last-ULP results are not guaranteed
+// bit-identical across JS engines. Within one engine a seed replays exactly; the integer round() here
+// absorbs almost all drift. If a scenario must reproduce byte-identically across Node and the browser,
+// prefer an integer distribution (constant/uniform) or pin the generating platform.
 /** A lognormal sample: `exp(mu + sigma · Z)` where `Z` is standard normal. Always positive. */
 function lognormalSample(mu: number, sigma: number, rng: SeededRandom): number {
 	return Math.exp(mu + sigma * standardNormal(rng))
@@ -85,7 +89,13 @@ export function drawCapacity(dist: CapacityDistribution, rng: SeededRandom): Cap
 			if (!Number.isInteger(dist.limit) || dist.limit < 0) {
 				throw new Error(`constant distribution: limit must be a non-negative integer, got ${String(dist.limit)}`)
 			}
-			return { stockCreditLimit: dist.limit, foilCreditLimit: dist.limit, balance: dist.balance ?? 0 }
+			const balance = dist.balance ?? 0
+			// Keep the capacity invariant: b ∈ [-foilCreditLimit, +stockCreditLimit]. An out-of-range balance
+			// would silently yield a negative directed capacity downstream (see capacity.ts).
+			if (balance < -dist.limit || balance > dist.limit) {
+				throw new Error(`constant distribution: balance ${String(balance)} out of range [${-dist.limit}, ${dist.limit}]`)
+			}
+			return { stockCreditLimit: dist.limit, foilCreditLimit: dist.limit, balance }
 		}
 		case 'uniform': {
 			const stockCreditLimit = uniformInt(dist.min, dist.max, rng)

@@ -68,4 +68,11 @@ describe('capacity distributions', () => {
 	it('rejects an inverted uniform range', () => {
 		expect(() => drawCapacity({ kind: 'uniform', min: 10, max: 1 }, new SeededRandom(1))).toThrow()
 	})
+
+	it('rejects a constant balance outside [-limit, +limit]', () => {
+		expect(() => drawCapacity({ kind: 'constant', limit: 10, balance: 11 }, new SeededRandom(1))).toThrow(/out of range/)
+		expect(() => drawCapacity({ kind: 'constant', limit: 10, balance: -11 }, new SeededRandom(1))).toThrow(/out of range/)
+		// A balance exactly at a bound is valid.
+		expect(drawCapacity({ kind: 'constant', limit: 10, balance: 10 }, new SeededRandom(1)).balance).toBe(10)
+	})
 })
