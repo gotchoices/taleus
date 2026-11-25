@@ -17,15 +17,17 @@
  *
  * ── Sequential vs concurrent (a runner dep, not a scenario field) ───────────────────────────────────────
  * Sequential (default) issues and settles one query at a time; concurrent issues every query (session codes
- * mint in call order → deterministic) before a single `runUntilIdle()`. Both agree on the **outcome** metrics
- * (found, messages, nodes-touched, prune reasons, `pFoundGivenExists`) and both are byte-deterministic within
- * their mode. They do **NOT** agree on `roundsUsed` or the timing distributions: concurrent queries share one
- * `VirtualClock`, so a round's budget-expiry races a sub-request's delivery at equal timestamps, and the
- * shared global fire-order counter interleaves across sessions — a late answer that folds into round N
- * sequentially can fold into round N−1 concurrently, shifting rounds and times. This is a known limitation,
- * not a measurement artefact fixable here; use sequential mode for round/timing-sensitive metrics. See
- * `tickets/fix/tallysim-sim-runner-concurrent-divergence`. `concurrent` lives on {@link SimRunnerDeps}, never
- * on {@link SimScenario} (which is embedded verbatim in trace headers).
+ * mint in call order → deterministic) before a single `runUntilIdle()`. Both modes produce **byte-identical**
+ * records — outcome metrics (found, messages, nodes-touched, prune reasons, `pFoundGivenExists`), `roundsUsed`
+ * and the timing distributions alike. The two modes once diverged on `roundsUsed`/timing, but that was the
+ * `tallynet` `VirtualClock` under-draining discovery's completion cascade (its `DRAIN_QUIET` was too small):
+ * the drain quiesced mid-cascade and the run loop fired an about-to-be-cleared round budget timer, folding an
+ * instant answer one round late — and the interleaving of concurrent sessions changed *which* budget timers
+ * fired prematurely, so the two modes diverged. With the clock fixed (`tallynet-discovery-depth-reach` raised
+ * `DRAIN_QUIET` past the cascade) the budget timer is always cleared before it can fire, and the schedules
+ * coincide. Whether to keep `concurrent` as a feature (it is now equivalent and a touch faster) or drop it is
+ * the open call in `tickets/fix/tallysim-sim-runner-concurrent-divergence`. `concurrent` lives on
+ * {@link SimRunnerDeps}, never on {@link SimScenario} (which is embedded verbatim in trace headers).
  */
 
 import { SeededRandom } from 'tallynet/testing'
@@ -153,8 +155,8 @@ async function runProtocolQueries(
 	const sim = buildSimNetwork(network, scenario.conditions ?? {}, conditionsSeed, sink, scenario.budget)
 
 	const windows: { outcome: QueryOutcome; startMs: number; endMs: number }[] = []
-	// NOTE: concurrent and sequential modes agree on outcome metrics but NOT on roundsUsed/timing — the
-	// shared clock makes round progression race sub-request delivery (see the module header and
+	// NOTE: concurrent and sequential modes now produce identical records (roundsUsed/timing included) — the
+	// shared clock no longer fires a round budget timer prematurely mid-cascade (see the module header and
 	// tickets/fix/tallysim-sim-runner-concurrent-divergence). The shared `startMs`/`endMs` here is the window
 	// for a session with zero events; today every session emits ≥ 1 event (the originator's own participant
 	// emits `query-received` on entrance), so analyzeQuery reads each session's own last-event time.

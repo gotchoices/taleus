@@ -17,12 +17,19 @@
  *   and the originator's *own local participant* emits the same events for its own sub-query rounds.
  *   So the originator node shows both. This is intentional (two levels: the search round vs the
  *   participant's local round) and harmless. These tests assert **presence**, never counts, on those.
- * - **The maxDepth invariant.** A returned plan always satisfies `path.length <= maxDepth`. The
- *   *observed* tight relationship for a target reached via a peer-match terminus (a neighbour of a
- *   relay, not a relay the search enters) is one step stricter: `path.length <= maxDepth - 1`. The
- *   `maxDepth boundary` describe proves the edge empirically: a target reachable only at path length 3
- *   is missed at `maxDepth: 3` and found at `maxDepth: 4`. (`assertValidPlan` asserts only the loose
- *   `<= maxDepth` bound, which holds in every case including originator-local matches at round 0.)
+ * - **The maxDepth invariant.** A returned plan always satisfies `path.length <= maxDepth`, and the
+ *   bound is *tight*: an **L-hop** route is found at exactly `maxDepth = L` (one round per level) and
+ *   missed at `maxDepth = L - 1`. This holds even when the target is reached via a peer-match terminus
+ *   (a neighbour resolves it from its own adjacency, not a relay the search enters): the peer-match
+ *   resolves the last hop without costing an extra round, so an L-hop plan has `path.length = L <=
+ *   maxDepth = L`. The `maxDepth boundary` describe proves this edge empirically over a sweep of chain
+ *   lengths. (`assertValidPlan` asserts only the loose `<= maxDepth` bound, which holds in every case
+ *   including originator-local matches at round 0.)
+ *
+ *   `maxDepth = L` — not the `2(L − 1)` an earlier version of this suite codified — is the protocol's
+ *   true reach. The `2(L − 1)` "reach is ~half the ceiling" figure was an artifact of the `VirtualClock`
+ *   under-draining discovery's completion cascade; see `clock.ts`'s `DRAIN_QUIET` NOTE. The simulator's
+ *   reach only tells the truth while `DRAIN_QUIET` exceeds that per-level cascade.
  */
 
 import { VirtualClock } from './clock.js'
@@ -291,37 +298,45 @@ describe('discovery end to end — not found', () => {
 	})
 })
 
-/* ── maxDepth boundary (proves path.length ≤ maxDepth is tight) ────────────────────────────────── */
+/* ── maxDepth boundary (proves path.length ≤ maxDepth is tight: an L-hop route is found at maxDepth=L) ── */
 
 describe('discovery end to end — maxDepth boundary', () => {
-	// A straight chain N0-N1-N2-N3; the target N3 is reachable only at path length 3 (peer-match at N2).
-	const chain: NetworkGraph<Terms> = {
-		nodes: ['N0', 'N1', 'N2', 'N3'],
-		links: [
-			{ id: 'E01', node1: 'N0', node2: 'N1', intents: liftTerms(500) },
-			{ id: 'E12', node1: 'N1', node2: 'N2', intents: liftTerms(500) },
-			{ id: 'E23', node1: 'N2', node2: 'N3', intents: liftTerms(500) },
-		],
+	// A straight chain N0-N1-…-N{L}; the target N{L} is a peer-match terminus (resolved by N{L-1} from its
+	// own adjacency). The route is L hops long and is found at exactly maxDepth = L, missed at maxDepth = L-1.
+	function chain(L: number): NetworkGraph<Terms> {
+		const nodes = Array.from({ length: L + 1 }, (_unused, i) => `N${i}`)
+		const links = Array.from({ length: L }, (_unused, i) => ({
+			id: `E${i}`,
+			node1: `N${i}`,
+			node2: `N${i + 1}`,
+			intents: liftTerms(500),
+		}))
+		return { nodes, links }
 	}
 
-	it('stops at the ceiling with candidates still open and returns what it found (none) — no throw', async () => {
-		// A path-length-3 peer-match terminus (N3 via N2) needs maxDepth ≥ 4; at maxDepth 3 it is missed.
-		const { net, traces } = makeNet(chain)
-		const result = await runDiscovery(net, 'N0', { address: { key: 'N3' } }, liftTerms(1), { maxDepth: 3 })
+	it('misses an L-hop route at maxDepth = L-1, with candidates pruned at the ceiling — no throw', async () => {
+		for (let L = 2; L <= 6; L++) {
+			const graph = chain(L)
+			const { net, traces } = makeNet(graph)
+			const result = await runDiscovery(net, 'N0', { address: { key: `N${L}` } }, liftTerms(1), { maxDepth: L - 1 })
 
-		expect(result.plans).toEqual([])
-		expect(traces.some((event) => event.type === 'candidate-pruned' && event.reason === 'max-depth')).toBe(true)
-		expect(net.clock.pendingTimers).toBe(0)
+			expect(result.plans).toEqual([]) // one round short of the terminus
+			expect(traces.some((event) => event.type === 'candidate-pruned' && event.reason === 'max-depth')).toBe(true)
+			expect(net.clock.pendingTimers).toBe(0)
+		}
 	})
 
-	it('one deeper ceiling finds the same target at exactly path length 3', async () => {
-		const { net } = makeNet(chain)
-		const result = await runDiscovery(net, 'N0', { address: { key: 'N3' } }, liftTerms(1), { maxDepth: 4 })
+	it('finds an L-hop route at exactly maxDepth = L, at exactly path length L (one round per level)', async () => {
+		for (let L = 2; L <= 6; L++) {
+			const graph = chain(L)
+			const { net } = makeNet(graph)
+			const result = await runDiscovery(net, 'N0', { address: { key: `N${L}` } }, liftTerms(1), { maxDepth: L })
 
-		expect(result.plans).toHaveLength(1)
-		expect(result.plans[0].path).toHaveLength(3)
-		await assertValidPlan(net, chain.links, result.sessionCode, result.plans[0], 'N0', 'N3', 4)
-		expect(net.clock.pendingTimers).toBe(0)
+			expect(result.plans).toHaveLength(1)
+			expect(result.plans[0].path).toHaveLength(L)
+			await assertValidPlan(net, graph.links, result.sessionCode, result.plans[0], 'N0', `N${L}`, L)
+			expect(net.clock.pendingTimers).toBe(0)
+		}
 	})
 })
 

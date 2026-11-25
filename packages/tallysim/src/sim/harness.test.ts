@@ -31,15 +31,15 @@ function completeNetwork(n: number, limit: number): Network {
 }
 
 describe('harness — hand-built graphs', () => {
-	it('line: a 2-hop route is found at depth 3, at exactly path length 2', async () => {
+	it('line: a 2-hop route is found at exactly depth 2, at path length 2 (one round per level)', async () => {
 		const sim = buildSimNetwork(line(3), {}, 0)
-		const out = await runQuery(sim, { from: 0, to: 2, amount: 1, depth: 3 })
+		const out = await runQuery(sim, { from: 0, to: 2, amount: 1, depth: 2 })
 		expect(out.found).toBe(true)
 		expect(out.plans[0].path).toHaveLength(2)
 	})
 
-	it('line: the same 2-hop target is missed at depth 1 — the protocol reach grows with the ceiling', async () => {
-		// A peer-match terminus at path length L needs maxDepth ≥ 2(L−1); L=2 ⇒ needs depth ≥ 2, so depth 1 misses.
+	it('line: the same 2-hop target is missed at depth 1 — one round short of the terminus', async () => {
+		// An L-hop peer-match terminus needs maxDepth ≥ L; L=2 ⇒ needs depth ≥ 2, so depth 1 misses.
 		const sim = buildSimNetwork(line(3), {}, 0)
 		const out = await runQuery(sim, { from: 0, to: 2, amount: 1, depth: 1 })
 		expect(out.found).toBe(false)
@@ -85,20 +85,22 @@ describe('harness — hand-built graphs', () => {
 })
 
 describe('harness — rounds↔hops boundary (mirrors tallynet maxDepth boundary)', () => {
-	// A straight chain 0-1-2-3: the target 3 is a peer-match terminus at path length 3.
+	// A straight chain 0-1-2-3: the target 3 is a peer-match terminus at path length 3 (3 hops). It is
+	// found at exactly depth 3 (= hop count, one round per level) and missed at depth 2 — the protocol
+	// matches the oracle at the same depth; there is no "reach is half the ceiling" undercount.
 	const chain = line(4)
 
-	it('is MISSED at depth 3 though the oracle (same depth) says the route exists', async () => {
+	it('is FOUND at exactly depth 3 (= hop count), at path length 3 — matching the oracle at the same depth', async () => {
 		const out = await runQuery(buildSimNetwork(chain, {}, 0), { from: 0, to: 3, amount: 1, depth: 3 })
-		expect(out.found).toBe(false)
+		expect(out.found).toBe(true)
+		expect(out.plans[0].path).toHaveLength(3)
 		expect(new Oracle(buildGraphView(chain)).routeExistence(0, 3, 1, 3).exists).toBe(true)
 	})
 
-	it('is FOUND one ceiling deeper (depth 4) at exactly path length 3', async () => {
-		const out = await runQuery(buildSimNetwork(chain, {}, 0), { from: 0, to: 3, amount: 1, depth: 4 })
-		expect(out.found).toBe(true)
-		expect(out.plans[0].path).toHaveLength(3)
-		expect(new Oracle(buildGraphView(chain)).routeExistence(0, 3, 1, 4).exists).toBe(true)
+	it('is MISSED one ceiling shallower (depth 2) — one round short of the 3-hop terminus; the oracle agrees', async () => {
+		const out = await runQuery(buildSimNetwork(chain, {}, 0), { from: 0, to: 3, amount: 1, depth: 2 })
+		expect(out.found).toBe(false)
+		expect(new Oracle(buildGraphView(chain)).routeExistence(0, 3, 1, 2).exists).toBe(false)
 	})
 
 	it('every found route respects the depth bound across a sweep (the robust invariant)', async () => {

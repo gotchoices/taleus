@@ -59,6 +59,8 @@ The **rename** `chipnet` → `tallynet` (protocol id `/taleus/chipnet/1.0.0` →
 - **Hop context** for negotiation (the main extension; see next section).
 - Extensible intent codes (`string`), not `'L' | 'C'`.
 
+**Reach: `maxDepth` counts hops, and the bound is tight.** An **L-hop** route is found at exactly `maxDepth = L` — one round per level — and missed at `maxDepth = L − 1`. `maxDepth` counts hops the same way the simulator's routing oracle does. A target reached as a *peer-match terminus* (a neighbour resolves it from its own adjacency rather than the search entering it as a relay) still costs no extra round: the peer-match resolves the final hop in the same round, so an L-hop plan satisfies `path.length = L ≤ maxDepth = L`. (An earlier draft claimed reach was `⌊maxDepth/2⌋ + 1` — "half the ceiling", `maxDepth ≥ 2(L − 1)`. That was not a protocol property but a measurement artifact of the test/sim `VirtualClock` under-draining discovery's per-level completion cascade; it is withdrawn.) The simulator reports this true reach only while its `VirtualClock`'s `DRAIN_QUIET` exceeds that per-level cascade — see the `DRAIN_QUIET` NOTE in `src/testing/clock.ts`.
+
 ### Time budget (decided: drop the histogram)
 
 Each round waits a bounded time for replies before stepping one level deeper. The budget is **linear in the round**: `initialBudgetMs + round * perHopBudgetMs` (defaults 2000 ms + 1500 ms/round in `OriginatorOptions`). A deeper round gets a larger budget because its round-trip is longer. The constants are coarse — there is **no adaptive tuning in v1**.

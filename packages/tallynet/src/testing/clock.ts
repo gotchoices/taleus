@@ -25,9 +25,12 @@
  * requests finish before the budget) -- that cascade schedules no new timer but must fully unwind
  * before the next fire, or a to-be-cleared timer fires prematurely and advances `now` wrongly.
  *
- * For discovery the gap between a fire and its consequent mutations is ~2-5 microtask hops
+ * For discovery the gap between a fire and its consequent *scheduling* mutations is ~2-5 microtask hops
  * (`findAddress` is a resolved promise -> `issueBatch` schedules delivery timers synchronously ->
- * `await budgetedStep` schedules the budget timer synchronously), well under {@link DRAIN_QUIET} = 16.
+ * `await budgetedStep` schedules the budget timer synchronously). The binding constraint is not that
+ * forward gap but the *completion* cascade described just above: when a nested sub-query finishes, the
+ * promise-resolution chain that clears its budget timer early and unwinds `reenter` runs ~17-23 quiet
+ * hops (it schedules no new timer), so {@link DRAIN_QUIET} must comfortably exceed that — see its NOTE.
  *
  * ── Async timer callbacks (the consensus case) ───────────────────────────────────────────────────
  *
@@ -49,10 +52,23 @@ import type { Clock, TimerHandle } from '../clock.js'
 
 /** Consecutive quiet microtask hops (no timer created / cleared / fired) that end one drain. */
 // NOTE: only async timer callbacks (ones returning a promise — consensus pushes) are pending-tracked and
-// awaited regardless of this count; discovery's callbacks return void, so they still rely on their whole
-// query chain fitting inside 16 quiet hops. If discovery ever grows a longer void chain that under-drains,
-// either have its timer callbacks return their promise (as consensus does) or raise DRAIN_QUIET.
-const DRAIN_QUIET = 16
+// awaited regardless of this count; discovery's callbacks return void, so they rely on their whole query
+// chain — including the completion cascade that clears budget timers early — fitting inside DRAIN_QUIET
+// quiet hops. Discovery's completion cascade is ~17-23 microtask hops per level (send-delivery resolves →
+// `budgetedStep.checkDone` clears the budget → `reenter` harvests/folds/`saveContext`s → the child `query`
+// resolves → the parent `Pending` resolves → the parent `checkDone`). It is *constant in depth*, not
+// cumulative — each level's harvest is its own fire/drain cycle — so one fixed value covers any maxDepth.
+// It was 16, which the cascade exceeds: the drain then quiesced mid-cascade and the runUntilIdle loop
+// fired the about-to-be-cleared budget timer, advancing virtual time to full budget and folding an
+// instant answer one round late — the simulator under-reported discovery's reach as `2(L−1)` instead of
+// its true `maxDepth = L`. Measured threshold is 24; 64 is ~3× margin over the ~20-hop cascade, cheap
+// insurance against future awaits added to `reenter`. The other fix the "async timer callbacks" case
+// uses — returning the query promise so `fire` pending-tracks it — does NOT work for discovery: a
+// discovery `query` awaits a nested `budgetedStep` whose budget/delivery timers only fire in the
+// runUntilIdle loop, never during a drain, so a drain waiting on that promise (pending > 0) would
+// deadlock to MAX_DRAIN. Consensus callbacks arm no timer mid-flight, which is why they can. Raise this
+// instead.
+const DRAIN_QUIET = 64
 /** Safety valve: the most microtask hops a single drain will ever take before giving up. */
 const MAX_DRAIN = 100_000
 /** Safety valve: the most timers `advance` / {@link VirtualClock.runUntilIdle} fire before throwing. */

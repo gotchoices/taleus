@@ -488,25 +488,28 @@ protocol returns is one the oracle confirms** — `found ⊆ oracle` at matched 
 (unlimited credit) compares and inverts correctly and is never serialised here, so CBOR's `Infinity`
 rejection does not apply.
 
-### Rounds ↔ hops: NOT an identity, and reach is ~half the ceiling
+### Rounds ↔ hops: one round per level, `maxDepth = L`
 
-The oracle's `maxDepth` counts hops (a 1-hop path is length 1). The protocol's reach is **strictly less**
-than its `maxDepth` for multi-hop routes, so it finds *fewer* routes than the oracle at a given depth —
-that undercount is expected and is part of what the degradation experiment measures. Empirically (every
-target in this tier surfaces as a *peer-match terminus* — a neighbour resolves the target from its own
-adjacency), a route of **L** hops is found only at:
+The oracle's `maxDepth` counts hops (a 1-hop path is length 1), and so does the protocol's: a route of
+**L** hops is found at exactly `maxDepth = L` — one round per level — and missed at `maxDepth = L − 1`.
+The two use the same hop count, so **no depth doubling is needed**: the harness passes `discover maxDepth
+= query.depth` and compares the oracle at the *same* depth, and that comparison is now apples-to-apples.
+Every target in this tier surfaces as a *peer-match terminus* (a neighbour resolves the target from its
+own adjacency rather than the search entering it as a relay), which resolves the final hop in the same
+round and so costs no extra round — an L-hop plan has `path.length = L ≤ maxDepth = L`.
 
-| hops L | 1 | 2 | 3 | 4 | 5 |
-|--------|---|---|---|---|---|
-| min `maxDepth` to find it | 1 | 2 | 4 | 6 | 8 |
+> An earlier version of this section claimed reach was `⌊maxDepth/2⌋ + 1` — "~half the ceiling",
+> `maxDepth ≥ 2(L − 1)` — and told depth sweeps to "budget roughly double the hop distance". That
+> doubling was **not** a protocol property: it was an artifact of the `tallynet/testing` `VirtualClock`
+> under-draining discovery's per-level completion cascade (`DRAIN_QUIET` was too small), which folded
+> instant answers one round late. With the clock fixed the systematic 2× undercount is gone. See
+> `tallynet`'s `src/testing/clock.ts` `DRAIN_QUIET` NOTE and `docs/design.md` § Protocol design.
 
-i.e. `maxDepth ≥ 2(L − 1)` for `L ≥ 2`, so the effective reach at a ceiling `D` is `⌊D/2⌋ + 1` hops —
-roughly **half** the ceiling. (A single boundary data point, as `tallynet`'s own `maxDepth boundary` test
-checks, cannot tell this apart from `maxDepth − 1`; the longer chains above distinguish them.) The harness
-therefore passes `discover maxDepth = query.depth` and compares the oracle at the *same* depth; the robust,
-always-true guarantee is **`found ⊆ oracle`** (every found `path.length ≤ depth`, every hop `capFwd ≥
-amount`), **never `found iff oracle`**. A depth sweep that expects the protocol to reach the oracle's full
-depth must budget roughly double the hop distance.
+The robust, always-true guarantee remains **`found ⊆ oracle`** (every found `path.length ≤ depth`, every
+hop `capFwd ≥ amount`), **never `found iff oracle`**: the protocol is a greedy, distributed search, so it
+can still miss routes the whole-graph oracle sees. But that remaining found-vs-oracle gap is now **real
+protocol loss** (greedy pruning, degrading conditions) — the thing the degradation experiment is meant to
+measure — not a fixed simulator-clock undercount layered on top of it.
 
 ### Network conditions
 
@@ -593,11 +596,14 @@ runSeed`), conditions (`(conditionsSeed ?? 0) + runSeed`). A sub-two-entity netw
 degenerate zeroed results, the same guard the oracle runner uses.
 
 `SimRunnerDeps.concurrent` (default sequential) issues every query before a single `runUntilIdle()`, for
-speed. **Caveat:** concurrent and sequential agree on the outcome metrics (found, messages, nodes, prune
-reasons, `pFoundGivenExists`) and each is byte-deterministic, but they do **not** agree on `roundsUsed` or the
-timing distributions — concurrent queries share one `VirtualClock`, so a round's budget-expiry races a
-sub-request's delivery and the shared fire-order counter interleaves across sessions. Use **sequential** for
-round/timing-sensitive metrics until `fix/tallysim-sim-runner-concurrent-divergence` resolves it.
+speed. Both modes now produce **byte-identical** records — outcome metrics (found, messages, nodes, prune
+reasons, `pFoundGivenExists`), `roundsUsed` and the timing distributions alike. The two once diverged on
+`roundsUsed`/timing, but that was the `tallynet` `VirtualClock` under-draining discovery's completion cascade
+(`DRAIN_QUIET` too small): it fired an about-to-be-cleared round budget timer, folding an instant answer one
+round late, and the interleaving of concurrent sessions changed which budget timers fired prematurely. The
+clock fix in `tallynet-discovery-depth-reach` (raising `DRAIN_QUIET` past the cascade) removed that race, so
+the modes coincide. Whether to keep `concurrent` as a feature or drop it is the open call in
+`fix/tallysim-sim-runner-concurrent-divergence`.
 
 ## Trace & replay format
 

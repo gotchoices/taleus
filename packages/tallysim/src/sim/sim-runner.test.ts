@@ -219,12 +219,17 @@ describe('runSimSweep — concurrent and sequential agree, both deterministic', 
 		expect(second).toBe(first)
 	})
 
-	it('agrees on outcome metrics under real latency but diverges on round/timing (known limitation)', async () => {
-		// On a multi-hop line with base latency, events spread over non-zero clock times and a round's
-		// budget-expiry races a sub-request's delivery. Because concurrent queries share one VirtualClock, that
-		// race resolves differently than when each query runs alone: the OUTCOME metrics still match exactly,
-		// but roundsUsed and the timing distributions diverge. Characterizes the current behaviour; see
-		// tickets/fix/tallysim-sim-runner-concurrent-divergence. Tighten to full equality once that lands.
+	it('produces identical full records in both modes under real latency (concurrent == sequential)', async () => {
+		// On a multi-hop line with base latency, events spread over non-zero clock times. Concurrent queries
+		// share one VirtualClock, so a round's budget-expiry timer and a sub-request's delivery can fall at the
+		// same virtual instant. Earlier this diverged between the modes — but that was the VirtualClock
+		// under-draining discovery's completion cascade (DRAIN_QUIET too small), which fired an
+		// about-to-be-cleared budget timer and folded instant answers one round late; the interleaving of
+		// concurrent sessions changed *which* timers fired prematurely. With the clock fixed in
+		// `tallynet-discovery-depth-reach` (DRAIN_QUIET raised), the cascade fully drains and the two modes
+		// produce byte-identical records (verified here and over a broad line/seed/latency sweep). The
+		// keep-vs-drop decision for concurrent mode itself still lives in
+		// tickets/fix/tallysim-sim-runner-concurrent-divergence.
 		const latencySpec: SimSweepSpec = {
 			base: {
 				network: { materialized: line(5) },
@@ -238,7 +243,7 @@ describe('runSimSweep — concurrent and sequential agree, both deterministic', 
 		const sequential = await runSimSweepToArray(latencySpec)
 		const concurrent = await runSimSweepToArray(latencySpec, { concurrent: true })
 
-		/** The mode-invariant outcome metrics (everything except roundsUsed and the timing distributions). */
+		/** The outcome metrics (found/messages/nodes/prune reasons) — asserted first for a readable diff. */
 		const outcome = (records: typeof sequential) =>
 			records.map(({ metrics: m }) => ({
 				queryCount: m.queryCount,
@@ -253,8 +258,8 @@ describe('runSimSweep — concurrent and sequential agree, both deterministic', 
 				pruneReasons: m.pruneReasons,
 			}))
 		expect(outcome(concurrent)).toEqual(outcome(sequential))
-		// But the full records differ: roundsUsed and the timing distributions are mode-dependent today.
-		expect(JSON.stringify(concurrent)).not.toBe(JSON.stringify(sequential))
+		// The full records now match too — roundsUsed and the timing distributions included.
+		expect(JSON.stringify(concurrent)).toBe(JSON.stringify(sequential))
 		// Guard that this scenario really does produce non-zero completion times (else the test is vacuous).
 		expect(sequential[0].metrics.timeToCompletionMs.max).toBeGreaterThan(0)
 	})
@@ -328,7 +333,8 @@ describe('runSimSweep — validation', () => {
 			records.push(record)
 		}
 		expect(records).toHaveLength(2)
-		// Depth 1 cannot reach a 2-hop route; depth 3 can — so the deeper cell finds at least as many.
+		// A deeper ceiling can only reach more routes (reach = depth, one round per level), never fewer —
+		// so the deeper cell finds at least as many as the shallower one.
 		const [shallow, deep] = records
 		expect(deep.metrics.foundCount).toBeGreaterThanOrEqual(shallow.metrics.foundCount)
 	})
