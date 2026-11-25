@@ -345,7 +345,7 @@ export class Participant<TTerms, TPayload> {
 		}
 
 		// Issue the next batch and wait up to the real remaining budget.
-		const requests = this.issueBatch(context, reentrance.path, budgetMs, start)
+		const requests = this.issueBatch(context, reentrance.path, budgetMs, start, errored)
 		await budgetedStep(this.clock, Math.max(0, budgetMs - (this.clock.now() - start)), requests)
 		if (Object.values(requests).some((pending) => !pending.isComplete)) {
 			this.traceSink({ ...this.base(session), type: 'round-budget-expired', round: context.depth })
@@ -404,10 +404,14 @@ export class Participant<TTerms, TPayload> {
 		path: string[],
 		budgetMs: number,
 		start: number,
+		errored: Set<string>,
 	): Record<string, Pending<QueryResponse<TTerms, TPayload>>> {
 		const session = context.query.sessionCode
 		const requests: Record<string, Pending<QueryResponse<TTerms, TPayload>>> = {}
 		for (const candidate of context.candidates) {
+			if (errored.has(candidate.linkId)) {
+				continue // errored in this cycle's prior harvest; pruned `failed` below -- never re-issue
+			}
 			const key = this.inFlightKey(session, path, candidate.linkId)
 			const existing = this.inFlight.get(key)
 			if (existing && !existing.isComplete) {

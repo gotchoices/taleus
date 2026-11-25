@@ -371,6 +371,37 @@ describe('reenter — the real time budget (ChipNet hard-coded 1000ms) and leake
 		expect(r2.plans).toHaveLength(1)
 		expect(r2.reentrance).toBeUndefined() // dead end after folding → concluded
 	})
+
+	it('a sleeping peer that errors between rounds is pruned (failed) without a spurious retry', async () => {
+		const session = makeSession()
+		let rejectPeer!: (reason: Error) => void
+		const peerPromise = new Promise<QueryResponse<TTerms, TPayload>>((_resolve, reject) => {
+			rejectPeer = reject
+		})
+		const h = makeHarness({
+			findAddress: findAddress({ candidates: [{ id: 'L1', intents: { lift: 't' } }] }),
+			queryPeer: () => peerPromise,
+		})
+		await h.participant.query(entranceReq(makeQuery(session), originatorPlan()))
+
+		// Round 1: the peer sleeps through the whole budget (issued exactly once).
+		const round1 = h.participant.query(reentranceReq(session, [], BUDGET))
+		await jest.advanceTimersByTimeAsync(BUDGET)
+		const r1 = await round1
+		expect(r1.reentrance).toBeDefined() // candidate kept, still outstanding
+		expect(h.peerCalls).toHaveLength(1)
+
+		// The sleeping sub-query errors between rounds.
+		rejectPeer(new Error('peer died late'))
+		await Promise.resolve()
+
+		// Round 2: the late error is harvested → candidate pruned (failed), and NOT re-queried.
+		const r2 = await h.participant.query(reentranceReq(session, [], BUDGET))
+		expect(prunes(h.traces, 'failed')).toHaveLength(1)
+		expect(h.peerCalls).toHaveLength(1) // no spurious retry of the errored candidate
+		expect(r2.reentrance).toBeUndefined()
+		expect(r2.plans).toBeUndefined()
+	})
 })
 
 describe('reenter — ticket validation', () => {
