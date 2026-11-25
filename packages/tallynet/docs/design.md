@@ -59,6 +59,8 @@ The **rename** `chipnet` → `tallynet` (protocol id `/taleus/chipnet/1.0.0` →
 - **Hop context** for negotiation (the main extension; see next section).
 - Extensible intent codes (`string`), not `'L' | 'C'`.
 
+*Implemented in `src/discovery/` (participant side): the one-link-shape data model (`types.ts`), the durable/in-flight state split (`store.ts` holds only serialisable data; the participant holds the live requests), the negotiation hooks with hop context (`hooks.ts`), and `enter`/`reenter` with the no-op filters fixed and the real budget honoured (`participant.ts`). The originator and end-to-end wiring remain to the `tallynet-discovery` ticket.*
+
 **Consensus** keeps ChipNet's model: a self-describing record (payload, topology, promise signatures, commit signatures), merged by union, pushed to reachable members until settled. Participants promise; referees vote; a majority settles. Changes from ChipNet:
 
 - Every signature covers the canonical digest **and its own signature type**, and verification recomputes exactly that preimage. Every verification is awaited.
