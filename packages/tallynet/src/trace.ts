@@ -15,7 +15,13 @@
  * Note: {@link PruneReason} here is the discovery-prune enum. It is **distinct** from
  * `taleus-core`'s accumulator `PruneReason` (`missing-quote` / `zero-capacity` /
  * `insufficient-capacity`); the two live in different packages and never meet.
+ *
+ * This is ONE union across both milestones: discovery emits the query/plan/round events, consensus
+ * emits the record/promise/vote/settle/release events. The simulator consumes the single union; do
+ * not fork it per milestone.
  */
+
+import type { SignatureRejectReason } from './consensus/types.js'
 
 /** Common envelope on every trace event: the clock time, the emitting node's own id, the session. */
 export interface TraceBase {
@@ -34,6 +40,16 @@ export type PruneReason =
 	| 'expired'        // session code expired / too little life left
 	| 'no-reentrance'  // candidate returned no reentrance ticket and no plan
 
+/**
+ * The consensus events additionally carry `transactionCode` (the lift this concerns). It is NOT added
+ * to {@link TraceBase} — discovery events have no transaction — but to each consensus variant below.
+ * The disclosure invariant still holds: `to`/`from` are member **addresses** (public by default in
+ * the route), never a neighbour's link id or nonce; signature counts are the emitting node's own.
+ *
+ * `promise-signed`'s signature-kind field is named `signatureType`, not `type`, because `type` is the
+ * union discriminant (`'promise-signed'`); the field it would otherwise shadow is the `'P'`/`'NP'` it
+ * just cast.
+ */
 export type TraceEvent =
 	| (TraceBase & { type: 'query-sent';           nonce: string; depth: number; round: number })
 	| (TraceBase & { type: 'query-received';       nonce: string; depth: number; round: number })
@@ -43,6 +59,13 @@ export type TraceEvent =
 	| (TraceBase & { type: 'round-started';        round: number; budgetMs: number })
 	| (TraceBase & { type: 'round-budget-expired'; round: number })
 	| (TraceBase & { type: 'late-answer-folded';   nonce: string; round: number })
+	| (TraceBase & { type: 'record-pushed';        transactionCode: string; to: string; promiseCount: number; commitCount: number; ok: boolean })
+	| (TraceBase & { type: 'record-received';      transactionCode: string; from?: string; promiseCount: number; commitCount: number })
+	| (TraceBase & { type: 'promise-signed';       transactionCode: string; signatureType: 'P' | 'NP' })
+	| (TraceBase & { type: 'signature-rejected';   transactionCode: string; reason: SignatureRejectReason })
+	| (TraceBase & { type: 'referee-vote';         transactionCode: string; decision: 'C' | 'NC' })
+	| (TraceBase & { type: 'settled';              transactionCode: string; decision: 'commit' | 'void' })
+	| (TraceBase & { type: 'resources-released';   transactionCode: string; success: boolean })
 
 /** A trace sink receives every event. Default is a no-op. A throwing sink must never break the engine. */
 export type TraceSink = (event: TraceEvent) => void

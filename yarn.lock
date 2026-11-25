@@ -6601,6 +6601,7 @@ __metadata:
   dependencies:
     "@eslint/js": "npm:10.0.1"
     "@ipld/dag-cbor": "npm:^11.0.0"
+    "@noble/curves": "npm:^2.4.0"
     "@noble/hashes": "npm:^2.2.0"
     "@types/jest": "npm:30.0.0"
     "@types/node": "npm:26.1.1"

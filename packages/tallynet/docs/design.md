@@ -81,6 +81,14 @@ The adaptive version — size the budget from a distribution of round-trip times
 - A member may appear on more than one link (a circular lift starts and ends at the originator), so "find our member" returns all our links, not one.
 - Terms are checked at promise time: each participant checks its own in/out links against its own policy (that's where Taleus's per-node quote check goes).
 
+### The commit attachment seam
+
+The Taleus referee produces **two** signatures at commit: TallyNet's whole-record commit signature (an entry in the record's `commits[]`), and a **separate per-edge** signature the Quereus schema verifies to settle each strand (`packages/taleus-core/src/lift/referee.ts`, `RefereeCommit.edgeSignatures`, keyed by `LiftId`). The per-edge signatures must travel with the record so each strand's agent can copy its edge's signature into that strand's finalize row.
+
+They cannot live in the record `payload`: `payload` is part of the immutable, promise-signed core, and the originator sets it *before* any referee has committed. So they ride as the **opaque `attachment`** on the referee's commit `Signature` (`src/consensus/types.ts`). The `attachment` is deliberately **not** part of the whole-record signed preimage (`recordDigest` covers only the immutable core plus — for a commit — the promise set), which matches `taleus-core`'s injected `RecordDigest`: it, too, signs only the core + promises, never the edge-signature bundle.
+
+This is safe because the per-edge signatures are **self-authenticating at the host layer**: each verifies against the referee's known key under the schema's own digest (`liftTermsDigest` for commit, `liftVoidDigest` for void), independent of TallyNet's record signature. A stripped or swapped `attachment` therefore fails at the destination strand — a **liveness** concern (that edge cannot settle until a good copy arrives), never a **safety** one (no wrong settlement can be forged). The binding ticket (`tallynet-bind-taleus-core`) maps `taleus-core`'s `RefereeCommit.edgeSignatures` / `RefereeVoidResult.edgeSignatures` onto the commit signature's `attachment` without further ceremony.
+
 **Not in v1** (backlog): bidirectional search; ring/star propagation with a convergence node; pre-promise void on timeout; void-on-timeout and stalled-transaction recovery (coordinate with `feat-lift-timeout-release`); query economics and policing; advertising. v1 is unidirectional and push-to-reachable, and supports referee sets. Taleus's schema still holds one referee per edge; `feat-multi-referee-consensus` lifts that limit soon after binding, and until then Taleus's policy hooks refuse plans with more than one referee.
 
 ## Member identity and disclosure
