@@ -202,11 +202,22 @@ export class TrxParticipant<TTerms, TPayload> {
 		for (const signature of incoming.promises) {
 			await this.mergeSignature(merged, signature, 'promises')
 		}
+
+		// Commit-phase side pool: durable, keyed by transactionCode, never part of the wire record. Drain
+		// any earlier-arrived (pooled) commits once the promise phase is complete — BEFORE the incoming
+		// commits, so a pooled vote wins the "first face stands" ordering over a same-update arrival — then
+		// merge the incoming commits (pooling the ones that still cannot be verified).
+		const pending = await this.store.getPendingCommits(merged.transactionCode)
+		const hadPending = pending.length > 0
+		await this.drainPendingCommits(merged, pending)
 		for (const signature of incoming.commits) {
-			await this.mergeSignature(merged, signature, 'commits')
+			await this.mergeSignature(merged, signature, 'commits', pending)
 		}
 
 		await this.store.saveRecord(merged)
+		if (pending.length > 0 || hadPending) {
+			await this.store.savePendingCommits(merged.transactionCode, pending)
+		}
 		this.traceSink({
 			...this.traceBase(merged),
 			type: 'record-received',
@@ -219,65 +230,147 @@ export class TrxParticipant<TTerms, TPayload> {
 	}
 
 	/**
-	 * Merge one incoming signature into `merged[bucket]` with the per-signer phase rules. Order:
-	 * membership → role → already-have-one-from-this-signer → cryptographic verify → store.
+	 * Merge one incoming signature into the record. Both phases first pass the membership + role gate
+	 * ({@link checkMemberAndRole}); then promises and commits diverge, because only a promise can be
+	 * verified the instant it arrives.
 	 *
-	 * The already-have-one check runs **before** cryptographic verification on purpose: a signer
-	 * contributes at most one promise-phase and one commit-phase signature, and the FIRST verified one
-	 * is authoritative. So a genuine second vote (a referee that truly signs both `C` and `NC`) is
-	 * refused as `equivocation` without re-verifying it, and a member re-sending a *different* value for
-	 * the same phase is `changed` — both keep the first. A relabel/forgery that arrives with NO prior
-	 * signature from that member still fails verification and is `forged`. (A forged relabel arriving
-	 * *after* the member's genuine signature is reported as `equivocation`/`changed` rather than
-	 * `forged`; the outcome — refuse the second, keep the first, log once — is identical.)
+	 * **Promise phase.** The already-have-one check runs **before** verification, and this is SAFE: a
+	 * promise's preimage never depends on the promise set, so every promise is verified immediately. A
+	 * forged promise with no prior entry fails verification and is dropped as `forged` — it is never
+	 * stored, so it can never become the `existing` that shadows a genuine one. The first verified promise
+	 * is authoritative: a genuine second *value* for the same phase is `changed`, a second *face* (P&NP)
+	 * is `equivocation`, both keeping the first.
+	 *
+	 * **Commit phase.** A commit binds the full promise set, so it cannot be verified until the promise
+	 * phase completes. Verifying before the dedupe is therefore impossible early — and dedupe-before-verify
+	 * is exactly the forged-commit-shadows-vote hole (a garbage commit would occupy a referee's slot and
+	 * block the genuine vote). So commits route through {@link mergeCommit}: unverifiable ones wait in a
+	 * side pool and NEVER enter the authoritative `commits` set until they verify. See docs/design.md
+	 * § Protocol design (Consensus).
 	 */
 	private async mergeSignature(
 		merged: TrxRecord<TTerms, TPayload>,
 		signature: Signature,
 		bucket: 'promises' | 'commits',
+		pending?: Signature[],
 	): Promise<void> {
-		const member = this.memberByKey(merged.topology, signature.address)
-		if (!member) {
-			return this.rejectSignature(merged, 'non-member')
+		if (!this.checkMemberAndRole(merged, signature)) {
+			return
+		}
+		if (bucket === 'commits') {
+			return this.mergeCommit(merged, signature, pending ?? [])
 		}
 
-		const isPromisePhase = signature.type === 'P' || signature.type === 'NP'
-		const requiredRole: MemberType = isPromisePhase ? MemberTypes.participant : MemberTypes.referee
-		if (!member.types.includes(requiredRole)) {
-			return this.rejectSignature(merged, 'wrong-role')
-		}
-
-		const existing = merged[bucket].find((candidate) => candidate.address === signature.address)
+		const existing = merged.promises.find((candidate) => candidate.address === signature.address)
 		if (existing) {
 			if (existing.type === signature.type && existing.value === signature.value) {
 				return // identical re-delivery: dedupe silently (idempotent)
 			}
 			return this.rejectSignature(merged, existing.type === signature.type ? 'changed' : 'equivocation')
 		}
-
-		if (isPromisePhase) {
-			// A promise's preimage never depends on the promise set, so it verifies the same at any time.
-			if (!(await verifySignature(this.verifier, signature, merged, this.hasher))) {
-				return this.rejectSignature(merged, 'forged')
-			}
-		} else if (this.promisePhaseComplete(merged)) {
-			// A commit's preimage binds the full promise set. Only verify once the promise phase is
-			// complete; an earlier-arriving commit is retained unverified (out-of-order delivery) and
-			// counted later, once the last promise lands, by `countVerifiedCommits`.
-			if (!(await verifySignature(this.verifier, signature, merged, this.hasher))) {
-				return this.rejectSignature(merged, 'forged')
-			}
+		// A promise's preimage never depends on the promise set, so it verifies the same at any time.
+		if (!(await verifySignature(this.verifier, signature, merged, this.hasher))) {
+			return this.rejectSignature(merged, 'forged')
 		}
-		// NOTE: liveness edge (safety-preserving). A forged commit carrying a referee's `address` but a
-		// garbage `value`, arriving BEFORE the promise phase completes, is retained unverified here and
-		// occupies that referee's commit slot; the genuine vote then arrives and is refused as
-		// `equivocation`/`changed` (the already-have-one check above), so it is never counted and the
-		// lift STALLS (liveness denial). This is safety-preserving — the forged value never verifies, so
-		// `countVerifiedCommits` never counts it, and no wrong outcome can settle. Not reachable as a
-		// *flip* (the value cannot verify), so not a filed ticket; a propagation timeout
-		// (`feat-tallynet-propagation-timeouts`) would eventually void such a stall.
+		merged.promises = [...merged.promises, signature]
+	}
 
-		merged[bucket] = [...merged[bucket], signature]
+	/**
+	 * Membership + role gate, shared by both phases. Returns the member on success, or `undefined` after
+	 * tracing+logging the rejection (`non-member` / `wrong-role`). The required role is derived from the
+	 * signature's own type (`P`/`NP` → participant, `C`/`NC` → referee).
+	 */
+	private checkMemberAndRole(merged: TrxRecord<TTerms, TPayload>, signature: Signature): DependentMember | undefined {
+		const member = this.memberByKey(merged.topology, signature.address)
+		if (!member) {
+			this.rejectSignature(merged, 'non-member')
+			return undefined
+		}
+		const isPromisePhase = signature.type === 'P' || signature.type === 'NP'
+		const requiredRole: MemberType = isPromisePhase ? MemberTypes.participant : MemberTypes.referee
+		if (!member.types.includes(requiredRole)) {
+			this.rejectSignature(merged, 'wrong-role')
+			return undefined
+		}
+		return member
+	}
+
+	/**
+	 * Merge one incoming commit (membership + role already checked). The authoritative `commits` set holds
+	 * **only verified** signatures, so the `changed`/`equivocation` dedupe can never be triggered by — nor
+	 * a genuine vote shadowed by — an unverified one (the forged-commit-shadows-vote fix):
+	 *
+	 * - Promise phase **complete** → verify now and, on success, promote into the authoritative set with
+	 *   the dedupe/equivocation check ({@link promoteCommit}); a failure is `forged`.
+	 * - Promise phase **incomplete** → the commit cannot be verified yet. Hold it in the durable side pool
+	 *   ({@link poolCommit}), never in `merged.commits`. {@link drainPendingCommits} promotes or drops it
+	 *   once the promise set fills.
+	 */
+	private async mergeCommit(merged: TrxRecord<TTerms, TPayload>, signature: Signature, pending: Signature[]): Promise<void> {
+		if (this.promisePhaseComplete(merged)) {
+			return this.promoteCommit(merged, signature)
+		}
+		this.poolCommit(merged, signature, pending)
+	}
+
+	/**
+	 * Promote a commit into the authoritative `commits` set once it verifies against the complete promise
+	 * set. Verification runs **first**; only a verified commit reaches the dedupe/equivocation check, so an
+	 * unverified one can never occupy a referee's slot. A verification failure is `forged`; an identical
+	 * re-delivery is deduped silently; a different value for the same signer is `changed` (same face) or
+	 * `equivocation` (opposite face), keeping the first (earlier) verified face. Used for both an incoming
+	 * complete-phase commit and a pooled commit on drain.
+	 */
+	private async promoteCommit(merged: TrxRecord<TTerms, TPayload>, signature: Signature): Promise<void> {
+		if (!(await verifySignature(this.verifier, signature, merged, this.hasher))) {
+			return this.rejectSignature(merged, 'forged')
+		}
+		const existing = merged.commits.find((candidate) => candidate.address === signature.address)
+		if (existing) {
+			if (existing.type === signature.type && existing.value === signature.value) {
+				return // identical re-delivery: dedupe silently (idempotent)
+			}
+			return this.rejectSignature(merged, existing.type === signature.type ? 'changed' : 'equivocation')
+		}
+		merged.commits = [...merged.commits, signature]
+	}
+
+	/**
+	 * Hold an unverifiable (promise-phase-incomplete) commit in the side `pending` pool. Idempotent on an
+	 * identical re-delivery; capped at {@link MAX_PENDING_COMMITS_PER_REFEREE} entries **per signer** so a
+	 * peer cannot grow the pool without bound (the overflow drops as `pool-full`). The pool is side state:
+	 * never merged into the record, never pushed, never digested. Appends to `pending` in place (the caller
+	 * persists it via `savePendingCommits`).
+	 */
+	private poolCommit(merged: TrxRecord<TTerms, TPayload>, signature: Signature, pending: Signature[]): void {
+		const identical = pending.some(
+			(candidate) => candidate.address === signature.address && candidate.type === signature.type && candidate.value === signature.value,
+		)
+		if (identical) {
+			return // already pooled: idempotent
+		}
+		const forThisSigner = pending.reduce((count, candidate) => (candidate.address === signature.address ? count + 1 : count), 0)
+		if (forThisSigner >= MAX_PENDING_COMMITS_PER_REFEREE) {
+			return this.rejectSignature(merged, 'pool-full')
+		}
+		pending.push(signature)
+	}
+
+	/**
+	 * Drain the pending-commit pool once the promise phase is complete: run each pooled commit through
+	 * {@link promoteCommit} (verify → promote or drop), in insertion order so the earliest genuine face of
+	 * a true equivocation is the one that stands. The pool is emptied in place — every entry is either
+	 * promoted into `merged.commits` or dropped (`forged`). A no-op while the promise phase is incomplete
+	 * or the pool is empty.
+	 */
+	private async drainPendingCommits(merged: TrxRecord<TTerms, TPayload>, pending: Signature[]): Promise<void> {
+		if (!this.promisePhaseComplete(merged) || pending.length === 0) {
+			return
+		}
+		const toDrain = pending.splice(0, pending.length) // empty the pool; each entry is promoted or dropped
+		for (const signature of toDrain) {
+			await this.promoteCommit(merged, signature)
+		}
 	}
 
 	/** Trace + log a dropped signature. The record is otherwise unharmed; the merge continues. */
@@ -343,9 +436,10 @@ export class TrxParticipant<TTerms, TPayload> {
 	}
 
 	/**
-	 * Count distinct referees whose `type` commit signature verifies against the record's current (now
-	 * complete) promise set. Retained-but-unverified commits (out-of-order arrivals) verify here once the
-	 * promise set has filled; a commit that still does not verify is simply not counted.
+	 * Count distinct referees whose `type` commit signature verifies against the record's (now complete)
+	 * promise set. The merge now admits only already-verified commits into `commits` (an unverified
+	 * out-of-order arrival waits in the side pool, never here), so this re-verification is **defensive** —
+	 * it cannot admit a forged vote; a signature that somehow fails to verify is simply not counted.
 	 */
 	private async countVerifiedCommits(
 		record: TrxRecord<TTerms, TPayload>,
@@ -695,6 +789,13 @@ export class TrxParticipant<TTerms, TPayload> {
 
 /** The signature-kind constants, locally named so call sites read `promise`/`noPromise` not `'P'`/`'NP'`. */
 const SignatureTypesLocal = { promise: 'P', noPromise: 'NP' } as const satisfies Record<string, SignatureType>
+
+/**
+ * Cap on unverified (promise-phase-incomplete) commits held **per referee** in the side pool before the
+ * overflow is dropped as `pool-full`. Small by design: a genuine referee contributes at most two faces
+ * (`C` and `NC`), so 4 leaves slack for out-of-order re-delivery while denying a peer unbounded growth.
+ */
+const MAX_PENDING_COMMITS_PER_REFEREE = 4
 
 /** A shallow copy with copied signature arrays — enough to freeze a push snapshot (the core is immutable). */
 function snapshotRecord<TTerms, TPayload>(record: TrxRecord<TTerms, TPayload>): TrxRecord<TTerms, TPayload> {

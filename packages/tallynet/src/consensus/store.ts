@@ -18,7 +18,7 @@
  * one. The release flag is idempotent across restarts so resources are released exactly once.
  */
 
-import type { TrxRecord } from './types.js'
+import type { Signature, TrxRecord } from './types.js'
 
 /**
  * The durable store a consensus participant reads and writes, keyed by `transactionCode`. A host backs
@@ -37,6 +37,20 @@ export interface TrxStore<TTerms, TPayload> {
 	isReleased(transactionCode: string): Promise<boolean>
 	/** Mark `transactionCode`'s resources released, idempotent across restarts. */
 	setReleased(transactionCode: string): Promise<void>
+	/**
+	 * The pending-commit **side pool** for `transactionCode`: commit-phase signatures that arrived before
+	 * the promise phase was complete and so could not yet be verified. They are held out-of-band here —
+	 * never merged into the record's counted `commits` set, never pushed, never digested — until the
+	 * promise set completes and each is verified and promoted (or dropped). Returns `[]` if none.
+	 *
+	 * This is the fix for the forged-commit-shadows-vote defect: an unverified commit must not occupy a
+	 * referee's slot in the authoritative set, where it could block that referee's genuine vote. See
+	 * `participant.ts` (`mergeSignature` + the drain in `validateAndMerge`) and docs/design.md
+	 * § Protocol design (Consensus).
+	 */
+	getPendingCommits(transactionCode: string): Promise<Signature[]>
+	/** Persist the pending-commit side pool for `transactionCode` (replacing any prior pool). */
+	savePendingCommits(transactionCode: string, commits: Signature[]): Promise<void>
 }
 
 /**
@@ -49,6 +63,7 @@ export class MemoryTrxStore<TTerms, TPayload> implements TrxStore<TTerms, TPaylo
 	private readonly records = new Map<string, TrxRecord<TTerms, TPayload>>()
 	private readonly peerRecords = new Map<string, TrxRecord<TTerms, TPayload>>()
 	private readonly released = new Set<string>()
+	private readonly pendingCommits = new Map<string, Signature[]>()
 
 	getRecord(transactionCode: string): Promise<TrxRecord<TTerms, TPayload> | undefined> {
 		return Promise.resolve(this.records.get(transactionCode))
@@ -78,6 +93,17 @@ export class MemoryTrxStore<TTerms, TPayload> implements TrxStore<TTerms, TPaylo
 
 	setReleased(transactionCode: string): Promise<void> {
 		this.released.add(transactionCode)
+		return Promise.resolve()
+	}
+
+	getPendingCommits(transactionCode: string): Promise<Signature[]> {
+		// Return a fresh copy so the participant can splice/push its working pool without aliasing the
+		// stored array; the participant persists the final pool back via savePendingCommits.
+		return Promise.resolve([...(this.pendingCommits.get(transactionCode) ?? [])])
+	}
+
+	savePendingCommits(transactionCode: string, commits: Signature[]): Promise<void> {
+		this.pendingCommits.set(transactionCode, [...commits])
 		return Promise.resolve()
 	}
 }
