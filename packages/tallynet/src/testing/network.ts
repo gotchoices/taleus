@@ -127,6 +127,7 @@ export class InMemoryNetwork<TTerms, TPayload> {
 	private readonly adjacency = new Map<string, AdjacencyEntry<TTerms>[]>()
 	private readonly linkLookup = new Map<string, Map<string, string>>()
 	private readonly nodeByName = new Map<string, DiscoveryNode<TTerms, TPayload>>()
+	private readonly storeByName = new Map<string, MemoryParticipantStore<TTerms, TPayload>>()
 
 	constructor(config: InMemoryNetworkConfig<TTerms, TPayload>) {
 		this.clock = config.clock
@@ -164,6 +165,32 @@ export class InMemoryNetwork<TTerms, TPayload> {
 			throw new Error(`no node named ${name}`)
 		}
 		return node
+	}
+
+	/**
+	 * The participant store backing node `name` -- the originator can read its own session's
+	 * `getNonceToLinkMap` through it (as a host would via its real store). Throws if there is no such node.
+	 */
+	storeOf(name: string): MemoryParticipantStore<TTerms, TPayload> {
+		const store = this.storeByName.get(name)
+		if (!store) {
+			throw new Error(`no node named ${name}`)
+		}
+		return store
+	}
+
+	/**
+	 * Merge every node's nonce->linkId map for `session` into one lookup. A test/sim helper for
+	 * resolving a returned plan's anonymised path nonces back to real link ids (to check the route is a
+	 * valid chain). Its cost is O(nodes) and it is NEVER used in discovery control flow -- a node only
+	 * ever reads its own store (the per-query scale invariant).
+	 */
+	async nonceToLinkMap(session: string): Promise<Record<string, string>> {
+		const merged: Record<string, string> = {}
+		for (const store of this.storeByName.values()) {
+			Object.assign(merged, await store.getNonceToLinkMap(session))
+		}
+		return merged
 	}
 
 	/** Convenience: run a search from node `from`. Drive {@link clock} to settle the returned promise. */
@@ -211,9 +238,11 @@ export class InMemoryNetwork<TTerms, TPayload> {
 		options: Partial<OriginatorOptions & ParticipantOptions> | undefined,
 	): DiscoveryNode<TTerms, TPayload> {
 		const adjacency = this.adjacency.get(name) ?? []
+		const store = new MemoryParticipantStore<TTerms, TPayload>()
+		this.storeByName.set(name, store)
 		return new DiscoveryNode<TTerms, TPayload>({
 			nodeId: name,
-			store: new MemoryParticipantStore<TTerms, TPayload>(),
+			store,
 			clock: this.clock,
 			random: this.random,
 			hasher: this.hasher,

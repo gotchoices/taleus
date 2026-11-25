@@ -55,11 +55,22 @@ The **rename** `chipnet` → `tallynet` (protocol id `/taleus/chipnet/1.0.0` →
 
 - **Split durable from in-flight state.** The persisted query context holds only serialisable data (query, plan so far, candidates with their nonce, depth and last response). In-flight requests live in an in-memory table keyed by session and candidate. A restart loses in-flight requests, which is acceptable: those candidates are simply retried or dropped next round.
 - Fix the no-op filters: cycle removal, pruning of failed candidates, duplicate-query rejection.
-- Use the real time budget, and validate peers' timing statistics before trusting them. Always clear timers.
+- Use the real time budget, computed solely from the originator's own options; **nothing trusts peer-reported timing** (see *Time budget* below). Always clear timers.
 - **Hop context** for negotiation (the main extension; see next section).
 - Extensible intent codes (`string`), not `'L' | 'C'`.
 
-*Implemented in `src/discovery/` (participant side): the one-link-shape data model (`types.ts`), the durable/in-flight state split (`store.ts` holds only serialisable data; the participant holds the live requests), the negotiation hooks with hop context (`hooks.ts`), and `enter`/`reenter` with the no-op filters fixed and the real budget honoured (`participant.ts`). The originator and end-to-end wiring remain to the `tallynet-discovery` ticket.*
+### Time budget (decided: drop the histogram)
+
+Each round waits a bounded time for replies before stepping one level deeper. The budget is **linear in the round**: `initialBudgetMs + round * perHopBudgetMs` (defaults 2000 ms + 1500 ms/round in `OriginatorOptions`). A deeper round gets a larger budget because its round-trip is longer. The constants are coarse — there is **no adaptive tuning in v1**.
+
+Two deliberate departures from ChipNet:
+
+- **The `sparstogram` dependency is dropped** — not for platform-compatibility (it is pure-ESM and React-Native-safe) but because adaptive histogram budgeting was an untested prototype optimisation, and dropping it removes the "trust a peer's reported stats" attack surface entirely. ChipNet grew the per-round budget from peers' reported timing histograms behind a `validatedStats` stub that trusted them outright (`chipnet-review.md`, `originator.ts:62`).
+- **The budget never reads peer-reported stats.** Peer `QueryStats` (`earliest` / `latest` / `gross` / `outstanding`) stay in the protocol as **informational only** — a simulator or viewer can display a round's shape, but nothing in control flow trusts them, so there is nothing to validate. A node sizes its budget purely from its own `OriginatorOptions` and its own clock.
+
+The adaptive version — size the budget from a distribution of round-trip times the originator **measures itself** (never a peer's figure), e.g. a locally-tracked quantile — is parked as backlog `feat-tallynet-adaptive-budget`. It depends on nothing but is a pure optimisation, best judged against simulator metrics.
+
+*Implemented in `src/discovery/`: the one-link-shape data model (`types.ts`), the durable/in-flight state split (`store.ts` holds only serialisable data; the participant holds the live requests), the negotiation hooks with hop context (`hooks.ts`), `enter`/`reenter` with the no-op filters fixed and the real budget honoured (`participant.ts`), the originator round loop + linear budget (`originator.ts`), and the per-node `DiscoveryNode` bundle that wires both roles (`engine.ts`). End-to-end discovery is proven over the in-memory harness (`src/testing/`, driven in `src/testing/discovery.test.ts`). The `taleus-core` adapter is described in `engine.ts` and implemented by `tallynet-bind-taleus-core`.*
 
 **Consensus** keeps ChipNet's model: a self-describing record (payload, topology, promise signatures, commit signatures), merged by union, pushed to reachable members until settled. Participants promise; referees vote; a majority settles. Changes from ChipNet:
 
