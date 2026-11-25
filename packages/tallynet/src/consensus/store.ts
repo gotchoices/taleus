@@ -63,6 +63,9 @@ export class MemoryTrxStore<TTerms, TPayload> implements TrxStore<TTerms, TPaylo
 	private readonly records = new Map<string, TrxRecord<TTerms, TPayload>>()
 	private readonly peerRecords = new Map<string, TrxRecord<TTerms, TPayload>>()
 	private readonly released = new Set<string>()
+	// NOTE: like every map here, this is never pruned — a committed/voted lift drains its pool to empty, but
+	// an NP-voided lift (promise phase never completes) leaves its pre-promise pool undrained. Bounded and
+	// tiny in memory; when durable-store cleanup of terminal transactions lands, prune this alongside records.
 	private readonly pendingCommits = new Map<string, Signature[]>()
 
 	getRecord(transactionCode: string): Promise<TrxRecord<TTerms, TPayload> | undefined> {
