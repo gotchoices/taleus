@@ -10,8 +10,8 @@ This document is the canonical design and grows one ticket at a time. It current
 — the platform-neutral, headlessly-tested logic that loads and interprets a recorded run — the **graph tier**
 (the `graphology` model, the seeded worker layout, and the `sigma` renderer), the **app shell** (a `Graph |
 Sweep` view-mode toggle over: load a network, draw it, search it, switch theme), the **replay tier** (the
-transport that plays a payment search across the graph), the **sweeps view** (parameter-sweep charts), and the
-settled **stack decision**. The remaining rendering tier (live in-browser runs) extends it as it lands.
+transport that plays a payment search across the graph), the **sweeps view** (parameter-sweep charts), the
+**live-run tier** (generate + search a network in the browser), and the settled **stack decision**.
 
 Read first: [`packages/tallysim/docs/design.md`](../../tallysim/docs/design.md) (the simulator whose output
 this viewer reads — especially its *Trace & replay format* and *Discovery simulation* sections) and
@@ -232,6 +232,69 @@ originator owns the search result, so this discloses nothing a relay could not a
 return — unlike relay events, it adds no disclosure. It is a cross-package change (a `tallynet` `TraceEvent`
 additive field, the originator emission, and a `TRACE_FORMAT_VERSION` bump in tallysim), deliberately out of
 the viewer's scope; it is filed as a backlog ticket.
+
+## Live-run tier (`src/live/`)
+
+The live-run tier **runs a payment search in the browser** instead of loading a recorded one: a developer picks
+a generator and params, generates a network, clicks a payer and a payee, runs the real `tallynet` discovery
+search, watches it animate, and downloads the run as a trace. It is the tier that finally lights up the **full**
+found-routes list (exact-path isolate-on-select) — closing the loop the Replay tier's *trace-format gap* left
+open (see § Found routes — and the trace-format gap), because the live source *drives* the search and so holds
+each plan's link-nonce path directly.
+
+| Module | Responsibility | Tested |
+|---|---|---|
+| `build-scenario.ts` | Pure form-values → `SimScenario` + `QuerySpec` translation (the nominal single-query workload, the fixed run seed). | jest |
+| `sim-run.ts` | Pure per-run core: build the trace `header` for a minted session code; map found `QueryOutcome.plans` → `RouteInput`s. | jest |
+| `sim-protocol.ts` | The type-only `postMessage` contract between the worker and the panel. | — |
+| `sim-worker.ts` | The Web Worker: generate the network, run the discovery search, stream the trace envelope back. | build + manual |
+| `controls.ts` | The panel (the form, the one worker, the generate → pick → run → download flow). Browser-only. | build + manual |
+
+### Generate and discover in a worker
+
+Generation (a settled graph + layout) and the discovery search are expensive and must not freeze the page, so
+both run in a module Web Worker (`sim-worker.ts`). Only two things cross back to the main thread: the **network
+snapshot** (drawn once) and the **streamed trace events** (one per `postMessage`, in time order). The in-worker
+engine is the *same* platform-neutral `tallysim` core + `tallynet` the CLI records with — no server, no Node —
+so a live run behaves exactly as a recorded one. The contract is **one run at a time** (no run-correlation id):
+the panel drives each run to its `done`/`error` before issuing the next.
+
+Two phases share one kept network: `generate` materialises it once (kept read-only in worker scope), and each
+`run` builds a fresh `buildSimNetwork` over it and searches the one picked payment. A fresh `buildSimNetwork`
+per run restarts the session-code RNG at its fixed seed, so a single-query live run byte-matches a
+`tallysim trace` single-query trace of the same seeds — the cleanest reading of *same params + seed ⇒
+byte-identical trace*.
+
+### Header from the first event (determinism note)
+
+A trace header lists the query's session code, but the code is minted *inside* `discover()` and is not knowable
+synchronously. Unlike the Node CLI (which reruns to learn it), the live path never needs a second pass — it
+animates the one real run it observes, and every `TraceEvent` carries its `sessionCode`. So the worker builds +
+posts the header on the **first** event; a zero-event degenerate run (`from === to`, `< 2` entities, or an
+edge-less network) posts the header from the resolved `outcome.sessionCode` instead, so the panel can still
+build an index.
+
+### The trace-envelope reuse (a live run is a byte-compatible trace)
+
+The live path reuses the trace machinery end-to-end: `buildTraceHeader` + `makeNetworkSnapshot` +
+`serializeTraceLine` produce the same `header`/`network`/`event` lines the CLI writes, and the panel feeds the
+streamed events into the **same** `trace-index → timeline → paint → replay` path a file load uses (via the
+incremental `TraceIndexBuilder`). So a finished live run animates through the identical replay, and **Download
+trace** emits a byte-compatible NDJSON trace (reusing the kept snapshot verbatim) that, reloaded via the File
+tab, replays identically — it replays the *recorded* events, it never re-runs the search.
+
+### The panel and the shell (host contract)
+
+`controls.ts` owns the worker and the form; it does **not** own the graph or the replay panel — the shell does.
+The panel defines a `LiveRunHost` the shell implements (`renderNetwork` draws a generated network and returns
+the view to wire click-to-pick onto; `mountReplay`/`mountDisabledReplay` swap the replay panel; `palette` hands
+over the theme), and the shell's Source section gains a **File | Live-run** tab toggle over the two sub-panels.
+Both source paths feed the one shared graph view and replay panel, so a theme toggle re-palettes a live run for
+free (the picked payer/payee marks re-theme with it). Click-to-pick writes into number `from`/`to` inputs that
+are the **source of truth** (the editable fallback when WebGL or clicking is unavailable); Run reads them.
+**Cancel** is a hard `Worker.terminate()` + a fresh worker (which loses the kept network), followed by a
+**silent** re-generate that refreshes the worker's network scope without re-drawing — so the graph and the
+picks survive a cancel.
 
 ## Sweeps view (`src/sweeps/`)
 

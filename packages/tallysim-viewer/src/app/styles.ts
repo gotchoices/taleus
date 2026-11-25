@@ -112,7 +112,8 @@ html, body, #app {
 	border-color: var(--tsv-text-secondary);
 }
 
-#tsv-app input[type='text'] {
+#tsv-app input[type='text'],
+#tsv-app input[type='number'] {
 	font: inherit;
 	color: var(--tsv-text);
 	background: var(--tsv-surface);
@@ -149,6 +150,70 @@ html, body, #app {
 	display: flex;
 	flex-direction: column;
 	gap: 1rem;
+}
+
+/* ── Source tabs (File | Live-run) ── */
+.tsv-source-tabs {
+	display: flex;
+	gap: 0.25rem;
+	margin-bottom: 0.5rem;
+}
+
+#tsv-app .tsv-source-tabs button.tsv-source-tab-active {
+	background: var(--tsv-text);
+	color: var(--tsv-surface);
+	border-color: var(--tsv-text);
+}
+
+/* ── Live-run form ── */
+.tsv-live {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.tsv-live-field {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.tsv-live-label {
+	font-size: 0.8rem;
+	color: var(--tsv-text-secondary);
+}
+
+#tsv-app .tsv-live-input {
+	width: 9rem;
+	max-width: 55%;
+}
+
+.tsv-live-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	margin-top: 0.5rem;
+}
+
+.tsv-live-readout {
+	font-size: 0.8rem;
+	color: var(--tsv-text-secondary);
+	font-variant-numeric: tabular-nums;
+}
+
+.tsv-live-status {
+	font-size: 0.85rem;
+	color: var(--tsv-text-secondary);
+	min-height: 1rem;
+	white-space: pre-wrap;
+}
+
+.tsv-live-error {
+	font-size: 0.85rem;
+	color: #c0392b;
+	min-height: 1rem;
+	white-space: pre-wrap;
 }
 
 /* ── Sweep chart main container ── */

@@ -2,8 +2,15 @@
  * The app shell: the top bar, the left control panel, and the two main views, with a light/dark theme toggle.
  * A **view-mode toggle** (`Graph | Sweep`) switches between the graph tier (load a network, draw it, search it,
  * replay a trace) and the sweeps tier (chart a parameter sweep). Each mode shows its own panel-control group and
- * its own main container; switching to Sweep re-fits the chart (uPlot measures 0×0 while its tab is hidden). The
- * live-run source tab is still a later ticket — its mount point keeps the seam comment below.
+ * its own main container; switching to Sweep re-fits the chart (uPlot measures 0×0 while its tab is hidden).
+ *
+ * ── Two source tabs ───────────────────────────────────────────────────────────────────────────────
+ * The graph mode's Source section has a **File | Live-run** tab toggle. The File tab loads a recorded trace (or
+ * the in-page sample); the Live-run tab generates a network and runs the real discovery search in a Web Worker,
+ * animating the result through the same replay pipeline. Both paths feed the one shared graph view and replay
+ * panel: the shell exposes `renderNetwork` (draw a network) + `setReplay` (swap the replay panel) so the live
+ * driver reuses exactly the file path's rendering, and a file/sample load calls `liveControls.invalidate()`
+ * because it replaces the drawn view out from under the live tab.
  *
  * ── The load path ──────────────────────────────────────────────────────────────────────────────────
  * A file the developer picks is read as text and handed to {@link indexTrace} (which wraps `tallysim`'s
@@ -21,6 +28,7 @@ import { buildGraph } from '../graph/model.js'
 import { createGraphView, type GraphView } from '../graph/render.js'
 import { runLayout, type LayoutController } from '../graph/layout.js'
 import { mountDisabledReplayControls, mountReplayControls, type ReplayControls } from '../replay/controls.js'
+import { mountLiveControls, type LiveControls, type LiveRunHost } from '../live/controls.js'
 import { mountSweepView, type SweepView } from '../sweeps/view.js'
 import { sampleNetwork } from './sample-network.js'
 import { SHELL_CSS } from './styles.js'
@@ -154,16 +162,29 @@ export function mountShell(root: HTMLElement): void {
 	app.append(topbar, body)
 	root.append(app)
 
-	// ── Source section: load a recorded trace file, or materialise the in-page sample. ──
+	// ── Source section: a File | Live-run tab toggle over the file sub-panel and the live-run sub-panel. ──
 	const sourceHost = panelSection(graphControls, 'Source')
+	const sourceTabs = el('div', 'tsv-source-tabs')
+	const fileTabButton = el('button', 'tsv-source-tab-file')
+	fileTabButton.textContent = 'File'
+	const liveTabButton = el('button', 'tsv-source-tab-live')
+	liveTabButton.textContent = 'Live-run'
+	sourceTabs.append(fileTabButton, liveTabButton)
+
+	// File sub-panel: load a recorded trace file, or materialise the in-page sample.
+	const fileSubPanel = el('div', 'tsv-source-file')
 	const fileInput = el('input', 'tsv-file')
 	fileInput.type = 'file'
 	fileInput.accept = '.ndjson,.jsonl,.json,.txt,application/json'
 	const sampleButton = el('button', 'tsv-sample')
 	sampleButton.textContent = 'Load sample'
 	const status = el('div', 'tsv-status')
-	sourceHost.append(fileInput, sampleButton, status)
-	// SEAM: the live-run driver tab and the sweep-source tab mount here in later tickets.
+	fileSubPanel.append(fileInput, sampleButton, status)
+
+	// Live-run sub-panel: the generate → pick → run → download driver (mounted after the fn defs below).
+	const liveSubPanel = el('div', 'tsv-source-live')
+
+	sourceHost.append(sourceTabs, fileSubPanel, liveSubPanel)
 
 	// ── Summary section: the loaded network at a glance. ──
 	const summaryHost = panelSection(graphControls, 'Network')
@@ -199,10 +220,11 @@ export function mountShell(root: HTMLElement): void {
 	}
 
 	/**
-	 * Build the graph + renderer, then mount the replay panel: the live transport when a trace with sessions is
-	 * loaded (and WebGL is available to paint the overlay), otherwise the disabled panel (the sample path).
+	 * Build the graph + renderer for `network`, mount a **disabled** replay panel as the default, and return the
+	 * new view. Tears down any prior view/layout/replay first. This is the rendering half both the file path and
+	 * the live-run driver share; a caller that has a trace (or a finished live run) then calls {@link setReplay}.
 	 */
-	function loadNetwork(network: Network, summary: NetworkSummary, trace?: TraceContext): void {
+	function renderNetwork(network: Network, summary: NetworkSummary): GraphView | undefined {
 		teardown()
 		const built = buildGraph(network)
 		const view = createGraphView(graph, built, paletteFor(state.theme))
@@ -210,21 +232,34 @@ export function mountShell(root: HTMLElement): void {
 		if (view.webglAvailable) {
 			state.layout = runLayout(built, { seed: network.meta.seed })
 		}
-		if (trace !== undefined && view.webglAvailable) {
-			state.replay = mountReplayControls({
-				host: replayHost,
-				view,
-				index: trace.index,
-				deanon: trace.deanon,
-				conditions: trace.conditions,
-				palette: paletteFor(state.theme),
-			})
-		} else {
-			state.replay = mountDisabledReplayControls(replayHost)
-		}
+		state.replay = mountDisabledReplayControls(replayHost)
 		renderSummary(summaryHost, summary)
 		searchInput.value = ''
 		searchMiss.textContent = ''
+		return view
+	}
+
+	/** Replace the replay panel (destroying the prior one) without touching the current view. */
+	function setReplay(buildFn: () => ReplayControls): void {
+		state.replay?.destroy()
+		state.replay = buildFn()
+	}
+
+	/** The file path: render the network, then — for a trace with sessions — mount the live replay transport. */
+	function loadNetwork(network: Network, summary: NetworkSummary, trace?: TraceContext): void {
+		const view = renderNetwork(network, summary)
+		if (trace !== undefined && view !== undefined && view.webglAvailable) {
+			setReplay(() =>
+				mountReplayControls({
+					host: replayHost,
+					view,
+					index: trace.index,
+					deanon: trace.deanon,
+					conditions: trace.conditions,
+					palette: paletteFor(state.theme),
+				}),
+			)
+		}
 	}
 
 	function loadTraceText(text: string): void {
@@ -247,6 +282,8 @@ export function mountShell(root: HTMLElement): void {
 				},
 				{ index, deanon, conditions },
 			)
+			// The load replaced the drawn view out from under the live tab — its generated network is now stale.
+			liveControls.invalidate()
 		} catch (err) {
 			// parseTrace throws a version/format error with a clear message — surface it, don't swallow it.
 			setStatus(errorMessage(err))
@@ -263,6 +300,8 @@ export function mountShell(root: HTMLElement): void {
 			tallyCount: network.tallies.length,
 			queryCount: 0,
 		})
+		// The load replaced the drawn view out from under the live tab — its generated network is now stale.
+		liveControls.invalidate()
 	}
 
 	function runSearch(): void {
@@ -306,6 +345,53 @@ export function mountShell(root: HTMLElement): void {
 		}
 	}
 
+	/** Switch the Source tab (File ↔ Live-run): show one sub-panel, hide the other. */
+	function applySourceTab(tab: 'file' | 'live'): void {
+		const live = tab === 'live'
+		fileSubPanel.style.display = live ? 'none' : ''
+		liveSubPanel.style.display = live ? '' : 'none'
+		fileTabButton.classList.toggle('tsv-source-tab-active', !live)
+		liveTabButton.classList.toggle('tsv-source-tab-active', live)
+	}
+
+	// The live-run driver's view of the shell: render a generated network, swap the replay panel, hand over the
+	// palette. It reuses `renderNetwork`/`setReplay` so a live run draws and replays exactly as a file load does.
+	const liveHost: LiveRunHost = {
+		renderNetwork(network: Network): GraphView | undefined {
+			return renderNetwork(network, {
+				generator: network.meta.generator,
+				entityCount: network.entityCount,
+				tallyCount: network.tallies.length,
+				queryCount: 0,
+			})
+		},
+		mountReplay(p): void {
+			const view = state.view
+			if (view === undefined) {
+				return
+			}
+			setReplay(() =>
+				mountReplayControls({
+					host: replayHost,
+					view,
+					index: p.index,
+					deanon: p.deanon,
+					conditions: p.conditions,
+					routeSource: p.routeSource,
+					autoplay: p.autoplay,
+					palette: paletteFor(state.theme),
+				}),
+			)
+		},
+		mountDisabledReplay(): void {
+			setReplay(() => mountDisabledReplayControls(replayHost))
+		},
+		palette(): Palette {
+			return paletteFor(state.theme)
+		},
+	}
+	const liveControls: LiveControls = mountLiveControls(liveSubPanel, liveHost)
+
 	fileInput.addEventListener('change', () => {
 		const file = fileInput.files?.[0]
 		if (file === undefined) {
@@ -336,7 +422,14 @@ export function mountShell(root: HTMLElement): void {
 	sweepModeButton.addEventListener('click', () => {
 		applyMode('sweep')
 	})
+	fileTabButton.addEventListener('click', () => {
+		applySourceTab('file')
+	})
+	liveTabButton.addEventListener('click', () => {
+		applySourceTab('live')
+	})
 
 	applyTheme(state.theme)
 	applyMode(state.mode)
+	applySourceTab('file')
 }
