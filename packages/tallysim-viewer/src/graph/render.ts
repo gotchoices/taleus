@@ -53,8 +53,25 @@ export interface GraphView {
 	clearSelection(): void
 	/** Centre the camera on a node without changing selection. No-op if the key is unknown. */
 	focusNode(key: string): void
+	/**
+	 * Register a click-to-pick handler: sigma fires it with the clicked node's key (`entityName(id)`, the same
+	 * key {@link search} uses) on every `clickNode`. The live-run panel uses it to set the payer/payee.
+	 */
+	onNodeClick(callback: (nodeKey: string) => void): void
+	/**
+	 * Mark the click-picked payer (`from`) and payee (`to`) by their node keys (or clear with `undefined`). The
+	 * marks compose **after** the replay overlay but **below** the built-in hover/selection accent (a hovered
+	 * node still wins on top), and re-theme for free on the next {@link setPalette} refresh.
+	 */
+	setPicked(from: string | undefined, to: string | undefined): void
 	/** Tear down sigma and remove the tooltip/message DOM. Idempotent-safe to call once on unmount. */
 	destroy(): void
+}
+
+/** The click-picked payer/payee node keys the node reducer marks (either may be `undefined` = unset). */
+interface PickedPair {
+	from: string | undefined
+	to: string | undefined
 }
 
 /** Finite min/max of edge total-swing across the graph, computed once; `undefined` when no finite edge. */
@@ -207,6 +224,7 @@ function nodeStyle(
 	state: ItemState,
 	palette: Palette,
 	overlay: ReplayOverlay | undefined,
+	picked: PickedPair,
 ): Partial<NodeDisplayData> {
 	const lit = state.isHovered || state.isHighlighted
 	let color = palette.node
@@ -219,6 +237,15 @@ function nodeStyle(
 		} else if (overlay.dim !== undefined) {
 			color = overlay.dim.node
 		}
+	}
+	// Click-picked payer/payee, over the replay overlay but under the hover/selection accent below. A
+	// self-payment (`from === to`) marks the node as the payer (the first branch wins).
+	if (key === picked.from) {
+		color = palette.highlight
+		size = NODE_SIZE_LIT
+	} else if (key === picked.to) {
+		color = palette.found
+		size = NODE_SIZE_LIT
 	}
 	if (lit) {
 		color = palette.highlight
@@ -288,6 +315,8 @@ function stubView(message: HTMLElement): GraphView {
 		},
 		clearSelection(): void {},
 		focusNode(): void {},
+		onNodeClick(): void {},
+		setPicked(): void {},
 		destroy(): void {
 			message.remove()
 		},
@@ -309,6 +338,7 @@ export function createGraphView(container: HTMLElement, graph: TallyGraph, initi
 
 	let palette = initialPalette
 	let overlay: ReplayOverlay | undefined
+	let picked: PickedPair = { from: undefined, to: undefined }
 	const range = finiteCapacityRange(graph)
 	container.style.background = palette.surface
 
@@ -320,7 +350,7 @@ export function createGraphView(container: HTMLElement, graph: TallyGraph, initi
 			enableEdgeEvents: true,
 			allowInvalidContainer: true,
 		},
-		nodeReducer: (key, _data, attrs, state) => nodeStyle(key, attrs, state, palette, overlay),
+		nodeReducer: (key, _data, attrs, state) => nodeStyle(key, attrs, state, palette, overlay, picked),
 		edgeReducer: (key, _data, attrs, state) => edgeStyle(key, attrs, state, palette, range, overlay),
 	})
 
@@ -387,6 +417,15 @@ export function createGraphView(container: HTMLElement, graph: TallyGraph, initi
 		},
 		clearSelection,
 		focusNode,
+		onNodeClick(callback: (nodeKey: string) => void): void {
+			sigma.on('clickNode', ({ node }) => {
+				callback(node)
+			})
+		},
+		setPicked(from: string | undefined, to: string | undefined): void {
+			picked = { from, to }
+			sigma.refresh()
+		},
 		destroy(): void {
 			sigma.kill()
 			tooltip.remove()

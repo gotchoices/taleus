@@ -149,6 +149,8 @@ export function mountReplayControls(params: {
 	conditions: CompiledConditions
 	palette: Palette
 	routeSource?: ReplayRouteSource
+	/** When set, auto-play from `t = min` after the initial paint (the live-run source sets it on `done`). */
+	autoplay?: boolean
 }): ReplayControls {
 	const { host, view, index, deanon, conditions, routeSource } = params
 	let palette = params.palette
@@ -401,6 +403,10 @@ export function mountReplayControls(params: {
 	})
 
 	renderFrame() // initial paint at t = min (clean empty)
+	if (params.autoplay === true) {
+		// A finished live run plays itself from t = min (the file-load path leaves it paused).
+		setPlaying(true)
+	}
 
 	return {
 		setPalette(next: Palette): void {
