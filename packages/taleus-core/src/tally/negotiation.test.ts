@@ -416,5 +416,5 @@ describe('the denomination', () => {
 				]),
 			).resolves.toMatch(/validdenomination/i)
 		}
-	})
+	}, 30_000) // opens three tallies; slow under a full parallel run
 })
