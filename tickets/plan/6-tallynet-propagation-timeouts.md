@@ -11,15 +11,15 @@ ChipNet's design (`../chipnet/doc/cluster.md` § Promise Phase, § Commit Phase,
 - **stalled-transaction recovery** (periodic re-reach);
 - handling of dead voters, lying voters and network splits.
 
-TallyNet today pushes the record to reachable members until settled, by a strict majority of its voter set, with no timer. `tallynet-voter-model` adds voter-set rules, the circuit (closing contact, completion code) and record availability. This ticket adds time.
+TallyNet today pushes the record to reachable members until settled, by a strict majority of its voter set, with no timer. `tallynet-voter-model` adds proposal parameters, voter-set acceptance, proceed/abort, contact points and record availability. This ticket adds time.
 
 ## Principle that bounds it
 
-Before every participant has promised, a stalled lift may be voided (PPV, voters voting void at the deadline carried by the self-expiring transaction code). **After every participant has promised, no participant may void on its own**: the lift completes once a voter majority decides, and each cooperating member must be able to obtain that outcome (`tallynet-voter-model` principle 3). So post-promise timeouts drive *voters* to decide and *records* to spread (re-reach, fetch from voters), never a participant-side void. A tie or a dead voter majority is the hard case: define it.
+Before every participant has promised, a stalled lift may be voided (PPV, voters voting void at the proposal's deadline). **After every participant has promised, no participant may void on its own**: the lift completes once a voter majority decides, and each cooperating member must be able to obtain that outcome (`tallynet-voter-model` principle 3). So post-promise timeouts drive *voters* to decide and *records* to spread (re-reach, fetch from voters), never a participant-side void. A tie or a dead voter majority is the hard case: define it.
 
 ## Scope to plan
 
-- Deadlines: what each phase's deadline is, who acts at it, and how it relates to `expiresAt(transactionCode)`.
+- **The deadline is a proposal parameter** (`tallynet-voter-model` principle 0). Today it is implicit in the self-expiring transaction code (`expiresAt(transactionCode)`); make it explicit in the proposal so each node can judge, before promising, whether enough time remains to execute, and refuse if not. A proposal that stalls and resurfaces past its deadline **before everyone has promised** is ignored and so dies out with no message needed. **After everyone has promised** the deadline can't simply be ignored: it is when voters vote void if they haven't committed, and a late-arriving record with a valid deciding majority must still be honoured. Define whether phases get their own deadlines, who acts at each, and how deadlines relate to the transaction code's expiry and to clock skew.
 - PPV and voter void-on-timeout; the injection point (`participant.ts` `advanceState`, `propagating` branch).
 - Stalled-transaction recovery: periodic re-push / fetch around the circuit until settled.
 - Whether ring/star convergence is needed given the circuit, or the circuit plus fetch-from-voters suffices. Decide and record.

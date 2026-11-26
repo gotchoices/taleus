@@ -6,7 +6,7 @@ Where TallyNet and its simulator stand, and the order the remaining work follows
 
 TallyNet is developed, tested and measured on its own, with `tallysim` and `tallysim-viewer`, before `taleus-core` changes to use it. Reasons:
 
-- The protocol is still moving (voter model, circuit completion, timeouts, hostile peers). Iterating inside one package is cheap; every change after binding also ripples into `taleus-core`'s adapters and schema.
+- The protocol is still moving (voter model, record availability, timeouts, hostile peers). Iterating inside one package is cheap; every change after binding also ripples into `taleus-core`'s adapters and schema.
 - The voter model decides what each tally's schema must verify. Binding first would build in the legacy single-referee shape only to replace it.
 - Simulation supplies the defaults (depth, time budget, voter policy, timeouts) from measurement.
 
@@ -27,7 +27,7 @@ TallyNet is developed, tested and measured on its own, with `tallysim` and `tall
 | 1 | Finish consensus in the simulator and viewer | `tallysim-consensus-*`, `tallysim-viewer-consensus` |
 | 2 | Make the simulator's virtual clock drain robustly | `debt-tallynet-virtual-clock-drain` |
 | 3 | Regression check against ChipNet, feature by feature | `tallynet-chipnet-regression` |
-| 4 | Voter model and circuit completion (principles 1–4 in design.md § Lift design principles) | `tallynet-voter-model` |
+| 4 | Voter model, proposal parameters, record availability (principles 0–4 in design.md § Lift design principles) | `tallynet-voter-model` |
 | 5 | Liveness: pre-promise void, voter timeouts, stalled-lift recovery | `tallynet-propagation-timeouts` |
 | 6 | Hostile actors in the simulator | `tallysim-hostile-actors` |
 | 7 | Reputation, evidence and expulsion policy (brainstorm first) | `feat-tallynet-hostile-peers` |

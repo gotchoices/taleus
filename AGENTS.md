@@ -38,6 +38,11 @@ Focus: Taleus — MyCHIPs reboot on Sereus. Tallies (private credit relationship
 
 Start w/ [`docs/index.md`](docs/index.md) then [`docs/architecture.md`](docs/architecture.md) to come up to speed, then read + maintain docs along w/ work.
 
+## Editorial Comments
+The user may edit comments into markdown files for agent consumption using the form:
+<!--EC -->
+When present, follow the enclosed instructions and/or integrate relevant content into the document where appropriate and then remove the comment.
+
 ## Caveman
 
 Respond terse like smart caveman. All technical substance stay. Only fluff die.
