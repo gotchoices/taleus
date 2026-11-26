@@ -25,8 +25,9 @@
  * (e.g. the originator's own first `query-received`, whose inbound nonce is empty) is skipped, not an edge.
  */
 
-import { entityId } from 'tallysim'
+import { entityId, type TraceLiftEntry } from 'tallysim'
 import type { PruneReason, TraceEvent } from 'tallynet'
+import type { LiftResolver } from './trace-index.js'
 
 /** The transport-control state the UI binds to. The derived active set is computed from `currentTime`, not stored. */
 export interface PlaybackState {
@@ -65,16 +66,88 @@ export interface FoundPlanMark {
 	node: number
 }
 
+/**
+ * The settlement phase a route edge has reached by `currentTime`:
+ *   - `promised` — a record was pushed over it (a promise in flight); nothing has settled yet;
+ *   - `committed` — the lift committed, so every route edge is now solid (a closed settled path);
+ *   - `released` — the lift voided, so the held edges are let go (the "flash then clear" state — `paint.ts`
+ *     times the brief flash off `settledTime`, after which the edge reads as resting again).
+ */
+export type ConsensusEdgePhase = 'promised' | 'committed' | 'released'
+
+/**
+ * The settlement phase a route member node has reached by `currentTime`:
+ *   - `promised` — it signed/pushed a promise;
+ *   - `voted` — it cast a referee vote (carried in {@link ConsensusNodeState.vote}: `C` commit-pending / `NC`
+ *     no-commit, so the two read differently);
+ *   - `settled` — the lift settled (every route node settles once, on the single `settled` event).
+ */
+export type ConsensusNodePhase = 'promised' | 'voted' | 'settled'
+
+/** The settled decision of a lift (from its `settled` event), once the head has reached it. */
+export type ConsensusDecision = 'commit' | 'void'
+
+/** One route edge's settlement phase at `currentTime`. */
+export interface ConsensusEdgeState {
+	tally: number
+	phase: ConsensusEdgePhase
+}
+
+/** One route member node's settlement phase (and vote, if it voted) at `currentTime`. */
+export interface ConsensusNodeState {
+	node: number
+	phase: ConsensusNodePhase
+	/** The referee vote this node cast, if any — `C` (commit-pending) or `NC` (no-commit). */
+	vote?: 'C' | 'NC'
+}
+
+/**
+ * The per-lift settlement state at `currentTime`, recomputed from scratch like the discovery active set — so a
+ * scrub back before `settled` un-solidifies the route, and a scrub forward re-settles it. A **stalled** lift
+ * (no `settled` event in the trace) leaves `decision`/`settledTime` undefined and its promised edges in
+ * `promised` — nothing is fabricated.
+ */
+export interface ConsensusState {
+	/** The lift this state is for (joins to the header's {@link TraceLiftEntry}). */
+	transactionCode: string
+	/** Each route edge touched by a promise/settle so far, with its phase. Sorted by tally index. */
+	edges: ConsensusEdgeState[]
+	/** Each route member node reached by a consensus event so far, with its phase. Sorted by entity id. */
+	nodes: ConsensusNodeState[]
+	/** The settled decision, if the head has reached the `settled` event; `undefined` while still in flight / stalled. */
+	decision?: ConsensusDecision
+	/** The time of the `settled` event, for `paint.ts`'s void flash window; `undefined` until settled. */
+	settledTime?: number
+	/**
+	 * Member keys a consensus event carried that the lift's `memberKeys` map did not resolve — a malformed-trace
+	 * sentinel, surfaced (never silently dropped) so a well-formed self-recorded trace can be asserted to leave
+	 * it empty. Sorted for stability.
+	 */
+	unresolved: string[]
+}
+
 /** The whole derived view at a `currentTime`: lit nodes/edges, pruned candidates, found plans. All sorted. */
 export interface ActiveSet {
 	nodes: ActiveNode[]
 	edges: ActiveEdge[]
 	pruned: PrunedCandidate[]
 	foundPlans: FoundPlanMark[]
+	/** The lift's settlement state — present only on a {@link Timeline} bound to a lift (a consensus trace). */
+	consensus?: ConsensusState
 }
 
 /** Resolve a nonce to a tally index for the session under view (bind `deanon.tallyOfNonce` to a session). */
 export type ResolveTally = (nonce: string) => number | undefined
+
+/**
+ * Bind a session's {@link Timeline} to the one lift it settled into (consensus trace only): the header's
+ * {@link TraceLiftEntry} plus the {@link LiftResolver} built from it (see `trace-index.ts`). When present, the
+ * active set gains its {@link ConsensusState}; when absent, the timeline is discovery-only and unchanged.
+ */
+export interface ConsensusBinding {
+	lift: TraceLiftEntry
+	resolver: LiftResolver
+}
 
 /** A built timeline for one session: its event-time stops and the active-set derivation at any time. */
 export interface Timeline {
@@ -83,6 +156,27 @@ export interface Timeline {
 	eventTimes(): readonly number[]
 	/** The active set at `currentTime` (recomputed from events ≤ `currentTime`). */
 	deriveActiveSet(currentTime: number): ActiveSet
+}
+
+/** The consensus events carry a `transactionCode` (discovery events do not) and their ids are member keys. */
+type ConsensusTraceEvent = Extract<TraceEvent, { transactionCode: string }>
+
+/** Is this a consensus event (carries `transactionCode`)? Such events are decoded via the {@link LiftResolver}. */
+function isConsensusEvent(event: TraceEvent): event is ConsensusTraceEvent {
+	return 'transactionCode' in event
+}
+
+/** The settlement-phase ranks, so a node only ever moves forward (promised → voted → settled) within a seek. */
+const PHASE_RANK: Record<ConsensusNodePhase, number> = { promised: 1, voted: 2, settled: 3 }
+
+/** The node phase for a rank (the inverse of {@link PHASE_RANK}). */
+function phaseOfRank(rank: number): ConsensusNodePhase {
+	return rank >= 3 ? 'settled' : rank === 2 ? 'voted' : 'promised'
+}
+
+/** The distinct entity ids on a route, in ascending order (a circular route's repeated origin counted once). */
+function distinctRouteNodes(route: readonly number[]): number[] {
+	return [...new Set(route)].sort((a, b) => a - b)
 }
 
 /** Does this event type carry a `nonce` (so it maps to an edge)? */
@@ -120,8 +214,10 @@ export function createTimeline(params: {
 	sessionCode: string
 	events: readonly TraceEvent[]
 	resolveTally: ResolveTally
+	/** Bind the session's lift to animate its settlement (consensus trace); omit for discovery-only. */
+	consensus?: ConsensusBinding
 }): Timeline {
-	const { sessionCode, events, resolveTally } = params
+	const { sessionCode, events, resolveTally, consensus: binding } = params
 	const times = [...new Set(events.map((event) => event.time))].sort((a, b) => a - b)
 
 	function deriveActiveSet(currentTime: number): ActiveSet {
@@ -136,6 +232,11 @@ export function createTimeline(params: {
 
 		for (const event of events) {
 			if (event.time > currentTime) {
+				continue
+			}
+			// Consensus events carry a member key in `nodeId` (not an entity id) and are decoded separately in
+			// deriveConsensus — never through the discovery path below (which would `entityId(memberKey)` → NaN).
+			if (isConsensusEvent(event)) {
 				continue
 			}
 			const node = entityId(event.nodeId)
@@ -159,11 +260,117 @@ export function createTimeline(params: {
 			}
 		}
 
-		return {
+		const result: ActiveSet = {
 			nodes: [...nodes.values()].sort((a, b) => a.node - b.node),
 			edges: [...edges.values()].sort((a, b) => a.tally - b.tally),
 			pruned: [...pruned.entries()].map(([tally, reason]) => ({ tally, reason })).sort((a, b) => a.tally - b.tally),
 			foundPlans: foundPlans.sort((a, b) => a.time - b.time || a.node - b.node),
+		}
+		if (binding !== undefined) {
+			result.consensus = deriveConsensus(currentTime)
+		}
+		return result
+	}
+
+	/**
+	 * The lift's settlement state at `currentTime`, recomputed from scratch (so a backward scrub un-settles).
+	 * Only this lift's consensus events (filtered by `transactionCode`) are read; each node is decoded via the
+	 * resolver's `memberKeys` map and each `record-pushed` edge via the `(from, to) → tally` map.
+	 */
+	function deriveConsensus(currentTime: number): ConsensusState {
+		const { lift, resolver } = binding as ConsensusBinding
+		const promisedEdges = new Set<number>() // tally indices a record was pushed over, by now
+		const nodeRank = new Map<number, number>() // entity id → max PHASE_RANK reached
+		const nodeVote = new Map<number, 'C' | 'NC'>()
+		const unresolved = new Set<string>()
+		let decision: ConsensusDecision | undefined
+		let settledTime: number | undefined
+
+		const bumpNode = (id: number, rank: number): void => {
+			const prev = nodeRank.get(id)
+			if (prev === undefined || rank > prev) {
+				nodeRank.set(id, rank)
+			}
+		}
+		const resolveMember = (key: string): number | undefined => {
+			const id = resolver.entityOfMember(key)
+			if (id === undefined) {
+				unresolved.add(key) // malformed-trace sentinel — surfaced, never silently dropped
+			}
+			return id
+		}
+
+		for (const event of events) {
+			if (event.time > currentTime || !isConsensusEvent(event) || event.transactionCode !== lift.transactionCode) {
+				continue
+			}
+			const node = resolveMember(event.nodeId)
+			switch (event.type) {
+				case 'record-pushed': {
+					const to = resolveMember(event.to)
+					if (node !== undefined && to !== undefined) {
+						const tally = resolver.tallyOfEdge(node, to)
+						if (tally !== undefined) {
+							promisedEdges.add(tally)
+						}
+					}
+					if (node !== undefined) {
+						bumpNode(node, PHASE_RANK.promised)
+					}
+					break
+				}
+				case 'record-received': {
+					if (node !== undefined) {
+						bumpNode(node, PHASE_RANK.promised)
+					}
+					break
+				}
+				case 'promise-signed': {
+					// A real promise (`P`) marks participation; a refusal (`NP`) does not promote the node — the void
+					// outcome (below) is what the refusal drives, and there is no distinct "refused" node phase in v1.
+					if (node !== undefined && event.signatureType === 'P') {
+						bumpNode(node, PHASE_RANK.promised)
+					}
+					break
+				}
+				case 'referee-vote': {
+					if (node !== undefined) {
+						bumpNode(node, PHASE_RANK.voted)
+						nodeVote.set(node, event.decision)
+					}
+					break
+				}
+				case 'settled': {
+					decision = event.decision
+					settledTime = event.time
+					break
+				}
+				default: {
+					// record-received's `from`, signature-rejected, resources-released: no node/edge phase in v1.
+					break
+				}
+			}
+		}
+
+		// On settle, every distinct route node settles once (one `settled` per lift carries the whole route).
+		if (decision !== undefined) {
+			for (const id of distinctRouteNodes(lift.route)) {
+				bumpNode(id, PHASE_RANK.settled)
+			}
+		}
+
+		return {
+			transactionCode: lift.transactionCode,
+			edges: consensusEdges(lift, decision, promisedEdges),
+			nodes: [...nodeRank.entries()]
+				.map(([node, rank]): ConsensusNodeState => {
+					const vote = nodeVote.get(node)
+					return vote === undefined ? { node, phase: phaseOfRank(rank) } : { node, phase: phaseOfRank(rank), vote }
+				})
+				.sort((a, b) => a.node - b.node),
+			decision,
+			settledTime,
+			unresolved: [...unresolved].sort(),
 		}
 	}
 
@@ -172,6 +379,29 @@ export function createTimeline(params: {
 		eventTimes: () => times,
 		deriveActiveSet,
 	}
+}
+
+/**
+ * The route edges' phases from the settled `decision` and the set of edges a promise reached:
+ *   - `commit` ⇒ **every** route edge (`tallyPath`) is `committed` — the whole route reads solid;
+ *   - `void`   ⇒ only the edges that were promised are `released` (they flash then clear); never-promised
+ *     edges stay resting (absent here);
+ *   - no decision yet (in flight / stalled) ⇒ the promised edges are `promised`.
+ */
+function consensusEdges(
+	lift: TraceLiftEntry,
+	decision: ConsensusDecision | undefined,
+	promisedEdges: ReadonlySet<number>,
+): ConsensusEdgeState[] {
+	const phaseOf = (tallies: readonly number[], phase: ConsensusEdgePhase): ConsensusEdgeState[] =>
+		[...tallies].sort((a, b) => a - b).map((tally) => ({ tally, phase }))
+	if (decision === 'commit') {
+		return phaseOf(lift.tallyPath, 'committed')
+	}
+	if (decision === 'void') {
+		return phaseOf([...promisedEdges], 'released')
+	}
+	return phaseOf([...promisedEdges], 'promised')
 }
 
 /** Merge one event's round/depth into a node's running record (max round, max depth). */
