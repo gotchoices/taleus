@@ -128,6 +128,41 @@ function drawLatency(dist: LatencyDistribution | undefined, rng: SeededRandom): 
  * Draw order (so a seed replays exactly): sleeping entities, then late entities, then the dropped-link
  * selection, then each remaining link's base latency in tally-index order.
  */
+/**
+ * The consensus-phase analogue of {@link ConditionsSpec}: failure injection that bites the **commit** phase
+ * rather than discovery. Separate from {@link ConditionsSpec} (and drawn from a separate seed) because its
+ * selection must not perturb the discovery streams. `ConsensusSpec` (in `scenario.ts`) is structurally
+ * assignable to this, so the runner passes `scenario.consensus` here directly.
+ */
+export interface ConsensusConditionsSpec {
+	/** Fraction of entities made refusers (a refuser on a taken route signs `NP` → that lift voids). Count-based. */
+	refuserFraction?: number
+}
+
+/** The compiled consensus conditions: which entities refuse to promise. */
+export interface CompiledConsensusConditions {
+	/** The entities made refusers (exactly `round(refuserFraction · entityCount)` of them). */
+	refusers: Set<number>
+}
+
+/**
+ * Select exactly `round(refuserFraction · network.entityCount)` refuser entity ids from a fresh
+ * `SeededRandom(seed)` — the **dedicated** consensus stream, independent of the conditions/network/workload
+ * streams. Reuses the same seeded partial-shuffle machinery {@link compileConditions} uses, so the two
+ * selectors behave identically (same `round` rule, same determinism). `refuserFraction` 0 / undefined ⇒ an
+ * empty set. The runner turns `refusers` into `{ shouldPromise: false }` resource specs (see
+ * `sim/consensus-resource.ts`).
+ */
+export function compileConsensusConditions(
+	network: Network,
+	spec: ConsensusConditionsSpec,
+	seed: number,
+): CompiledConsensusConditions {
+	const rng = new SeededRandom(seed)
+	const refusers = pickFraction(range(network.entityCount), spec.refuserFraction, rng)
+	return { refusers }
+}
+
 export function compileConditions(network: Network, spec: ConditionsSpec, seed: number): CompiledConditions {
 	const rng = new SeededRandom(seed)
 	const entities = range(network.entityCount)

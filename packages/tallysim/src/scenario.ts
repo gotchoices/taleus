@@ -73,6 +73,31 @@ export interface ScenarioSpec {
 	workload: WorkloadSpec
 }
 
+/** The identity seed used when a {@link ConsensusSpec} omits {@link ConsensusSpec.identitySeed}. */
+export const DEFAULT_CONSENSUS_IDENTITY_SEED = 1
+
+/**
+ * Consensus-phase failure injection + identity for a {@link SimScenario}. Its **presence** on a scenario is
+ * the "run consensus" switch (omitted ⇒ discovery-only, consensus not driven); the runner and the trace
+ * both key off that. The refuser selection is drawn from the dedicated {@link SimScenario.consensusSeed}
+ * stream so it never perturbs which network / queries / link-conditions a run gets.
+ *
+ * It is structurally assignable to {@link ConsensusConditionsSpec} (same `refuserFraction` field), so the
+ * runner compiles refusers with `compileConsensusConditions(network, scenario.consensus, consensusSeed)`.
+ */
+export interface ConsensusSpec {
+	/**
+	 * Fraction of entities made refusers — count-based, `round(fraction · entityCount)` selected. A refuser
+	 * on a taken route signs `NP` (no-promise), so that lift voids (`refused-promise`). Omitted / 0 ⇒ none.
+	 */
+	refuserFraction?: number
+	/**
+	 * Seed for every node's deterministic ed25519 identity (the harness's signer/verifier layer). Omitted ⇒
+	 * {@link DEFAULT_CONSENSUS_IDENTITY_SEED}. Same seed ⇒ same keys across runs.
+	 */
+	identitySeed?: number
+}
+
 /**
  * A discovery-simulation scenario: the same network + workload a {@link ScenarioSpec} carries, plus the
  * discovery-tier knobs (network conditions, the discovery time budget, and the conditions seed). It is
@@ -94,6 +119,19 @@ export interface SimScenario {
 	budget?: { initialBudgetMs?: number; perHopBudgetMs?: number }
 	/** Seed for the conditions stream — independent of the network / workload / economy seeds. */
 	conditionsSeed?: number
+	/**
+	 * Consensus failure-injection + identity. **Presence is the "run consensus" switch** — omitted ⇒ the run
+	 * is discovery-only. Optional and absent on a discovery-only scenario, so it round-trips through a trace
+	 * header unchanged. See {@link ConsensusSpec}.
+	 */
+	consensus?: ConsensusSpec
+	/**
+	 * Seed for the **dedicated** consensus (refuser-selection) stream — independent of the network / workload
+	 * / conditions / economy seeds (same discipline as {@link SimScenario.conditionsSeed}), so the refuser
+	 * draw never shifts which network / queries / link-conditions a run gets. Optional; absent on a
+	 * discovery-only scenario.
+	 */
+	consensusSeed?: number
 }
 
 /**

@@ -1,5 +1,5 @@
 import { FORMAT_VERSION, type Network, type Tally } from '../model.js'
-import { compileConditions, type ConditionsSpec } from './conditions.js'
+import { compileConditions, compileConsensusConditions, type ConditionsSpec } from './conditions.js'
 import { linkIdForTally } from './naming.js'
 
 /** A line network `0 - 1 - … - (n-1)` with one tally per consecutive pair, symmetric credit limits. */
@@ -103,5 +103,30 @@ describe('compileConditions — incidence and precedence', () => {
 		const { conditions, sleeping } = compileConditions(network, {}, 7)
 		expect(Object.keys(conditions)).toHaveLength(0)
 		expect(sleeping.size).toBe(0)
+	})
+})
+
+describe('compileConsensusConditions — refuser selection', () => {
+	it('selects exactly round(refuserFraction · entityCount) refusers', () => {
+		const network = lineNetwork(10)
+		expect(compileConsensusConditions(network, { refuserFraction: 0.3 }, 7).refusers.size).toBe(3) // round(3.0)
+		expect(compileConsensusConditions(network, { refuserFraction: 0.25 }, 7).refusers.size).toBe(3) // round(2.5) → 3
+		expect(compileConsensusConditions(network, { refuserFraction: 1 }, 7).refusers.size).toBe(10)
+	})
+
+	it('refuserFraction 0 / undefined ⇒ empty set', () => {
+		const network = lineNetwork(10)
+		expect(compileConsensusConditions(network, { refuserFraction: 0 }, 7).refusers.size).toBe(0)
+		expect(compileConsensusConditions(network, {}, 7).refusers.size).toBe(0)
+	})
+
+	it('same (network, spec, seed) ⇒ identical refuser set; a different seed generally differs', () => {
+		const network = lineNetwork(20)
+		const spec = { refuserFraction: 0.3 }
+		const a = compileConsensusConditions(network, spec, 11)
+		const b = compileConsensusConditions(network, spec, 11)
+		expect([...a.refusers].sort((x, y) => x - y)).toEqual([...b.refusers].sort((x, y) => x - y))
+		const c = compileConsensusConditions(network, spec, 12)
+		expect([...a.refusers].sort((x, y) => x - y)).not.toEqual([...c.refusers].sort((x, y) => x - y))
 	})
 })
