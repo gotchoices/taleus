@@ -158,12 +158,13 @@ export class TrxParticipant<TTerms, TPayload> {
 	}
 
 	/**
-	 * The settled outcome of `transactionCode` from our stored record: `'commit'` on a strict commit
-	 * majority, `'void'` on any refusal or strict void majority, `'pending'` otherwise (and when the
-	 * record has never been seen). Reuses the same classifier as the state machine ({@link getRecordState});
-	 * its **terminal** states (`consensus`/`rejected`) are role-independent — they are global properties
-	 * of the record (any `NP`, or a strict commit/void majority) — so a relay, or the simulator polling
-	 * every node, reads the same commit/void a member does.
+	 * The settled outcome of `transactionCode` from our stored record: `'commit'` when the commit side
+	 * settles (a strict majority that also reaches the method's threshold), `'void'` on any refusal or a
+	 * settled void side, `'pending'` otherwise (and when the record has never been seen). Reuses the same
+	 * classifier as the state machine ({@link getRecordState}); its **terminal** states (`consensus`/
+	 * `rejected`) are role-independent — they are global properties of the record (any `NP`, or a side
+	 * that settles under the record's method) — so a relay, or the simulator polling every node, reads the
+	 * same commit/void a member does.
 	 */
 	async outcome(transactionCode: string): Promise<'commit' | 'void' | 'pending'> {
 		const record = await this.store.getRecord(transactionCode)

@@ -216,6 +216,21 @@ describe('enter — validation (errors never disclose a link id)', () => {
 		await expect(h.participant.query(entranceReq(makeQuery(shortSession), originatorPlan()))).rejects.toThrow(/too short-lived/)
 	})
 
+	it('refuses a query whose consensus method we cannot honour, before promising (ConsensusMethod)', async () => {
+		const session = makeSession()
+		const h = makeHarness({ findAddress: findAddress({}) })
+		// A reserved weighting is refused at discovery time — the same validator the consensus new-record rule runs.
+		const badMethod = { weighting: 'nominator-split', thresholdNum: 1, thresholdDen: 2 } as unknown as UniQuery<TTerms>['method']
+		await expect(
+			h.participant.query(entranceReq(makeQuery(session, { method: badMethod }), originatorPlan())),
+		).rejects.toThrow(/weighting/)
+		// An out-of-range threshold (below the strict-majority floor) is likewise refused.
+		const lowThreshold = { weighting: 'distinct-voter', thresholdNum: 1, thresholdDen: 3 } as const
+		await expect(
+			h.participant.query(entranceReq(makeQuery(makeSession(), { method: lowThreshold }), originatorPlan())),
+		).rejects.toThrow(/at least 1\/2/)
+	})
+
 	it('rejects a duplicate first visit for the same (session, path) — the check that never fired in ChipNet', async () => {
 		const session = makeSession()
 		const h = makeHarness({ findAddress: findAddress({ candidates: [{ id: 'L1', intents: { lift: 't' } }] }) })

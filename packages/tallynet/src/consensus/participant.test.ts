@@ -797,6 +797,14 @@ describe('TrxParticipant — consensus-method validation', () => {
 		})
 		await expect(harness({ self: makeParty() }).participant.update(record)).resolves.toBeDefined()
 	})
+
+	it('rejects an empty-string lift contract but accepts a present, non-empty one (LiftContract)', async () => {
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])]
+		const empty = makeRecord(members, { n1: link(alice, bob) }, { liftContract: '' })
+		await expect(harness({ self: makeParty() }).participant.update(empty)).rejects.toThrow(/liftContract/)
+		const present = makeRecord(members, { n1: link(alice, bob) }, { liftContract: 'bafyLiftContractCID' })
+		await expect(harness({ self: makeParty() }).participant.update(present)).resolves.toBeDefined()
+	})
 })
 
 describe('TrxParticipant — equivocation (a voter signs both faces)', () => {
