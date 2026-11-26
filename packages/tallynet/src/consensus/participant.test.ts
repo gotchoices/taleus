@@ -931,6 +931,31 @@ describe('TrxParticipant — reachability and push', () => {
 		expect(pushes).toHaveLength(4) // re-pushed to both
 	})
 
+	it('suppresses the echo back to the peer we just received from, but still forwards onward and re-pushes once content changes', async () => {
+		// ChipNet primed the sender's peer-record on receipt so an unchanged record was never pushed
+		// straight back to whoever just sent it (docs/chipnet-review.md § Regression check). A relay with
+		// nothing new to add must stay quiet toward the sender while still forwarding to other peers, and
+		// must resume pushing to the sender once our content actually changes.
+		const alice = makeParty()
+		const bob = makeParty()
+		const relay = makeParty()
+		const members = [
+			member(alice, [MemberTypes.participant], { physical: 'addr-alice' }),
+			member(bob, [MemberTypes.participant, MemberTypes.referee], { physical: 'addr-bob' }),
+		]
+		const record = makeRecord(members, { n1: link(alice, bob) })
+		const { participant, pushes } = harness({ self: relay })
+		const aliceP = await sign(alice, 'P', record)
+
+		await participant.update({ ...record, promises: [aliceP] }, { key: alice.key })
+		expect(pushes.map((p) => p.to)).toEqual([bob.key]) // forwarded to bob, not echoed back to alice
+
+		const bobP = await sign(bob, 'P', record)
+		await participant.update({ ...record, promises: [aliceP, bobP] }, { key: bob.key })
+		// bob's own content is suppressed (we just received it from bob); alice's copy is now stale → re-pushed
+		expect(pushes.map((p) => p.to)).toEqual([bob.key, alice.key])
+	})
+
 	it('logs once and emits ok:false when a push fails; it is not retried in-band', async () => {
 		const alice = makeParty()
 		const bob = makeParty()

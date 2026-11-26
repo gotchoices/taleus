@@ -218,6 +218,12 @@ export class TrxParticipant<TTerms, TPayload> {
 		if (pending.length > 0 || hadPending) {
 			await this.store.savePendingCommits(merged.transactionCode, pending)
 		}
+		if (fromAddress) {
+			// Prime the push skip-test with what the sender just gave us (ChipNet did the same, but with
+			// the raw incoming record — we save the merged copy instead, which is never stale): an unchanged
+			// record is never echoed straight back to the peer we just received it from.
+			await this.store.savePeerRecord(merged.transactionCode, fromAddress.key, snapshotRecord(merged))
+		}
 		this.traceSink({
 			...this.traceBase(merged),
 			type: 'record-received',
