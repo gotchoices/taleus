@@ -509,9 +509,10 @@ round and so costs no extra round — an L-hop plan has `path.length = L ≤ max
 > An earlier version of this section claimed reach was `⌊maxDepth/2⌋ + 1` — "~half the ceiling",
 > `maxDepth ≥ 2(L − 1)` — and told depth sweeps to "budget roughly double the hop distance". That
 > doubling was **not** a protocol property: it was an artifact of the `tallynet/testing` `VirtualClock`
-> under-draining discovery's per-level completion cascade (`DRAIN_QUIET` was too small), which folded
-> instant answers one round late. With the clock fixed the systematic 2× undercount is gone. See
-> `tallynet`'s `src/testing/clock.ts` `DRAIN_QUIET` NOTE and `docs/design.md` § Protocol design.
+> under-draining discovery's per-level completion cascade, which folded instant answers one round late.
+> The clock now drains a full macrotask between fires — flushing a cascade of any length in one hop — so
+> the systematic 2× undercount is gone. See the drain docs atop `tallynet`'s `src/testing/clock.ts` and
+> `docs/design.md` § Protocol design.
 
 The robust, always-true guarantee remains **`found ⊆ oracle`** (every found `path.length ≤ depth`, every
 hop `capFwd ≥ amount`), **never `found iff oracle`**: the protocol is a greedy, distributed search, so it

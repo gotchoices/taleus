@@ -118,4 +118,9 @@ describe('VirtualClock long-continuation-chain drain', () => {
 		expect(fired).toEqual(['first', 'second'])
 		expect(clock.pendingTimers).toBe(0)
 	})
+	// NOTE: a timer callback that schedules its next timer only after a *real macrotask* hop (not just
+	// microtasks) is silently dropped by the macrotask drain — the clock's own MessageChannel reaches
+	// quiescence while the callback's independent macrotask sits unserviced. No current callback does this
+	// (consensus `update` is pure microtasks + sync crypto; discovery callbacks are void), so it is dormant.
+	// Tracked in tickets/backlog/debt-tallynet-macrotask-callback-drop; its fix lands the regression test.
 })
