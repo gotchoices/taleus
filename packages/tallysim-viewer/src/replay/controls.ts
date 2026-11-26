@@ -18,11 +18,19 @@
  * {@link SessionFoundState}, but it cannot draw the exact winning route. The full found-routes list (length +
  * per-link terms, isolate-on-select) lights up only when a {@link ReplayRouteSource} supplies the link-nonce
  * paths — the live-run source (a later ticket) or a test. See `routes.ts` and `docs/design.md` § Replay tier.
+ *
+ * ── Consensus phase (v2 trace) ─────────────────────────────────────────────────────────────────────
+ * When the loaded trace is a consensus run, each session that settled carries a lift in the header
+ * (`index.liftFor`). Its {@link Timeline} is bound to that lift, so the active set gains a settlement state and
+ * the overlay animates the sign-and-settle phase (promises light the route, the vote previews, commit turns it
+ * solid or void flashes then clears). The found-routes side list then shows the lift's **chosen route** — read
+ * straight from the header, so this is *exact*, unlike the discovery gap above — with an outcome badge
+ * (committed / voided / stalled); selecting it isolates the route. See `docs/design.md` § Consensus phase.
  */
 
 import type { TraceQueryEntry } from 'tallysim'
 import type { CompiledConditions } from 'tallysim'
-import type { TraceIndex } from '../core/trace-index.js'
+import { createLiftResolver, type TraceIndex } from '../core/trace-index.js'
 import type { Deanonymiser } from '../core/deanonymise.js'
 import {
 	createTimeline,
@@ -31,18 +39,25 @@ import {
 	play,
 	seek,
 	setSpeed,
+	type ConsensusBinding,
 	type PlaybackState,
 	type Timeline,
 } from '../core/timeline.js'
 import { advanceClock, progressFraction, timeAtFraction, type TimeBounds } from './clock.js'
 import { buildOverlay, mergeOverlays, type IsolatedRoute, type ReplayOverlay } from './paint.js'
 import {
+	liftIsolate,
+	liftOutcome,
+	liftRoute,
 	reconstructRoute,
 	routeEdgeTallies,
 	sessionFoundState,
+	type LiftOutcome,
+	type LiftRoute,
 	type RouteInput,
 	type SessionFoundState,
 } from './routes.js'
+import type { TraceLiftEntry } from 'tallysim'
 import type { GraphView } from '../graph/render.js'
 import type { Palette } from '../app/theme.js'
 
@@ -166,12 +181,17 @@ export function mountReplayControls(params: {
 
 	const timelines = new Map<string, Timeline>()
 	for (const session of sessions) {
+		// A consensus trace carries one lift per settled session; bind it so the timeline animates settlement.
+		// A discovery-only / v1 trace has no lift here, so the binding is omitted and the timeline is unchanged.
+		const lift = index.liftFor(session.sessionCode)
+		const consensus: ConsensusBinding | undefined = lift !== undefined ? { lift, resolver: createLiftResolver(lift) } : undefined
 		timelines.set(
 			session.sessionCode,
 			createTimeline({
 				sessionCode: session.sessionCode,
 				events: index.eventsForSession(session.sessionCode),
 				resolveTally: (nonce) => deanon.tallyOfNonce(session.sessionCode, nonce),
+				consensus,
 			}),
 		)
 	}
@@ -180,6 +200,7 @@ export function mountReplayControls(params: {
 	let selected = sessions[0].sessionCode
 	let colourBySession = false
 	let isolatedRoute: number | undefined
+	let liftIsolated = false
 	let rafId: number | undefined
 	let lastTs: number | undefined
 	let lastFoundSignature = ''
@@ -208,7 +229,16 @@ export function mountReplayControls(params: {
 
 	/** The isolated route for the selected session, resolved to node ids + tally indices, or `undefined`. */
 	function currentIsolate(): IsolatedRoute | undefined {
-		if (isolatedRoute === undefined || colourBySession) {
+		if (colourBySession) {
+			return undefined
+		}
+		// A settled lift's route isolates straight from the header — exact nodes + tallies, no de-anonymisation.
+		if (liftIsolated) {
+			const lift = index.liftFor(selected)
+			return lift !== undefined ? liftIsolate(lift) : undefined
+		}
+		// Otherwise the discovery found-plan isolate (needs a route source + de-anonymisation).
+		if (isolatedRoute === undefined) {
 			return undefined
 		}
 		const inputs = routeSource?.routesForSession(selected)
@@ -228,23 +258,32 @@ export function mountReplayControls(params: {
 	function computeOverlay(): ReplayOverlay {
 		const time = playback.currentTime
 		if (colourBySession) {
-			const overlays = sessions.map((session, i) =>
-				buildOverlay({
-					active: timelineFor(session.sessionCode).deriveActiveSet(time),
+			const overlays = sessions.map((session, i) => {
+				const active = timelineFor(session.sessionCode).deriveActiveSet(time)
+				return buildOverlay({
+					active,
 					sleeping: conditions.sleeping,
 					late: conditions.late,
 					palette,
 					sessionColor: SESSION_HUES[i % SESSION_HUES.length],
-				}),
-			)
+					// A consensus trace animates each session's settlement over its own session hue.
+					consensus: active.consensus,
+					currentTime: time,
+				})
+			})
 			return mergeOverlays(overlays)
 		}
+		const active = timelineFor(selected).deriveActiveSet(time)
 		return buildOverlay({
-			active: timelineFor(selected).deriveActiveSet(time),
+			active,
 			sleeping: conditions.sleeping,
 			late: conditions.late,
 			palette,
 			isolate: currentIsolate(),
+			// `active.consensus` is present only when the selected session has a bound lift; buildOverlay
+			// suppresses it in isolate mode anyway.
+			consensus: active.consensus,
+			currentTime: time,
 		})
 	}
 
@@ -265,7 +304,24 @@ export function mountReplayControls(params: {
 		const atEnd = playback.currentTime >= sessionEnd(selected)
 		const state = sessionFoundState({ loaded: true, atEnd, foundCount: active.foundPlans.length })
 		const inputs = routeSource?.routesForSession(selected)
-		const signature = [selected, state.kind, active.foundPlans.length, isolatedRoute ?? -1, inputs === undefined].join('|')
+		// A consensus trace: the selected session's settled lift (its chosen route + outcome badge, isolatable).
+		const lift = index.liftFor(selected)
+		// The outcome is the lift's final settled decision — derived at the end of its own events (the badge is
+		// stable regardless of the current head).
+		// NOTE: derives the selected session's active set a third time per rebuild (on top of the twice-per-frame
+		// NOTE at renderFrame). Fine for planned trace sizes; if a large trace stutters, derive once and thread.
+		const outcome: LiftOutcome | undefined =
+			lift !== undefined ? liftOutcome(timelineFor(selected).deriveActiveSet(sessionEnd(selected)).consensus?.decision) : undefined
+		const signature = [
+			selected,
+			state.kind,
+			active.foundPlans.length,
+			isolatedRoute ?? -1,
+			liftIsolated,
+			inputs === undefined,
+			lift !== undefined,
+			outcome ?? '',
+		].join('|')
 		if (signature === lastFoundSignature) {
 			return
 		}
@@ -275,13 +331,25 @@ export function mountReplayControls(params: {
 			markers: active.foundPlans,
 			inputs,
 			selected,
+			lift,
+			outcome,
 		})
 	}
 
-	/** Render the found-state label and either the full routes list (with inputs) or the markers-only view. */
+	/**
+	 * Render the found-state label and then one of: the settled lift's route (consensus trace), the full
+	 * routes list (a route source), or the markers-only view (a loaded discovery trace).
+	 */
 	function renderFound(
 		container: HTMLElement,
-		info: { state: SessionFoundState; markers: readonly { time: number; node: number }[]; inputs: readonly RouteInput[] | undefined; selected: string },
+		info: {
+			state: SessionFoundState
+			markers: readonly { time: number; node: number }[]
+			inputs: readonly RouteInput[] | undefined
+			selected: string
+			lift: TraceLiftEntry | undefined
+			outcome: LiftOutcome | undefined
+		},
 	): void {
 		container.textContent = ''
 		const label = document.createElement('div')
@@ -289,6 +357,11 @@ export function mountReplayControls(params: {
 		label.textContent = foundStateLabel(info.state)
 		container.append(label)
 
+		// Consensus trace: the chosen lift route (exact, from the header) with an outcome badge; click isolates it.
+		if (info.lift !== undefined) {
+			renderLiftRoute(container, info.lift, info.outcome ?? 'stalled', info.markers.length)
+			return
+		}
 		if (info.inputs !== undefined) {
 			renderRouteList(container, info.inputs, info.selected)
 			return
@@ -332,6 +405,39 @@ export function mountReplayControls(params: {
 			list.append(item)
 		})
 		container.append(list)
+	}
+
+	/**
+	 * Render the settled lift's single route item — its hop count + outcome badge — read straight from the
+	 * header (exact, no decode). Clicking it toggles isolate (dim the rest), like the discovery route list. Any
+	 * other discovery plans beyond the one that settled stay markers-only (the format carries no path for them).
+	 */
+	function renderLiftRoute(container: HTMLElement, lift: TraceLiftEntry, outcome: LiftOutcome, markerCount: number): void {
+		const list = document.createElement('ul')
+		list.className = 'tsv-replay-routes'
+		const route = liftRoute(lift)
+		const item = document.createElement('li')
+		const button = document.createElement('button')
+		button.className = 'tsv-replay-route tsv-replay-lift'
+		button.textContent = liftRouteLabel(route, outcome)
+		if (liftIsolated) {
+			button.classList.add('tsv-replay-route-active')
+		}
+		button.addEventListener('click', () => {
+			liftIsolated = !liftIsolated
+			lastFoundSignature = '' // force the active-state class to repaint
+			renderFrame()
+		})
+		item.append(button)
+		list.append(item)
+		container.append(list)
+		// Discovery may find several plans while only one settles into this lift; the rest have no recorded path.
+		if (markerCount > 1) {
+			const note = document.createElement('div')
+			note.className = 'tsv-replay-note'
+			note.textContent = `${markerCount - 1} other discovery plan${markerCount - 1 === 1 ? '' : 's'} found — markers only (exact path not recorded).`
+			container.append(note)
+		}
 	}
 
 	// ── Transport wiring ──
@@ -391,6 +497,7 @@ export function mountReplayControls(params: {
 	picker.select.addEventListener('change', () => {
 		selected = picker.select.value
 		isolatedRoute = undefined
+		liftIsolated = false
 		lastFoundSignature = ''
 		renderFrame()
 	})
@@ -398,6 +505,7 @@ export function mountReplayControls(params: {
 		colourBySession = picker.colour.checked
 		picker.select.disabled = colourBySession
 		isolatedRoute = undefined
+		liftIsolated = false
 		lastFoundSignature = ''
 		renderFrame()
 	})
@@ -483,6 +591,12 @@ function routeLabel(route: ReturnType<typeof reconstructRoute>, index: number): 
 			return `route ${index + 1}: (decode failed)`
 		}
 	}
+}
+
+/** The label for the settled lift's route item: `route`/`loop`, hop count, and the outcome badge word. */
+function liftRouteLabel(route: LiftRoute, outcome: LiftOutcome): string {
+	const kind = route.kind === 'loop' ? 'loop' : 'route'
+	return `${kind}: ${route.hops} hop${route.hops === 1 ? '' : 's'} — ${outcome}`
 }
 
 /** Summarise per-link terms opaquely (the viewer must not couple to the lift's term shape). */

@@ -19,7 +19,10 @@
  * styling, and this stays unit-tested with hand-built plan paths.
  */
 
+import type { TraceLiftEntry } from 'tallysim'
 import type { Deanonymiser } from '../core/deanonymise.js'
+import type { ConsensusDecision } from '../core/timeline.js'
+import type { IsolatedRoute } from './paint.js'
 
 /**
  * One found plan's anonymised description, as the UI hands it in: the originator `from`, the query target `to`
@@ -85,6 +88,60 @@ export function routeEdgeTallies(deanon: Deanonymiser, sessionCode: string, inpu
 		tallies.push(tally)
 	}
 	return tallies
+}
+
+// ── Lift routes (consensus v2): the header carries the chosen lift's exact route, so unlike the discovery
+// found-plan case above, no de-anonymisation or inference is needed — the route is read straight from the
+// `TraceLiftEntry`. This closes the trace-format gap for the *settled lift's* route (see the design doc).
+
+/** The settled lift's chosen route, read straight from its header entry (no decode): the exact nodes + tallies. */
+export interface LiftRoute {
+	/** `loop` when the route returns to its origin (a self-payment / circular lift); else `path`. */
+	kind: 'path' | 'loop'
+	/** The entity ids the lift traversed, `[from, …, to]` (loop ⇒ first === last). */
+	nodes: readonly number[]
+	/** The tally index of each hop, in order (`nodes.length − 1` entries). */
+	tallies: readonly number[]
+	/** The hop count (`tallies.length`). */
+	hops: number
+	/** The lift's transaction code (joins to its consensus events). */
+	transactionCode: string
+}
+
+/** The outcome badge a settled lift shows in the side list. */
+export type LiftOutcome = 'committed' | 'voided' | 'stalled'
+
+/**
+ * The chosen route of a settled lift, straight from its {@link TraceLiftEntry} — the header records
+ * `route` + `tallyPath` exactly, so this is precise with no de-anonymiser and no inference (the gap the
+ * discovery found-plan path still has is closed here for the lift's own route).
+ */
+export function liftRoute(lift: TraceLiftEntry): LiftRoute {
+	const nodes = lift.route
+	const closesOnOrigin = nodes.length > 1 && nodes[0] === nodes[nodes.length - 1]
+	return {
+		kind: closesOnOrigin ? 'loop' : 'path',
+		nodes,
+		tallies: lift.tallyPath,
+		hops: lift.tallyPath.length,
+		transactionCode: lift.transactionCode,
+	}
+}
+
+/** The outcome badge for a lift's settled decision: commit ⇒ committed, void ⇒ voided, none ⇒ stalled (pending). */
+export function liftOutcome(decision: ConsensusDecision | undefined): LiftOutcome {
+	if (decision === 'commit') {
+		return 'committed'
+	}
+	if (decision === 'void') {
+		return 'voided'
+	}
+	return 'stalled'
+}
+
+/** The isolate view for a settled lift's route — its exact nodes + tallies, from the header (no decode). */
+export function liftIsolate(lift: TraceLiftEntry): IsolatedRoute {
+	return { nodes: lift.route, tallies: lift.tallyPath }
 }
 
 /**

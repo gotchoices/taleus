@@ -1,6 +1,6 @@
-import { FORMAT_VERSION, TRACE_FORMAT_VERSION, makeNetworkSnapshot, type Network, type TraceQueryEntry } from 'tallysim'
+import { FORMAT_VERSION, TRACE_FORMAT_VERSION, makeNetworkSnapshot, type Network, type TraceLiftEntry, type TraceQueryEntry } from 'tallysim'
 import type { TraceEvent } from 'tallynet'
-import { createTraceIndex, indexTrace } from './trace-index.js'
+import { createLiftResolver, createTraceIndex, indexTrace } from './trace-index.js'
 
 const network: Network = {
 	entityCount: 3,
@@ -26,7 +26,7 @@ const events: TraceEvent[] = [
 	{ time: 25, nodeId: '0', sessionCode: 'S2', type: 'plan-found' },
 ]
 
-function headerLine(formatVersion: number, q: TraceQueryEntry[]): string {
+function headerLine(formatVersion: number, q: TraceQueryEntry[], lifts?: TraceLiftEntry[]): string {
 	return JSON.stringify({
 		kind: 'header',
 		traceFormatVersion: formatVersion,
@@ -35,12 +35,14 @@ function headerLine(formatVersion: number, q: TraceQueryEntry[]): string {
 		scenario: {},
 		runSeed: 1,
 		queries: q,
+		// Only stamp `lifts` when present, matching a discovery-only header (which omits the key entirely).
+		...(lifts !== undefined ? { lifts } : {}),
 	})
 }
 
-function traceLines(formatVersion: number, q: TraceQueryEntry[], evs: TraceEvent[]): string[] {
+function traceLines(formatVersion: number, q: TraceQueryEntry[], evs: TraceEvent[], lifts?: TraceLiftEntry[]): string[] {
 	return [
-		headerLine(formatVersion, q),
+		headerLine(formatVersion, q, lifts),
 		JSON.stringify(makeNetworkSnapshot(network)),
 		...evs.map((event) => JSON.stringify({ kind: 'event', event })),
 	]
@@ -103,5 +105,76 @@ describe('createTraceIndex (incremental builder)', () => {
 		builder.add({ time: 5, nodeId: '0', sessionCode: 'UNKNOWN', type: 'plan-found' })
 		expect(builder.eventsForSession('UNKNOWN')).toHaveLength(1)
 		expect(builder.sessions()).toEqual(queries)
+	})
+})
+
+describe('createLiftResolver', () => {
+	// A path lift 0→1→2: hop 0 joins 0↔1 on tally 0, hop 1 joins 1↔2 on tally 1.
+	const pathLift: TraceLiftEntry = {
+		sessionCode: 'S1',
+		transactionCode: 'TX1',
+		route: [0, 1, 2],
+		tallyPath: [0, 1],
+		memberKeys: { m0: 0, m1: 1, m2: 2 },
+		amount: 1,
+	}
+
+	it('maps a member key to its entity id (and an unknown key to undefined)', () => {
+		const resolver = createLiftResolver(pathLift)
+		expect(resolver.entityOfMember('m0')).toBe(0)
+		expect(resolver.entityOfMember('m2')).toBe(2)
+		expect(resolver.entityOfMember('not-a-member')).toBeUndefined()
+	})
+
+	it('resolves an adjacent (from, to) pair to its tally index, order-independently', () => {
+		const resolver = createLiftResolver(pathLift)
+		expect(resolver.tallyOfEdge(0, 1)).toBe(0)
+		expect(resolver.tallyOfEdge(1, 0)).toBe(0) // same undirected pair
+		expect(resolver.tallyOfEdge(1, 2)).toBe(1)
+		// 0 and 2 are not adjacent on this path route — no hop, no tally.
+		expect(resolver.tallyOfEdge(0, 2)).toBeUndefined()
+	})
+
+	it('resolves a circular lift originator on its two distinct hops without ambiguity', () => {
+		// A ring 0→1→2→0: the originator 0 sits on hop 0 (0↔1, tally 0) and the closing hop 2 (2↔0, tally 2).
+		const loopLift: TraceLiftEntry = {
+			sessionCode: 'S1',
+			transactionCode: 'TXL',
+			route: [0, 1, 2, 0],
+			tallyPath: [0, 1, 2],
+			memberKeys: { m0: 0, m1: 1, m2: 2 },
+			amount: 1,
+		}
+		const resolver = createLiftResolver(loopLift)
+		expect(resolver.tallyOfEdge(0, 1)).toBe(0) // opening hop
+		expect(resolver.tallyOfEdge(1, 2)).toBe(1)
+		expect(resolver.tallyOfEdge(2, 0)).toBe(2) // closing hop — distinct pair {0,2}, so unambiguous
+	})
+})
+
+describe('index lifts (consensus v2)', () => {
+	const pathLift: TraceLiftEntry = {
+		sessionCode: 'S1',
+		transactionCode: 'TX1',
+		route: [0, 1, 2],
+		tallyPath: [0, 1],
+		memberKeys: { m0: 0, m1: 1, m2: 2 },
+		amount: 1,
+	}
+
+	it('indexes the header lifts by session code and transaction code', () => {
+		const idx = indexTrace(traceLines(TRACE_FORMAT_VERSION, queries, events, [pathLift]))
+		expect(idx.lifts()).toEqual([pathLift])
+		expect(idx.liftFor('S1')).toEqual(pathLift)
+		expect(idx.liftFor('S2')).toBeUndefined() // S2 drove no lift
+		expect(idx.liftByTransaction('TX1')).toEqual(pathLift)
+		expect(idx.liftByTransaction('absent-tx')).toBeUndefined()
+	})
+
+	it('a trace with no lifts header (v1 / discovery-only v2) has an empty lifts() and no bindings', () => {
+		const idx = indexTrace(traceLines(TRACE_FORMAT_VERSION, queries, events))
+		expect(idx.lifts()).toEqual([])
+		expect(idx.liftFor('S1')).toBeUndefined()
+		expect(idx.liftByTransaction('TX1')).toBeUndefined()
 	})
 })

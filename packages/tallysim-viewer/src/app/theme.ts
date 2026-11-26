@@ -30,6 +30,13 @@
  *     neighbour).
  *   - **dimmed** is the recede colour for everything *outside* a selected (isolated) route — near the surface,
  *     so the isolated route stands alone.
+ *   - **promised / committed / voidFlash** animate a lift's sign-and-settle phase (the consensus overlay): a
+ *     teal/cyan **promised** as a record is pushed over a hop, a solid green **committed** when the whole route
+ *     settles, and a crimson **voidFlash** for a brief flash as a voided lift lets its held hops go (and on a
+ *     no-commit vote). The triad is chosen to separate from the other roles (blue capacity edges, warm
+ *     roundScale, violet unlimited, rose pruned) and from each other; its one colour-blind-risky pair —
+ *     committed (green) vs voidFlash (red) — never co-occurs (commit XOR void) and is backed by the
+ *     found-routes outcome **badge** text, so colour is never the sole channel.
  *
  * Persistence: the chosen theme is stored in `localStorage` and defaults to the OS `prefers-color-scheme`.
  */
@@ -76,6 +83,12 @@ export interface Palette {
 	late: string
 	/** The recede colour for items outside a selected (isolated) route, so the route stands alone. */
 	dimmed: string
+	/** A hop with a promise in flight (a record pushed over it, not yet settled): teal/cyan, distinct from blue. */
+	promised: string
+	/** A hop (and node) of a committed lift — the whole route reads solid: a success green, its own step. */
+	committed: string
+	/** The brief flash a voided lift's held hops take as they clear, and a no-commit vote's node: a crimson red. */
+	voidFlash: string
 	/**
 	 * The sweep charts' categorical series colours — one per plotted line. The data-viz reference's eight-hue
 	 * categorical set in its validated order (the ordering is the colour-blind-safety mechanism, not cosmetic);
@@ -105,6 +118,11 @@ export const lightPalette: Palette = {
 	sleeping: '#8a94a6',
 	late: '#b98f36',
 	dimmed: '#dddddd',
+	// Consensus triad (light): cyan promise → solid green commit → crimson void flash. Committed is a touch
+	// deeper than `found` (#0aac23) so the two greens are not identical where both could show.
+	promised: '#0e9fb8',
+	committed: '#0a8f3c',
+	voidFlash: '#d81e3f',
 	// Categorical slots 1–8 (blue, orange, aqua, yellow, magenta, green, violet, red), light column.
 	seriesScale: ['#257de0', '#f47230', '#00b894', '#f2a600', '#ee7fac', '#008a17', '#6a4ce2', '#ec4647'],
 }
@@ -129,6 +147,10 @@ export const darkPalette: Palette = {
 	sleeping: '#6b7585',
 	late: '#b9923f',
 	dimmed: '#333333',
+	// Consensus triad (dark): brighter steps for the #191919 surface, its own values (not an inversion).
+	promised: '#34c0d6',
+	committed: '#2bb14e',
+	voidFlash: '#f0506a',
 	// The same eight hues stepped for the dark surface (data-viz reference's dark column).
 	seriesScale: ['#338ced', '#e76624', '#00a888', '#d28e05', '#e24d8b', '#0aac23', '#9887ef', '#eb6263'],
 }

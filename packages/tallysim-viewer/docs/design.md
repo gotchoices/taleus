@@ -233,6 +233,54 @@ return — unlike relay events, it adds no disclosure. It is a cross-package cha
 additive field, the originator emission, and a `TRACE_FORMAT_VERSION` bump in tallysim), deliberately out of
 the viewer's scope; it is filed as a backlog ticket.
 
+**The gap is closed for a *settled lift's* route.** A v2 consensus trace records, per settled session, a
+`lifts[]` header entry carrying the lift's exact `route` + `tallyPath` (see *Consensus phase* below). So the
+chosen route that settled *is* in the format and is drawn precisely — no inference. What stays markers-only is
+discovery's *other* found plans (a session can find several routes but settle only one); recovering those still
+needs the deferred `plan-found`-carries-path fix above.
+
+### Consensus phase
+
+A v2 trace produced from a scenario with a `consensus` block drives each query's **lift** (the atomic
+sign-and-settle across the found route) to settlement and records, per settled session, a `TraceLiftEntry` in
+the header's `lifts[]`. The replay tier animates that settlement on top of the discovery spread.
+
+**Why the header entry is needed.** A consensus `TraceEvent` (`record-pushed`, `promise-signed`,
+`referee-vote`, `settled`, `resources-released`, …) addresses nodes by their **member key** (a public
+per-lift address), not by entity id, and carries no link nonce. Neither the node nor the hop is placeable from
+the event alone. The `TraceLiftEntry` closes this: `memberKeys` maps each member key → entity id, and the
+index-aligned `route` + `tallyPath` give the `(from, to) → tally` for each hop (hop `i` joins
+`route[i] ↔ route[i+1]` on `tallyPath[i]`). `core/trace-index.ts`'s `createLiftResolver` folds those into the
+two resolvers (`entityOfMember`, `tallyOfEdge`), the latter keyed by an **order-independent** unordered pair —
+so a circular lift's repeated originator, which sits on two *distinct* pairs, stays unambiguous.
+
+**The reducer** (`core/timeline.ts`). A session's `Timeline` is bound to its lift (a `ConsensusBinding`); the
+active set then gains a `ConsensusState` recomputed from scratch at each `currentTime` (so a backward scrub
+un-settles, exactly like the discovery set). It tracks, per lift: which hops a promise has reached, each member
+node's phase (promised < voted < settled, with its `C`/`NC` vote), and the settled `decision` + `settledTime`.
+Edge phases follow the decision: **commit ⇒ every `tallyPath` hop is `committed`** (the whole route reads
+solid); **void ⇒ only the promised hops are `released`** (flash then clear); **no decision (in-flight /
+stalled) ⇒ the promised hops stay `promised`**. A member key the lift did not map lands in `unresolved` (a
+malformed-trace sentinel, surfaced, never silently dropped). A v1 / discovery-only trace binds no lift, so the
+active set carries no `consensus` key and discovery replay is byte-for-byte unchanged.
+
+**The overlay** (`paint.ts` + `theme.ts`). The consensus layer composes **over** the discovery spread (it is
+later in event time, so it wins the hops/nodes it touches) and is **suppressed in isolate mode** (isolate stays
+the green route selection). Three palette entries carry it, each with light + dark steps:
+`promised` (teal/cyan, promise in flight, keeps capacity thickness), `committed` (solid green, a size boost),
+and `voidFlash` (crimson). Nodes mirror this: a `voted` node previews `committed` (vote `C`) or `voidFlash`
+(vote `NC`) before the lift settles; a `settled` node is `committed` on commit, or flashes `voidFlash` on void.
+The flash window is `VOID_FLASH_MS` of **virtual** (trace) time measured from `settledTime`; after it, a
+released hop/node is *not keyed*, so it falls back to its resting/discovery style. (If a `settled` event sits
+within that window of the trace's last event, the flash can still show at `t = max` — acceptable.)
+
+**The side list and the closed-loop case** (`routes.ts` + `controls.ts`). When the selected session has a
+lift, the found-routes list shows its chosen route from `liftRoute` (classified `path` or `loop` — a circular
+lift whose `route` returns to its origin) with an outcome **badge** from `liftOutcome` (committed / voided /
+stalled, the lift's final decision at its own `sessionEnd`); selecting it isolates the route via `liftIsolate`
+(exact nodes + tallies from the header, no decode) and dims the rest. Multiple lifts in one trace each animate
+on their own session/route; picking a session selects its lift.
+
 ## Live-run tier (`src/live/`)
 
 The live-run tier **runs a payment search in the browser** instead of loading a recorded one: a developer picks

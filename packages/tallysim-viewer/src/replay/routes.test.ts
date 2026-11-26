@@ -1,7 +1,10 @@
-import { FORMAT_VERSION, linkIdForTally, type Network } from 'tallysim'
+import { FORMAT_VERSION, linkIdForTally, type Network, type TraceLiftEntry } from 'tallysim'
 import { makeNonce } from 'tallynet'
 import { createDeanonymiser } from '../core/deanonymise.js'
 import {
+	liftIsolate,
+	liftOutcome,
+	liftRoute,
 	reconstructRoute,
 	reconstructRoutes,
 	routeEdgeTallies,
@@ -102,6 +105,56 @@ describe('reconstructRoutes / routeEdgeTallies', () => {
 		const deanon = createDeanonymiser(pathNetwork())
 		expect(routeEdgeTallies(deanon, SESSION, { from: 0, to: 3, linkNonces: noncesFor([0, 1, 2]) })).toEqual([0, 1, 2])
 		expect(routeEdgeTallies(deanon, SESSION, { from: 0, to: 3, linkNonces: ['bogus'] })).toBeUndefined()
+	})
+})
+
+describe('liftRoute / liftOutcome / liftIsolate — the settled lift from the header (no decode)', () => {
+	const pathLift: TraceLiftEntry = {
+		sessionCode: 'session-alpha',
+		transactionCode: 'TX1',
+		route: [0, 1, 2, 3],
+		tallyPath: [0, 1, 2],
+		memberKeys: { m0: 0, m1: 1, m2: 2, m3: 3 },
+		amount: 100,
+	}
+	const loopLift: TraceLiftEntry = {
+		sessionCode: 'session-beta',
+		transactionCode: 'TXL',
+		route: [0, 1, 2, 0],
+		tallyPath: [0, 1, 2],
+		memberKeys: { m0: 0, m1: 1, m2: 2 },
+		amount: 100,
+	}
+
+	it('reads a path lift straight from the header — exact nodes and tallies, no inference', () => {
+		expect(liftRoute(pathLift)).toEqual({
+			kind: 'path',
+			nodes: [0, 1, 2, 3],
+			tallies: [0, 1, 2],
+			hops: 3,
+			transactionCode: 'TX1',
+		})
+	})
+
+	it('classifies a circular lift (route returns to origin) as a loop', () => {
+		expect(liftRoute(loopLift)).toEqual({
+			kind: 'loop',
+			nodes: [0, 1, 2, 0],
+			tallies: [0, 1, 2],
+			hops: 3,
+			transactionCode: 'TXL',
+		})
+	})
+
+	it('maps the settled decision to the outcome badge', () => {
+		expect(liftOutcome('commit')).toBe('committed')
+		expect(liftOutcome('void')).toBe('voided')
+		expect(liftOutcome(undefined)).toBe('stalled')
+	})
+
+	it('isolates a lift to its exact nodes + tallies from the header', () => {
+		expect(liftIsolate(pathLift)).toEqual({ nodes: [0, 1, 2, 3], tallies: [0, 1, 2] })
+		expect(liftIsolate(loopLift)).toEqual({ nodes: [0, 1, 2, 0], tallies: [0, 1, 2] })
 	})
 })
 

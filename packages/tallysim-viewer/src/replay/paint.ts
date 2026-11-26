@@ -22,6 +22,13 @@
  *   - **Colour-by-session** — when {@link PaintInput.sessionColor} is set, lit nodes/edges take that one hue
  *     instead of the round scale, so several sessions overlaid at once stay separable by colour. The caller
  *     builds one overlay per session and {@link mergeOverlays merges} them.
+ *   - **Consensus** — when {@link PaintInput.consensus} is set (a settling lift's state at `currentTime`), the
+ *     sign-and-settle phase is layered **over** the spread marks: promised hops take {@link Palette.promised},
+ *     a committed route turns solid {@link Palette.committed}, and a voided route's held hops flash
+ *     {@link Palette.voidFlash} for {@link VOID_FLASH_MS} then clear back to their resting/discovery style. It
+ *     is composed last (consensus is later in event time than discovery, so it wins past settlement) and is
+ *     **suppressed in isolate mode** (isolate stays the green route selection). See the design doc's *Consensus
+ *     phase*.
  *
  * This module is sigma-free on purpose: it imports only the key-mapping helpers (`edgeKeyForTally`,
  * `entityName`) that are the one documented place the tally-index↔edge-key and id↔node-key conventions live.
@@ -29,7 +36,13 @@
 
 import { entityName } from 'tallysim'
 import { edgeKeyForTally } from '../graph/model.js'
-import type { ActiveSet } from '../core/timeline.js'
+import type {
+	ActiveSet,
+	ConsensusDecision,
+	ConsensusEdgeState,
+	ConsensusNodeState,
+	ConsensusState,
+} from '../core/timeline.js'
 import type { Palette } from '../app/theme.js'
 
 /** Overlay styling for one node (keyed by node key). Any field left `undefined` keeps the renderer's base. */
@@ -72,6 +85,13 @@ export interface PaintInput {
 	sessionColor?: string
 	/** When set, isolate just this route: key only its nodes/edges and dim everything else. */
 	isolate?: IsolatedRoute
+	/**
+	 * When set, the selected lift's settlement state at {@link currentTime} — layered over the spread marks
+	 * (never in isolate mode). Omit for a discovery-only timeline (no lift bound).
+	 */
+	consensus?: ConsensusState
+	/** The playback head time, for the void-flash window (`currentTime − settledTime ≤ VOID_FLASH_MS`). */
+	currentTime?: number
 }
 
 /** A route to isolate, as entity ids and the tally indices its links traverse (from `routes.ts`). */
@@ -85,6 +105,18 @@ const ISOLATE_NODE_SIZE = 7
 /** The size a route's edges take when isolated (above the finite capacity maximum so the route is unmistakable). */
 const ISOLATE_EDGE_SIZE = 6
 
+/**
+ * How long (in the trace's **virtual-time** ms) a voided lift's released hops flash before clearing to their
+ * resting/discovery style. A fixed, brief window: long enough to notice the "let go", short enough not to
+ * linger. If a `settled` event sits within this window of the trace's last event, the flash can still be
+ * showing at `t = max` (the head cannot advance past it) — acceptable; the route reads as "just voided".
+ */
+export const VOID_FLASH_MS = 400
+/** The size a committed/flashing route's edges take (a solid boost above the finite-capacity maximum). */
+const CONSENSUS_EDGE_SIZE = 6
+/** The size a settled (committed or flashing-void) route's nodes take, so the settled route stands out. */
+const CONSENSUS_NODE_SIZE = 7
+
 /** The round ramp colour for `round`, clamping a round past the last step to the last colour. */
 function roundColor(scale: readonly string[], round: number): string {
 	if (scale.length === 0) {
@@ -97,9 +129,86 @@ function roundColor(scale: readonly string[], round: number): string {
 /** Build the overlay for one session's active set (or, with {@link PaintInput.isolate}, the isolate overlay). */
 export function buildOverlay(input: PaintInput): ReplayOverlay {
 	if (input.isolate !== undefined) {
+		// Isolate is the green route-selection view; the consensus phase is suppressed by design here.
 		return isolateOverlay(input.isolate, input.palette)
 	}
-	return spreadOverlay(input)
+	const overlay = spreadOverlay(input)
+	if (input.consensus !== undefined) {
+		applyConsensus(overlay, input.consensus, input.currentTime, input.palette)
+	}
+	return overlay
+}
+
+/**
+ * Layer a lift's settlement state over the spreading overlay (mutating it in place). Consensus is later in
+ * event time than discovery, so it **wins** on the hops/nodes it touches past settlement. A released (voided)
+ * hop or node that has fallen outside the flash window is deliberately **not keyed** — it is left to show the
+ * resting/discovery style underneath, not forced to a colour.
+ */
+function applyConsensus(overlay: ReplayOverlay, consensus: ConsensusState, currentTime: number | undefined, palette: Palette): void {
+	const flashing =
+		consensus.settledTime !== undefined && currentTime !== undefined && currentTime - consensus.settledTime <= VOID_FLASH_MS
+	for (const edge of consensus.edges) {
+		const style = consensusEdgeStyle(edge, palette, flashing)
+		if (style !== undefined) {
+			overlay.edges.set(edgeKeyForTally(edge.tally), style)
+		}
+	}
+	for (const node of consensus.nodes) {
+		const style = consensusNodeStyle(node, consensus.decision, palette, flashing)
+		if (style !== undefined) {
+			overlay.nodes.set(entityName(node.node), style)
+		}
+	}
+}
+
+/**
+ * One consensus hop's edge style, or `undefined` to leave it resting:
+ *   - `promised` — the promise colour, risen above the discovery edges, keeping its capacity thickness;
+ *   - `committed` — solid (colour + a size boost), risen highest;
+ *   - `released` — flash the void colour while inside the window, else `undefined` (back to resting/discovery).
+ */
+function consensusEdgeStyle(state: ConsensusEdgeState, palette: Palette, flashing: boolean): OverlayEdgeStyle | undefined {
+	switch (state.phase) {
+		case 'promised': {
+			return { color: palette.promised, zIndex: 2 }
+		}
+		case 'committed': {
+			return { color: palette.committed, size: CONSENSUS_EDGE_SIZE, zIndex: 3 }
+		}
+		case 'released': {
+			return flashing ? { color: palette.voidFlash, size: CONSENSUS_EDGE_SIZE, zIndex: 3 } : undefined
+		}
+	}
+}
+
+/**
+ * One consensus member node's style, or `undefined` to leave it resting:
+ *   - `promised` — the promise colour;
+ *   - `voted` — a commit-pending (`C`) vote previews committed; a no-commit (`NC`) vote previews the void flash,
+ *     so the two read differently before the lift settles;
+ *   - `settled` — committed ⇒ the commit colour (boosted); void ⇒ flash while inside the window, else resting.
+ */
+function consensusNodeStyle(
+	state: ConsensusNodeState,
+	decision: ConsensusDecision | undefined,
+	palette: Palette,
+	flashing: boolean,
+): OverlayNodeStyle | undefined {
+	switch (state.phase) {
+		case 'promised': {
+			return { color: palette.promised }
+		}
+		case 'voted': {
+			return { color: state.vote === 'NC' ? palette.voidFlash : palette.committed }
+		}
+		case 'settled': {
+			if (decision === 'commit') {
+				return { color: palette.committed, size: CONSENSUS_NODE_SIZE }
+			}
+			return flashing ? { color: palette.voidFlash, size: CONSENSUS_NODE_SIZE } : undefined
+		}
+	}
 }
 
 /** Isolate: only the route's nodes/edges are lit (in `found`); `dim` makes the renderer recede the rest. */
