@@ -53,6 +53,14 @@ export type Logger = (message: string, ...args: unknown[]) => void
 /** Send the (merged) record to member `to` over the host's transport. */
 export type UpdatePeerFunc<TTerms, TPayload> = (record: TrxRecord<TTerms, TPayload>, to: Address) => Promise<void>
 
+/**
+ * Host port for the **pull**: ask `from` for its current record for `transactionCode`, returning its merged
+ * copy or `undefined` if it holds none. The responder end is {@link TrxParticipant.serveRecord} (safe to
+ * serve anyone — the record is self-authenticating); the requester end is {@link TrxParticipant.fetchOutcome}.
+ * See docs/design.md § Record availability.
+ */
+export type FetchRecordFunc<TTerms, TPayload> = (transactionCode: string, from: Address) => Promise<TrxRecord<TTerms, TPayload> | undefined>
+
 /** The default session-code checks, wrapping `session-code.ts`. Used for BOTH the transaction and session codes. */
 const defaultSessionCodeValidators: SessionCodeValidators = {
 	isValid: (code, now) => isValid(code, now),
@@ -74,6 +82,12 @@ export interface TrxParticipantConfig<TTerms, TPayload> {
 	resource: TrxParticipantResource<TTerms, TPayload>
 	/** Host port: send the record to a peer over its transport. */
 	updatePeer: UpdatePeerFunc<TTerms, TPayload>
+	/**
+	 * Host port: pull the current record for a `transactionCode` from a reachable peer (the record-availability
+	 * requester, docs/design.md § Record availability). Default: a port that holds nothing (`undefined`), which
+	 * makes {@link TrxParticipant.fetchOutcome} a no-op beyond reading our own stored outcome.
+	 */
+	fetchRecord?: FetchRecordFunc<TTerms, TPayload>
 	/** Our discovery session's nonce→linkId map (`ParticipantStore.getNonceToLinkMap`). Identifies OUR links. */
 	nonceToLinkId: Record<string, string>
 	/** All wall-clock time (for code-expiry checks, and the `now` a `proceed` transaction code expires from). */
