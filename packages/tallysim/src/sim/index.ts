@@ -6,6 +6,7 @@
  * § Discovery simulation.
  *
  * - `naming.ts` — the node↔entity bijection and the tally→link-id naming shared by harness and conditions.
+ * - `well-known.ts` — derive the well-known (high-degree) entities, and build a run's referee nominations.
  * - `terms.ts` — the discovery link-term type and the capacity-aware node policy (the correctness anchor).
  * - `conditions.ts` — compile a declarative conditions spec into the harness's per-link condition map.
  * - `identity.ts` — the deterministic signer/verifier layer that gives consensus nodes reproducible keys.
@@ -23,6 +24,7 @@
  */
 
 export * from './naming.js'
+export * from './well-known.js'
 export * from './terms.js'
 export * from './conditions.js'
 export * from './identity.js'
