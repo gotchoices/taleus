@@ -51,6 +51,40 @@ export interface TrxStore<TTerms, TPayload> {
 	getPendingCommits(transactionCode: string): Promise<Signature[]>
 	/** Persist the pending-commit side pool for `transactionCode` (replacing any prior pool). */
 	savePendingCommits(transactionCode: string, commits: Signature[]): Promise<void>
+
+	/**
+	 * The **equivocation proof store** for `transactionCode`: the distinct signed faces retained from a
+	 * signer caught contradicting itself (both `C` and `NC`, or both `P` and `NP`). This is side state,
+	 * exactly like the pending-commit pool: it is **never** merged into the authoritative `promises` /
+	 * `commits` sets, never pushed, never digested. Settlement is wholly unchanged by it. A signer appears
+	 * here only once a second, contradicting face from it has *verified*; at that point BOTH the first
+	 * (authoritative) face and the contradicting one are retained as evidence. Returns the faces for one
+	 * signer (`[]` if none). See `participant.ts` (`retainEquivocationProof`) and docs/design.md
+	 * § Equivocation proof kept. The proof feeds `feat-tallynet-hostile-peers` / `feat-lift-healing`; this
+	 * package only surfaces it, it builds no remedy.
+	 */
+	getProof(transactionCode: string, signerKey: string): Promise<Signature[]>
+	/**
+	 * Retain one signed face as equivocation proof for its signer (`signature.address`). Idempotent on an
+	 * identical (type, value) re-delivery and capped at {@link MAX_PROOF_FACES_PER_SIGNER} faces per signer
+	 * (the overflow is dropped). A genuine signer contributes at most two faces per phase, so an honest
+	 * party never approaches the cap; it bounds a hostile peer's growth of this side state.
+	 */
+	saveProof(transactionCode: string, signature: Signature): Promise<void>
+	/** Every signer key that has retained equivocation proof on `transactionCode` (so a simulator can count equivocators). `[]` if none. */
+	getProofSigners(transactionCode: string): Promise<string[]>
+
+	/**
+	 * Whether a **settled-outcome contradiction** has been observed for `transactionCode`: a record a node
+	 * holds (pushed or pulled) settled the opposite way from this node's own settled outcome — only possible
+	 * when voters equivocated (the authoritative union keeps one face per voter, so a single node is always
+	 * self-consistent; two nodes that saw different faces first can disagree). The flag is observational; the
+	 * *remedy* is host policy (ChipNet § Lying referees), not built here. See `participant.ts`
+	 * (`detectContradiction`).
+	 */
+	hasContradiction(transactionCode: string): Promise<boolean>
+	/** Flag `transactionCode` as having an observed settled-outcome contradiction (idempotent). */
+	setContradiction(transactionCode: string): Promise<void>
 }
 
 /**
@@ -67,6 +101,11 @@ export class MemoryTrxStore<TTerms, TPayload> implements TrxStore<TTerms, TPaylo
 	// an NP-voided lift (promise phase never completes) leaves its pre-promise pool undrained. Bounded and
 	// tiny in memory; when durable-store cleanup of terminal transactions lands, prune this alongside records.
 	private readonly pendingCommits = new Map<string, Signature[]>()
+	// Equivocation proof: transactionCode -> signerKey -> retained faces. Side state, capped per signer; never
+	// merged, pushed, or digested. Pruned alongside records when terminal-transaction cleanup lands.
+	private readonly proofs = new Map<string, Map<string, Signature[]>>()
+	// Transaction codes for which a settled-outcome contradiction has been observed.
+	private readonly contradictions = new Set<string>()
 
 	getRecord(transactionCode: string): Promise<TrxRecord<TTerms, TPayload> | undefined> {
 		return Promise.resolve(this.records.get(transactionCode))
@@ -110,7 +149,48 @@ export class MemoryTrxStore<TTerms, TPayload> implements TrxStore<TTerms, TPaylo
 		this.pendingCommits.set(transactionCode, [...commits])
 		return Promise.resolve()
 	}
+
+	getProof(transactionCode: string, signerKey: string): Promise<Signature[]> {
+		// A fresh copy so a caller cannot mutate the stored faces.
+		return Promise.resolve([...(this.proofs.get(transactionCode)?.get(signerKey) ?? [])])
+	}
+
+	saveProof(transactionCode: string, signature: Signature): Promise<void> {
+		let bySigner = this.proofs.get(transactionCode)
+		if (!bySigner) {
+			bySigner = new Map<string, Signature[]>()
+			this.proofs.set(transactionCode, bySigner)
+		}
+		const faces = bySigner.get(signature.address) ?? []
+		const already = faces.some((face) => face.type === signature.type && face.value === signature.value)
+		if (!already && faces.length < MAX_PROOF_FACES_PER_SIGNER) {
+			faces.push(signature) // capped: a genuine signer never exceeds two faces per phase
+		}
+		bySigner.set(signature.address, faces)
+		return Promise.resolve()
+	}
+
+	getProofSigners(transactionCode: string): Promise<string[]> {
+		return Promise.resolve([...(this.proofs.get(transactionCode)?.keys() ?? [])])
+	}
+
+	hasContradiction(transactionCode: string): Promise<boolean> {
+		return Promise.resolve(this.contradictions.has(transactionCode))
+	}
+
+	setContradiction(transactionCode: string): Promise<void> {
+		this.contradictions.add(transactionCode)
+		return Promise.resolve()
+	}
 }
+
+/**
+ * Cap on distinct equivocation-proof faces retained **per signer** per transaction. A genuine signer can
+ * verifiably produce at most two faces per phase (`P`/`NP`, then `C`/`NC`) — four across both phases — and
+ * only verified faces are ever stored, so an honest party never approaches this cap; it exists to bound a
+ * hostile peer's attempts to grow this side state.
+ */
+export const MAX_PROOF_FACES_PER_SIGNER = 4
 
 /**
  * The peer-record key. A NUL byte (`\u0000`) separates the transaction code from the peer address so
