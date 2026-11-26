@@ -37,10 +37,10 @@ import { makeNonce } from '../nonce.js'
 import { generate } from '../session-code.js'
 import type { TraceEvent } from '../trace.js'
 import { signRecord } from '../consensus/signature.js'
-import { MAX_PENDING_COMMITS_PER_VOTER } from '../consensus/participant.js'
+import { DEFAULT_TTL, MAX_PENDING_COMMITS_PER_VOTER } from '../consensus/participant.js'
 import type { ResourceContext, TrxParticipantResource } from '../consensus/resource.js'
 import type { Signature, TrxRecord } from '../consensus/types.js'
-import { MemberTypes, type MemberType } from '../discovery/types.js'
+import { DEFAULT_CONSENSUS_METHOD, MemberTypes, type DependentMember, type Link, type MemberType, type Plan, type UniQuery } from '../discovery/types.js'
 import { VirtualClock } from './clock.js'
 import { SeededRandom } from './random.js'
 import {
@@ -209,6 +209,33 @@ function linear(n: number): { names: string[]; graph: NetworkGraph<Terms>; membe
 	const graph = makeGraph(names, edges)
 	const members: LiftMemberSpec[] = names.map((name, i) => ({ name, roles: i === n - 1 ? [PART, VOTER] : [PART] }))
 	return { names, graph, members }
+}
+
+/**
+ * A plan built by hand (no discovery) over `linear(3)`'s P0—P1—P2 graph (edge ids `e0`, `e1`; P2 is
+ * `[P,V]`), for the `proceed` tests that start a lift directly from a chosen plan. `proceed` never
+ * ranks or discovers — it only mints the transaction code and folds the plan it is given — so a
+ * hand-built plan exercises it exactly as a caller handing it `discover`'s `plans[0]` would.
+ */
+function handPlan(net: InMemoryNetwork<Terms, Payload>, randomSeed: number): { plan: Plan<Terms, Payload>; query: UniQuery<Terms> } {
+	const sessionCode = generate(DEFAULT_TTL, { now: net.clock.now(), random: new SeededRandom(randomSeed) })
+	const members: DependentMember[] = [
+		{ types: [PART], address: { key: net.memberKey('P0') } },
+		{ types: [PART], address: { key: net.memberKey('P1') } },
+		{ types: [PART, VOTER], address: { key: net.memberKey('P2') } },
+	]
+	const path: Link<Terms>[] = [
+		{ nonce: makeNonce(sessionCode, 'e0'), intents: { L: { balance: 100 } } },
+		{ nonce: makeNonce(sessionCode, 'e1'), intents: { L: { balance: 100 } } },
+	]
+	const query: UniQuery<Terms> = {
+		target: { address: { key: net.memberKey('P2') } },
+		sessionCode,
+		intents: { L: { balance: 100 } },
+		maxDepth: 8,
+		method: DEFAULT_CONSENSUS_METHOD,
+	}
+	return { plan: { members, path }, query }
 }
 
 /** Seed the originator and drive the clock to quiescence; returns the lift's transaction code. */
@@ -725,6 +752,107 @@ describe('buildLift — routeLinkIds disambiguates parallel tallies', () => {
 	it('throws when a routeLinkId does not name an edge to the given neighbour', () => {
 		const { net } = makeNet({ graph: parallel })
 		expect(() => net.buildLift({ members, route: ['A', 'B'], routeLinkIds: ['nope'], payload: PAYLOAD })).toThrow(/no graph link nope/)
+	})
+})
+
+describe('consensus end to end — originator proceed / abort', () => {
+	it('proceed starts a lift from a hand-built plan; it commits everywhere, each node releasing once', async () => {
+		const { names, graph } = linear(3)
+		const { net, doubles } = makeNet({ graph })
+		const { plan, query } = handPlan(net, 99)
+
+		const record = await net.consensusNode('P0').proceed({ plan, query, payload: PAYLOAD })
+		expect(record.promises.some((signature) => signature.type === 'P' && signature.address === net.memberKey('P0'))).toBe(true)
+
+		await net.clock.runUntilIdle()
+
+		expect(await outcomes(net, names, record.transactionCode)).toEqual(names.map(() => 'commit'))
+		for (const name of names) {
+			expect(doubles.get(name)!.releaseSuccesses).toEqual([true])
+		}
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('abort voids a seeded-but-unpromised record; every node, including the originator, releases as failure', async () => {
+		const { names, graph, members } = linear(3)
+		const { net, doubles } = makeNet({ graph })
+		const { record, transactionCode: tx } = net.buildLift({ members, route: names, payload: PAYLOAD })
+		expect(record.promises).toEqual([])
+
+		await net.consensusStoreOf('P0').saveRecord(record)
+		await net.consensusNode('P0').abort(tx)
+		await net.clock.runUntilIdle()
+
+		expect(await outcomes(net, names, tx)).toEqual(names.map(() => 'void'))
+		for (const name of names) {
+			// Including the originator: abort signs our own NP and routes it through update, so P0
+			// releases its own (empty) hold as a failure exactly as a refusing participant does.
+			expect(doubles.get(name)!.releaseSuccesses).toEqual([false])
+		}
+		const stored = await net.consensusStoreOf('P0').getRecord(tx)
+		expect(stored!.promises.some((signature) => signature.type === 'NP' && signature.address === net.memberKey('P0'))).toBe(true)
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('abort is refused once every participant has promised — no-op, the settled commit stands', async () => {
+		const { names, graph, members } = linear(3)
+		const { net, doubles } = makeNet({ graph })
+		const tx = await runLift(net, { members, route: names, payload: PAYLOAD })
+		const before = await net.consensusStoreOf('P0').getRecord(tx)
+		expect(await net.consensusNode('P0').outcome(tx)).toBe('commit')
+
+		await net.consensusNode('P0').abort(tx)
+		await net.clock.runUntilIdle()
+
+		const after = await net.consensusStoreOf('P0').getRecord(tx)
+		expect(after!.promises).toEqual(before!.promises) // no NP appended
+		expect(await net.consensusNode('P0').outcome(tx)).toBe('commit')
+		expect(doubles.get('P0')!.releaseSuccesses).toEqual([true]) // no second release
+		expect(net.clock.pendingTimers).toBe(0)
+	})
+
+	it('abort is refused once we have already signed our own P (atomicity guard) — no second release', async () => {
+		const { graph } = linear(3)
+		const { net, doubles } = makeNet({ graph })
+		const { plan, query } = handPlan(net, 7)
+
+		const record = await net.consensusNode('P0').proceed({ plan, query, payload: PAYLOAD })
+		await net.clock.runUntilIdle()
+		expect(await net.consensusNode('P0').outcome(record.transactionCode)).toBe('commit')
+
+		await net.consensusNode('P0').abort(record.transactionCode)
+		await net.clock.runUntilIdle()
+
+		expect(await net.consensusNode('P0').outcome(record.transactionCode)).toBe('commit')
+		expect(doubles.get('P0')!.releaseSuccesses).toEqual([true]) // unchanged — abort is a no-op
+		expect(net.clock.pendingTimers).toBe(0)
+	})
+
+	it('abort no-ops on an unknown transaction code', async () => {
+		const { graph } = linear(3)
+		const { net, doubles } = makeNet({ graph })
+
+		await net.consensusNode('P0').abort('not-a-real-transaction-code')
+		await net.clock.runUntilIdle()
+
+		expect(doubles.get('P0')!.releaseSuccesses).toEqual([])
+		expect(net.clock.pendingTimers).toBe(0)
+	})
+
+	it('abort no-ops on an already-settled transaction — no second release', async () => {
+		const { names, graph, members } = linear(3)
+		const { net, doubles } = makeNet({ graph })
+		const tx = await runLift(net, { members, route: names, payload: PAYLOAD })
+		expect(await net.consensusNode('P0').outcome(tx)).toBe('commit')
+
+		await net.consensusNode('P0').abort(tx)
+		await net.clock.runUntilIdle()
+
+		expect(await net.consensusNode('P0').outcome(tx)).toBe('commit')
+		expect(doubles.get('P0')!.releaseSuccesses).toEqual([true]) // unchanged
+		expect(net.clock.pendingTimers).toBe(0)
 	})
 })
 
