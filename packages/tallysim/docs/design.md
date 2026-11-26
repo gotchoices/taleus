@@ -370,22 +370,28 @@ serialiser keeps its `RunRecord`-typed functions (`recordToJsonLine`, `createCsv
 wrappers that pin the oracle's canonical column order — so their byte output is unchanged — and
 `serialize-sim-records.ts` adds the discovery-sweep counterpart (`simRecordToJsonLine`,
 `createSimCsvAccumulator`, …) with its own column order (the found-vs-oracle fields, the six cost/timing
-distributions, then the six prune-reason tallies).
+distributions, then the six prune-reason tallies). `serialize-consensus-records.ts` adds the **consensus-sweep**
+counterpart (`consensusRecordToJsonLine`, `createConsensusCsvAccumulator`, …) the same way — reusing the generic
+machinery, supplying only its column order (`pCommitGivenFound` and the commit/void/pending counts, the
+`timeToSettleMs` / `messagesPerLift` distributions, then the four `voidReasons.<reason>` tallies).
 
 The **CLIs** (`src/cli/`) are the **only Node-specific files** in the package — they do file I/O, so they live
 outside the neutral core, are excluded from the `no-node-globals` guard and the neutral `tsconfig.build.json`,
 and are compiled with node types by `tsconfig.cli.json`. `cli/sweep.ts` drives the oracle sweep; `cli/simulate.ts`
-drives the discovery sweep (iterating the **`async`** `runSimSweep` with `for await`). Each reads its spec JSON
-file, **streams** the JSON-lines records to stdout (or `--jsonl <path>`) as each is produced, and writes the
-CSV summary to `--csv <path>`:
+drives the discovery sweep (iterating the **`async`** `runSimSweep` with `for await`); `cli/consensus.ts` drives
+the consensus sweep (iterating `runConsensusSweep`). Each reads its spec JSON file, **streams** the JSON-lines
+records to stdout (or `--jsonl <path>`) as each is produced, and writes the CSV summary to `--csv <path>`:
 
 ```
 yarn workspace tallysim sweep <spec.json> [--jsonl <out.jsonl>] [--csv <out.csv>]
 yarn workspace tallysim simulate <spec.json> [--jsonl <out.jsonl>] [--csv <out.csv>] [--concurrent] \
     [--trace <trace.ndjson> [--query <i> ...] [--seed <n>]]
+yarn workspace tallysim consensus <spec.json> [--jsonl <out.jsonl>] [--csv <out.csv>]
 ```
 
-`simulate`'s `--concurrent` sets `SimRunnerDeps.concurrent`. Its optional `--trace` dumps one full, replayable
+`consensus` deliberately carries **no** `--concurrent` (the consensus sweep is sequential-only — see § *The
+sequential consensus sweep runner*) and **no** `--trace` (the consensus trace is a separate tier). `simulate`'s
+`--concurrent` sets `SimRunnerDeps.concurrent`. Its optional `--trace` dumps one full, replayable
 trace — of the sweep's **unvaried base scenario** (`spec.base`, with `vary` NOT applied) at the `--seed` run
 seed (default 0), for the selected `--query` indices (default all) — by reusing `cli/trace.ts`'s `recordTrace`,
 so that trace is byte-identical to what `cli/trace.js` would write for the same scenario + seed. It is **not** a
@@ -778,6 +784,40 @@ lift ran. Cost distributions reuse `summarizeDistribution` from `metrics.ts`; `t
 over the settled lifts only (a pending contributes no sample), `messagesPerLift` over all lifts; `voidReasons`
 sums each non-commit lift's reason. `queryCount` and the `StructuralMetrics` carry through from the runner
 unchanged.
+
+### The sequential consensus sweep runner
+
+`sim/consensus-runner.ts` is the consensus counterpart to `sim-runner.ts`: `runConsensusSweep(spec)` turns a
+`SimSweepSpec` into a stream of `ConsensusRunRecord`s — one per `(cell × seed)`, same provenance shape as
+`SimRunRecord` with a `ConsensusRunMetrics` payload. For each run it clones the materialised network
+(`cloneNetwork(materializeNetwork(…))` — the driver mutates balances, so each run starts from a pristine copy),
+draws the payment workload, then drives **each** query through the whole pipeline: `buildSimNetwork` → `runQuery`
+(discovery) → `runLiftForOutcome` (sign-and-settle; mutates balances on commit) → `analyzeLift`, finally
+`summarizeConsensusMetrics`. A sub-two-entity network short-circuits to a fully-zeroed `ConsensusRunMetrics`
+(no pair, no query, no lift), mirroring the discovery runner's degenerate guard.
+
+- **Sequential only (load-bearing).** A committed lift moves `tally.balance` on the one kept network, and the
+  next query must see that changed capacity, so the lifts form an **ordered** sequence — a between-lifts balance
+  is defined only under a fixed order. There is therefore no `concurrent` dependency here (unlike `sim-runner.ts`,
+  whose queries mutate no shared state); offering one would make balances order-dependent and the sweep
+  non-deterministic.
+- **Rebuild per query.** `InMemoryNetwork` freezes link terms at construction (see § *Seeing the changed capacity
+  needs a rebuild*), so each query rebuilds `buildSimNetwork` from the mutated network with a fresh events array;
+  `analyzeLift` filters by this lift's `transactionCode`, so session/transaction-code collisions across rebuilds
+  never mix lifts. Refusers are compiled once per run (`compileConsensusConditions`) and the resource port is
+  built once (its promise/commit gates are stateless), so the refuser set stays stable across rebuilds.
+- **Seed streams.** Every base seed is offset by the run seed, mirroring `sim-runner.ts` plus the two consensus
+  streams: network, workload, conditions (`conditionsSeed`), refuser (`consensusSeed`) and identity
+  (`consensus.identitySeed ?? DEFAULT_CONSENSUS_IDENTITY_SEED`). The refuser/identity streams are independent of
+  the discovery streams, so failure injection never shifts which network/queries a run gets.
+- **Validation widening.** A materialised network is shared by reference, so structural vary paths stay forbidden;
+  but the materialised-network guard is widened past `workload.*` to also accept `conditions.*` and `consensus.*`
+  (both cloned one level deep per cell), because the consensus CSV x-axis is typically `consensus.refuserFraction`
+  or `conditions.dropFraction`.
+
+The sweep-plumbing helpers (`validateConsensusSweep`, `applyVary`, `cloneSimScenario`, `cloneConditions`,
+`cloneCapacity`) are presently **duplicated** from `sim-runner.ts` (private there) rather than shared, to keep the
+pinned byte-identical discovery sweep untouched; extracting a common module is tracked as follow-up tech debt.
 
 ## Trace & replay format
 

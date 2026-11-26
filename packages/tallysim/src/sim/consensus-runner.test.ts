@@ -117,3 +117,58 @@ describe('runConsensusSweep — determinism', () => {
 		expect(a).toEqual(b)
 	})
 })
+
+describe('runConsensusSweep — degenerate network (entityCount < 2)', () => {
+	it('emits a single fully-zeroed record (no query, no lift, no throw)', async () => {
+		const base: SimScenario = {
+			network: { materialized: line(1) }, // one entity, no tally ⇒ no payment pair exists
+			workload: { kind: 'payment', queries: 10, amount: { dist: 'constant', params: { value: 5 } }, depth: 4, seed: 200 },
+			consensus: {},
+		}
+		const records = await runConsensusSweepToArray(specFor(base, 1))
+		expect(records).toHaveLength(1)
+		const m = records[0].metrics
+		expect(m.queryCount).toBe(0)
+		expect(m.liftCount).toBe(0)
+		expect(m.commitCount).toBe(0)
+		expect(m.voidCount).toBe(0)
+		expect(m.pendingCount).toBe(0)
+		expect(m.pCommitGivenFound).toBe(0) // 0/0 guarded to 0, never NaN
+		expect(m.timeToSettleMs.count).toBe(0)
+		expect(m.messagesPerLift.count).toBe(0)
+	})
+})
+
+describe('runConsensusSweep — spec validation', () => {
+	const base = (): SimScenario => ({
+		network: { materialized: line(4) },
+		workload: { kind: 'payment', queries: 4, amount: { dist: 'constant', params: { value: 5 } }, depth: 4, seed: 200 },
+		consensus: { refuserFraction: 0 },
+	})
+
+	it('rejects an empty seeds array', async () => {
+		const spec: SimSweepSpec = { base: base(), vary: [{ path: 'workload.depth', values: [4] }], seeds: [] }
+		await expect(runConsensusSweepToArray(spec)).rejects.toThrow(/seeds/)
+	})
+
+	it('rejects a vary dimension with no values', async () => {
+		const spec: SimSweepSpec = { base: base(), vary: [{ path: 'workload.depth', values: [] }], seeds: [1] }
+		await expect(runConsensusSweepToArray(spec)).rejects.toThrow(/non-empty values array/)
+	})
+
+	it('rejects a structural vary path on a materialised network', async () => {
+		// The widened guard still forbids reaching into the shared-by-reference network (only workload./
+		// conditions./consensus.* are cloned one level deep and safe to vary).
+		const spec: SimSweepSpec = { base: base(), vary: [{ path: 'network.params.meanDegree', values: [2, 3] }], seeds: [1] }
+		await expect(runConsensusSweepToArray(spec)).rejects.toThrow(/must target workload\.\/conditions\.\/consensus\.\* for a materialized network/)
+	})
+
+	it('allows a consensus.* vary path on a materialised network (the widening)', async () => {
+		// `consensus.refuserFraction` / `conditions.dropFraction` are the consensus CSV x-axis — the whole
+		// reason the materialised-network guard is widened past `workload.*`. This must run, not throw.
+		const spec: SimSweepSpec = { base: base(), vary: [{ path: 'consensus.refuserFraction', values: [0, 0.5] }], seeds: [1] }
+		const records = await runConsensusSweepToArray(spec)
+		expect(records).toHaveLength(2) // 2 cells × 1 seed
+		expect(records.map((r) => r.params['consensus.refuserFraction'])).toEqual([0, 0.5])
+	})
+})
