@@ -14,11 +14,18 @@
  * The header and network come first so a streaming reader can set up before the events arrive.
  *
  * ── Versioning ────────────────────────────────────────────────────────────────────────────────────
- * {@link TRACE_FORMAT_VERSION} is checked on read; any other version is rejected with a message naming
- * the found vs the supported version. Bump it only when the **line envelopes** below change — the
- * {@link TraceEvent} union already spans discovery *and* consensus, so consensus events (ticket 3.7)
- * need no bump. This module records whatever events the sink receives and never forks or narrows the
- * union; a hand-built consensus event round-trips unchanged.
+ * {@link TRACE_FORMAT_VERSION} is checked on read; an unsupported version is rejected with a message naming
+ * the found version AND the supported set. Bump it only when a **line envelope** below changes — and note
+ * which kind of change does *not* count: the {@link TraceEvent} union already spans discovery *and*
+ * consensus, so a new consensus **event** needs no bump (this module records whatever events the sink
+ * receives, forks nothing, and round-trips a hand-built consensus event unchanged).
+ *
+ * What *did* bump, v1 → v2: the **header** gained the optional {@link TraceHeader.lifts} field. A
+ * consensus event's `nodeId`/`to`/`from` are member **keys** (ed25519 pubkeys), not entity ids, and a
+ * found route is not recoverable from the discovery event stream — so each lift's route + member map must
+ * ride in the header for a reader to place consensus events on the graph. A new header field is an
+ * envelope change, hence the bump. {@link parseTrace} reads **both** v1 and v2: `lifts` is absent on a v1
+ * file and on a discovery-only v2 run, present on a consensus v2 run.
  *
  * ── One encoding for the network ──────────────────────────────────────────────────────────────────
  * The snapshot reuses `model.ts`'s {@link networkToSerialized} / {@link networkFromSerialized} (the same
@@ -30,7 +37,10 @@ import { type Network, type SerializedNetwork, networkFromSerialized, networkToS
 import type { SimScenario } from '../scenario.js'
 
 /** The on-disk trace format version. Bump only when a line envelope below changes (not for new events). */
-export const TRACE_FORMAT_VERSION = 1
+export const TRACE_FORMAT_VERSION = 2
+
+/** The trace-format versions this build can read. v1 = discovery-only; v2 adds the optional header `lifts`. */
+const SUPPORTED_TRACE_FORMAT_VERSIONS: readonly number[] = [1, 2]
 
 /** One issued query, as recorded in the header so a reader can join events (by `sessionCode`) to it. */
 export interface TraceQueryEntry {
@@ -39,6 +49,27 @@ export interface TraceQueryEntry {
 	to: number
 	amount: number
 	depth: number
+}
+
+/**
+ * One settled consensus lift, recorded in the header (consensus runs only) so a reader can place the lift's
+ * consensus events on the graph and show which route it took. It joins to its discovery query by
+ * {@link sessionCode} (the same code the {@link TraceQueryEntry} carries) and to its consensus events by
+ * {@link transactionCode}. Absent on a v1 file and on a discovery-only v2 run (no consensus was driven).
+ */
+export interface TraceLiftEntry {
+	/** Joins to the {@link TraceQueryEntry} (discovery) this lift came from — the reused discovery session code. */
+	sessionCode: string
+	/** Joins the lift's consensus events (every such event carries this `transactionCode`). */
+	transactionCode: string
+	/** The entity ids the lift traversed, ordered `[from, …, to]` (originator first; circular ⇒ first === last). */
+	route: number[]
+	/** The tally index of each hop, in order (`route.length − 1` entries) — resolves the concrete edges exactly. */
+	tallyPath: number[]
+	/** Each distinct route entity's consensus member key (base64url) → its entity id, to place consensus events. */
+	memberKeys: Record<string, number>
+	/** The lift amount. */
+	amount: number
 }
 
 /** Line 1: the run's provenance. One `header` per file. */
@@ -56,6 +87,14 @@ export interface TraceHeader {
 	runSeed: number
 	/** One entry per query recorded in this file (see the selected-query note below). */
 	queries: TraceQueryEntry[]
+	/**
+	 * One entry per **lift** recorded in this file (consensus runs only). Absent on a v1 file and on a
+	 * discovery-only v2 run. Carries each lift's route + member map so a reader can place the consensus
+	 * events — whose `nodeId`/`to`/`from` are member keys, not entity ids — and show the chosen route. Holds
+	 * only the lifts for the **recorded** queries (same `--query` narrowing as {@link queries}); a recorded
+	 * query that found no route contributes none. See {@link TraceLiftEntry}.
+	 */
+	lifts?: TraceLiftEntry[]
 }
 
 /** Line 2: the exact network the run searched, in the model's `Infinity ↔ null` on-disk shape. */
@@ -90,6 +129,9 @@ export function buildTraceHeader(parts: TraceHeaderParts): TraceHeader {
 		scenario: parts.scenario,
 		runSeed: parts.runSeed,
 		queries: parts.queries,
+		// Only stamp `lifts` when present: a discovery-only header must stay byte-identical to a v1 header
+		// (modulo the version field), and `lifts` is absent there (and on a v1 file).
+		...(parts.lifts !== undefined ? { lifts: parts.lifts } : {}),
 	}
 }
 
@@ -147,10 +189,13 @@ function readHeader(line: string): TraceHeader {
 	if (parsed.kind !== 'header') {
 		throw new Error(`parseTrace: first line is not a header (kind="${String(parsed.kind)}")`)
 	}
-	if (parsed.traceFormatVersion !== TRACE_FORMAT_VERSION) {
+	if (
+		typeof parsed.traceFormatVersion !== 'number' ||
+		!SUPPORTED_TRACE_FORMAT_VERSIONS.includes(parsed.traceFormatVersion)
+	) {
 		throw new Error(
 			`parseTrace: unsupported traceFormatVersion ${String(parsed.traceFormatVersion)} ` +
-				`(this build reads ${TRACE_FORMAT_VERSION})`,
+				`(this build reads ${SUPPORTED_TRACE_FORMAT_VERSIONS.join(', ')})`,
 		)
 	}
 	return parsed as TraceHeader

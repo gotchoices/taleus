@@ -50,7 +50,7 @@ import { compileConsensusConditions } from './conditions.js'
 import { runLiftForOutcome } from './consensus-harness.js'
 import { analyzeLift, summarizeConsensusMetrics, type ConsensusLiftMetrics, type ConsensusRunMetrics } from './consensus-metrics.js'
 import { makeSimResources, type SimResourceSpec } from './consensus-resource.js'
-import { buildSimNetwork, drawPaymentQueries, runQuery, type QuerySpec } from './harness.js'
+import { buildSimNetwork, drawPaymentQueries, runQuery, type ConsensusConfig, type QuerySpec } from './harness.js'
 
 /** One consensus run's result: resolved sweep coordinates, the run seed, provenance labels, and the metrics. */
 export interface ConsensusRunRecord {
@@ -123,14 +123,10 @@ async function runConsensusQueries(
 ): Promise<ConsensusLiftMetrics[]> {
 	const conditions = scenario.conditions ?? {}
 	const conditionsSeed = (scenario.conditionsSeed ?? 0) + runSeed
-	const consensus = scenario.consensus ?? {}
-	const refuserSeed = (scenario.consensusSeed ?? 0) + runSeed
-	const identitySeed = (consensus.identitySeed ?? DEFAULT_CONSENSUS_IDENTITY_SEED) + runSeed
-
-	const refusers = compileConsensusConditions(network, consensus, refuserSeed).refusers
-	// Build the resource port ONCE: its handles accumulate observations across lifts, but the shouldPromise
-	// gate is stateless/deterministic, so reuse is fine (and keeps the refuser set stable across rebuilds).
-	const { resourceFor } = makeSimResources(refuserSpecs(refusers))
+	// The identity + refuser port the whole run shares. Built ONCE: the port's handles accumulate observations
+	// across lifts, but its shouldPromise gate is stateless/deterministic, so reuse is fine (and keeps the
+	// refuser set stable across the per-query rebuilds).
+	const consensus = consensusConfigFor(scenario, network, runSeed)
 
 	const liftMetrics: ConsensusLiftMetrics[] = []
 	// NOTE: rebuild-per-query pays keygen per query; fine for the small grids this tier runs (~50 queries).
@@ -140,7 +136,7 @@ async function runConsensusQueries(
 		const sink: TraceSink = (event) => {
 			events.push(event)
 		}
-		const sim = buildSimNetwork(network, conditions, conditionsSeed, sink, scenario.budget, { identitySeed, resourceFor })
+		const sim = buildSimNetwork(network, conditions, conditionsSeed, sink, scenario.budget, consensus)
 		const outcome = await runQuery(sim, query)
 		const result = await runLiftForOutcome(sim, network, outcome, query) // mutates network.balance on commit
 		if (result) {
@@ -148,6 +144,22 @@ async function runConsensusQueries(
 		}
 	}
 	return liftMetrics
+}
+
+/**
+ * Build the {@link ConsensusConfig} a scenario's consensus phase runs under: the identity seed (offset by the
+ * run seed) and a resource port whose refusers are drawn from the dedicated consensus (refuser-selection)
+ * stream — independent of the discovery streams, so failure injection never perturbs which network/queries a
+ * run gets. Shared by this sweep runner and the trace recorder (`cli/trace.ts`), so both derive the **same**
+ * identities + refusers for a given `(scenario, runSeed)`.
+ */
+export function consensusConfigFor(scenario: SimScenario, network: Network, runSeed: number): ConsensusConfig {
+	const consensus = scenario.consensus ?? {}
+	const refuserSeed = (scenario.consensusSeed ?? 0) + runSeed
+	const identitySeed = (consensus.identitySeed ?? DEFAULT_CONSENSUS_IDENTITY_SEED) + runSeed
+	const refusers = compileConsensusConditions(network, consensus, refuserSeed).refusers
+	const { resourceFor } = makeSimResources(refuserSpecs(refusers))
+	return { identitySeed, resourceFor }
 }
 
 /** Turn a refuser id set into `{ shouldPromise: false }` specs for {@link makeSimResources}. */

@@ -139,3 +139,78 @@ describe('recordTrace', () => {
 		expect([...parsed.events()]).toEqual([])
 	})
 })
+
+describe('recordTrace — consensus', () => {
+	/** The same line scenario with consensus turned on (cooperative — every found route commits). */
+	const consensusScenario: SimScenario = { ...scenario, consensus: {} }
+
+	/** The `transactionCode` carried by `events` (consensus events only — discovery events have none). */
+	function eventTxCodes(parsed: ReturnType<typeof parseTrace>): Set<string> {
+		const codes = new Set<string>()
+		for (const ev of parsed.events()) {
+			const tx = (ev as { transactionCode?: string }).transactionCode
+			if (tx !== undefined) {
+				codes.add(tx)
+			}
+		}
+		return codes
+	}
+
+	it('records one header.lifts entry per found recorded query, route/tallyPath/memberKeys populated', async () => {
+		const lines: string[] = []
+		await recordTrace(consensusScenario, { seed: 0, queries: [] }, versions, intoArray(lines))
+		const parsed = parseTrace(lines)
+
+		const queryCodes = new Set(parsed.header.queries.map((q) => q.sessionCode))
+		const lifts = parsed.header.lifts
+		expect(lifts).toBeDefined()
+		expect(lifts!.length).toBeGreaterThanOrEqual(1)
+		for (const lift of lifts!) {
+			expect(queryCodes.has(lift.sessionCode)).toBe(true) // joins back to a recorded discovery query
+			expect(lift.route.length).toBeGreaterThanOrEqual(2) // [from, …, to]
+			expect(lift.tallyPath).toHaveLength(lift.route.length - 1) // one edge per hop (acyclic payment)
+			const distinct = new Set(lift.route)
+			expect(Object.keys(lift.memberKeys)).toHaveLength(distinct.size) // one key per distinct route entity
+			for (const id of Object.values(lift.memberKeys)) {
+				expect(distinct.has(id)).toBe(true) // every mapped id is on the route
+			}
+			expect(lift.amount).toBe(100)
+		}
+
+		// The consensus events made it into the trace and join to a recorded lift by transactionCode.
+		const liftTxCodes = new Set(lifts!.map((l) => l.transactionCode))
+		const txCodes = eventTxCodes(parsed)
+		expect(txCodes.size).toBeGreaterThanOrEqual(1)
+		for (const tx of txCodes) {
+			expect(liftTxCodes.has(tx)).toBe(true)
+		}
+	})
+
+	it('is byte-identical across two runs of the same consensus scenario + seed', async () => {
+		const first: string[] = []
+		const second: string[] = []
+		await recordTrace(consensusScenario, { seed: 0, queries: [] }, versions, intoArray(first))
+		await recordTrace(consensusScenario, { seed: 0, queries: [] }, versions, intoArray(second))
+		expect(second).toEqual(first)
+	})
+
+	it('records consensus events only for the selected query when --query is given', async () => {
+		const sel: string[] = []
+		await recordTrace(consensusScenario, { seed: 0, queries: [0] }, versions, intoArray(sel))
+		const parsed = parseTrace(sel)
+		expect(parsed.header.queries).toHaveLength(1)
+		const selectedCode = parsed.header.queries[0].sessionCode
+		// Every recorded lift and every recorded event belongs to the one selected session.
+		expect(parsed.header.lifts!.every((l) => l.sessionCode === selectedCode)).toBe(true)
+		for (const ev of parsed.events()) {
+			expect(ev.sessionCode).toBe(selectedCode)
+		}
+	})
+
+	it('a discovery-only scenario records no lifts (the header omits the field)', async () => {
+		const lines: string[] = []
+		await recordTrace(scenario, { seed: 0, queries: [] }, versions, intoArray(lines))
+		expect(parseTrace(lines).header.lifts).toBeUndefined()
+		expect(JSON.parse(lines[0])).not.toHaveProperty('lifts')
+	})
+})

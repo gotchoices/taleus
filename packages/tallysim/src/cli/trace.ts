@@ -1,9 +1,25 @@
 /**
- * `trace` — a Node-specific driver that records one discovery-simulation run to a versioned NDJSON trace
- * file. It reads a {@link SimScenario} JSON file, materialises the network, draws the workload's payment
- * queries, runs them on the `tallynet` protocol over compressed time, and **streams** the trace (header,
- * network snapshot, then one line per event) to stdout or a file — never buffering the event list, so
- * memory stays flat regardless of run size. It prints the final trace-size stats to stderr.
+ * `trace` — a Node-specific driver that records one discovery (and, when the scenario enables consensus,
+ * consensus) simulation run to a versioned NDJSON trace file. It reads a {@link SimScenario} JSON file,
+ * materialises the network, draws the workload's payment queries, runs them on the `tallynet` protocol over
+ * compressed time, and **streams** the trace (header, network snapshot, then one line per event) to stdout or
+ * a file — never buffering the event list, so memory stays flat regardless of run size. It prints the final
+ * trace-size stats to stderr.
+ *
+ * ── Consensus is opt-in, keyed off `scenario.consensus` ───────────────────────────────────────────────
+ * A scenario that carries a `consensus` block drives each query's **lift** to settlement as well as its
+ * discovery, and records one {@link TraceLiftEntry} per found/recorded query in the header (its route +
+ * member-key map, so a reader can place the consensus events, whose addresses are member keys not entity
+ * ids). A scenario without the block is **discovery-only** and this path stays byte-identical to before —
+ * the pinned discovery-trace tests depend on that — bar the header's `traceFormatVersion`, now 2.
+ *
+ * Deliberately, the consensus trace does **not** model capacity depletion: it builds ONE consensus sim per
+ * pass (so session + transaction codes mint on one incrementing RNG and stay unique across the pass — the
+ * viewer joins events to queries by those codes), and discards each lift's balance move against a fresh
+ * {@link cloneNetwork} copy, leaving the recorded snapshot the pristine initial network. This differs on
+ * purpose from the consensus **metrics** sweep (`sim/consensus-runner.ts`), which rebuilds per query and
+ * mutates one kept network to model depletion; the two are each internally deterministic and need not agree,
+ * exactly as the discovery trace already seeds differently from the discovery sweep.
  *
  * The platform-neutral core (`sim/trace-format.ts`, `sim/trace-writer.ts`, `sim/harness.ts`) does the
  * work; this file only wires `node:fs`/process args and reads the two package versions for the header.
@@ -35,13 +51,22 @@ import { SeededRandom } from 'tallynet/testing'
 import {
 	buildSimNetwork,
 	buildTraceHeader,
+	cloneNetwork,
+	consensusConfigFor,
 	drawPaymentQueries,
+	entityName,
 	makeNetworkSnapshot,
 	makeTraceWriter,
 	materializeNetwork,
+	runLiftForOutcome,
 	runQuery,
 	type LineSink,
+	type Network,
+	type QueryOutcome,
+	type QuerySpec,
+	type SimNetwork,
 	type SimScenario,
+	type TraceLiftEntry,
 	type TraceQueryEntry,
 } from '../index.js'
 
@@ -153,11 +178,20 @@ export async function recordTrace(
 	// CLI's historical behaviour byte-identically; the sim-runner offsets by the run seed, this does not).
 	const queries = drawPaymentQueries(scenario.workload, network.entityCount, new SeededRandom(scenario.workload.seed))
 
-	// Pass 1: learn each query's session code (collect codes only; events are discarded — memory stays flat).
-	const pass1 = buildSimNetwork(network, conditions, conditionsSeed, undefined, options)
+	// Consensus is driven iff the scenario carries a `consensus` block (its presence is the switch). When it
+	// is absent, `consensus` stays `undefined` and every step below collapses to the discovery-only recorder,
+	// byte-for-byte as before (one extra `liftEntries.push(undefined)` that touches no rng and no sink).
+	const consensus = scenario.consensus !== undefined ? consensusConfigFor(scenario, network, runSeed) : undefined
+
+	// Pass 1: learn each query's session code (events discarded — memory stays flat). With consensus on, also
+	// drive each query's lift to settlement and collect its TraceLiftEntry (undefined when it found no route).
+	const pass1 = buildSimNetwork(network, conditions, conditionsSeed, undefined, options, consensus)
 	const sessionCodes: string[] = []
+	const liftEntries: (TraceLiftEntry | undefined)[] = []
 	for (const query of queries) {
-		sessionCodes.push((await runQuery(pass1, query)).sessionCode)
+		const outcome = await runQuery(pass1, query)
+		sessionCodes.push(outcome.sessionCode)
+		liftEntries.push(consensus ? await recordLift(pass1, network, outcome, query) : undefined)
 	}
 
 	// Which queries to record: all when no --query was given, else the selected 0-based indices.
@@ -179,23 +213,77 @@ export async function recordTrace(
 		amount: query.amount,
 		depth: query.depth,
 	}))
+	// The lifts for the recorded queries only (same --query narrowing); a recorded query with no found route
+	// contributes none. Undefined (not []) on a discovery-only run, so the header omits `lifts` entirely.
+	const headerLifts: TraceLiftEntry[] | undefined = consensus
+		? recorded.map(({ index }) => liftEntries[index]).filter((entry): entry is TraceLiftEntry => entry !== undefined)
+		: undefined
 	const recordedSessions = selected === undefined ? undefined : new Set(recorded.map(({ index }) => sessionCodes[index]))
 
-	const header = buildTraceHeader({ ...versions, scenario, runSeed, queries: headerQueries })
+	const header = buildTraceHeader({ ...versions, scenario, runSeed, queries: headerQueries, lifts: headerLifts })
 	const snapshot = makeNetworkSnapshot(network)
 
 	const { out, close } = open()
 	try {
 		const writer = makeTraceWriter(header, snapshot, out, recordedSessions ? { sessions: recordedSessions } : undefined)
-		// Pass 2: rebuild an identical network and rerun the same queries, streaming events to the sink.
-		const pass2 = buildSimNetwork(network, conditions, conditionsSeed, writer.sink, options)
+		// Pass 2: rebuild an identical sim and rerun the same queries (and lifts), streaming events to the sink.
+		// Deterministic ⇒ pass-2 codes/events match pass-1's recorded `lifts`; consensus events carry the reused
+		// discovery session code, so the writer's session filter records them for the selected queries too.
+		const pass2 = buildSimNetwork(network, conditions, conditionsSeed, writer.sink, options, consensus)
 		for (const query of queries) {
-			await runQuery(pass2, query)
+			const outcome = await runQuery(pass2, query)
+			if (consensus) {
+				// Discard the balance move against a fresh clone (see the module header): the recorded snapshot
+				// stays pristine and lifts never accumulate into an over-limit settle across queries.
+				await runLiftForOutcome(pass2, cloneNetwork(network), outcome, query)
+			}
 		}
 		return writer.stats()
 	} finally {
 		close()
 	}
+}
+
+/**
+ * Drive one query's lift to settlement on `sim` (a consensus-enabled sim) and, if it found a route, return
+ * the {@link TraceLiftEntry} for the header. The balance move is discarded against a fresh {@link cloneNetwork}
+ * copy — the recorded snapshot stays the pristine initial network, and lifts never accumulate into an
+ * over-limit settle across queries (the single-sim trace deliberately does not model capacity depletion).
+ */
+async function recordLift(
+	sim: SimNetwork,
+	network: Network,
+	outcome: QueryOutcome,
+	query: QuerySpec,
+): Promise<TraceLiftEntry | undefined> {
+	// NOTE: clones the whole network per lift (so the throwaway balance move never touches the snapshot);
+	// fine for the planned trace sizes. If a traced scenario ever has very many queries over a huge network,
+	// settle on a scratch clone reused across lifts (reset its balances per lift) instead of one clone each.
+	const result = await runLiftForOutcome(sim, cloneNetwork(network), outcome, query)
+	if (result === undefined) {
+		return undefined
+	}
+	return {
+		sessionCode: outcome.sessionCode,
+		transactionCode: result.transactionCode,
+		route: result.route,
+		tallyPath: result.tallyPath,
+		memberKeys: Object.fromEntries(distinctEntities(result.route).map((id) => [sim.net.memberKey(entityName(id)), id])),
+		amount: result.amount,
+	}
+}
+
+/** The distinct entity ids on a route, in first-appearance order (a circular route lists its repeated origin once). */
+function distinctEntities(route: number[]): number[] {
+	const seen = new Set<number>()
+	const distinct: number[] = []
+	for (const id of route) {
+		if (!seen.has(id)) {
+			seen.add(id)
+			distinct.push(id)
+		}
+	}
+	return distinct
 }
 
 async function main(): Promise<void> {

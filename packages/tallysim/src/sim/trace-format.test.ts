@@ -3,6 +3,7 @@ import { FORMAT_VERSION, type Network, serialize } from '../model.js'
 import type { SimScenario } from '../scenario.js'
 import {
 	TRACE_FORMAT_VERSION,
+	type TraceLiftEntry,
 	type TraceLine,
 	buildTraceHeader,
 	makeNetworkSnapshot,
@@ -28,16 +29,27 @@ function event(sessionCode: string, time: number): TraceEvent {
 }
 
 /** Serialise a header + network + events into NDJSON lines, as a file on disk would hold them. */
-function linesFor(network: Network, events: TraceEvent[]): string[] {
+function linesFor(network: Network, events: TraceEvent[], lifts?: TraceLiftEntry[]): string[] {
 	const header = buildTraceHeader({
 		tallysimVersion: '0.1.0',
 		tallynetVersion: '0.1.0',
 		scenario,
 		runSeed: 0,
 		queries: [{ sessionCode: 'S1', from: 0, to: 2, amount: 100, depth: 7 }],
+		lifts,
 	})
 	const lines: TraceLine[] = [header, makeNetworkSnapshot(network), ...events.map((e) => ({ kind: 'event' as const, event: e }))]
 	return lines.map(serializeTraceLine)
+}
+
+/** One lift-header fixture joining to the `S1` query above. */
+const lift: TraceLiftEntry = {
+	sessionCode: 'S1',
+	transactionCode: 'TX1',
+	route: [0, 1, 2],
+	tallyPath: [0, 1],
+	memberKeys: { 'key-0': 0, 'key-1': 1, 'key-2': 2 },
+	amount: 100,
 }
 
 describe('trace-format round-trip', () => {
@@ -94,17 +106,44 @@ describe('trace-format round-trip', () => {
 	})
 })
 
+describe('trace-format header lifts (v2)', () => {
+	const network = networkWith([{ stock: 0, foil: 1, balance: 0, stockCreditLimit: 5, foilCreditLimit: 5 }], 2)
+
+	it('a v2 header with lifts round-trips (deep-equal)', () => {
+		const parsed = parseTrace(linesFor(network, [], [lift]))
+		expect(parsed.header.traceFormatVersion).toBe(2)
+		expect(parsed.header.lifts).toEqual([lift])
+	})
+
+	it('a v2 discovery-only header has no lifts (the field is omitted, not empty)', () => {
+		const lines = linesFor(network, [])
+		// The header JSON must not carry a `lifts` key when none was supplied (byte-identical to a v1 header
+		// but for the version field).
+		expect(JSON.parse(lines[0])).not.toHaveProperty('lifts')
+		expect(parseTrace(lines).header.lifts).toBeUndefined()
+	})
+
+	it('a v1 file (older build, no lifts) still parses, with lifts absent', () => {
+		const lines = linesFor(network, [event('S1', 1)])
+		const header = JSON.parse(lines[0]) as { traceFormatVersion: number }
+		header.traceFormatVersion = 1 // pretend an older, v1 writer produced this file
+		lines[0] = JSON.stringify(header)
+		const parsed = parseTrace(lines)
+		expect(parsed.header.traceFormatVersion).toBe(1)
+		expect(parsed.header.lifts).toBeUndefined()
+		expect([...parsed.events()]).toEqual([event('S1', 1)])
+	})
+})
+
 describe('trace-format version + shape checks', () => {
 	const network = networkWith([{ stock: 0, foil: 1, balance: 0, stockCreditLimit: 5, foilCreditLimit: 5 }], 2)
 
-	it('rejects a bumped traceFormatVersion, naming found vs supported', () => {
+	it('rejects an unsupported traceFormatVersion, naming found vs the supported set', () => {
 		const lines = linesFor(network, [])
 		const bumped = JSON.parse(lines[0]) as { traceFormatVersion: number }
-		bumped.traceFormatVersion = TRACE_FORMAT_VERSION + 1
+		bumped.traceFormatVersion = 3 // past the supported {1, 2}
 		lines[0] = JSON.stringify(bumped)
-		expect(() => parseTrace(lines)).toThrow(
-			new RegExp(`traceFormatVersion ${TRACE_FORMAT_VERSION + 1}.*reads ${TRACE_FORMAT_VERSION}`),
-		)
+		expect(() => parseTrace(lines)).toThrow(/unsupported traceFormatVersion 3 \(this build reads 1, 2\)/)
 	})
 
 	it('rejects a garbage traceFormatVersion', () => {
