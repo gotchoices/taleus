@@ -63,7 +63,7 @@ export type TraceEvent =
 	| (TraceBase & { type: 'record-received';      transactionCode: string; from?: string; promiseCount: number; commitCount: number })
 	| (TraceBase & { type: 'promise-signed';       transactionCode: string; signatureType: 'P' | 'NP' })
 	| (TraceBase & { type: 'signature-rejected';   transactionCode: string; reason: SignatureRejectReason })
-	| (TraceBase & { type: 'referee-vote';         transactionCode: string; decision: 'C' | 'NC' })
+	| (TraceBase & { type: 'voter-vote';           transactionCode: string; decision: 'C' | 'NC' })
 	| (TraceBase & { type: 'settled';              transactionCode: string; decision: 'commit' | 'void' })
 	| (TraceBase & { type: 'resources-released';   transactionCode: string; success: boolean })
 

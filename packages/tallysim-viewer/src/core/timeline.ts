@@ -78,7 +78,7 @@ export type ConsensusEdgePhase = 'promised' | 'committed' | 'released'
 /**
  * The settlement phase a route member node has reached by `currentTime`:
  *   - `promised` — it signed/pushed a promise;
- *   - `voted` — it cast a referee vote (carried in {@link ConsensusNodeState.vote}: `C` commit-pending / `NC`
+ *   - `voted` — it cast a voter vote (carried in {@link ConsensusNodeState.vote}: `C` commit-pending / `NC`
  *     no-commit, so the two read differently);
  *   - `settled` — the lift settled (every route node settles once, on the single `settled` event).
  */
@@ -97,7 +97,7 @@ export interface ConsensusEdgeState {
 export interface ConsensusNodeState {
 	node: number
 	phase: ConsensusNodePhase
-	/** The referee vote this node cast, if any — `C` (commit-pending) or `NC` (no-commit). */
+	/** The voter vote this node cast, if any — `C` (commit-pending) or `NC` (no-commit). */
 	vote?: 'C' | 'NC'
 }
 
@@ -333,7 +333,7 @@ export function createTimeline(params: {
 					}
 					break
 				}
-				case 'referee-vote': {
+				case 'voter-vote': {
 					if (node !== undefined) {
 						bumpNode(node, PHASE_RANK.voted)
 						nodeVote.set(node, event.decision)

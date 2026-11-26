@@ -44,7 +44,7 @@ export interface TrxStore<TTerms, TPayload> {
 	 * promise set completes and each is verified and promoted (or dropped). Returns `[]` if none.
 	 *
 	 * This is the fix for the forged-commit-shadows-vote defect: an unverified commit must not occupy a
-	 * referee's slot in the authoritative set, where it could block that referee's genuine vote. See
+	 * voter's slot in the authoritative set, where it could block that voter's genuine vote. See
 	 * `participant.ts` (`mergeCommit`, and the drain in `validateAndMerge` for a peer's completing promise /
 	 * in `drainPendingFromStore` for our own) and docs/design.md § Protocol design (Consensus).
 	 */

@@ -24,11 +24,15 @@ export interface Address {
 	key: string
 }
 
-/** Participant (must promise) or referee (votes at commit). All nodes can additionally relay. */
-export type MemberType = 'P' | 'R'
+/**
+ * Participant (must promise) or voter (votes at commit). All nodes can additionally relay. A
+ * **referee** is simply a voter (`'V'`) that is not also a participant — it rides no tally edge and
+ * only votes; there is no distinct wire code for it.
+ */
+export type MemberType = 'P' | 'V'
 
 /** The member-type constants, so call sites read `MemberTypes.participant` rather than a bare `'P'`. */
-export const MemberTypes = { participant: 'P', referee: 'R' } as const satisfies Record<string, MemberType>
+export const MemberTypes = { participant: 'P', voter: 'V' } as const satisfies Record<string, MemberType>
 
 export interface Member {
 	types: MemberType[]
@@ -45,7 +49,7 @@ export interface IdentifiedMember extends Member {
 }
 
 export interface DependentMember extends IdentifiedMember {
-	/** Other members this member nominates (referees or relays). */
+	/** Other members this member nominates (voters or relays). */
 	dependsOn?: Address[]
 }
 
@@ -61,7 +65,7 @@ export interface Link<TTerms> {
 
 /**
  * A route under construction. `path` grows outward (one link per hop, toward the target); `members`
- * are prepended on the return trip (participants first, then any nominated referees/relays). The
+ * are prepended on the return trip (participants first, then any nominated voters/relays). The
  * optional `payload` is a host value carried end to end (e.g. a terminus→originator message).
  */
 export interface Plan<TTerms, TPayload> {
@@ -83,6 +87,60 @@ export interface Target {
 }
 
 /**
+ * The rules a lift is proposed to run under: how votes are weighted and the threshold the winning side
+ * must reach. Carried as explicit proposal parameters (on the {@link UniQuery} at discovery time and the
+ * transaction record's immutable core at settlement time) so every node sees — and every signature binds —
+ * the exact win condition. There are no global rules; a node accepts or refuses the method it is offered.
+ */
+export interface ConsensusMethod {
+	/**
+	 * How vote weight is assigned. v1 implements only `'distinct-voter'` (one vote per distinct voter;
+	 * total weight = voter count). Reserved and validation-rejected until built: `'nominator-split'` and
+	 * future weightings.
+	 */
+	weighting: 'distinct-voter'
+	/**
+	 * The winning side must REACH the rational fraction `thresholdNum / thresholdDen` of total vote
+	 * weight, on top of always holding a strict majority. Default `1 / 2` (a plain strict majority).
+	 * Integers only, so the comparison is exact and deterministic.
+	 */
+	thresholdNum: number
+	thresholdDen: number
+}
+
+/** The default consensus method: `distinct-voter` weighting at a plain strict-majority threshold (1/2). */
+export const DEFAULT_CONSENSUS_METHOD: ConsensusMethod = { weighting: 'distinct-voter', thresholdNum: 1, thresholdDen: 2 }
+
+/**
+ * Validate a {@link ConsensusMethod}'s shape, shared by the discovery query rules and the consensus
+ * new-record rules so one vocabulary of failures serves both. Returns a human-readable message naming the
+ * offending field, or `undefined` when the method is well-formed.
+ *
+ * A valid method: has `weighting === 'distinct-voter'` (the only v1 weighting); `thresholdNum`/
+ * `thresholdDen` positive integers; and `1/2 ≤ thresholdNum/thresholdDen ≤ 1` — a threshold below the
+ * strict-majority floor is meaningless (the floor already applies) and above 1 is unreachable.
+ */
+export function consensusMethodError(method: ConsensusMethod | undefined): string | undefined {
+	if (!method || typeof method !== 'object') {
+		return 'Missing consensus method'
+	}
+	if (method.weighting !== 'distinct-voter') {
+		return `Unsupported consensus weighting '${String(method.weighting)}' (only 'distinct-voter' is implemented)`
+	}
+	const { thresholdNum, thresholdDen } = method
+	if (!Number.isInteger(thresholdNum) || !Number.isInteger(thresholdDen) || thresholdNum <= 0 || thresholdDen <= 0) {
+		return 'Consensus threshold must be a ratio of positive integers'
+	}
+	if (2 * thresholdNum < thresholdDen) {
+		return 'Consensus threshold must be at least 1/2'
+	}
+	if (thresholdNum > thresholdDen) {
+		return 'Consensus threshold must be at most 1 (a threshold of 1 means unanimity)'
+	}
+	return undefined
+}
+
+/**
  * The originator's query, carried unchanged to every node a search reaches. `maxDepth` rides on the
  * query so every node agrees on the ceiling (it is authoritative per-search; a node's own options
  * only supply a default when minting a query).
@@ -92,6 +150,10 @@ export interface UniQuery<TTerms> {
 	sessionCode: string
 	intents: Record<string, TTerms>
 	maxDepth: number
+	/** The consensus method the eventual lift will settle under, so a node can refuse one it dislikes during the search. */
+	method: ConsensusMethod
+	/** Optional reference (a Stroc CID) to the lift's written contract. Omit when absent — never set `undefined`. */
+	liftContract?: string
 }
 
 /** A ticket a node returns while a search through it can still go deeper; feed it back to reenter. */
@@ -144,7 +206,7 @@ export interface PrivateLink<TTerms> {
 	intents: Record<string, TTerms>
 }
 
-/** A matched member and whom it depends on (nominated referees/relays). */
+/** A matched member and whom it depends on (nominated voters/relays). */
 export interface Match {
 	member: IdentifiedMember
 	dependsOn?: IdentifiedMember[]

@@ -4,7 +4,7 @@ import { InMemoryNetwork, negateNumericTerms, type NetworkGraph } from './networ
 import { generate } from '../session-code.js'
 import { makeNonce } from '../nonce.js'
 import { nobleHasher } from '../crypto.js'
-import type { QueryRequest, UniQuery } from '../discovery/types.js'
+import { DEFAULT_CONSENSUS_METHOD, type QueryRequest, type UniQuery } from '../discovery/types.js'
 
 type Terms = { balance: number }
 
@@ -16,6 +16,7 @@ function newQuery(targetKey: string, now: number, random: SeededRandom): UniQuer
 		sessionCode: generate(SESSION_TTL, { now, random }),
 		intents: { L: { balance: 1 } },
 		maxDepth: 7,
+		method: DEFAULT_CONSENSUS_METHOD,
 	}
 }
 

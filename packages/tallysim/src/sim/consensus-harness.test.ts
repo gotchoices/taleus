@@ -7,7 +7,7 @@ import { buildSimNetwork, runQuery, type QueryOutcome, type QuerySpec } from './
 import { linkIdForTally } from './naming.js'
 
 const PART: MemberType = MemberTypes.participant
-const REF: MemberType = MemberTypes.referee
+const VOTER: MemberType = MemberTypes.voter
 
 /** A node's net credit position: `Σ balance where it is stock − Σ balance where it is foil` (what it is owed net). */
 function netPosition(network: Network, entity: number): number {
@@ -39,9 +39,9 @@ function line(n: number, limit = 1000): Network {
 	return { entityCount: n, tallies, meta: { generator: 'test', params: {}, seed: 0, formatVersion: FORMAT_VERSION } }
 }
 
-/** The members of a line lift: every node a participant, the terminus also the sole referee (a voter set of one). */
+/** The members of a line lift: every node a participant, the terminus also the sole voter (a voter set of one). */
 function lineMembers(n: number): LiftMemberSpec[] {
-	return Array.from({ length: n }, (_, i) => ({ name: String(i), roles: i === n - 1 ? [PART, REF] : [PART] }))
+	return Array.from({ length: n }, (_, i) => ({ name: String(i), roles: i === n - 1 ? [PART, VOTER] : [PART] }))
 }
 
 /** The exact tally link ids for a line's route hops (`T0, T1, …`), matching `linkIdForTally`. */
@@ -162,7 +162,7 @@ describe('runLiftForOutcome — discovery + consensus end to end', () => {
 		expect(sim.net.clock.pendingTimers).toBe(0) // the stall left nothing in flight
 	})
 
-	it('throws when a voter is not on the route (a misconfigured voter set, not a silent zero-referee stall)', async () => {
+	it('throws when a voter is not on the route (a misconfigured voter set, not a silent zero-voter stall)', async () => {
 		const network = line(3)
 		const sim = buildSimNetwork(network, {}, 0, undefined, undefined, CONSENSUS)
 		const q: QuerySpec = { from: 0, to: 2, amount: 5, depth: 3 }

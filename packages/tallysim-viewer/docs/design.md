@@ -274,7 +274,7 @@ sign-and-settle across the found route) to settlement and records, per settled s
 the header's `lifts[]`. The replay tier animates that settlement on top of the discovery spread.
 
 **Why the header entry is needed.** A consensus `TraceEvent` (`record-pushed`, `promise-signed`,
-`referee-vote`, `settled`, `resources-released`, …) addresses nodes by their **member key** (a public
+`voter-vote`, `settled`, `resources-released`, …) addresses nodes by their **member key** (a public
 per-lift address), not by entity id, and carries no link nonce. Neither the node nor the hop is placeable from
 the event alone. The `TraceLiftEntry` closes this: `memberKeys` maps each member key → entity id, and the
 index-aligned `route` + `tallyPath` give the `(from, to) → tally` for each hop (hop `i` joins

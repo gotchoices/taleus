@@ -713,7 +713,7 @@ bug in this tier, not an input to tolerate.
 
 - **Members & voters.** Every distinct entity on the route is a participant (`['P']`); the voter set (default
   `[route[0]]`, the originator) additionally gets `['R']`, so a default lift settles on the originator's own vote
-  — the "lift voters, not referee" model, a voter set of one. A circular lift (`route[0] === route[last]`) lists
+  — the voter model, a voter set of one. A circular lift (`route[0] === route[last]`) lists
   the originator **once** in `members` though it sits on two links; `buildLift` resolves the route pairs anyway.
 - **Exact tally selection.** `routeLinkIds: tallyPath.map(linkIdForTally)` picks the *discovery-chosen* tally at
   each hop, not merely the first edge to the neighbour — essential when a pair holds parallel tallies and only
@@ -801,7 +801,7 @@ a payment, but it reaches the metrics by a different path — a missing `found` 
 **v1 has no recovery — a stalled push is a dead lift.** The v1 commit engine has **no propagation timeout**:
 a dropped push on a needed edge stalls the whole lift indefinitely (the `VirtualClock` simply runs out of
 timers and the outcome stays `pending`). The more forgiving behaviour — *a refuser or a dead edge takes only
-itself out of the running, and the lift re-routes, or a referee times the stall out and voids it cleanly* — is
+itself out of the running, and the lift re-routes, or a voter times the stall out and voids it cleanly* — is
 **phase-2** work, explicitly out of v1. Until it lands, read every `pending` as "a needed message was lost and
 nothing timed it out." That timeout/retry design is tracked in `tallynet-propagation-timeouts`.
 
@@ -821,7 +821,7 @@ lift's events it derives: `messages` = count of `record-pushed` (the push is the
 `pending`** (nothing settled); and `voidReason`, by an **outcome-driven precedence** — `commit` ⇒ none;
 `pending` ⇒ always `'stalled'` (a stray `NP`/`NC` that never reached a decision does not override it); `void`
 ⇒ the first of `expired` (a `signature-rejected`), `'refused-promise'` (a `promise-signed` `NP`), or
-`'voted-no-commit'` (a `referee-vote` `NC`). (`zeroVoidReasons()` is the compile-checked source of truth for
+`'voted-no-commit'` (a `voter-vote` `NC`). (`zeroVoidReasons()` is the compile-checked source of truth for
 the reason set; `ALL_VOID_REASONS` derives from it, so the two cannot drift — the same `pruneReasons` pattern
 the discovery tier's § *Protocol metrics* uses for its reason set.)
 

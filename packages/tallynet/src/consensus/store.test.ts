@@ -1,4 +1,5 @@
 import { canonicalEncode, digest, type DigestValue } from '../digest.js'
+import { DEFAULT_CONSENSUS_METHOD } from '../discovery/types.js'
 import { MemoryTrxStore } from './store.js'
 import type { Signature, TrxRecord } from './types.js'
 
@@ -7,7 +8,7 @@ type TPayload = unknown
 
 /**
  * A fully-populated record exercising every field, including a commit carrying an opaque (but
- * encodable) `attachment` — the per-edge referee signatures ride there in production. Everything here
+ * encodable) `attachment` — the per-edge voter signatures ride there in production. Everything here
  * must be JSON- and DAG-CBOR-round-trippable, like the discovery store's `StoredContext`.
  */
 function sampleRecord(): TrxRecord<TTerms, TPayload> {
@@ -18,12 +19,13 @@ function sampleRecord(): TrxRecord<TTerms, TPayload> {
 		topology: {
 			members: [
 				{ types: ['P'], address: { key: 'alice' } },
-				{ types: ['P', 'R'], address: { key: 'bob' }, dependsOn: [{ key: 'carol' }] },
+				{ types: ['P', 'V'], address: { key: 'bob' }, dependsOn: [{ key: 'carol' }] },
 			],
 			links: {
 				nA: { source: 'alice', target: 'bob', intents: { lift: 'termsAB' } },
 			},
 		},
+		method: DEFAULT_CONSENSUS_METHOD,
 		promises: [
 			{ type: 'P', address: 'alice', value: 'sigAliceP' },
 			{ type: 'P', address: 'bob', value: 'sigBobP' },

@@ -1,4 +1,5 @@
 import { recordDigest } from './digest.js'
+import { DEFAULT_CONSENSUS_METHOD } from '../discovery/types.js'
 import type { Signature, TrxRecord } from './types.js'
 
 type TTerms = string
@@ -21,12 +22,13 @@ function sampleRecord(overrides: Partial<TrxRecord<TTerms, TPayload>> = {}): Trx
 		topology: {
 			members: [
 				{ types: ['P'], address: { key: 'alice' } },
-				{ types: ['P', 'R'], address: { key: 'bob' } },
+				{ types: ['P', 'V'], address: { key: 'bob' } },
 			],
 			links: {
 				nonce1: { source: 'alice', target: 'bob', intents: { lift: 'termsAB' } },
 			},
 		},
+		method: DEFAULT_CONSENSUS_METHOD,
 		promises: [],
 		commits: [],
 		...overrides,
@@ -84,7 +86,7 @@ describe('recordDigest — payload and topology are covered', () => {
 			topology: {
 				members: [
 					{ types: ['P'], address: { key: 'alice' } },
-					{ types: ['P', 'R'], address: { key: 'mallory' } }, // bob → mallory
+					{ types: ['P', 'V'], address: { key: 'mallory' } }, // bob → mallory
 				],
 				links: { nonce1: { source: 'alice', target: 'bob', intents: { lift: 'termsAB' } } },
 			},
@@ -168,5 +170,26 @@ describe('recordDigest — payload that cannot canonically encode', () => {
 	it('throws on undefined in the payload with its path', () => {
 		const record = sampleRecord({ payload: { x: undefined } })
 		expect(() => recordDigest('P', record)).toThrow(/\$\.pl\.x/)
+	})
+})
+
+describe('recordDigest — binds the consensus method and lift contract (proposal params)', () => {
+	it('a record differing only in method yields different bytes', () => {
+		const a = sampleRecord({ method: { weighting: 'distinct-voter', thresholdNum: 1, thresholdDen: 2 } })
+		const b = sampleRecord({ method: { weighting: 'distinct-voter', thresholdNum: 2, thresholdDen: 3 } })
+		expect(toHex(recordDigest('P', a))).not.toBe(toHex(recordDigest('P', b)))
+	})
+
+	it('adding a lift contract changes the bytes; the same contract is stable', () => {
+		const without = sampleRecord()
+		const withContract = sampleRecord({ liftContract: 'bafyLiftContractCID' })
+		expect(toHex(recordDigest('P', withContract))).not.toBe(toHex(recordDigest('P', without)))
+		expect(toHex(recordDigest('P', withContract))).toBe(toHex(recordDigest('P', sampleRecord({ liftContract: 'bafyLiftContractCID' }))))
+	})
+
+	it('a record differing only in lift contract yields different bytes', () => {
+		const a = sampleRecord({ liftContract: 'bafyA' })
+		const b = sampleRecord({ liftContract: 'bafyB' })
+		expect(toHex(recordDigest('P', a))).not.toBe(toHex(recordDigest('P', b)))
 	})
 })

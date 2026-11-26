@@ -1,9 +1,9 @@
-import type { Link, Plan, UniQuery } from 'tallynet'
+import { DEFAULT_CONSENSUS_METHOD, type Link, type Plan, type UniQuery } from 'tallynet'
 import { type LiftTerms, invertLiftTerms, makeCapacityHooks } from './terms.js'
 
 /** A query carrying one `'L'` intent of the given required amount. */
 function query(amount: number): UniQuery<LiftTerms> {
-	return { target: { address: { key: 'x' } }, sessionCode: 's', intents: { L: { capFwd: 0, capBack: 0, amount } }, maxDepth: 5 }
+	return { target: { address: { key: 'x' } }, sessionCode: 's', intents: { L: { capFwd: 0, capBack: 0, amount } }, maxDepth: 5, method: DEFAULT_CONSENSUS_METHOD }
 }
 
 /** A plan whose path links carry the given forward capacities (one link per capacity). */

@@ -9,6 +9,7 @@ import { defaultHooks, type DiscoveryHooks } from './hooks.js'
 import { MemoryParticipantStore, type ParticipantStore, type StoredContext } from './store.js'
 import { Participant, type ParticipantConfig, type ParticipantOptions } from './participant.js'
 import {
+	DEFAULT_CONSENSUS_METHOD,
 	MemberTypes,
 	type FindAddressFunc,
 	type FindResult,
@@ -53,7 +54,7 @@ function nonceOf(session: string, linkId: string): string {
 }
 
 function makeQuery(session: string, overrides: Partial<UniQuery<TTerms>> = {}): UniQuery<TTerms> {
-	return { target: { address: { key: 'target' } }, sessionCode: session, intents: { lift: 'want' }, maxDepth: 7, ...overrides }
+	return { target: { address: { key: 'target' } }, sessionCode: session, intents: { lift: 'want' }, maxDepth: 7, method: DEFAULT_CONSENSUS_METHOD, ...overrides }
 }
 
 function originatorPlan(): Plan<TTerms, TPayload> {

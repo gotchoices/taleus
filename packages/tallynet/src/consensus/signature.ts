@@ -1,6 +1,6 @@
 /**
  * Sign and verify a transaction-record signature. These are the two primitives the consensus state
- * machine (next ticket) and the Taleus referee both call; they are kept **pure** — no clock, no store,
+ * machine (next ticket) and the Taleus voter both call; they are kept **pure** — no clock, no store,
  * no record mutation — so they can be reused anywhere.
  *
  * Both go through the one shared preimage {@link recordDigest}, so sign and verify can never disagree

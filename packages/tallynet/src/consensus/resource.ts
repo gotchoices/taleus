@@ -1,6 +1,6 @@
 /**
  * The resource port: where the **host** (Taleus) holds and releases the value on its tally edges and,
- * if it is a referee, casts the settlement vote. TallyNet drives the promise/commit protocol; the host
+ * if it is a voter, casts the settlement vote. TallyNet drives the promise/commit protocol; the host
  * owns the money. Ported from ChipNet's `TrxParticipantResource` (`participant-resource.ts:12-21`) with
  * the **ordering bug fixed**: ChipNet called `promise` (the hold) *before* `shouldPromise` decided
  * (docs/chipnet-review.md § Transaction module defects, `:75-77`), so a declined promise still held
@@ -73,13 +73,13 @@ export interface TrxParticipantResource<TTerms, TPayload> {
 	release(ctx: ResourceContext<TTerms, TPayload> & { success: boolean }): void | Promise<void>
 
 	/**
-	 * Referee vote gate (members whose `types` include `R` only). `false` → we sign `NC` (no-commit /
+	 * Voter vote gate (members whose `types` include `V` only). `false` → we sign `NC` (no-commit /
 	 * void). Default when omitted: `true`.
 	 */
 	shouldCommit?(ctx: ResourceContext<TTerms, TPayload>): boolean | Promise<boolean>
 
 	/**
-	 * Referee only: opaque per-edge settlement data to ride alongside our `C`/`NC` signature as its
+	 * Voter only: opaque per-edge settlement data to ride alongside our `C`/`NC` signature as its
 	 * `attachment` (see docs/design.md § The commit attachment seam). TallyNet never inspects what this
 	 * returns — it travels by union with the signature and is not part of the signed preimage. Default
 	 * when omitted: no attachment.

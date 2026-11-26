@@ -30,7 +30,7 @@ describe('analyzeLift — a committed lift (hand trace)', () => {
 		{ type: 'record-pushed', time: 0, nodeId: 'E0', sessionCode: 'S1', transactionCode: tx, to: 'E1', promiseCount: 0, commitCount: 0, ok: true },
 		{ type: 'promise-signed', time: 5, nodeId: 'E1', sessionCode: 'S1', transactionCode: tx, signatureType: 'P' },
 		{ type: 'record-pushed', time: 10, nodeId: 'E1', sessionCode: 'S1', transactionCode: tx, to: 'E0', promiseCount: 1, commitCount: 0, ok: true },
-		{ type: 'referee-vote', time: 15, nodeId: 'E0', sessionCode: 'S1', transactionCode: tx, decision: 'C' },
+		{ type: 'voter-vote', time: 15, nodeId: 'E0', sessionCode: 'S1', transactionCode: tx, decision: 'C' },
 		{ type: 'settled', time: 20, nodeId: 'E0', sessionCode: 'S1', transactionCode: tx, decision: 'commit' },
 		// A discovery event (no transactionCode) and another lift's event — both must be ignored.
 		{ type: 'query-sent', time: 3, nodeId: 'E9', sessionCode: 'S1', nonce: 'n', depth: 3, round: 0 },
@@ -67,7 +67,7 @@ describe('analyzeLift — a no-commit vote void', () => {
 		const events: TraceEvent[] = [
 			{ type: 'record-pushed', time: 0, nodeId: 'E0', sessionCode: 'S1', transactionCode: tx, to: 'E1', promiseCount: 0, commitCount: 0, ok: true },
 			{ type: 'promise-signed', time: 4, nodeId: 'E1', sessionCode: 'S1', transactionCode: tx, signatureType: 'P' },
-			{ type: 'referee-vote', time: 9, nodeId: 'E0', sessionCode: 'S1', transactionCode: tx, decision: 'NC' },
+			{ type: 'voter-vote', time: 9, nodeId: 'E0', sessionCode: 'S1', transactionCode: tx, decision: 'NC' },
 			{ type: 'settled', time: 11, nodeId: 'E0', sessionCode: 'S1', transactionCode: tx, decision: 'void' },
 		]
 		const metrics = analyzeLift(events, lift(tx, 'void'))

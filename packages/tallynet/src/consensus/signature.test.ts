@@ -2,6 +2,7 @@ import { ed25519 } from '@noble/curves/ed25519.js'
 import { base64urlToBytes, bytesToBase64url } from '../base64url.js'
 import type { Signer, Verifier } from '../crypto.js'
 import { signRecord, verifySignature } from './signature.js'
+import { DEFAULT_CONSENSUS_METHOD } from '../discovery/types.js'
 import type { Signature, TrxRecord } from './types.js'
 
 type TTerms = string
@@ -32,10 +33,11 @@ function sampleRecord(overrides: Partial<TrxRecord<TTerms, TPayload>> = {}): Trx
 		topology: {
 			members: [
 				{ types: ['P'], address: { key: 'alice' } },
-				{ types: ['P', 'R'], address: { key: 'bob' } },
+				{ types: ['P', 'V'], address: { key: 'bob' } },
 			],
 			links: { nonce1: { source: 'alice', target: 'bob', intents: { lift: 'termsAB' } } },
 		},
+		method: DEFAULT_CONSENSUS_METHOD,
 		promises: [],
 		commits: [],
 		...overrides,
@@ -61,10 +63,10 @@ describe('signRecord / verifySignature — happy path', () => {
 
 	it('round-trips a commit signature over the record promise set', async () => {
 		const participant = makeSigner()
-		const referee = makeSigner()
+		const voter = makeSigner()
 		const record = sampleRecord()
 		record.promises = [await signRecord(participant, 'P', record)]
-		const commit = await signRecord(referee, 'C', record)
+		const commit = await signRecord(voter, 'C', record)
 		expect(commit.type).toBe('C')
 		expect(await verifySignature(verifier, commit, record)).toBe(true)
 	})
@@ -109,12 +111,12 @@ describe('verifySignature — adversarial cases', () => {
 	it('a commit fails once the promise set it was cast over changes', async () => {
 		const participant = makeSigner()
 		const other = makeSigner()
-		const referee = makeSigner()
+		const voter = makeSigner()
 		const record = sampleRecord()
 		record.promises = [await signRecord(participant, 'P', record)]
-		const commit = await signRecord(referee, 'C', record)
+		const commit = await signRecord(voter, 'C', record)
 		expect(await verifySignature(verifier, commit, record)).toBe(true)
-		// A promise appears that the referee never saw: the commit preimage no longer matches.
+		// A promise appears that the voter never saw: the commit preimage no longer matches.
 		record.promises = [...record.promises, await signRecord(other, 'P', record)]
 		expect(await verifySignature(verifier, commit, record)).toBe(false)
 	})

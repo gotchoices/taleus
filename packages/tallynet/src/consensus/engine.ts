@@ -32,7 +32,7 @@ export interface ConsensusNodeDeps<TTerms, TPayload> {
 	verifier: Verifier
 	/** Durable record / peer-record / release-flag store (one per node). */
 	store: TrxStore<TTerms, TPayload>
-	/** Host port: holds/releases value, casts the referee vote. */
+	/** Host port: holds/releases value, casts the voter vote. */
 	resource: TrxParticipantResource<TTerms, TPayload>
 	/** Host port: send the record to a peer over its transport. */
 	updatePeer: UpdatePeerFunc<TTerms, TPayload>

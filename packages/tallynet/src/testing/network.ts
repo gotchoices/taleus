@@ -54,8 +54,10 @@ import type { DiscoveryResult, OriginatorOptions } from '../discovery/originator
 import type { ParticipantOptions, SessionCodeValidators } from '../discovery/participant.js'
 import { MemoryParticipantStore } from '../discovery/store.js'
 import {
+	DEFAULT_CONSENSUS_METHOD,
 	MemberTypes,
 	type Address,
+	type ConsensusMethod,
 	type DependentMember,
 	type FindAddressFunc,
 	type FindResult,
@@ -133,7 +135,7 @@ export interface InMemoryNetworkConfig<TTerms, TPayload> {
 	consensusLog?: (nodeId: string) => Logger
 }
 
-/** One member of a lift, by node name: its roles (`[P]` / `[R]` / `[P,R]`) and whether it publishes a dial address. */
+/** One member of a lift, by node name: its roles (`[P]` / `[V]` / `[P,V]`) and whether it publishes a dial address. */
 export interface LiftMemberSpec {
 	name: string
 	roles: MemberType[]
@@ -144,7 +146,7 @@ export interface LiftMemberSpec {
 /**
  * A lift to build over the consensus nodes. `route` is an ordered node-name path whose consecutive pairs
  * are the tally links of the lift chain; `extraLinks` adds any further links the topology needs (a
- * diamond's second path, a referee hung off a participant). Both resolve to real graph edges — a pair
+ * diamond's second path, a voter hung off a participant). Both resolve to real graph edges — a pair
  * with no graph edge throws. Codes are minted deterministically from the network's seeded random (or
  * supplied) so two runs with the same seed build identical records.
  */
@@ -165,6 +167,10 @@ export interface LiftSpec<TPayload> {
 	extraLinks?: Array<[string, string]>
 	/** The opaque Taleus value carried end to end. */
 	payload: TPayload
+	/** The consensus method the lift settles under. Default: {@link DEFAULT_CONSENSUS_METHOD} (plain strict majority). */
+	method?: ConsensusMethod
+	/** Optional reference (a Stroc CID) to the lift's written contract. Stamped onto the record when set. */
+	liftContract?: string
 	/** Override the minted session code. */
 	sessionCode?: string
 	/** Override the minted transaction code. */
@@ -412,6 +418,8 @@ export class InMemoryNetwork<TTerms, TPayload> {
 			sessionCode,
 			payload: spec.payload,
 			topology: { members, links },
+			method: spec.method ?? DEFAULT_CONSENSUS_METHOD,
+			...(spec.liftContract !== undefined ? { liftContract: spec.liftContract } : {}),
 			promises: [],
 			commits: [],
 		}
@@ -487,7 +495,7 @@ export class InMemoryNetwork<TTerms, TPayload> {
 	/**
 	 * The link condition governing a push from `fromName` to `toName`: the condition on the direct graph
 	 * edge between them, or `undefined` (instant, reliable) when there is no such edge — the case for a
-	 * referee-only member reached by a `physical` dial address rather than a tally link.
+	 * voter-only member reached by a `physical` dial address rather than a tally link.
 	 */
 	private pushCondition(fromName: string, toName: string): LinkCondition | undefined {
 		const edge = (this.adjacency.get(fromName) ?? []).find((candidate) => candidate.neighbour === toName)

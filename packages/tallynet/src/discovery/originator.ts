@@ -32,7 +32,7 @@ import type { RandomSource } from '../crypto.js'
 import { generate } from '../session-code.js'
 import { noopTraceSink, safeTraceSink, type TraceBase, type TraceSink } from '../trace.js'
 import type { DiscoveryHooks } from './hooks.js'
-import type { Plan, QueryRequest, QueryResponse, Target, UniQuery } from './types.js'
+import { DEFAULT_CONSENSUS_METHOD, type ConsensusMethod, type Plan, type QueryRequest, type QueryResponse, type Target, type UniQuery } from './types.js'
 
 /**
  * Originator tuning. The whole time budget lives here: a round's budget is
@@ -49,6 +49,10 @@ export interface OriginatorOptions {
 	perHopBudgetMs: number
 	/** Lifetime of the session code this search mints, in ms. Must exceed a participant's `minSessionMs`. */
 	sessionTtlMs: number
+	/** The consensus method the eventual lift settles under; stamped onto the query. Default: a plain strict majority. */
+	method: ConsensusMethod
+	/** Optional reference (a Stroc CID) to the lift's written contract; stamped onto the query when set. */
+	liftContract?: string
 }
 
 export const defaultOriginatorOptions: OriginatorOptions = {
@@ -56,6 +60,7 @@ export const defaultOriginatorOptions: OriginatorOptions = {
 	initialBudgetMs: 2_000,
 	perHopBudgetMs: 1_500,
 	sessionTtlMs: 600_000,
+	method: DEFAULT_CONSENSUS_METHOD,
 }
 
 /** The result of a search: the minted session code and the satisfying plans found (possibly empty). */
@@ -119,7 +124,14 @@ export class UniOriginator<TTerms, TPayload> {
 	): Promise<DiscoveryResult<TTerms, TPayload>> {
 		const opts = options ? { ...this.options, ...options } : this.options
 		const sessionCode = generate(opts.sessionTtlMs, { now: this.clock.now(), random: this.random })
-		const query: UniQuery<TTerms> = { target, sessionCode, intents, maxDepth: opts.maxDepth }
+		const query: UniQuery<TTerms> = {
+			target,
+			sessionCode,
+			intents,
+			maxDepth: opts.maxDepth,
+			method: opts.method,
+			...(opts.liftContract !== undefined ? { liftContract: opts.liftContract } : {}),
+		}
 
 		// Round 0 is the entrance (the local participant enumerates its own links; it ignores the
 		// budget). Every later round feeds back the previous round's reentrance ticket.

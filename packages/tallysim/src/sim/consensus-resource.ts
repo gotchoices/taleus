@@ -3,7 +3,7 @@
  * node identity, not the `tallynet` node name). The cooperative default — a holder that promises, releases
  * and votes commit while holding nothing real — already lives in the harness (`cooperativeResource`, used
  * when no `resourceFor` is passed). This module supplies the *refusers* a behavioural test needs: a node
- * that declines to promise, one whose `promise` throws, or a referee that votes no-commit.
+ * that declines to promise, one whose `promise` throws, or a voter that votes no-commit.
  *
  * It mirrors the resource doubles in `tallynet`'s `consensus.test.ts`: each handle records the contexts its
  * `promise` saw and the `success` flag of each `release`, so a test reads back exactly what each node held
@@ -21,7 +21,7 @@ import type { LiftTerms } from './terms.js'
  *
  * - `shouldPromise: false` — the promise gate declines; the node signs `NP` and nothing is ever held.
  * - `promiseThrows: true` — `promise` throws (the engine catches it, signs `NP`); nothing is held.
- * - `shouldCommit: false` — an `R`-role member's vote gate declines; it signs `NC` (void).
+ * - `shouldCommit: false` — a `V`-role member's vote gate declines; it signs `NC` (void).
  */
 export interface SimResourceSpec {
 	shouldPromise?: boolean

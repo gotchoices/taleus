@@ -16,10 +16,12 @@
  *   - **Hold only after the gate decides** — `shouldPromise` runs before `promise` (`:75-77`).
  *   - **Expiry and missing hooks always refuse, never approve** — an expired code signs `NP`/`NC`
  *     before any gate runs (`:151-153,169-171`).
- *   - **No "majority of zero"** — an empty referee set is invalid at validation, so `isConsensus(0,0)`
+ *   - **No "majority of zero"** — an empty voter set is invalid at validation, so `isConsensus(0,0)`
  *     cannot arise (`:285-287`).
- *   - **Strict majority both ways** — commit and void each need `> R/2`; they are mutually exclusive, so
- *     an even split satisfies neither (the ChipNet even-split-and-reject-wins bug, `:285-287`).
+ *   - **Strict majority plus threshold** — a side settles only on a strict majority AND reaching the
+ *     method's threshold; commit and void stay mutually exclusive, so an even split satisfies neither
+ *     (the ChipNet even-split-and-reject-wins bug, `:285-287`). The default 1/2 threshold is a plain
+ *     strict majority, byte-identical to before.
  *   - **A circular lift is valid** — our member appears once in `members` but may ride many `links`; the
  *     invalid case is a duplicate *member entry*, not a repeated address on links (`:105`).
  *   - **A failed push logs once** (`:133-134`).
@@ -37,7 +39,7 @@ import { Rule, RuleSet, type RuleResponse } from '../rule.js'
 import { expiresAt, isExpired, isValid } from '../session-code.js'
 import { noopTraceSink, safeTraceSink, type TraceBase, type TraceSink } from '../trace.js'
 import type { SessionCodeValidators } from '../discovery/participant.js'
-import { MemberTypes, type Address, type DependentMember, type MemberType } from '../discovery/types.js'
+import { consensusMethodError, MemberTypes, type Address, type DependentMember, type MemberType } from '../discovery/types.js'
 import { recordDigest } from './digest.js'
 import { signRecord, verifySignature } from './signature.js'
 import type { OurLink, ResourceContext, TrxParticipantResource } from './resource.js'
@@ -67,7 +69,7 @@ export interface TrxParticipantConfig<TTerms, TPayload> {
 	verifier: Verifier
 	/** Durable record / peer-record / release-flag store. */
 	store: TrxStore<TTerms, TPayload>
-	/** Host port: holds/releases value, casts the referee vote. */
+	/** Host port: holds/releases value, casts the voter vote. */
 	resource: TrxParticipantResource<TTerms, TPayload>
 	/** Host port: send the record to a peer over its transport. */
 	updatePeer: UpdatePeerFunc<TTerms, TPayload>
@@ -89,8 +91,8 @@ export interface TrxParticipantConfig<TTerms, TPayload> {
  * How the current record classifies for OUR member role. The two phases (promise, then commit) and
  * their outcomes, per docs/design.md § Protocol design (Consensus):
  *   - `ourPromiseNeeded` / `promising` — promise phase: we owe a promise, or we are waiting on others.
- *   - `ourCommitNeeded` / `propagating` — commit phase: we (a referee) owe a vote, or we are waiting on
- *     other referees / on a tie that cannot settle in-band (see the timeout seam below).
+ *   - `ourCommitNeeded` / `propagating` — commit phase: we (a voter) owe a vote, or we are waiting on
+ *     other voters / on a tie that cannot settle in-band (see the timeout seam below).
  *   - `consensus` — a strict commit majority: commit and release.
  *   - `rejected` — a refusal (any `NP`) or a strict void majority: void and release.
  */
@@ -249,7 +251,7 @@ export class TrxParticipant<TTerms, TPayload> {
 	 *
 	 * **Commit phase.** A commit binds the full promise set, so it cannot be verified until the promise
 	 * phase completes. Verifying before the dedupe is therefore impossible early — and dedupe-before-verify
-	 * is exactly the forged-commit-shadows-vote hole (a garbage commit would occupy a referee's slot and
+	 * is exactly the forged-commit-shadows-vote hole (a garbage commit would occupy a voter's slot and
 	 * block the genuine vote). So commits route through {@link mergeCommit}: unverifiable ones wait in a
 	 * side pool and NEVER enter the authoritative `commits` set until they verify. See docs/design.md
 	 * § Protocol design (Consensus).
@@ -284,7 +286,7 @@ export class TrxParticipant<TTerms, TPayload> {
 	/**
 	 * Membership + role gate, shared by both phases. Returns the member on success, or `undefined` after
 	 * tracing+logging the rejection (`non-member` / `wrong-role`). The required role is derived from the
-	 * signature's own type (`P`/`NP` → participant, `C`/`NC` → referee).
+	 * signature's own type (`P`/`NP` → participant, `C`/`NC` → voter).
 	 */
 	private checkMemberAndRole(merged: TrxRecord<TTerms, TPayload>, signature: Signature): DependentMember | undefined {
 		const member = this.memberByKey(merged.topology, signature.address)
@@ -293,7 +295,7 @@ export class TrxParticipant<TTerms, TPayload> {
 			return undefined
 		}
 		const isPromisePhase = signature.type === 'P' || signature.type === 'NP'
-		const requiredRole: MemberType = isPromisePhase ? MemberTypes.participant : MemberTypes.referee
+		const requiredRole: MemberType = isPromisePhase ? MemberTypes.participant : MemberTypes.voter
 		if (!member.types.includes(requiredRole)) {
 			this.rejectSignature(merged, 'wrong-role')
 			return undefined
@@ -322,7 +324,7 @@ export class TrxParticipant<TTerms, TPayload> {
 	/**
 	 * Promote a commit into the authoritative `commits` set once it verifies against the complete promise
 	 * set. Verification runs **first**; only a verified commit reaches the dedupe/equivocation check, so an
-	 * unverified one can never occupy a referee's slot. A verification failure is `forged`; an identical
+	 * unverified one can never occupy a voter's slot. A verification failure is `forged`; an identical
 	 * re-delivery is deduped silently; a different value for the same signer is `changed` (same face) or
 	 * `equivocation` (opposite face), keeping the first (earlier) verified face. Used for both an incoming
 	 * complete-phase commit and a pooled commit on drain.
@@ -343,7 +345,7 @@ export class TrxParticipant<TTerms, TPayload> {
 
 	/**
 	 * Hold an unverifiable (promise-phase-incomplete) commit in the side `pending` pool. Idempotent on an
-	 * identical re-delivery; capped at {@link MAX_PENDING_COMMITS_PER_REFEREE} entries **per signer** so a
+	 * identical re-delivery; capped at {@link MAX_PENDING_COMMITS_PER_VOTER} entries **per signer** so a
 	 * peer cannot grow the pool without bound (the overflow drops as `pool-full`). The pool is side state:
 	 * never merged into the record, never pushed, never digested. Appends to `pending` in place (the caller
 	 * persists it via `savePendingCommits`).
@@ -356,7 +358,7 @@ export class TrxParticipant<TTerms, TPayload> {
 			return // already pooled: idempotent
 		}
 		const forThisSigner = pending.reduce((count, candidate) => (candidate.address === signature.address ? count + 1 : count), 0)
-		if (forThisSigner >= MAX_PENDING_COMMITS_PER_REFEREE) {
+		if (forThisSigner >= MAX_PENDING_COMMITS_PER_VOTER) {
 			return this.rejectSignature(merged, 'pool-full')
 		}
 		pending.push(signature)
@@ -424,30 +426,37 @@ export class TrxParticipant<TTerms, TPayload> {
 		}
 
 		// ── Commit phase (every participant has promised; the full promise set is present) ──
-		const referees = this.membersWithRole(record.topology, MemberTypes.referee)
-		if (referees.length === 0) {
-			// Unreachable after validation (an empty referee set is rejected there); guarded so a stray
+		const voters = this.membersWithRole(record.topology, MemberTypes.voter)
+		if (voters.length === 0) {
+			// Unreachable after validation (an empty voter set is rejected there); guarded so a stray
 			// record can never settle on a "majority of zero" (ChipNet's isConsensus(0,0), review :285-287).
-			this.log('tallynet consensus: empty referee set reached the commit phase on transaction %s (invalid)', record.transactionCode)
+			this.log('tallynet consensus: empty voter set reached the commit phase on transaction %s (invalid)', record.transactionCode)
 			return 'propagating'
 		}
 
-		const commitCount = await this.countVerifiedCommits(record, 'C', referees)
-		const noCommitCount = await this.countVerifiedCommits(record, 'NC', referees)
-		// Strict majority both ways → mutually exclusive (counts are over distinct referees, so they sum
-		// to at most R; two strict majorities would sum to more than R). A tie satisfies neither.
-		if (commitCount > referees.length / 2) {
+		const commitCount = await this.countVerifiedCommits(record, 'C', voters)
+		const noCommitCount = await this.countVerifiedCommits(record, 'NC', voters)
+		// A side settles when it holds a strict majority AND reaches the method's threshold. The
+		// strict-majority floor (`count*2 > W`) keeps commit and void mutually exclusive for any
+		// threshold (two strict majorities over distinct voters would sum to more than W); the threshold
+		// only ever raises the bar. Integer arithmetic throughout, so the comparison is exact and
+		// deterministic. With the default 1/2, `count*thresholdDen >= thresholdNum*W` becomes `count*2 >=
+		// W`, which combined with the floor is just `count*2 > W` — byte-identical to a plain strict majority.
+		const totalWeight = voters.length // the only v1 weighting is distinct-voter: total weight = voter count
+		const { thresholdNum, thresholdDen } = record.method
+		const settles = (count: number): boolean => count * 2 > totalWeight && count * thresholdDen >= thresholdNum * totalWeight
+		if (settles(commitCount)) {
 			return 'consensus'
 		}
-		if (noCommitCount > referees.length / 2) {
+		if (settles(noCommitCount)) {
 			return 'rejected'
 		}
-		if (this.weAre(MemberTypes.referee, record) && !this.weHaveSigned(record.commits)) {
+		if (this.weAre(MemberTypes.voter, record) && !this.weHaveSigned(record.commits)) {
 			return 'ourCommitNeeded'
 		}
-		// NOTE: a stuck commit phase (a tie, or referees still to vote) stays `propagating` and does NOT
+		// NOTE: a stuck commit phase (a tie, or voters still to vote) stays `propagating` and does NOT
 		// settle in-band — v1 has no timer. This is the seam for `tallynet-propagation-timeouts`: a
-		// timeout-triggered referee NC (void-on-timeout) would be injected here, keyed off the record's
+		// timeout-triggered voter NC (void-on-timeout) would be injected here, keyed off the record's
 		// deadline `this.sessionCodes.expiresAt(record.transactionCode)`; stalled-transaction recovery
 		// hangs off the same point. Do not add a timer here — the extension owns it.
 		return 'propagating'
@@ -462,7 +471,7 @@ export class TrxParticipant<TTerms, TPayload> {
 	}
 
 	/**
-	 * Count distinct referees whose `type` commit signature verifies against the record's (now complete)
+	 * Count distinct voters whose `type` commit signature verifies against the record's (now complete)
 	 * promise set. The merge now admits only already-verified commits into `commits` (an unverified
 	 * out-of-order arrival waits in the side pool, never here), so this re-verification is **defensive** —
 	 * it cannot admit a forged vote; a signature that somehow fails to verify is simply not counted.
@@ -470,15 +479,15 @@ export class TrxParticipant<TTerms, TPayload> {
 	private async countVerifiedCommits(
 		record: TrxRecord<TTerms, TPayload>,
 		type: 'C' | 'NC',
-		referees: DependentMember[],
+		voters: DependentMember[],
 	): Promise<number> {
 		// NOTE: re-verifies every commit on each classification pass, and getRecordState runs in a loop.
-		// Fine at lift scale (a handful of referees); if referee sets ever grow large, cache verification
+		// Fine at lift scale (a handful of voters); if voter sets ever grow large, cache verification
 		// per (record promise-set, signature).
-		const refereeKeys = new Set(referees.map((member) => member.address.key))
+		const voterKeys = new Set(voters.map((member) => member.address.key))
 		const counted = new Set<string>()
 		for (const signature of record.commits) {
-			if (signature.type !== type || counted.has(signature.address) || !refereeKeys.has(signature.address)) {
+			if (signature.type !== type || counted.has(signature.address) || !voterKeys.has(signature.address)) {
 				continue
 			}
 			if (await verifySignature(this.verifier, signature, record, this.hasher)) {
@@ -551,7 +560,7 @@ export class TrxParticipant<TTerms, TPayload> {
 	}
 
 	/**
-	 * Cast our referee vote. Expiry votes `NC` first (never approve). Else the host's `shouldCommit`
+	 * Cast our voter vote. Expiry votes `NC` first (never approve). Else the host's `shouldCommit`
 	 * gate (default true): true → `C`, false → `NC`. The host's opaque per-edge attachment rides along.
 	 */
 	private async castCommit(record: TrxRecord<TTerms, TPayload>): Promise<void> {
@@ -564,7 +573,7 @@ export class TrxParticipant<TTerms, TPayload> {
 		}
 		const attachment = await this.resource.resolveAttachment?.(decision, context)
 		await this.sign(record, decision, 'commits', attachment)
-		this.traceSink({ ...this.traceBase(record), type: 'referee-vote', transactionCode: record.transactionCode, decision })
+		this.traceSink({ ...this.traceBase(record), type: 'voter-vote', transactionCode: record.transactionCode, decision })
 	}
 
 	/**
@@ -772,8 +781,18 @@ export class TrxParticipant<TTerms, TPayload> {
 			new Rule<Test>('NonEmptyParticipantSet', (record) =>
 				Promise.resolve({ passed: this.membersWithRole(record.topology, MemberTypes.participant).length > 0, message: 'No participant members' }),
 			),
-			new Rule<Test>('NonEmptyRefereeSet', (record) =>
-				Promise.resolve({ passed: this.membersWithRole(record.topology, MemberTypes.referee).length > 0, message: 'Empty referee set' }),
+			new Rule<Test>('NonEmptyVoterSet', (record) =>
+				Promise.resolve({ passed: this.membersWithRole(record.topology, MemberTypes.voter).length > 0, message: 'Empty voter set' }),
+			),
+			new Rule<Test>('ConsensusMethod', (record) => {
+				const error = consensusMethodError(record.method)
+				return Promise.resolve({ passed: error === undefined, message: error ?? 'Consensus method is valid' })
+			}),
+			new Rule<Test>('LiftContract', (record) =>
+				Promise.resolve({
+					passed: record.liftContract === undefined || (typeof record.liftContract === 'string' && record.liftContract.length > 0),
+					message: 'liftContract, when present, must be a non-empty Stroc CID string',
+				}),
 			),
 			new Rule<Test>('SelfConsistent', (record) =>
 				Promise.resolve({ passed: this.selfConsistent(record.topology), message: 'Our member/links are inconsistent' }),
@@ -784,7 +803,7 @@ export class TrxParticipant<TTerms, TPayload> {
 
 	/**
 	 * Our membership is consistent with our links: if we are a participant member we must ride at least
-	 * one link, and if we ride any link we must be a member. A referee-only member rides no tally edge
+	 * one link, and if we ride any link we must be a member. A voter-only member rides no tally edge
 	 * and is exempt from the link requirement.
 	 */
 	private selfConsistent(topology: TrxTopology<TTerms>): boolean {
@@ -823,11 +842,11 @@ export class TrxParticipant<TTerms, TPayload> {
 const SignatureTypesLocal = { promise: 'P', noPromise: 'NP' } as const satisfies Record<string, SignatureType>
 
 /**
- * Cap on unverified (promise-phase-incomplete) commits held **per referee** in the side pool before the
- * overflow is dropped as `pool-full`. Small by design: a genuine referee contributes at most two faces
+ * Cap on unverified (promise-phase-incomplete) commits held **per voter** in the side pool before the
+ * overflow is dropped as `pool-full`. Small by design: a genuine voter contributes at most two faces
  * (`C` and `NC`), so 4 leaves slack for out-of-order re-delivery while denying a peer unbounded growth.
  */
-export const MAX_PENDING_COMMITS_PER_REFEREE = 4
+export const MAX_PENDING_COMMITS_PER_VOTER = 4
 
 /** A shallow copy with copied signature arrays — enough to freeze a push snapshot (the core is immutable). */
 function snapshotRecord<TTerms, TPayload>(record: TrxRecord<TTerms, TPayload>): TrxRecord<TTerms, TPayload> {

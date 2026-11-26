@@ -126,14 +126,14 @@ describe('createTimeline — consensus settlement', () => {
 		return createTimeline({ sessionCode: 'S1', events: evs, resolveTally: noTally, consensus: binding })
 	}
 
-	// A committing run: promises flow 0→1→2, the referee votes commit, then the lift settles commit.
+	// A committing run: promises flow 0→1→2, the voter votes commit, then the lift settles commit.
 	const commitEvents: TraceEvent[] = [
 		{ time: 10, nodeId: 'm0', sessionCode: 'S1', type: 'record-pushed', transactionCode: 'TX1', to: 'm1', promiseCount: 1, commitCount: 0, ok: true },
 		{ time: 11, nodeId: 'm1', sessionCode: 'S1', type: 'record-received', transactionCode: 'TX1', from: 'm0', promiseCount: 1, commitCount: 0 },
 		{ time: 12, nodeId: 'm1', sessionCode: 'S1', type: 'record-pushed', transactionCode: 'TX1', to: 'm2', promiseCount: 2, commitCount: 0, ok: true },
 		{ time: 13, nodeId: 'm2', sessionCode: 'S1', type: 'record-received', transactionCode: 'TX1', from: 'm1', promiseCount: 2, commitCount: 0 },
 		{ time: 14, nodeId: 'm2', sessionCode: 'S1', type: 'promise-signed', transactionCode: 'TX1', signatureType: 'P' },
-		{ time: 20, nodeId: 'm2', sessionCode: 'S1', type: 'referee-vote', transactionCode: 'TX1', decision: 'C' },
+		{ time: 20, nodeId: 'm2', sessionCode: 'S1', type: 'voter-vote', transactionCode: 'TX1', decision: 'C' },
 		{ time: 40, nodeId: 'm0', sessionCode: 'S1', type: 'settled', transactionCode: 'TX1', decision: 'commit' },
 	]
 
@@ -152,7 +152,7 @@ describe('createTimeline — consensus settlement', () => {
 		})
 	})
 
-	it('records the referee vote (commit-pending) while still in flight', () => {
+	it('records the voter vote (commit-pending) while still in flight', () => {
 		const c = consensusTimeline(commitEvents).deriveActiveSet(20).consensus
 		expect(c?.edges).toEqual([
 			{ tally: 0, phase: 'promised' },
@@ -188,7 +188,7 @@ describe('createTimeline — consensus settlement', () => {
 		const voidEvents: TraceEvent[] = [
 			{ time: 10, nodeId: 'm0', sessionCode: 'S1', type: 'record-pushed', transactionCode: 'TX1', to: 'm1', promiseCount: 1, commitCount: 0, ok: true },
 			{ time: 14, nodeId: 'm1', sessionCode: 'S1', type: 'promise-signed', transactionCode: 'TX1', signatureType: 'NP' },
-			{ time: 20, nodeId: 'm2', sessionCode: 'S1', type: 'referee-vote', transactionCode: 'TX1', decision: 'NC' },
+			{ time: 20, nodeId: 'm2', sessionCode: 'S1', type: 'voter-vote', transactionCode: 'TX1', decision: 'NC' },
 			{ time: 40, nodeId: 'm0', sessionCode: 'S1', type: 'settled', transactionCode: 'TX1', decision: 'void' },
 		]
 		const c = consensusTimeline(voidEvents).deriveActiveSet(40).consensus

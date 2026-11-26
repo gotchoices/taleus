@@ -17,11 +17,11 @@
  * undefine" discipline — leave an optional field absent, never set it to `undefined`.
  */
 
-import type { DependentMember } from '../discovery/types.js'
+import type { ConsensusMethod, DependentMember } from '../discovery/types.js'
 
 /**
  * The kind of a signature. A **promise** (`P`) / **no-promise** (`NP`) is cast by a participant; a
- * **commit** (`C`) / **no-commit** i.e. void (`NC`) is cast by a referee. The kind is bound INTO the
+ * **commit** (`C`) / **no-commit** i.e. void (`NC`) is cast by a voter. The kind is bound INTO the
  * signed preimage (see `digest.ts`), so a signature cannot be relabelled from one kind to another
  * without failing verification — the fix for ChipNet's type-substitution hole.
  */
@@ -36,7 +36,7 @@ export const SignatureTypes = { promise: 'P', noPromise: 'NP', commit: 'C', noCo
  * - `address` is the signer's key, base64url-encoded — it equals a topology member's `address.key`.
  * - `value` is the base64url signature bytes over the canonical preimage (see {@link recordDigest}).
  * - `attachment` is OPAQUE host data a signer may ride alongside its signature. At commit a Taleus
- *   referee attaches its per-edge settlement signatures here (see docs/design.md § The commit
+ *   voter attaches its per-edge settlement signatures here (see docs/design.md § The commit
  *   attachment seam). TallyNet never inspects, digests, or validates `attachment`; it travels by
  *   union with the signature and is deliberately **not** part of the signed preimage. Promise-phase
  *   signatures never carry one; omit the field rather than setting it to `undefined`.
@@ -65,7 +65,7 @@ export interface TrxLink<TTerms> {
  *
  * - `members` is an **array** whose order the originator fixes once; it is part of the immutable core,
  *   so a reordering reads as a core mismatch (checked in the participant ticket). Each member carries
- *   its `types` (`'P'` participant / `'R'` referee) and may nominate referees/relays via `dependsOn`.
+ *   its `types` (`'P'` participant / `'V'` voter) and may nominate voters/relays via `dependsOn`.
  * - `links` is a **map keyed by the edge's per-session nonce**, so link order is irrelevant under
  *   DAG-CBOR's sorted map keys.
  */
@@ -83,6 +83,10 @@ export interface TrxTopology<TTerms> {
  *   the session code salts the edge nonces.
  * - `payload` is the opaque Taleus value and MUST canonically encode — it is covered by the digest, so
  *   a signing host must supply a `DigestValue`-compatible payload (see {@link recordDigest}).
+ * - `method` and the optional `liftContract` are part of the immutable, promise-signed core: every
+ *   signature binds them (see {@link recordDigest}), so a peer cannot alter the win condition or the
+ *   referenced contract. `method` carries the vote weighting and threshold settlement reads; omit
+ *   `liftContract` when absent (never set it to `undefined` — DAG-CBOR rejects it).
  * - `promises` and `commits` each accumulate by **union** as the record propagates; the signed
  *   preimage binds enough of the record (and, for commits, the promise set) that a merge can detect a
  *   forged, replayed, or equivocating signature (see {@link SignatureRejectReason}).
@@ -92,6 +96,10 @@ export interface TrxRecord<TTerms, TPayload> {
 	sessionCode: string
 	payload: TPayload
 	topology: TrxTopology<TTerms>
+	/** The vote weighting + threshold the lift settles under (part of the immutable, signed core). */
+	method: ConsensusMethod
+	/** Optional reference (a Stroc CID) to the lift's written contract. Omit when absent — never `undefined`. */
+	liftContract?: string
 	promises: Signature[]
 	commits: Signature[]
 }
@@ -103,7 +111,7 @@ export interface TrxRecord<TTerms, TPayload> {
 export type SignatureRejectReason =
 	| 'forged'        // verification failed against a determined preimage (covers type-substitution)
 	| 'non-member'    // signer address is not in topology.members
-	| 'wrong-role'    // a non-P member signed P/NP, or a non-R member signed C/NC
+	| 'wrong-role'    // a non-P member signed P/NP, or a non-V member signed C/NC
 	| 'replay'        // a valid signature for a DIFFERENT (tx, session) with the same topology
 	| 'changed'       // the signer already contributed a different value for this phase
 	| 'equivocation'  // the signer contributed both faces of a phase (P&NP, or C&NC)

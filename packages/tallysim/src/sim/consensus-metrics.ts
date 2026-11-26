@@ -26,7 +26,7 @@
  *     edge, or an even voter-set tie (v1 has no timeout). We do **not** infer a different reason from
  *     stray `NP`/`NC` events that never carried the lift to a decision.
  *   - `void`    ⇒ the first of: a `signature-rejected` with `reason === 'expired'` ⇒ `'expired'`; else any
- *     `promise-signed` `NP` (a refusal) ⇒ `'refused-promise'`; else any `referee-vote` `NC` (a no-commit
+ *     `promise-signed` `NP` (a refusal) ⇒ `'refused-promise'`; else any `voter-vote` `NC` (a no-commit
  *     vote) ⇒ `'voted-no-commit'`; else, defensively, `'voted-no-commit'` (a void always has one of these
  *     causes, so the fallback is unreachable).
  * This resolves the "a refuser **and** a dropped edge counts once as `refused-promise`" case correctly:
@@ -201,7 +201,7 @@ export function analyzeLift(events: readonly TraceEvent[], result: LiftResult): 
 				}
 				break
 			}
-			case 'referee-vote': {
+			case 'voter-vote': {
 				if (event.decision === 'NC') {
 					signals.sawNoCommit = true
 				}

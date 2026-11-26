@@ -4,10 +4,10 @@ import type { Clock } from '../clock.js'
 import type { Signer, Verifier } from '../crypto.js'
 import { generate } from '../session-code.js'
 import type { TraceEvent } from '../trace.js'
-import { MemberTypes, type DependentMember, type MemberType } from '../discovery/types.js'
+import { DEFAULT_CONSENSUS_METHOD, MemberTypes, type ConsensusMethod, type DependentMember, type MemberType } from '../discovery/types.js'
 import { signRecord } from './signature.js'
 import { MemoryTrxStore, type TrxStore } from './store.js'
-import { MAX_PENDING_COMMITS_PER_REFEREE, TrxParticipant, type Logger, type UpdatePeerFunc } from './participant.js'
+import { MAX_PENDING_COMMITS_PER_VOTER, TrxParticipant, type Logger, type UpdatePeerFunc } from './participant.js'
 import type { ResourceContext, TrxParticipantResource } from './resource.js'
 import type { Signature, SignatureType, TrxLink, TrxRecord } from './types.js'
 
@@ -84,6 +84,7 @@ function makeRecord(
 		sessionCode: generate(LONG_TTL, { now: NOW }),
 		payload: { amount: '100' },
 		topology: { members, links },
+		method: DEFAULT_CONSENSUS_METHOD,
 		promises: [],
 		commits: [],
 		...overrides,
@@ -292,7 +293,7 @@ describe('TrxParticipant — first-sight validation (new-record RuleSet)', () =>
 	}
 
 	it('rejects an expired transaction code', async () => {
-		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])], {
+		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])], {
 			n1: link(alice, bob),
 		})
 		record.transactionCode = generate(1000, { now: NOW - 10_000 }) // expired well before NOW
@@ -300,14 +301,14 @@ describe('TrxParticipant — first-sight validation (new-record RuleSet)', () =>
 	})
 
 	it('rejects an expired session code', async () => {
-		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])], {
+		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])], {
 			n1: link(alice, bob),
 		})
 		record.sessionCode = generate(1000, { now: NOW - 10_000 })
 		await expect(reject(record)).rejects.toThrow()
 	})
 
-	it('rejects an empty referee set (no "majority of zero")', async () => {
+	it('rejects an empty voter set (no "majority of zero")', async () => {
 		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant])], { n1: link(alice, bob) })
 		await expect(reject(record)).rejects.toThrow()
 	})
@@ -315,13 +316,13 @@ describe('TrxParticipant — first-sight validation (new-record RuleSet)', () =>
 	it('rejects an empty participant set', async () => {
 		const r1 = makeParty()
 		const r2 = makeParty()
-		const record = makeRecord([member(r1, [MemberTypes.referee]), member(r2, [MemberTypes.referee])], {})
+		const record = makeRecord([member(r1, [MemberTypes.voter]), member(r2, [MemberTypes.voter])], {})
 		await expect(reject(record)).rejects.toThrow()
 	})
 
 	it('rejects a duplicate member entry', async () => {
 		const record = makeRecord(
-			[member(alice, [MemberTypes.participant]), member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])],
+			[member(alice, [MemberTypes.participant]), member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])],
 			{ n1: link(alice, bob) },
 		)
 		await expect(reject(record)).rejects.toThrow()
@@ -329,7 +330,7 @@ describe('TrxParticipant — first-sight validation (new-record RuleSet)', () =>
 
 	it('rejects a link that references a non-member', async () => {
 		const stranger = makeParty()
-		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])], {
+		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])], {
 			n1: { source: alice.key, target: stranger.key, intents: { lift: 'terms' } },
 		})
 		await expect(reject(record)).rejects.toThrow()
@@ -337,7 +338,7 @@ describe('TrxParticipant — first-sight validation (new-record RuleSet)', () =>
 
 	it('rejects a record where our own participant member rides no link', async () => {
 		// self = alice, a participant, but the only link is bob→bob — so alice is on no link (self-inconsistent).
-		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])], {
+		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])], {
 			n1: link(bob, bob),
 		})
 		const { participant } = harness({ self: alice })
@@ -355,7 +356,7 @@ describe('TrxParticipant — signature merge rejection reasons', () => {
 	it('drops a forged promise (verification fails) and leaves the record unharmed', async () => {
 		const alice = makeParty()
 		const bob = makeParty()
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])]
 		const record = makeRecord(members, { n1: link(alice, bob) })
 		const forged = corrupt(await sign(alice, 'P', record))
 		const { participant, events } = relayOver()
@@ -368,7 +369,7 @@ describe('TrxParticipant — signature merge rejection reasons', () => {
 		const alice = makeParty()
 		const bob = makeParty()
 		const stranger = makeParty()
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])]
 		const record = makeRecord(members, { n1: link(alice, bob) })
 		const strangerPromise = await sign(stranger, 'P', record)
 		const { participant, events } = relayOver()
@@ -377,10 +378,10 @@ describe('TrxParticipant — signature merge rejection reasons', () => {
 		expect(rejectReasons(events)).toContain('non-member')
 	})
 
-	it('drops a promise cast by a referee-only member (wrong role)', async () => {
+	it('drops a promise cast by a voter-only member (wrong role)', async () => {
 		const alice = makeParty()
 		const ref = makeParty()
-		const members = [member(alice, [MemberTypes.participant]), member(ref, [MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(ref, [MemberTypes.voter])]
 		const record = makeRecord(members, { n1: link(alice, alice) })
 		const refPromise = await sign(ref, 'P', record)
 		const { participant, events } = relayOver()
@@ -389,10 +390,10 @@ describe('TrxParticipant — signature merge rejection reasons', () => {
 		expect(rejectReasons(events)).toContain('wrong-role')
 	})
 
-	it('drops a commit cast by a non-referee member (wrong role)', async () => {
+	it('drops a commit cast by a non-voter member (wrong role)', async () => {
 		const alice = makeParty()
 		const bob = makeParty()
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])]
 		const record = makeRecord(members, { n1: link(alice, bob) })
 		const aliceCommit = await sign(alice, 'C', record) // alice is participant-only → cannot vote
 		const { participant, events } = relayOver()
@@ -404,7 +405,7 @@ describe('TrxParticipant — signature merge rejection reasons', () => {
 	it('drops a type-substituted promise (P relabelled NP) arriving fresh as forged', async () => {
 		const alice = makeParty()
 		const bob = makeParty()
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])]
 		const record = makeRecord(members, { n1: link(alice, bob) })
 		const genuineP = await sign(alice, 'P', record)
 		const relabelled: Signature = { ...genuineP, type: 'NP' } // relabel, no genuine prior signature present
@@ -417,7 +418,7 @@ describe('TrxParticipant — signature merge rejection reasons', () => {
 	it('drops a signature replayed from another transaction with the same topology (forged)', async () => {
 		const alice = makeParty()
 		const bob = makeParty()
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])]
 		const links = { n1: link(alice, bob) }
 		const recordA = makeRecord(members, links)
 		const recordB: TrxRecord<TTerms, TPayload> = {
@@ -437,7 +438,7 @@ describe('TrxParticipant — signature merge rejection reasons', () => {
 	it('refuses a changed promise value for the same phase and keeps the first', async () => {
 		const alice = makeParty()
 		const bob = makeParty()
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])]
 		const record = makeRecord(members, { n1: link(alice, bob) })
 		const first = await sign(alice, 'P', record)
 		// A second promise, same address + same phase type, different value — refused as `changed` before any
@@ -452,7 +453,7 @@ describe('TrxParticipant — signature merge rejection reasons', () => {
 	it('dedupes an identical re-delivered signature with no change and no rejection', async () => {
 		const alice = makeParty()
 		const bob = makeParty()
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])]
 		const record = makeRecord(members, { n1: link(alice, bob) })
 		const promise = await sign(alice, 'P', record)
 		const { participant, events } = relayOver()
@@ -464,7 +465,7 @@ describe('TrxParticipant — signature merge rejection reasons', () => {
 	it('refuses a whole update whose immutable core differs from the stored copy (core-mismatch)', async () => {
 		const alice = makeParty()
 		const bob = makeParty()
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])]
 		const record = makeRecord(members, { n1: link(alice, bob) })
 		const { participant, store, events } = harness({ self: makeParty() })
 		await participant.update(record) // first sight, stored
@@ -485,7 +486,7 @@ describe('TrxParticipant — promise phase', () => {
 			self: alice,
 			resource: resource.resource,
 		})
-		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])], {
+		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])], {
 			n1: link(alice, bob),
 		})
 		const merged = await participant.update(record)
@@ -500,7 +501,7 @@ describe('TrxParticipant — promise phase', () => {
 		const bob = makeParty()
 		const resource = makeResource({ shouldPromise: false })
 		const { participant, events } = harness({ self: alice, resource: resource.resource })
-		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])], {
+		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])], {
 			n1: link(alice, bob),
 		})
 		await participant.update(record)
@@ -515,7 +516,7 @@ describe('TrxParticipant — promise phase', () => {
 		const bob = makeParty()
 		const resource = makeResource({ promiseThrows: true })
 		const { participant, events, logs } = harness({ self: alice, resource: resource.resource })
-		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])], {
+		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])], {
 			n1: link(alice, bob),
 		})
 		await participant.update(record)
@@ -530,7 +531,7 @@ describe('TrxParticipant — promise phase', () => {
 		const bob = makeParty()
 		const clock = makeClock(NOW)
 		const store = new MemoryTrxStore<TTerms, TPayload>()
-		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.referee])], {
+		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])], {
 			n1: link(alice, bob),
 		})
 		// Seed the record by first sight (via a relay) while the codes are still valid.
@@ -547,9 +548,9 @@ describe('TrxParticipant — promise phase', () => {
 })
 
 describe('TrxParticipant — commit phase and settlement', () => {
-	/** A one-member [P,R] lift over a self-link: it cascades promise → vote → release in one update. */
+	/** A one-member [P,V] lift over a self-link: it cascades promise → vote → release in one update. */
 	function soloRecord(solo: Party): TrxRecord<TTerms, TPayload> {
-		return makeRecord([member(solo, [MemberTypes.participant, MemberTypes.referee])], { n1: link(solo, solo) })
+		return makeRecord([member(solo, [MemberTypes.participant, MemberTypes.voter])], { n1: link(solo, solo) })
 	}
 
 	it('a solo node promises, commits (carrying its attachment), and releases on consensus', async () => {
@@ -560,7 +561,7 @@ describe('TrxParticipant — commit phase and settlement', () => {
 		expect(merged.promises.map((s) => s.type)).toEqual(['P'])
 		expect(merged.commits.map((s) => s.type)).toEqual(['C'])
 		expect(merged.commits[0].attachment).toBe('edge-sig-bundle') // the opaque per-edge bundle rides the vote
-		expect(eventsOfType(events, 'referee-vote').map((e) => e.decision)).toEqual(['C'])
+		expect(eventsOfType(events, 'voter-vote').map((e) => e.decision)).toEqual(['C'])
 		expect(eventsOfType(events, 'settled').map((e) => e.decision)).toEqual(['commit'])
 		expect(resource.releaseSuccesses).toEqual([true])
 	})
@@ -581,7 +582,7 @@ describe('TrxParticipant — commit phase and settlement', () => {
 		const ref = makeParty()
 		const clock = makeClock(NOW)
 		const store = new MemoryTrxStore<TTerms, TPayload>()
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.voter])]
 		const base = makeRecord(members, { n1: link(alice, bob) })
 		const record: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base), await sign(bob, 'P', base)] }
 		// Seed by first sight with the promise phase already complete; codes valid.
@@ -592,7 +593,7 @@ describe('TrxParticipant — commit phase and settlement', () => {
 		const merged = await participant.update(record)
 		expect(merged.commits.map((s) => s.type)).toEqual(['NC'])
 		expect(resource.shouldCommitCtxs).toEqual([]) // the gate is never consulted once expired
-		expect(eventsOfType(events, 'referee-vote').map((e) => e.decision)).toEqual(['NC'])
+		expect(eventsOfType(events, 'voter-vote').map((e) => e.decision)).toEqual(['NC'])
 		expect(resource.releaseSuccesses).toEqual([false])
 	})
 
@@ -604,8 +605,8 @@ describe('TrxParticipant — commit phase and settlement', () => {
 		const members = [
 			member(alice, [MemberTypes.participant]),
 			member(bob, [MemberTypes.participant]),
-			member(r1, [MemberTypes.referee]),
-			member(r2, [MemberTypes.referee]),
+			member(r1, [MemberTypes.voter]),
+			member(r2, [MemberTypes.voter]),
 		]
 		const base = makeRecord(members, { n1: link(alice, bob) })
 		const aliceP = await sign(alice, 'P', base)
@@ -632,13 +633,13 @@ describe('TrxParticipant — commit phase and settlement', () => {
 	})
 })
 
-describe('TrxParticipant — referee set sizes (strict majority, both ways, never both)', () => {
-	/** A 2-participant lift plus `refs` referee-only members; the promise phase is pre-filled. */
+describe('TrxParticipant — voter set sizes (strict majority, both ways, never both)', () => {
+	/** A 2-participant lift plus `refs` voter-only members; the promise phase is pre-filled. */
 	function completeLift(alice: Party, bob: Party, refs: Party[]) {
 		const members = [
 			member(alice, [MemberTypes.participant]),
 			member(bob, [MemberTypes.participant]),
-			...refs.map((r) => member(r, [MemberTypes.referee])),
+			...refs.map((r) => member(r, [MemberTypes.voter])),
 		]
 		const base = makeRecord(members, { n1: link(alice, bob) })
 		return { base, members }
@@ -693,12 +694,117 @@ describe('TrxParticipant — referee set sizes (strict majority, both ways, neve
 	})
 })
 
-describe('TrxParticipant — equivocation (a referee signs both faces)', () => {
+describe('TrxParticipant — threshold settlement (method-driven win condition)', () => {
+	const method = (thresholdNum: number, thresholdDen: number): ConsensusMethod => ({ weighting: 'distinct-voter', thresholdNum, thresholdDen })
+
+	/** A 2-participant lift plus `voterCount` voter-only members, promise phase pre-filled, under `consensusMethod`. */
+	async function completeUnder(voterCount: number, consensusMethod: ConsensusMethod): Promise<{ voters: Party[]; complete: TrxRecord<TTerms, TPayload> }> {
+		const alice = makeParty()
+		const bob = makeParty()
+		const voters = Array.from({ length: voterCount }, () => makeParty())
+		const members = [
+			member(alice, [MemberTypes.participant]),
+			member(bob, [MemberTypes.participant]),
+			...voters.map((v) => member(v, [MemberTypes.voter])),
+		]
+		const base = makeRecord(members, { n1: link(alice, bob) }, { method: consensusMethod })
+		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base), await sign(bob, 'P', base)] }
+		return { voters, complete }
+	}
+
+	it('2 of 3 voters commit settles at threshold 2/3 (reach, not merely a bare majority)', async () => {
+		const { voters, complete } = await completeUnder(3, method(2, 3))
+		const [v1, v2] = voters
+		const v2Commit = await sign(v2, 'C', complete)
+		const resource = makeResource() // v1 votes C by default → 2 of 3
+		const { participant, events } = harness({ self: v1, resource: resource.resource })
+		await participant.update({ ...complete, commits: [v2Commit] })
+		expect(eventsOfType(events, 'settled').map((e) => e.decision)).toEqual(['commit'])
+		expect(resource.releaseSuccesses).toEqual([true])
+	})
+
+	it('3 of 4 voters commit settles at threshold 3/4; 2 of 4 stays in the no-settle band', async () => {
+		const { voters, complete } = await completeUnder(4, method(3, 4))
+		const [v1, v2, v3] = voters
+		const c1 = await sign(v1, 'C', complete)
+		const c2 = await sign(v2, 'C', complete)
+		const c3 = await sign(v3, 'C', complete)
+		// 2 of 4: the strict-majority floor fails (2*2 = 4, not > 4) → no settle (the band), stays pending.
+		const band = harness({ self: makeParty() }) // a relay observes the merge without voting
+		await band.participant.update({ ...complete, commits: [c1, c2] })
+		expect(eventsOfType(band.events, 'settled')).toEqual([])
+		expect(await band.participant.outcome(complete.transactionCode)).toBe('pending')
+		// 3 of 4: clears the floor (3*2 = 6 > 4) and reaches 3/4 → commit.
+		const win = harness({ self: makeParty() })
+		await win.participant.update({ ...complete, commits: [c1, c2, c3] })
+		expect(await win.participant.outcome(complete.transactionCode)).toBe('commit')
+	})
+
+	it('threshold 1 (unanimity) needs every voter; one short does not settle', async () => {
+		const { voters, complete } = await completeUnder(3, method(1, 1))
+		const [v1, v2] = voters
+		const v2Commit = await sign(v2, 'C', complete)
+		const resource = makeResource() // v1 commits → 2 of 3, still short of unanimity
+		const { participant, events } = harness({ self: v1, resource: resource.resource })
+		await participant.update({ ...complete, commits: [v2Commit] })
+		expect(eventsOfType(events, 'settled')).toEqual([])
+		expect(resource.releaseSuccesses).toEqual([])
+	})
+
+	it('a lone voter under the default method settles on its own commit', async () => {
+		const { voters, complete } = await completeUnder(1, DEFAULT_CONSENSUS_METHOD)
+		const resource = makeResource()
+		const { participant, events } = harness({ self: voters[0], resource: resource.resource })
+		await participant.update(complete)
+		expect(eventsOfType(events, 'settled').map((e) => e.decision)).toEqual(['commit'])
+		expect(resource.releaseSuccesses).toEqual([true])
+	})
+})
+
+describe('TrxParticipant — consensus-method validation', () => {
+	const alice = makeParty()
+	const bob = makeParty()
+
+	function rejectWith(method: unknown): Promise<unknown> {
+		const record = makeRecord(
+			[member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])],
+			{ n1: link(alice, bob) },
+			{ method: method as ConsensusMethod },
+		)
+		return harness({ self: makeParty() }).participant.update(record)
+	}
+
+	it('rejects a threshold below 1/2', async () => {
+		await expect(rejectWith({ weighting: 'distinct-voter', thresholdNum: 1, thresholdDen: 3 })).rejects.toThrow()
+	})
+
+	it('rejects a zero or non-integer denominator', async () => {
+		await expect(rejectWith({ weighting: 'distinct-voter', thresholdNum: 1, thresholdDen: 0 })).rejects.toThrow()
+		await expect(rejectWith({ weighting: 'distinct-voter', thresholdNum: 1, thresholdDen: 2.5 })).rejects.toThrow()
+	})
+
+	it('rejects a threshold above 1', async () => {
+		await expect(rejectWith({ weighting: 'distinct-voter', thresholdNum: 3, thresholdDen: 2 })).rejects.toThrow()
+	})
+
+	it('rejects a reserved weighting', async () => {
+		await expect(rejectWith({ weighting: 'nominator-split', thresholdNum: 1, thresholdDen: 2 })).rejects.toThrow()
+	})
+
+	it('accepts the default method', async () => {
+		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])], {
+			n1: link(alice, bob),
+		})
+		await expect(harness({ self: makeParty() }).participant.update(record)).resolves.toBeDefined()
+	})
+})
+
+describe('TrxParticipant — equivocation (a voter signs both faces)', () => {
 	it('refuses the second face on merge, keeps the first, and logs', async () => {
 		const alice = makeParty()
 		const bob = makeParty()
 		const ref = makeParty()
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.voter])]
 		const base = makeRecord(members, { n1: link(alice, bob) })
 		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base), await sign(bob, 'P', base)] }
 		const refCommit = await sign(ref, 'C', complete)
@@ -713,12 +819,12 @@ describe('TrxParticipant — equivocation (a referee signs both faces)', () => {
 		expect(stored?.commits).toEqual([refCommit])
 	})
 
-	it('for a sole referee, the first face wins and a later opposite face cannot re-settle', async () => {
+	it('for a sole voter, the first face wins and a later opposite face cannot re-settle', async () => {
 		const alice = makeParty()
 		const bob = makeParty()
 		const ref = makeParty()
-		// alice is self (a participant on the link); ref is the one referee.
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.referee])]
+		// alice is self (a participant on the link); ref is the one voter.
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.voter])]
 		const base = makeRecord(members, { n1: link(alice, bob) })
 		const bobP = await sign(bob, 'P', base)
 		const aliceP = await sign(alice, 'P', base)
@@ -739,11 +845,11 @@ describe('TrxParticipant — equivocation (a referee signs both faces)', () => {
 })
 
 describe('TrxParticipant — commit-phase side pool (forged-commit-shadows-vote)', () => {
-	// A 2-participant, 1-referee lift. A relay observes the merge so the pool→drain transition is visible
-	// without the observer itself promising or voting. With a SOLE referee, a silenced vote would leave the
+	// A 2-participant, 1-voter lift. A relay observes the merge so the pool→drain transition is visible
+	// without the observer itself promising or voting. With a SOLE voter, a silenced vote would leave the
 	// route at `pending` (no majority) — so a `commit` outcome proves the genuine vote survived.
 	function lift(alice: Party, bob: Party, ref: Party): TrxRecord<TTerms, TPayload> {
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.voter])]
 		return makeRecord(members, { n1: link(alice, bob) })
 	}
 
@@ -769,7 +875,7 @@ describe('TrxParticipant — commit-phase side pool (forged-commit-shadows-vote)
 		// Promises complete and the genuine vote arrives: the garbage drains (forged), the genuine C counts.
 		const settled = await participant.update({ ...base, promises: [aliceP, bobP], commits: [genuineC] })
 		expect(settled.commits).toEqual([genuineC]) // the genuine vote stands
-		expect(await participant.outcome(base.transactionCode)).toBe('commit') // sole referee → strict majority
+		expect(await participant.outcome(base.transactionCode)).toBe('commit') // sole voter → strict majority
 		expect(rejectReasons(events)).toContain('forged') // the drained garbage, dropped on verification
 		expect(rejectReasons(events)).not.toContain('changed') // never collided with the genuine vote
 		expect(rejectReasons(events)).not.toContain('equivocation')
@@ -777,7 +883,7 @@ describe('TrxParticipant — commit-phase side pool (forged-commit-shadows-vote)
 	})
 
 	it('a garbage opposite-face (NC) commit pooled pre-promise does not collide with the genuine C', async () => {
-		// Under the old (dedupe-before-verify) code a garbage NC occupied the referee's slot first, so the
+		// Under the old (dedupe-before-verify) code a garbage NC occupied the voter's slot first, so the
 		// genuine C collided as `equivocation` and was silenced. Pooled-until-verified, the garbage NC instead
 		// drains as `forged` and the genuine C stands.
 		const alice = makeParty()
@@ -801,7 +907,7 @@ describe('TrxParticipant — commit-phase side pool (forged-commit-shadows-vote)
 		expect(rejectReasons(events)).not.toContain('equivocation')
 	})
 
-	it('caps the pool per referee: overflow drops as pool-full, and a later genuine vote still counts', async () => {
+	it('caps the pool per voter: overflow drops as pool-full, and a later genuine vote still counts', async () => {
 		const alice = makeParty()
 		const bob = makeParty()
 		const ref = makeParty()
@@ -810,13 +916,13 @@ describe('TrxParticipant — commit-phase side pool (forged-commit-shadows-vote)
 		const bobP = await sign(bob, 'P', base)
 		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [aliceP, bobP] }
 		const genuineC = await sign(ref, 'C', complete)
-		// MAX_PENDING_COMMITS_PER_REFEREE + 1 DISTINCT garbage commits for the one referee (distinct values, so
+		// MAX_PENDING_COMMITS_PER_VOTER + 1 DISTINCT garbage commits for the one voter (distinct values, so
 		// none dedupes): the pool fills at the cap and the final one overflows.
-		const garbage = Array.from({ length: MAX_PENDING_COMMITS_PER_REFEREE + 1 }, (_, i) => corruptAt(genuineC, i))
+		const garbage = Array.from({ length: MAX_PENDING_COMMITS_PER_VOTER + 1 }, (_, i) => corruptAt(genuineC, i))
 
 		const { participant, store, events } = harness({ self: makeParty() })
 		await participant.update({ ...base, promises: [], commits: garbage })
-		expect(await store.getPendingCommits(base.transactionCode)).toHaveLength(MAX_PENDING_COMMITS_PER_REFEREE)
+		expect(await store.getPendingCommits(base.transactionCode)).toHaveLength(MAX_PENDING_COMMITS_PER_VOTER)
 		expect(rejectReasons(events)).toContain('pool-full') // the overflow was refused, never pooled
 
 		const settled = await participant.update({ ...base, promises: [aliceP, bobP], commits: [genuineC] })
@@ -852,7 +958,7 @@ describe('TrxParticipant — commit-phase side pool (forged-commit-shadows-vote)
 
 describe('TrxParticipant — delivery lifecycle (release-once across re-delivery and restart)', () => {
 	function soloRecord(solo: Party): TrxRecord<TTerms, TPayload> {
-		return makeRecord([member(solo, [MemberTypes.participant, MemberTypes.referee])], { n1: link(solo, solo) })
+		return makeRecord([member(solo, [MemberTypes.participant, MemberTypes.voter])], { n1: link(solo, solo) })
 	}
 
 	it('does not re-release when a settled record is delivered again', async () => {
@@ -913,7 +1019,7 @@ describe('TrxParticipant — reachability and push', () => {
 		const relay = makeParty()
 		const members = [
 			member(alice, [MemberTypes.participant], { physical: 'addr-alice' }),
-			member(bob, [MemberTypes.participant, MemberTypes.referee], { physical: 'addr-bob' }),
+			member(bob, [MemberTypes.participant, MemberTypes.voter], { physical: 'addr-bob' }),
 		]
 		const record = makeRecord(members, { n1: link(alice, bob) })
 		const store = new MemoryTrxStore<TTerms, TPayload>()
@@ -941,7 +1047,7 @@ describe('TrxParticipant — reachability and push', () => {
 		const relay = makeParty()
 		const members = [
 			member(alice, [MemberTypes.participant], { physical: 'addr-alice' }),
-			member(bob, [MemberTypes.participant, MemberTypes.referee], { physical: 'addr-bob' }),
+			member(bob, [MemberTypes.participant, MemberTypes.voter], { physical: 'addr-bob' }),
 		]
 		const record = makeRecord(members, { n1: link(alice, bob) })
 		const { participant, pushes } = harness({ self: relay })
@@ -962,7 +1068,7 @@ describe('TrxParticipant — reachability and push', () => {
 		const relay = makeParty()
 		const members = [
 			member(alice, [MemberTypes.participant], { physical: 'addr-alice' }),
-			member(bob, [MemberTypes.participant, MemberTypes.referee]), // no physical, not linked to relay → unreachable
+			member(bob, [MemberTypes.participant, MemberTypes.voter]), // no physical, not linked to relay → unreachable
 		]
 		const record = makeRecord(members, { n1: link(alice, bob) })
 		const failingPush: UpdatePeerFunc<TTerms, TPayload> = () => Promise.reject(new Error('transport down'))
@@ -985,7 +1091,7 @@ describe('TrxParticipant — topology shapes', () => {
 			member(alice, [MemberTypes.participant]),
 			member(bob, [MemberTypes.participant]),
 			member(carol, [MemberTypes.participant]),
-			member(ref, [MemberTypes.referee]),
+			member(ref, [MemberTypes.voter]),
 		]
 		const links = { la: link(alice, bob), lb: link(bob, carol), lc: link(carol, alice) } // ring a→b→c→a
 		const record = makeRecord(members, links)
@@ -1004,7 +1110,7 @@ describe('TrxParticipant — topology shapes', () => {
 		const bob = makeParty()
 		const ref = makeParty()
 		const relay = makeParty()
-		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.referee])]
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.voter])]
 		const base = makeRecord(members, { n1: link(alice, bob) })
 		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base), await sign(bob, 'P', base)] }
 		const refCommit = await sign(ref, 'C', complete) // a record that WOULD settle at a member
@@ -1017,6 +1123,6 @@ describe('TrxParticipant — topology shapes', () => {
 		expect(resource.releaseSuccesses).toEqual([]) // never released
 		expect(eventsOfType(events, 'settled')).toEqual([]) // never settled — a relay does not act
 		expect(eventsOfType(events, 'promise-signed')).toEqual([])
-		expect(eventsOfType(events, 'referee-vote')).toEqual([])
+		expect(eventsOfType(events, 'voter-vote')).toEqual([])
 	})
 })

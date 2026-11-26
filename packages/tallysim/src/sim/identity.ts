@@ -12,8 +12,8 @@
  * The identity seed is its **own** stream, independent of the network/workload/conditions seeds. Secrets
  * are derived from `(identitySeed, name)` directly, never drawn from a shared RNG whose consumption order
  * could shift and silently rebind keys. Two runs with the same `identitySeed` and node names always get the
- * same keys. See the "lift voters, not referee" design note: a lift settles by its voter set (`R`-role
- * members), default a set of one — the originator voting itself.
+ * same keys. See the voter model: a lift settles by its voter set (`V`-role members), default a set of
+ * one — the originator voting itself.
  */
 
 import { ed25519 } from '@noble/curves/ed25519.js'

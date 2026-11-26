@@ -1,6 +1,6 @@
 /**
  * The one canonical preimage a transaction-record signature is made and checked over. Exported for
- * the Taleus referee too: `packages/taleus-core/src/lift/referee.ts` injects a record-digest function
+ * the Taleus voter too: `packages/taleus-core/src/lift/referee.ts` injects a record-digest function
  * so it signs exactly what TallyNet verifies; the binding ticket wires that injection to this.
  *
  * This is the heart of the two-bug fix from docs/chipnet-review.md § Transaction module defects. In
@@ -15,7 +15,8 @@
  * The preimage is a {@link DigestValue} run through the scaffold's `digest()` (`../digest.js`) —
  * sha256 of deterministic DAG-CBOR, the single encoding this repo signs over:
  *
- *     { k: kind, tx: transactionCode, sc: sessionCode, pl: payload, tp: topology
+ *     { k: kind, tx: transactionCode, sc: sessionCode, pl: payload, tp: topology, mt: method
+ *       [, lc: liftContract ]              // present ONLY when the record carries a lift-contract CID
  *       [, pr: <canonical promise set> ]   // present ONLY for kind 'C' | 'NC'
  *     }
  *
@@ -40,7 +41,7 @@
  *
  * **Why the commit preimage includes the promise set, and the convergence consequence** (carried into
  * the participant ticket as an edge case): binding a commit vote to the exact promise set keeps a
- * referee honest about which promises it saw. A node verifying a commit must therefore hold the same
+ * voter honest about which promises it saw. A node verifying a commit must therefore hold the same
  * promise set. The participant ticket only ever verifies commits once the full participant-promise set
  * is present — the promise phase completes before the commit phase opens — so verification is
  * deterministic. An early-arriving commit (out-of-order delivery) is retained by union but simply not
@@ -56,14 +57,15 @@ import type { Signature, SignatureType, TrxRecord } from './types.js'
  *
  * @param kind      the signature kind, bound into the bytes.
  * @param record    the immutable, digest-covered core (`transactionCode`, `sessionCode`, `payload`,
- *                  `topology`). Only these fields are read — never `commits`.
+ *                  `topology`, `method`, and the optional `liftContract`). Only these fields are read —
+ *                  never `promises` (except via the explicit `promises` arg) nor `commits`.
  * @param promises  the promise set a commit is cast over. REQUIRED for `'C'`/`'NC'` (pass the record's
  *                  full promise set); ignored and omitted from the preimage for `'P'`/`'NP'`.
  * @param hasher    sha256 port; defaults to `@noble/hashes`.
  */
 export function recordDigest<TTerms, TPayload>(
 	kind: SignatureType,
-	record: Pick<TrxRecord<TTerms, TPayload>, 'transactionCode' | 'sessionCode' | 'payload' | 'topology'>,
+	record: Pick<TrxRecord<TTerms, TPayload>, 'transactionCode' | 'sessionCode' | 'payload' | 'topology' | 'method' | 'liftContract'>,
 	promises?: readonly Signature[],
 	hasher?: Hasher,
 ): Uint8Array {
@@ -73,6 +75,12 @@ export function recordDigest<TTerms, TPayload>(
 		sc: record.sessionCode,
 		pl: record.payload as DigestValue,
 		tp: record.topology as unknown as DigestValue,
+		mt: record.method as unknown as DigestValue,
+	}
+	// `lc` (the lift-contract CID) is part of the signed core, but bound only when present — omit the
+	// key entirely when absent, never set it to `undefined` (DAG-CBOR rejects it), as the `pr` key does.
+	if (record.liftContract !== undefined) {
+		preimage.lc = record.liftContract
 	}
 	if (kind === 'C' || kind === 'NC') {
 		// NOTE: an absent promise set for a commit becomes the empty-set preimage, not a throw. Safe

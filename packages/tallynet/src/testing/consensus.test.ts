@@ -24,7 +24,7 @@
  *   at quiescence is the "no delivery left in flight" assertion, and `net.deliveryErrors` stays `[]` on
  *   a clean run (a receiver-side throw would land there, never back at the sender).
  * - **Latencies stay well under the code TTL.** A lift's codes are minted with the default 600_000 ms
- *   lifetime at `clock.now()` (= 0 on a fresh clock). The "sleeping node" / "slow third referee" cases
+ *   lifetime at `clock.now()` (= 0 on a fresh clock). The "sleeping node" / "slow third voter" cases
  *   use a 50_000 ms latency so no code expires mid-run (an expired code would make the woken node refuse
  *   and void the lift — a different outcome from the one under test).
  */
@@ -37,7 +37,7 @@ import { makeNonce } from '../nonce.js'
 import { generate } from '../session-code.js'
 import type { TraceEvent } from '../trace.js'
 import { signRecord } from '../consensus/signature.js'
-import { MAX_PENDING_COMMITS_PER_REFEREE } from '../consensus/participant.js'
+import { MAX_PENDING_COMMITS_PER_VOTER } from '../consensus/participant.js'
 import type { ResourceContext, TrxParticipantResource } from '../consensus/resource.js'
 import type { Signature, TrxRecord } from '../consensus/types.js'
 import { MemberTypes, type MemberType } from '../discovery/types.js'
@@ -56,7 +56,7 @@ type Terms = { balance: number }
 type Payload = { amount: string }
 
 const PART: MemberType = MemberTypes.participant
-const REF: MemberType = MemberTypes.referee
+const VOTER: MemberType = MemberTypes.voter
 /** The opaque Taleus value every lift in this file carries. Only needs to round-trip the digest. */
 const PAYLOAD: Payload = { amount: '100' }
 /** A latency that spans the whole run yet stays far under the 600_000 ms default code lifetime. */
@@ -110,7 +110,7 @@ function corruptAt(signature: Signature, index: number): Signature {
 interface ResourceOpts {
 	/** `shouldPromise` gate value. Omitted → the hook is absent (engine defaults true → promises). */
 	shouldPromise?: boolean
-	/** `shouldCommit` gate value for a referee. Omitted → the hook is absent (engine defaults true → C). */
+	/** `shouldCommit` gate value for a voter. Omitted → the hook is absent (engine defaults true → C). */
 	shouldCommit?: boolean
 }
 
@@ -197,12 +197,12 @@ function makeGraph(nodes: string[], edges: Array<[string, string, string]>): Net
 	}
 }
 
-/** A linear chain of `n` participants `P0..P{n-1}`; the last is also the sole referee. */
+/** A linear chain of `n` participants `P0..P{n-1}`; the last is also the sole voter. */
 function linear(n: number): { names: string[]; graph: NetworkGraph<Terms>; members: LiftMemberSpec[] } {
 	const names = Array.from({ length: n }, (_, i) => `P${i}`)
 	const edges: Array<[string, string, string]> = names.slice(1).map((name, i) => [`e${i}`, names[i], name])
 	const graph = makeGraph(names, edges)
-	const members: LiftMemberSpec[] = names.map((name, i) => ({ name, roles: i === n - 1 ? [PART, REF] : [PART] }))
+	const members: LiftMemberSpec[] = names.map((name, i) => ({ name, roles: i === n - 1 ? [PART, VOTER] : [PART] }))
 	return { names, graph, members }
 }
 
@@ -247,7 +247,7 @@ describe('consensus end to end — linear routes commit atomically', () => {
 
 describe('consensus end to end — a refusal voids the whole route', () => {
 	it('a participant that refuses to promise voids everywhere; every hold is released as failure', async () => {
-		const { names, graph, members } = linear(3) // P0 (origin) — P1 (refuser) — P2 ([P,R])
+		const { names, graph, members } = linear(3) // P0 (origin) — P1 (refuser) — P2 ([P,V])
 		const { net, doubles, traces } = makeNet({ graph, resourceSpecs: { P1: { shouldPromise: false } } })
 		const tx = await runLift(net, { members, route: names, payload: PAYLOAD })
 
@@ -261,12 +261,12 @@ describe('consensus end to end — a refusal voids the whole route', () => {
 		expect(net.deliveryErrors).toEqual([])
 	})
 
-	it('a referee that votes no-commit voids everywhere', async () => {
+	it('a voter that votes no-commit voids everywhere', async () => {
 		const graph = makeGraph(['A', 'B', 'R'], [['ab', 'A', 'B']])
 		const members: LiftMemberSpec[] = [
 			{ name: 'A', roles: [PART], physical: true },
 			{ name: 'B', roles: [PART], physical: true },
-			{ name: 'R', roles: [REF], physical: true },
+			{ name: 'R', roles: [VOTER], physical: true },
 		]
 		const { net, doubles } = makeNet({ graph, resourceSpecs: { R: { shouldCommit: false } } })
 		const tx = await runLift(net, { members, route: ['A', 'B'], payload: PAYLOAD })
@@ -281,7 +281,7 @@ describe('consensus end to end — a refusal voids the whole route', () => {
 })
 
 describe('consensus end to end — circular lift', () => {
-	it('a ring A→B→C→A (A the sole referee) commits and releases once at every node', async () => {
+	it('a ring A→B→C→A (A the sole voter) commits and releases once at every node', async () => {
 		const graph = makeGraph(
 			['A', 'B', 'C'],
 			[
@@ -291,7 +291,7 @@ describe('consensus end to end — circular lift', () => {
 			],
 		)
 		const members: LiftMemberSpec[] = [
-			{ name: 'A', roles: [PART, REF] },
+			{ name: 'A', roles: [PART, VOTER] },
 			{ name: 'B', roles: [PART] },
 			{ name: 'C', roles: [PART] },
 		]
@@ -309,7 +309,7 @@ describe('consensus end to end — circular lift', () => {
 
 describe('consensus end to end — dropped pushes', () => {
 	it('a dropped push on one arm of a diamond still commits via the other arm', async () => {
-		// A—B—D and A—C—D; the A—B edge is dropped. The record reaches referee D over the A→C→D arm; D's
+		// A—B—D and A—C—D; the A—B edge is dropped. The record reaches voter D over the A→C→D arm; D's
 		// commit returns to B over D—B. Every node commits; no node double-releases.
 		const graph = makeGraph(
 			['A', 'B', 'C', 'D'],
@@ -324,7 +324,7 @@ describe('consensus end to end — dropped pushes', () => {
 			{ name: 'A', roles: [PART] },
 			{ name: 'B', roles: [PART] },
 			{ name: 'C', roles: [PART] },
-			{ name: 'D', roles: [PART, REF] },
+			{ name: 'D', roles: [PART, VOTER] },
 		]
 		const { net, doubles } = makeNet({ graph, conditions: { ab: { drop: true } } })
 		const tx = await runLift(net, { members, route: ['A', 'B', 'D'], extraLinks: [['A', 'C'], ['C', 'D']], payload: PAYLOAD })
@@ -348,7 +348,7 @@ describe('consensus end to end — dropped pushes', () => {
 		const members: LiftMemberSpec[] = [
 			{ name: 'A', roles: [PART] },
 			{ name: 'B', roles: [PART] },
-			{ name: 'T', roles: [PART, REF] },
+			{ name: 'T', roles: [PART, VOTER] },
 		]
 		const { net, doubles } = makeNet({ graph, conditions: { ab: { drop: true } } })
 		const tx = await runLift(net, { members, route: ['A', 'B', 'T'], payload: PAYLOAD })
@@ -374,7 +374,7 @@ describe('consensus end to end — a sleeping node', () => {
 		const members: LiftMemberSpec[] = [
 			{ name: 'A', roles: [PART] },
 			{ name: 'B', roles: [PART] },
-			{ name: 'C', roles: [PART, REF] },
+			{ name: 'C', roles: [PART, VOTER] },
 		]
 		const { net, doubles } = makeNet({ graph, conditions: { bc: { latencyMs: SLOW_MS } } })
 		const { record, transactionCode: tx } = net.buildLift({ members, route: ['A', 'B', 'C'], payload: PAYLOAD })
@@ -393,20 +393,20 @@ describe('consensus end to end — a sleeping node', () => {
 	})
 })
 
-describe('consensus end to end — referee set sizes', () => {
-	/** Two participants plus `refs` referee-only members, all with a physical address for complete reachability. */
-	function refereeSet(refs: string[]) {
+describe('consensus end to end — voter set sizes', () => {
+	/** Two participants plus `refs` voter-only members, all with a physical address for complete reachability. */
+	function voterSet(refs: string[]) {
 		const nodes = ['A', 'B', ...refs]
 		const members: LiftMemberSpec[] = [
 			{ name: 'A', roles: [PART], physical: true },
 			{ name: 'B', roles: [PART], physical: true },
-			...refs.map((name) => ({ name, roles: [REF], physical: true })),
+			...refs.map((name) => ({ name, roles: [VOTER], physical: true })),
 		]
 		return { nodes, members, graph: makeGraph(nodes, [['ab', 'A', 'B']]) }
 	}
 
 	it('a set of one commits the route', async () => {
-		const { nodes, members, graph } = refereeSet(['R'])
+		const { nodes, members, graph } = voterSet(['R'])
 		const { net, doubles } = makeNet({ graph })
 		const tx = await runLift(net, { members, route: ['A', 'B'], payload: PAYLOAD })
 		expect(await outcomes(net, nodes, tx)).toEqual(nodes.map(() => 'commit'))
@@ -417,7 +417,7 @@ describe('consensus end to end — referee set sizes', () => {
 	})
 
 	it('a set of two that both commit reaches a strict majority and commits', async () => {
-		const { nodes, members, graph } = refereeSet(['R1', 'R2'])
+		const { nodes, members, graph } = voterSet(['R1', 'R2'])
 		const { net, doubles } = makeNet({ graph })
 		const tx = await runLift(net, { members, route: ['A', 'B'], payload: PAYLOAD })
 		expect(await outcomes(net, nodes, tx)).toEqual(nodes.map(() => 'commit'))
@@ -428,7 +428,7 @@ describe('consensus end to end — referee set sizes', () => {
 	})
 
 	it('a set of two that splits one commit / one void settles neither way (stall)', async () => {
-		const { nodes, members, graph } = refereeSet(['R1', 'R2'])
+		const { nodes, members, graph } = voterSet(['R1', 'R2'])
 		const { net, doubles } = makeNet({ graph, resourceSpecs: { R2: { shouldCommit: false } } })
 		const tx = await runLift(net, { members, route: ['A', 'B'], payload: PAYLOAD })
 		expect(await outcomes(net, nodes, tx)).toEqual(nodes.map(() => 'pending')) // even split → no strict majority
@@ -438,15 +438,15 @@ describe('consensus end to end — referee set sizes', () => {
 		expect(net.clock.pendingTimers).toBe(0)
 	})
 
-	it('a set of three commits on the two fast votes while the third referee is still asleep, then that one commits too', async () => {
+	it('a set of three commits on the two fast votes while the third voter is still asleep, then that one commits too', async () => {
 		// R3 is reached only over a slow link from B; R1 + R2 (fast, physical) are a strict majority on their own.
 		const nodes = ['A', 'B', 'R1', 'R2', 'R3']
 		const members: LiftMemberSpec[] = [
 			{ name: 'A', roles: [PART], physical: true },
 			{ name: 'B', roles: [PART], physical: true },
-			{ name: 'R1', roles: [REF], physical: true },
-			{ name: 'R2', roles: [REF], physical: true },
-			{ name: 'R3', roles: [REF] }, // NOT physical — reached only over the slow B—R3 edge
+			{ name: 'R1', roles: [VOTER], physical: true },
+			{ name: 'R2', roles: [VOTER], physical: true },
+			{ name: 'R3', roles: [VOTER] }, // NOT physical — reached only over the slow B—R3 edge
 		]
 		const graph = makeGraph(nodes, [['ab', 'A', 'B'], ['br3', 'B', 'R3']])
 		const { net, doubles } = makeNet({ graph, conditions: { br3: { latencyMs: SLOW_MS } } })
@@ -486,19 +486,19 @@ describe('consensus end to end — delivery lifecycle', () => {
 })
 
 describe('consensus end to end — adversarial signatures cannot flip a route', () => {
-	it('a post-commit equivocating referee is refused; the settled commit stands and no one re-releases', async () => {
+	it('a post-commit equivocating voter is refused; the settled commit stands and no one re-releases', async () => {
 		const seed = 'equivocate'
 		const graph = makeGraph(['A', 'B', 'R'], [['ab', 'A', 'B']])
 		const members: LiftMemberSpec[] = [
 			{ name: 'A', roles: [PART], physical: true },
 			{ name: 'B', roles: [PART], physical: true },
-			{ name: 'R', roles: [REF], physical: true },
+			{ name: 'R', roles: [VOTER], physical: true },
 		]
 		const { net, doubles, traces } = makeNet({ graph, seed })
 		const tx = await runLift(net, { members, route: ['A', 'B'], payload: PAYLOAD })
 		expect(await net.consensusNode('A').outcome(tx)).toBe('commit')
 
-		// The referee now signs the opposite face (NC) over the same, complete promise set and we deliver it.
+		// The voter now signs the opposite face (NC) over the same, complete promise set and we deliver it.
 		const settled = await net.consensusStoreOf('A').getRecord(tx)
 		const refVoid = await signRecord(makeSigner(seed, 'R'), 'NC', settled!)
 		await net.consensusNode('A').update({ ...settled!, commits: [refVoid] })
@@ -510,18 +510,18 @@ describe('consensus end to end — adversarial signatures cannot flip a route', 
 		expect(net.clock.pendingTimers).toBe(0)
 	})
 
-	it('a forged referee commit is dropped; the genuine majority still reads as a commit', async () => {
+	it('a forged voter commit is dropped; the genuine majority still reads as a commit', async () => {
 		// An observer X (not a member, so it only merges and classifies) is handed a complete-promise record
-		// carrying two genuine referee commits and one forged one. The forged commit fails verification once the
+		// carrying two genuine voter commits and one forged one. The forged commit fails verification once the
 		// promise phase is complete and is dropped; two of three genuine votes are a strict majority → commit.
 		const seed = 'forge'
 		const graph = makeGraph(['A', 'B', 'R1', 'R2', 'R3', 'X'], [['ab', 'A', 'B']])
 		const members: LiftMemberSpec[] = [
 			{ name: 'A', roles: [PART] },
 			{ name: 'B', roles: [PART] },
-			{ name: 'R1', roles: [REF] },
-			{ name: 'R2', roles: [REF] },
-			{ name: 'R3', roles: [REF] },
+			{ name: 'R1', roles: [VOTER] },
+			{ name: 'R2', roles: [VOTER] },
+			{ name: 'R3', roles: [VOTER] },
 		]
 		const { net, traces, doubles } = makeNet({ graph, seed })
 		const { record, transactionCode: tx } = net.buildLift({ members, route: ['A', 'B'], payload: PAYLOAD })
@@ -538,7 +538,7 @@ describe('consensus end to end — adversarial signatures cannot flip a route', 
 		await net.clock.runUntilIdle()
 
 		expect(rejectReasons(traces)).toContain('forged')
-		expect(await net.consensusNode('X').outcome(tx)).toBe('commit') // 2 of 3 genuine referees
+		expect(await net.consensusNode('X').outcome(tx)).toBe('commit') // 2 of 3 genuine voters
 		expect(doubles.get('X')!.releaseSuccesses).toEqual([]) // X is a relay — it classifies but never acts
 		expect(net.clock.pendingTimers).toBe(0)
 		expect(net.deliveryErrors).toEqual([])
@@ -550,14 +550,14 @@ describe('consensus end to end — a forged commit cannot shadow a genuine vote 
 	// signature BEFORE the promise phase completes — the window the forged-commit-shadows-vote defect lived
 	// in. The fix holds every unverifiable commit in a durable side pool until the promise set is complete,
 	// so a forged (or honestly out-of-order) commit can neither block nor silence the genuine one. R is the
-	// SOLE referee: a silenced vote would leave the route at `pending` (no majority), so `commit` proves it
+	// SOLE voter: a silenced vote would leave the route at `pending` (no majority), so `commit` proves it
 	// survived. (Keep the post-commit equivocation test above too — this block exercises the pre-promise path.)
 	const seed = 'pool'
 	const graph = makeGraph(['A', 'B', 'R', 'X'], [['ab', 'A', 'B']])
 	const members: LiftMemberSpec[] = [
 		{ name: 'A', roles: [PART] },
 		{ name: 'B', roles: [PART] },
-		{ name: 'R', roles: [REF] },
+		{ name: 'R', roles: [VOTER] },
 	]
 
 	/** The record with both participant promises merged — the complete set a commit binds and verifies against. */
@@ -647,13 +647,13 @@ describe('consensus end to end — a forged commit cannot shadow a genuine vote 
 		expect(net.deliveryErrors).toEqual([])
 	})
 
-	it('caps the pool per referee: pre-promise overflow drops as pool-full, the genuine vote still counts', async () => {
+	it('caps the pool per voter: pre-promise overflow drops as pool-full, the genuine vote still counts', async () => {
 		const { net, traces } = makeNet({ graph, seed })
 		const { record, transactionCode: tx } = net.buildLift({ members, route: ['A', 'B'], payload: PAYLOAD })
 		const complete = await completeOf(record)
 		const genuineC = await signRecord(makeSigner(seed, 'R'), 'C', complete)
-		// One past the cap, all DISTINCT (distinct byte flips) for the one referee → the final one overflows.
-		const garbage = Array.from({ length: MAX_PENDING_COMMITS_PER_REFEREE + 1 }, (_, i) => corruptAt(genuineC, i))
+		// One past the cap, all DISTINCT (distinct byte flips) for the one voter → the final one overflows.
+		const garbage = Array.from({ length: MAX_PENDING_COMMITS_PER_VOTER + 1 }, (_, i) => corruptAt(genuineC, i))
 
 		await net.consensusNode('X').update({ ...record, promises: [], commits: garbage })
 		await net.consensusNode('X').update({ ...complete, commits: [genuineC] })
@@ -671,7 +671,7 @@ describe('buildLift — routeLinkIds disambiguates parallel tallies', () => {
 	// simulator needs when a pair holds more than one tally.
 	const members: LiftMemberSpec[] = [
 		{ name: 'A', roles: [PART] },
-		{ name: 'B', roles: [PART, REF] },
+		{ name: 'B', roles: [PART, VOTER] },
 	]
 	const parallel: NetworkGraph<Terms> = {
 		nodes: ['A', 'B'],

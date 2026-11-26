@@ -10,8 +10,8 @@
  *
  * ── Three details that are easy to get wrong ───────────────────────────────────────────────────────────
  * - **Members & voters.** Every entity on the route is a participant (`['P']`); the voter set (default the
- *   originator alone) additionally gets `['R']`, so a default lift settles on the originator's own vote (the
- *   "lift voters, not referee" model — a voter set of one). A circular lift lists the originator **once** in
+ *   originator alone) additionally gets `['V']`, so a default lift settles on the originator's own vote (the
+ *   voter model — a voter set of one). A circular lift lists the originator **once** in
  *   `members` though it sits on two links; `buildLift` resolves the route pairs regardless.
  * - **CBOR-safe link intents.** `recordDigest` DAG-CBOR-encodes `topology.links[*].intents`, and DAG-CBOR
  *   throws on `Infinity` — which an `unlimited`-capacity tally carries in `capFwd`/`capBack`. So, after
@@ -36,7 +36,7 @@ import { reconstructRoute } from './route.js'
 import type { LiftTerms } from './terms.js'
 
 const PART: MemberType = MemberTypes.participant
-const REF: MemberType = MemberTypes.referee
+const VOTER: MemberType = MemberTypes.voter
 
 /** The settled result of driving one lift: the codes, the concrete route, the amount, and the outcome. */
 export interface LiftResult {
@@ -55,7 +55,7 @@ export interface LiftResult {
 export interface RunLiftOptions {
 	/** The originator's plan-selection policy (default `shortest`). */
 	policy?: PlanPolicy
-	/** The voter set (`R`-role members). Default: `[route[0]]`, the originator voting itself. */
+	/** The voter set (`V`-role members). Default: `[route[0]]`, the originator voting itself. */
 	voters?: number[]
 }
 
@@ -83,7 +83,7 @@ export async function runLiftForOutcome(
 	const onRoute = new Set(route)
 	for (const voter of voters) {
 		// A voter off the route is never emitted as a member (liftMembers walks the route), so it would
-		// silently carry no referee role — leaving the lift with too few (possibly zero) voters and a
+		// silently carry no voter role — leaving the lift with too few (possibly zero) voters and a
 		// confusing `pending`. Fail loudly instead; the voter set must be a subset of the route.
 		if (!onRoute.has(voter)) {
 			throw new Error(`runLiftForOutcome: voter ${voter} is not on the route [${route.join(', ')}]`)
@@ -112,7 +112,7 @@ export async function runLiftForOutcome(
 
 /**
  * The lift's members: each distinct entity on the route once, as a participant; an entity in `voters`
- * additionally carries the referee role. Order follows first appearance on the route (the originator first),
+ * additionally carries the voter role. Order follows first appearance on the route (the originator first),
  * which is deterministic. A circular route's repeated originator is emitted once.
  */
 function liftMembers(route: number[], voters: Set<number>): LiftMemberSpec[] {
@@ -123,7 +123,7 @@ function liftMembers(route: number[], voters: Set<number>): LiftMemberSpec[] {
 			continue
 		}
 		seen.add(id)
-		members.push({ name: entityName(id), roles: voters.has(id) ? [PART, REF] : [PART] })
+		members.push({ name: entityName(id), roles: voters.has(id) ? [PART, VOTER] : [PART] })
 	}
 	return members
 }

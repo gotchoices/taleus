@@ -36,6 +36,7 @@ import { contextKey, type ParticipantStore, type StoredCandidate, type StoredCon
 import {
 	addressesMatch,
 	appendPath,
+	consensusMethodError,
 	MemberTypes,
 	type DependentMember,
 	type FindAddressFunc,
@@ -569,6 +570,13 @@ export class Participant<TTerms, TPayload> {
 					this.sessionCodes.expiresAt(query.sessionCode) >= now + this.options.minSessionMs
 				return Promise.resolve({ passed: ok, message: 'Session code too short-lived to accept' })
 			}),
+			// Refuse a query whose proposed consensus method we cannot honour (reserved weighting,
+			// out-of-range threshold) before this node ever promises — the discovery-time mirror of
+			// the consensus new-record `ConsensusMethod` rule, over one shared validator.
+			new Rule<Test>('ConsensusMethod', (_plan, query) => {
+				const error = consensusMethodError(query.method)
+				return Promise.resolve({ passed: error === undefined, message: error ?? 'Consensus method is valid' })
+			}),
 			new Rule<Test>(
 				'NewPlan',
 				(plan) => Promise.resolve({ passed: plan.path.length === 0, message: 'Plan must be empty for an initial query' }),
@@ -727,7 +735,7 @@ export function prependMatch<TTerms, TPayload>(plan: Plan<TTerms, TPayload>, mat
 /** A plan's dedupe identity: its path nonces. Two plans with the same route are the same plan here. */
 function planKey<TTerms, TPayload>(plan: Plan<TTerms, TPayload>): string {
 	// NOTE: identity is the path alone. If two plans ever share a path but differ in members or
-	// payload (e.g. a downstream node renegotiates referees between rounds), dedupe keeps the first.
+	// payload (e.g. a downstream node renegotiates voters between rounds), dedupe keeps the first.
 	// Fine for single-denomination v1; revisit if return-path annotation makes members path-dependent.
 	return plan.path.map((link) => link.nonce).join('\u0000')
 }

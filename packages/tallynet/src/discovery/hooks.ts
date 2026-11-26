@@ -55,7 +55,7 @@ export interface DiscoveryHooks<TTerms, TPayload> {
 	annotateReturn?(ctx: { plan: Plan<TTerms, TPayload>; self: Match; inboundNonce?: string }): Plan<TTerms, TPayload> | undefined
 
 	/**
-	 * Optional whole-plan vetting/extension (e.g. add referees). ChipNet's `NegotiatePlanFunc`.
+	 * Optional whole-plan vetting/extension (e.g. add voters). ChipNet's `NegotiatePlanFunc`.
 	 * @returns the revised plan, or `undefined` to reject it. The **default** is identity.
 	 */
 	negotiatePlan?(plan: Plan<TTerms, TPayload>): Plan<TTerms, TPayload> | undefined
