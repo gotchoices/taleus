@@ -4,7 +4,7 @@ files: packages/tallysim/, packages/tallysim/docs/design.md, packages/tallysim-v
 difficulty: medium
 ----
 
-TallyNet's rules stop forgery from changing outcomes (no unverified input may block a verified one), majority voting stops a minority of voters from breaking a lift, and `tallynet-voter-model` / `tallynet-propagation-timeouts` make promised lifts completable and stalled ones end. Misbehaviour by members that are allowed to act can't be prevented locally, only bounded and, later, punished (`feat-tallynet-hostile-peers`, a brainstorm with the developer). This ticket measures it first.
+TallyNet's rules stop forgery from changing outcomes (no unverified input may block a verified one), majority voting stops a minority of voters from breaking a lift, and the voter model (5.1–5.4) / `tallynet-propagation-timeouts` make promised lifts completable and stalled ones end. Misbehaviour by members that are allowed to act can't be prevented locally, only bounded and, later, punished (`feat-tallynet-hostile-peers`, a brainstorm with the developer). This ticket measures it first.
 
 ## Scope
 
@@ -18,7 +18,7 @@ Hostile node behaviours as scenario options (a fraction of nodes, or chosen node
 
 Metrics: lift success, completion of cooperating members, time to settle, credit left held, messages spent, and whether any lift settled inconsistently (must be zero unless a voter majority equivocates; then report it as the expected failure). The viewer marks hostile nodes and shows where lifts break.
 
-**Compare consensus methods** (`tallynet-voter-model` makes the method a proposal parameter: one vote per voter, weight split per nominator, higher thresholds). Run the same attacks, especially voter-set stacking and equivocating voters, under each method, and recommend whether the default should change.
+**Compare consensus methods** (`tallynet-terms-and-proposal-params` makes the method a proposal parameter: one vote per voter, weight split per nominator, higher thresholds). Run the same attacks, especially voter-set stacking and equivocating voters, under each method, and recommend whether the default should change.
 
 Record findings briefly in `packages/tallysim/docs/design.md`, and feed concrete questions into `feat-tallynet-hostile-peers` (edit that backlog ticket).
 
