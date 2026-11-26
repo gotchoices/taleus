@@ -18,6 +18,8 @@ Hostile node behaviours as scenario options (a fraction of nodes, or chosen node
 
 Metrics: lift success, completion of cooperating members, time to settle, credit left held, messages spent, and whether any lift settled inconsistently (must be zero unless a voter majority equivocates; then report it as the expected failure). The viewer marks hostile nodes and shows where lifts break.
 
+**Compare consensus methods** (`tallynet-voter-model` makes the method a proposal parameter: one vote per voter, weight split per nominator, higher thresholds). Run the same attacks, especially voter-set stacking and equivocating voters, under each method, and recommend whether the default should change.
+
 Record findings briefly in `packages/tallysim/docs/design.md`, and feed concrete questions into `feat-tallynet-hostile-peers` (edit that backlog ticket).
 
 ## Edge cases & interactions
