@@ -1,3 +1,4 @@
+import { canonicalEncode, type DigestValue } from '../digest.js'
 import { makeNonce } from '../nonce.js'
 import {
 	DEFAULT_CONSENSUS_METHOD,
@@ -70,21 +71,21 @@ function memberKeysWithRole(topology: TrxTopology<TTerms>, role: MemberType): st
 	return topology.members.filter((m) => m.types.includes(role)).map((m) => m.address.key)
 }
 
+/** alice (origin) → bob → carol (target, self-voter). Folded members in route order, carol [P,V]. */
+function linearPlan(): Plan<TTerms, TPayload> {
+	return {
+		path: [link('L_ab'), link('L_bc')],
+		members: [
+			member('alice', [MemberTypes.participant]),
+			member('bob', [MemberTypes.participant]),
+			member('carol', [MemberTypes.participant, MemberTypes.voter]),
+		],
+	}
+}
+
 /* ── linear route ────────────────────────────────────────────────────────────────────── */
 
 describe('mintRecord — linear route', () => {
-	// alice (origin) → bob → carol (target, self-voter). Folded members in route order, carol [P,V].
-	function linearPlan(): Plan<TTerms, TPayload> {
-		return {
-			path: [link('L_ab'), link('L_bc')],
-			members: [
-				member('alice', [MemberTypes.participant]),
-				member('bob', [MemberTypes.participant]),
-				member('carol', [MemberTypes.participant, MemberTypes.voter]),
-			],
-		}
-	}
-
 	it('keeps participants in route order, origin-first and target-last', () => {
 		const record = mint(linearPlan())
 		expect(memberKeysWithRole(record.topology, MemberTypes.participant)).toEqual(['alice', 'bob', 'carol'])
@@ -233,5 +234,22 @@ describe('mintRecord — rejects an unsettleable plan', () => {
 			],
 		}
 		expect(() => mint(plan)).toThrow(/path has 0 link\(s\) but 3 participant\(s\)/)
+	})
+})
+
+/* ── digest-safety ───────────────────────────────────────────────────────────────────── */
+
+describe('mintRecord — the minted record is digest-safe', () => {
+	// The record is the signed preimage: it must canonically encode (DAG-CBOR), which rejects any
+	// `undefined`-valued key. Proves the `liftContract` omit-don't-undefine invariant end to end —
+	// a regression that always stamped `liftContract` would throw here when the query carries none.
+	it('canonically encodes when the query carries no liftContract (key omitted, not undefined)', () => {
+		const record = mint(linearPlan())
+		expect(() => canonicalEncode(record as unknown as DigestValue)).not.toThrow()
+	})
+
+	it('canonically encodes when the query carries a liftContract', () => {
+		const record = mint(linearPlan(), { liftContract: LIFT_CONTRACT })
+		expect(() => canonicalEncode(record as unknown as DigestValue)).not.toThrow()
 	})
 })
