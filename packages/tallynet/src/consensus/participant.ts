@@ -137,6 +137,7 @@ export class TrxParticipant<TTerms, TPayload> {
 	private readonly store: TrxStore<TTerms, TPayload>
 	private readonly resource: TrxParticipantResource<TTerms, TPayload>
 	private readonly updatePeer: UpdatePeerFunc<TTerms, TPayload>
+	private readonly fetchRecord: FetchRecordFunc<TTerms, TPayload>
 	private readonly nonceToLinkId: Record<string, string>
 	private readonly clock: Clock
 	private readonly random: RandomSource
@@ -153,6 +154,7 @@ export class TrxParticipant<TTerms, TPayload> {
 		this.store = config.store
 		this.resource = config.resource
 		this.updatePeer = config.updatePeer
+		this.fetchRecord = config.fetchRecord ?? (() => Promise.resolve(undefined))
 		this.nonceToLinkId = config.nonceToLinkId
 		this.clock = config.clock
 		this.random = config.random
