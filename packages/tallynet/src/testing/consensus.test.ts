@@ -174,6 +174,10 @@ interface NetOpts {
 	conditions?: Record<string, LinkCondition>
 	/** Per-node referee nominations, threaded straight into the network so a real `discover` folds them in. */
 	nomineesFor?: (nodeId: string) => RefereeNomination[]
+	/** A member that refuses to relay (and serve) the commit phase — the interior refuser a pull must route around. */
+	refuseRelay?: (nodeId: string) => boolean
+	/** A member that goes silent (sends/receives/serves no commit phase) once it has promised. */
+	silentAfterPromise?: (nodeId: string) => boolean
 }
 
 function makeNet(opts: NetOpts): {
@@ -193,6 +197,8 @@ function makeNet(opts: NetOpts): {
 		resourceFor,
 		conditions: opts.conditions,
 		nomineesFor: opts.nomineesFor,
+		refuseRelay: opts.refuseRelay,
+		silentAfterPromise: opts.silentAfterPromise,
 		trace: (event) => traces.push(event),
 	})
 	return { net, traces, doubles }
@@ -1062,5 +1068,159 @@ describe('consensus end to end — determinism', () => {
 		const second = await capture()
 		expect(first.length).toBeGreaterThan(0)
 		expect(second).toEqual(first)
+	})
+})
+
+describe('consensus end to end — record availability (a pull routes around a refuser)', () => {
+	it('a linear chain with contact points: an interior refuser cuts the far member off from the push, but a pull settles it', async () => {
+		// O—V—R—F. V (the sole voter) and O publish contact points. R refuses to relay the commit phase, so
+		// the commit reaches O and V (directly) and R (delivered to it), but R forwards nothing onward — F,
+		// whose only neighbour is R and which has no contact point, is cut off from the push. F pulls O's
+		// settled record over O's contact point (no direct F—O edge, so no interior refuser in the way) and
+		// settles. This is the hard case principle 3 names: on a linear chain, nothing routes around a refuser.
+		const graph = makeGraph(
+			['O', 'V', 'R', 'F'],
+			[
+				['ov', 'O', 'V'],
+				['vr', 'V', 'R'],
+				['rf', 'R', 'F'],
+			],
+		)
+		const members: LiftMemberSpec[] = [
+			{ name: 'O', roles: [PART], physical: true },
+			{ name: 'V', roles: [PART, VOTER], physical: true },
+			{ name: 'R', roles: [PART] },
+			{ name: 'F', roles: [PART] },
+		]
+		const { net, doubles } = makeNet({ graph, refuseRelay: (n) => n === 'R' })
+		const tx = await runLift(net, { members, route: ['O', 'V', 'R', 'F'], payload: PAYLOAD })
+
+		// The push settles everyone up to and including the refuser; F is stranded.
+		expect(await outcomes(net, ['O', 'V', 'R', 'F'], tx)).toEqual(['commit', 'commit', 'commit', 'pending'])
+		expect(doubles.get('F')!.releaseSuccesses).toEqual([]) // nothing reached F → nothing released
+
+		// F pulls and settles — synchronously (the pull resolves on a microtask), so fetchOutcome returns commit.
+		expect(await net.consensusNode('F').fetchOutcome(tx)).toBe('commit')
+		await net.clock.runUntilIdle() // flush the pushes F's own settlement scheduled
+		expect(await net.consensusNode('F').outcome(tx)).toBe('commit')
+		expect(doubles.get('F')!.releaseSuccesses).toEqual([true]) // released exactly once, success
+
+		// A second pull after settlement is idempotent: no second release, no delivery error.
+		expect(await net.consensusNode('F').fetchOutcome(tx)).toBe('commit')
+		await net.clock.runUntilIdle()
+		expect(doubles.get('F')!.releaseSuccesses).toEqual([true])
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('the same chain without contact points: the far member has no path to a voter and stays pending even after a pull', async () => {
+		// Drop every contact point. F's only reachable peer is the refuser R, which serves no pull, so there
+		// is no path to the voter at all — the linear contrast to the circular case below.
+		const graph = makeGraph(
+			['O', 'V', 'R', 'F'],
+			[
+				['ov', 'O', 'V'],
+				['vr', 'V', 'R'],
+				['rf', 'R', 'F'],
+			],
+		)
+		const members: LiftMemberSpec[] = [
+			{ name: 'O', roles: [PART] },
+			{ name: 'V', roles: [PART, VOTER] },
+			{ name: 'R', roles: [PART] },
+			{ name: 'F', roles: [PART] },
+		]
+		const { net, doubles } = makeNet({ graph, refuseRelay: (n) => n === 'R' })
+		const tx = await runLift(net, { members, route: ['O', 'V', 'R', 'F'], payload: PAYLOAD })
+
+		expect(await outcomes(net, ['O', 'V', 'R', 'F'], tx)).toEqual(['commit', 'commit', 'commit', 'pending'])
+		expect(await net.consensusNode('F').fetchOutcome(tx)).toBe('pending') // R serves no pull; no other path exists
+		expect(doubles.get('F')!.releaseSuccesses).toEqual([])
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('a circular lift routes around one refuser with no contact points at all', async () => {
+		// Ring A—B—C—A, A the sole voter, B refuses to relay. A pushes its commit to both neighbours directly
+		// (ab and ca), so C is reached over ca without ever going through B. The whole ring commits.
+		const graph = makeGraph(
+			['A', 'B', 'C'],
+			[
+				['ab', 'A', 'B'],
+				['bc', 'B', 'C'],
+				['ca', 'C', 'A'],
+			],
+		)
+		const members: LiftMemberSpec[] = [
+			{ name: 'A', roles: [PART, VOTER] },
+			{ name: 'B', roles: [PART] },
+			{ name: 'C', roles: [PART] },
+		]
+		const { net, doubles } = makeNet({ graph, refuseRelay: (n) => n === 'B' })
+		const tx = await runLift(net, { members, route: ['A', 'B', 'C', 'A'], payload: PAYLOAD })
+
+		expect(await outcomes(net, ['A', 'B', 'C'], tx)).toEqual(['commit', 'commit', 'commit'])
+		for (const name of ['A', 'B', 'C']) {
+			expect(doubles.get(name)!.releaseSuccesses).toEqual([true])
+		}
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('the originator goes silent after promising: the two voters still reach a majority over their contact points and commit', async () => {
+		// V1—O—V2, O the [P]-only minter, V1/V2 the voters with contact points. O promises, then goes silent
+		// for the commit phase. The voters exchange their commits directly (contact point to contact point),
+		// reach 2 of 2, and commit; O, which receives no commit, stays pending. The lift settles without the
+		// originator online post-promise.
+		const graph = makeGraph(
+			['V1', 'O', 'V2'],
+			[
+				['vo', 'V1', 'O'],
+				['ov2', 'O', 'V2'],
+			],
+		)
+		const members: LiftMemberSpec[] = [
+			{ name: 'O', roles: [PART] },
+			{ name: 'V1', roles: [PART, VOTER], physical: true },
+			{ name: 'V2', roles: [PART, VOTER], physical: true },
+		]
+		const { net, doubles } = makeNet({ graph, silentAfterPromise: (n) => n === 'O' })
+		const { record, transactionCode: tx } = net.buildLift({ members, route: ['V1', 'O', 'V2'], payload: PAYLOAD })
+		await net.consensusNode('O').start(record) // O injects and promises, then falls silent for commits
+		await net.clock.runUntilIdle()
+
+		expect(await outcomes(net, ['V1', 'O', 'V2'], tx)).toEqual(['commit', 'pending', 'commit'])
+		expect(doubles.get('V1')!.releaseSuccesses).toEqual([true])
+		expect(doubles.get('V2')!.releaseSuccesses).toEqual([true])
+		expect(doubles.get('O')!.releaseSuccesses).toEqual([]) // O never saw the commit → never released
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('the payee goes silent after its promise reached the originator: minting already happened, so the lift still commits', async () => {
+		// O—A—Z, O the origin and sole voter, Z the payee. Z's promise reaches O via A (promise phase always
+		// flows) before Z goes silent; O votes and settles, A commits, and A's commit to Z is dropped. The
+		// originator holds the full plan, so Z's silence does not block settlement — O and A commit, Z pends.
+		const graph = makeGraph(
+			['O', 'A', 'Z'],
+			[
+				['oa', 'O', 'A'],
+				['az', 'A', 'Z'],
+			],
+		)
+		const members: LiftMemberSpec[] = [
+			{ name: 'O', roles: [PART, VOTER] },
+			{ name: 'A', roles: [PART] },
+			{ name: 'Z', roles: [PART] },
+		]
+		const { net, doubles } = makeNet({ graph, silentAfterPromise: (n) => n === 'Z' })
+		const tx = await runLift(net, { members, route: ['O', 'A', 'Z'], payload: PAYLOAD })
+
+		expect(await outcomes(net, ['O', 'A', 'Z'], tx)).toEqual(['commit', 'commit', 'pending'])
+		expect(doubles.get('O')!.releaseSuccesses).toEqual([true])
+		expect(doubles.get('A')!.releaseSuccesses).toEqual([true])
+		expect(doubles.get('Z')!.releaseSuccesses).toEqual([]) // Z never saw the commit → never released
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
 	})
 })

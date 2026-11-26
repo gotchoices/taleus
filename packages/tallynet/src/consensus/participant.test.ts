@@ -1205,3 +1205,174 @@ describe('TrxParticipant — topology shapes', () => {
 		expect(eventsOfType(events, 'voter-vote')).toEqual([])
 	})
 })
+
+describe('TrxParticipant — record availability (fetchOutcome pulls a settled record)', () => {
+	/**
+	 * A two-member lift: `voter` is the sole `[P,V]` member and publishes a `physical` contact point;
+	 * `self` is a `[P]`-only participant on the `voter → self` link. `self` holds the complete promise
+	 * phase but no commit, so it is `pending` until it pulls the voter's settled record. The stub serves
+	 * the voter's settled copy (its commit) only when asked of the voter's key — exactly what the
+	 * in-memory network's pull channel does over a contact point.
+	 */
+	function availabilityFixture() {
+		const voter = makeParty()
+		const self = makeParty()
+		return { voter, self }
+	}
+
+	async function settledVoterRecord(voter: Party, self: Party) {
+		const members = [member(voter, [MemberTypes.participant, MemberTypes.voter], { physical: 'dial:voter' }), member(self, [MemberTypes.participant])]
+		const base = makeRecord(members, { n1: link(voter, self) })
+		const voterP = await sign(voter, 'P', base)
+		const selfP = await sign(self, 'P', base)
+		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [voterP, selfP] }
+		const voterCommit = await sign(voter, 'C', complete)
+		const settled: TrxRecord<TTerms, TPayload> = { ...complete, commits: [voterCommit] }
+		return { base, complete, voterCommit, settled }
+	}
+
+	it('pending with the promise phase alone; fetchOutcome pulls the voter commit, settles, and releases once', async () => {
+		const { voter, self } = availabilityFixture()
+		const { base, complete, voterCommit, settled } = await settledVoterRecord(voter, self)
+		const fetchRecord: FetchRecordFunc<TTerms, TPayload> = (_tx, from) => Promise.resolve(from.key === voter.key ? settled : undefined)
+		const resource = makeResource()
+		const { participant, store } = harness({ self, resource: resource.resource, fetchRecord })
+
+		// First sight of the complete promise phase, no commit: our side is settled nowhere yet.
+		await participant.update(complete)
+		expect(await participant.outcome(base.transactionCode)).toBe('pending')
+		expect(resource.releaseSuccesses).toEqual([]) // nothing settled → nothing released
+
+		// A pull obtains the voter's settled copy over its contact point and drives us to commit.
+		expect(await participant.fetchOutcome(base.transactionCode)).toBe('commit')
+		expect(resource.releaseSuccesses).toEqual([true])
+		const stored = await store.getRecord(base.transactionCode)
+		expect(stored?.commits).toEqual([voterCommit])
+
+		// A second pull after settlement is idempotent: the union merge adds nothing, no second release.
+		expect(await participant.fetchOutcome(base.transactionCode)).toBe('commit')
+		expect(resource.releaseSuccesses).toEqual([true])
+	})
+
+	it('a pull reply carrying a forged commit is dropped by verify-on-merge; the puller stays pending', async () => {
+		const { voter, self } = availabilityFixture()
+		const { base, complete, voterCommit } = await settledVoterRecord(voter, self)
+		const forgedReply: TrxRecord<TTerms, TPayload> = { ...complete, commits: [corrupt(voterCommit)] }
+		const fetchRecord: FetchRecordFunc<TTerms, TPayload> = (_tx, from) => Promise.resolve(from.key === voter.key ? forgedReply : undefined)
+		const resource = makeResource()
+		const { participant, events } = harness({ self, resource: resource.resource, fetchRecord })
+
+		await participant.update(complete)
+		expect(await participant.fetchOutcome(base.transactionCode)).toBe('pending') // the forged commit never counts
+		expect(rejectReasons(events)).toContain('forged')
+		expect(resource.releaseSuccesses).toEqual([]) // a pull cannot inject unverified state
+	})
+
+	it('fetchOutcome with no stored record returns pending and pulls nothing (no topology to address)', async () => {
+		const self = makeParty()
+		let pulls = 0
+		const fetchRecord: FetchRecordFunc<TTerms, TPayload> = () => {
+			pulls += 1
+			return Promise.resolve(undefined)
+		}
+		const { participant } = harness({ self, fetchRecord })
+		expect(await participant.fetchOutcome('a-transaction-we-never-saw')).toBe('pending')
+		expect(pulls).toBe(0) // without the record we hold no topology, so we cannot even address a pull
+	})
+})
+
+describe('TrxParticipant — equivocation proof kept (both signed faces retained as evidence)', () => {
+	it('retains both commit faces (C and NC) as proof while the first face still settles', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.voter])]
+		const base = makeRecord(members, { n1: link(alice, bob) })
+		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base), await sign(bob, 'P', base)] }
+		const refCommit = await sign(ref, 'C', complete)
+		const refVoid = await sign(ref, 'NC', complete) // a genuine, verifiable opposite face
+		const { participant, store, events } = harness({ self: makeParty() }) // a relay observes the merge
+		await participant.update({ ...complete, commits: [refCommit] })
+		const merged = await participant.update({ ...complete, commits: [refVoid] })
+		expect(merged.commits.map((s) => s.type)).toEqual(['C']) // the authoritative set is unchanged — the first face stands
+		expect(rejectReasons(events)).toContain('equivocation')
+		const proof = await store.getProof(base.transactionCode, ref.key)
+		expect(proof.map((s) => s.type)).toEqual(['C', 'NC']) // both faces retained as proof
+		expect(await store.getProofSigners(base.transactionCode)).toEqual([ref.key])
+		expect(eventsOfType(events, 'equivocation-proof-kept').map((e) => e.signer)).toEqual([ref.key])
+	})
+
+	it('retains both promise faces (P and NP) as proof', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.voter])]
+		const base = makeRecord(members, { n1: link(alice, bob) })
+		const aliceP = await sign(alice, 'P', base)
+		const aliceNP = await sign(alice, 'NP', base) // alice equivocates in the promise phase
+		const { participant, store, events } = harness({ self: makeParty() })
+		await participant.update({ ...base, promises: [aliceP] })
+		await participant.update({ ...base, promises: [aliceNP] })
+		const proof = await store.getProof(base.transactionCode, alice.key)
+		expect(proof.map((s) => s.type)).toEqual(['P', 'NP'])
+		expect(eventsOfType(events, 'equivocation-proof-kept').map((e) => e.signer)).toEqual([alice.key])
+	})
+
+	it('does not retain a forged opposite face — a face the signer never signed is not evidence', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const members = [member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant]), member(ref, [MemberTypes.voter])]
+		const base = makeRecord(members, { n1: link(alice, bob) })
+		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base), await sign(bob, 'P', base)] }
+		const refCommit = await sign(ref, 'C', complete)
+		const refVoidForged = corrupt(await sign(ref, 'NC', complete))
+		const { participant, store, events } = harness({ self: makeParty() })
+		await participant.update({ ...complete, commits: [refCommit] })
+		await participant.update({ ...complete, commits: [refVoidForged] })
+		expect(rejectReasons(events)).toContain('forged') // promoteCommit verifies first → forged, not equivocation
+		expect(await store.getProof(base.transactionCode, ref.key)).toEqual([]) // no proof retained
+		expect(await store.getProofSigners(base.transactionCode)).toEqual([])
+		expect(eventsOfType(events, 'equivocation-proof-kept')).toEqual([])
+	})
+})
+
+describe('TrxParticipant — settled-outcome contradiction (equivocating voters split two copies)', () => {
+	it('flags a contradiction when our committed outcome meets a voided copy, keeps our outcome, and retains the proof', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const r1 = makeParty()
+		const r2 = makeParty()
+		const members = [
+			member(alice, [MemberTypes.participant]),
+			member(bob, [MemberTypes.participant]),
+			member(r1, [MemberTypes.voter]),
+			member(r2, [MemberTypes.voter]),
+		]
+		const base = makeRecord(members, { n1: link(alice, bob) })
+		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base), await sign(bob, 'P', base)] }
+		const r1C = await sign(r1, 'C', complete)
+		const r2C = await sign(r2, 'C', complete)
+		const r1NC = await sign(r1, 'NC', complete)
+		const r2NC = await sign(r2, 'NC', complete)
+		const resource = makeResource()
+		const { participant, events } = harness({ self: alice, resource: resource.resource })
+
+		// Delivery 1: both voters' commit faces → strict majority → consensus; alice releases; no contradiction yet.
+		await participant.update({ ...complete, commits: [r1C, r2C] })
+		expect(await participant.outcome(base.transactionCode)).toBe('commit')
+		expect(resource.releaseSuccesses).toEqual([true])
+		expect(await participant.contradicts(base.transactionCode)).toBe(false)
+
+		// Delivery 2: the SAME voters' NC faces (they equivocated) → a copy that voids. Our settled outcome stands.
+		await participant.update({ ...complete, commits: [r1NC, r2NC] })
+		expect(await participant.outcome(base.transactionCode)).toBe('commit')
+		expect(await participant.contradicts(base.transactionCode)).toBe(true)
+		const flags = eventsOfType(events, 'contradiction-detected')
+		expect(flags).toHaveLength(1)
+		expect(flags[0]).toMatchObject({ ourOutcome: 'commit', peerOutcome: 'void' })
+		expect(resource.releaseSuccesses).toEqual([true]) // still exactly one release — settlement is untouched
+		expect([...(await participant.equivocators(base.transactionCode))].sort()).toEqual([r1.key, r2.key].sort())
+		expect(await participant.equivocationProof(base.transactionCode, r1.key)).toHaveLength(2) // C + NC
+	})
+})
