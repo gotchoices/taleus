@@ -83,9 +83,10 @@ export class MemoryTrxStore<TTerms, TPayload> implements TrxStore<TTerms, TPaylo
 
 	savePeerRecord(transactionCode: string, address: string, record: TrxRecord<TTerms, TPayload>): Promise<void> {
 		// NOTE: stores the record by reference (as the discovery store does). The reachability skip test
-		// (next ticket) compares a peer's last-pushed copy against the current record; if the participant
-		// mutates a record object in place after saving it here, the "last pushed" copy mutates with it
-		// and the skip test misreads. The participant must save a distinct object per push, not mutate.
+		// (`push`/`validateAndMerge` in participant.ts) compares a peer's last-pushed copy against the
+		// current record; if the participant mutates a record object in place after saving it here, the
+		// "last pushed" copy mutates with it and the skip test misreads. The participant must save a
+		// distinct object per push, not mutate (it uses `snapshotRecord`).
 		this.peerRecords.set(peerKey(transactionCode, address), record)
 		return Promise.resolve()
 	}
