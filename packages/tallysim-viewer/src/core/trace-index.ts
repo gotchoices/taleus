@@ -53,6 +53,9 @@ function pairKey(a: number, b: number): string {
  */
 export function createLiftResolver(lift: TraceLiftEntry): LiftResolver {
 	const tallyByPair = new Map<string, number>()
+	// NOTE: keyed by unordered pair, so a route that traverses the SAME entity pair on two different tallies
+	// collapses to the last one (the wrong hop could light). For simple path/cycle lifts the only such case is a
+	// degenerate 2-node loop `[A,B,A]`; if multi-tally pairs ever appear on a real route, key by (pair, hopIndex).
 	for (let i = 0; i < lift.tallyPath.length; i++) {
 		tallyByPair.set(pairKey(lift.route[i], lift.route[i + 1]), lift.tallyPath[i])
 	}
