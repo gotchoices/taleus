@@ -299,6 +299,7 @@ export class InMemoryNetwork<TTerms, TPayload> {
 			updatePeer: this.makeUpdatePeer(name),
 			nonceToLinkId,
 			clock: this.clock,
+			random: this.random,
 			hasher: this.hasher,
 			trace: config.trace,
 			log: config.consensusLog ? config.consensusLog(name) : undefined,

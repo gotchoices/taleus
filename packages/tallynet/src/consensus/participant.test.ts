@@ -1,7 +1,7 @@
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { base64urlToBytes, bytesToBase64url } from '../base64url.js'
 import type { Clock } from '../clock.js'
-import type { Signer, Verifier } from '../crypto.js'
+import type { RandomSource, Signer, Verifier } from '../crypto.js'
 import { generate } from '../session-code.js'
 import type { TraceEvent } from '../trace.js'
 import { DEFAULT_CONSENSUS_METHOD, MemberTypes, type ConsensusMethod, type DependentMember, type MemberType } from '../discovery/types.js'
@@ -51,6 +51,9 @@ const verifier: Verifier = {
 		}
 	},
 }
+
+/** A deterministic RandomSource for the harness. `random` is only consumed by `proceed`, which these one-node unit tests never drive (proceed's end-to-end path is `testing/consensus.test.ts`). */
+const harnessRandom: RandomSource = { randomBytes: (length) => new Uint8Array(length).fill(7) }
 
 /* ── parties, members, records ───────────────────────────────────────────────────────── */
 
@@ -268,6 +271,7 @@ function harness(opts: HarnessOpts): Harness {
 		updatePeer,
 		nonceToLinkId: opts.nonceToLinkId ?? {},
 		clock,
+		random: harnessRandom,
 		trace: (event) => events.push(event),
 		log,
 	})

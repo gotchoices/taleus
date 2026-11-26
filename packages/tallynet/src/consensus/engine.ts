@@ -13,11 +13,11 @@
  */
 
 import type { Clock } from '../clock.js'
-import type { Hasher, Signer, Verifier } from '../crypto.js'
+import type { Hasher, RandomSource, Signer, Verifier } from '../crypto.js'
 import type { TraceSink } from '../trace.js'
 import type { SessionCodeValidators } from '../discovery/participant.js'
 import type { Address } from '../discovery/types.js'
-import { TrxParticipant, type Logger, type UpdatePeerFunc } from './participant.js'
+import { TrxParticipant, type Logger, type ProceedArgs, type UpdatePeerFunc } from './participant.js'
 import type { TrxParticipantResource } from './resource.js'
 import type { TrxStore } from './store.js'
 import type { TrxRecord } from './types.js'
@@ -38,8 +38,10 @@ export interface ConsensusNodeDeps<TTerms, TPayload> {
 	updatePeer: UpdatePeerFunc<TTerms, TPayload>
 	/** Our discovery session's nonce→linkId map; identifies the links we own. */
 	nonceToLinkId: Record<string, string>
-	/** All wall-clock time (for code-expiry checks). */
+	/** All wall-clock time (for code-expiry checks, and the `now` a `proceed` transaction code expires from). */
 	clock: Clock
+	/** CSPRNG the originator's `proceed` mints the self-expiring transaction code from. */
+	random: RandomSource
 	/** sha256, for the canonical digest. Defaults to `@noble/hashes`. */
 	hasher?: Hasher
 	/** Optional trace sink; wrapped so a throw can never break the engine. Default: no-op. */
@@ -66,6 +68,7 @@ export class ConsensusNode<TTerms, TPayload> {
 			updatePeer: deps.updatePeer,
 			nonceToLinkId: deps.nonceToLinkId,
 			clock: deps.clock,
+			random: deps.random,
 			hasher: deps.hasher,
 			trace: deps.trace,
 			log: deps.log,
@@ -76,6 +79,24 @@ export class ConsensusNode<TTerms, TPayload> {
 	/** Originator role: seed the transaction with our own freshly-built record (our first update). */
 	start(record: TrxRecord<TTerms, TPayload>): Promise<TrxRecord<TTerms, TPayload>> {
 		return this.participant.update(record)
+	}
+
+	/**
+	 * Originator role: start a discovered lift from the chosen plan. Mints the self-expiring transaction
+	 * code, folds the plan into a record (reusing the query's session code), signs our promise and pushes.
+	 * The caller chooses the plan (`discover` returns them best-first); this delegate never ranks.
+	 */
+	proceed(args: ProceedArgs<TTerms, TPayload>): Promise<TrxRecord<TTerms, TPayload>> {
+		return this.participant.proceed(args)
+	}
+
+	/**
+	 * Originator role: void a lift we seeded but have not yet promised on — signs our `NP`, releases our
+	 * own (empty) hold as a failure, and diffuses the void. A no-op once we have promised or the lift has
+	 * settled (see {@link TrxParticipant.abort}).
+	 */
+	abort(transactionCode: string): Promise<void> {
+		return this.participant.abort(transactionCode)
 	}
 
 	// NOTE: `update` is not re-entrancy-safe per node — it reads the stored record, merges, then saves

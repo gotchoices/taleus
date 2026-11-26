@@ -34,13 +34,14 @@
 
 import { bytesToBase64url } from '../base64url.js'
 import type { Clock } from '../clock.js'
-import type { Hasher, Signer, Verifier } from '../crypto.js'
+import type { Hasher, RandomSource, Signer, Verifier } from '../crypto.js'
 import { Rule, RuleSet, type RuleResponse } from '../rule.js'
-import { expiresAt, isExpired, isValid } from '../session-code.js'
+import { expiresAt, generate, isExpired, isValid } from '../session-code.js'
 import { noopTraceSink, safeTraceSink, type TraceBase, type TraceSink } from '../trace.js'
 import type { SessionCodeValidators } from '../discovery/participant.js'
-import { consensusMethodError, MemberTypes, type Address, type DependentMember, type MemberType } from '../discovery/types.js'
+import { consensusMethodError, MemberTypes, type Address, type DependentMember, type MemberType, type Plan, type UniQuery } from '../discovery/types.js'
 import { recordDigest } from './digest.js'
+import { mintRecord } from './mint.js'
 import { signRecord, verifySignature } from './signature.js'
 import type { OurLink, ResourceContext, TrxParticipantResource } from './resource.js'
 import type { TrxStore } from './store.js'
@@ -75,8 +76,10 @@ export interface TrxParticipantConfig<TTerms, TPayload> {
 	updatePeer: UpdatePeerFunc<TTerms, TPayload>
 	/** Our discovery session's nonce→linkId map (`ParticipantStore.getNonceToLinkMap`). Identifies OUR links. */
 	nonceToLinkId: Record<string, string>
-	/** All wall-clock time (for code-expiry checks). */
+	/** All wall-clock time (for code-expiry checks, and the `now` a `proceed` transaction code expires from). */
 	clock: Clock
+	/** CSPRNG the originator's `proceed` mints the self-expiring transaction code from. */
+	random: RandomSource
 	/** sha256, for the canonical digest. Defaults to `@noble/hashes`. */
 	hasher?: Hasher
 	/** Optional trace sink; wrapped so a throw can never break the engine. Default: no-op. */
@@ -85,6 +88,18 @@ export interface TrxParticipantConfig<TTerms, TPayload> {
 	log?: Logger
 	/** Session-code checks (validate BOTH `transactionCode` and `sessionCode`); default wraps `session-code.ts`. */
 	sessionCodes?: SessionCodeValidators
+}
+
+/** What {@link TrxParticipant.proceed} needs to start a discovered lift. */
+export interface ProceedArgs<TTerms, TPayload> {
+	/** The ONE chosen plan. The caller picks it — `discover` returns plans best-first, so this is usually `plans[0]`. */
+	plan: Plan<TTerms, TPayload>
+	/** The originator's query: supplies `method`, optional `liftContract`, and the `sessionCode` to **reuse**. */
+	query: UniQuery<TTerms>
+	/** The opaque Taleus value stamped into the record once and carried, covered by the digest, to every node. */
+	payload: TPayload
+	/** Transaction-code lifetime in ms. Defaults to {@link DEFAULT_TTL}. */
+	ttlMs?: number
 }
 
 /**
@@ -110,6 +125,7 @@ export class TrxParticipant<TTerms, TPayload> {
 	private readonly updatePeer: UpdatePeerFunc<TTerms, TPayload>
 	private readonly nonceToLinkId: Record<string, string>
 	private readonly clock: Clock
+	private readonly random: RandomSource
 	private readonly hasher?: Hasher
 	private readonly traceSink: TraceSink
 	private readonly log: Logger
@@ -125,6 +141,7 @@ export class TrxParticipant<TTerms, TPayload> {
 		this.updatePeer = config.updatePeer
 		this.nonceToLinkId = config.nonceToLinkId
 		this.clock = config.clock
+		this.random = config.random
 		this.hasher = config.hasher
 		this.traceSink = safeTraceSink(config.trace ?? noopTraceSink)
 		this.log = config.log ?? (() => {})
@@ -173,6 +190,62 @@ export class TrxParticipant<TTerms, TPayload> {
 		}
 		const state = await this.getRecordState(record)
 		return state === 'consensus' ? 'commit' : state === 'rejected' ? 'void' : 'pending'
+	}
+
+	/* ── originate ──────────────────────────────────────────────────────────────────────── */
+
+	/**
+	 * Originator action: start a discovered lift. Mint a self-expiring transaction code (from our
+	 * injected clock + CSPRNG), fold the ONE chosen plan into a transaction record ({@link mintRecord},
+	 * reusing the query's session code so every edge nonce still resolves), then run it through
+	 * {@link update} — which classifies `ourPromiseNeeded`, signs our own **P** and pushes to reachable
+	 * peers. The record then diffuses until the lift settles everywhere. The caller picks the plan
+	 * (`discover` returns them best-first); `proceed` never ranks, and mints nothing but the code.
+	 */
+	async proceed(args: ProceedArgs<TTerms, TPayload>): Promise<TrxRecord<TTerms, TPayload>> {
+		const transactionCode = generate(args.ttlMs ?? DEFAULT_TTL, { now: this.clock.now(), random: this.random })
+		const record = mintRecord({ plan: args.plan, query: args.query, payload: args.payload, transactionCode })
+		return this.update(record)
+	}
+
+	/**
+	 * Originator action: void a lift we seeded but have **not yet promised on**. We sign our own `NP` —
+	 * the sole promise-phase face we contribute — so it voids cleanly everywhere (any `NP` → `rejected`,
+	 * applied the same by every node and relay), then run the record through {@link update} so we release
+	 * our own (empty) hold as a failure and diffuse the void, exactly as a refusing participant does.
+	 *
+	 * A no-op in four cases, each logged: an unknown transaction, one already released (settled), one we
+	 * are not a participant in, and one whose **promise phase is already complete** (principle 3 — no
+	 * abort once every participant has promised). And it is **refused once we ourselves have signed any
+	 * promise** (the atomicity guard): a later `NP` after our `P` would equivocate — `mergeSignature`
+	 * keeps our first face (`P`) at every peer, so those peers would still commit while we voided locally.
+	 * Since `proceed` signs our `P` immediately, a `proceed`-then-`abort` is correctly refused; `abort`
+	 * is only effective on a record seeded without a promise from us. See docs/design.md § Protocol design.
+	 */
+	async abort(transactionCode: string): Promise<void> {
+		const record = await this.store.getRecord(transactionCode)
+		if (!record) {
+			this.log('tallynet consensus: abort on unknown transaction %s (no-op)', transactionCode)
+			return
+		}
+		if (await this.store.isReleased(transactionCode)) {
+			this.log('tallynet consensus: abort after settlement on transaction %s (no-op)', transactionCode)
+			return
+		}
+		if (!this.weAre(MemberTypes.participant, record)) {
+			this.log('tallynet consensus: abort by a non-participant on transaction %s (no-op)', transactionCode)
+			return
+		}
+		if (this.promisePhaseComplete(record)) {
+			this.log('tallynet consensus: abort refused — every participant has promised on transaction %s', transactionCode)
+			return // principle 3: the lift is past the point an abort may void it
+		}
+		if (this.weHaveSigned(record.promises)) {
+			this.log('tallynet consensus: abort refused — we already promised on transaction %s (NP would equivocate)', transactionCode)
+			return // atomicity guard: signing NP after our own P equivocates; peers keep the P and commit
+		}
+		await this.sign(record, SignatureTypesLocal.noPromise, 'promises') // append + persist our sole promise-phase face
+		await this.update(record) // release our own (empty) hold as a failure and diffuse the void
 	}
 
 	/* ── validate + merge ─────────────────────────────────────────────────────────────── */
@@ -861,6 +934,13 @@ export class TrxParticipant<TTerms, TPayload> {
 
 /** The signature-kind constants, locally named so call sites read `promise`/`noPromise` not `'P'`/`'NP'`. */
 const SignatureTypesLocal = { promise: 'P', noPromise: 'NP' } as const satisfies Record<string, SignatureType>
+
+/**
+ * Default transaction-code lifetime for {@link TrxParticipant.proceed} (10 minutes). Matches the harness's
+ * `buildLift` default and the end-to-end tests; a lift session is short-lived, so the code self-expires
+ * well inside the session-code max-TTL ceiling. Override per call via {@link ProceedArgs.ttlMs}.
+ */
+export const DEFAULT_TTL = 600_000
 
 /**
  * Cap on unverified (promise-phase-incomplete) commits held **per voter** in the side pool before the
