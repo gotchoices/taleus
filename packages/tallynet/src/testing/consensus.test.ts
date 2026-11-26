@@ -40,7 +40,7 @@ import { signRecord } from '../consensus/signature.js'
 import { DEFAULT_TTL, MAX_PENDING_COMMITS_PER_VOTER } from '../consensus/participant.js'
 import type { ResourceContext, TrxParticipantResource } from '../consensus/resource.js'
 import type { Signature, TrxRecord } from '../consensus/types.js'
-import { DEFAULT_CONSENSUS_METHOD, MemberTypes, type DependentMember, type Link, type MemberType, type Plan, type UniQuery } from '../discovery/types.js'
+import { DEFAULT_CONSENSUS_METHOD, MemberTypes, type DependentMember, type Link, type MemberType, type Plan, type Target, type UniQuery } from '../discovery/types.js'
 import { VirtualClock } from './clock.js'
 import { SeededRandom } from './random.js'
 import {
@@ -50,6 +50,7 @@ import {
 	type LiftMemberSpec,
 	type LiftSpec,
 	type NetworkGraph,
+	type RefereeNomination,
 } from './network.js'
 
 type Terms = { balance: number }
@@ -171,6 +172,8 @@ interface NetOpts {
 	seed?: string
 	resourceSpecs?: Record<string, ResourceOpts>
 	conditions?: Record<string, LinkCondition>
+	/** Per-node referee nominations, threaded straight into the network so a real `discover` folds them in. */
+	nomineesFor?: (nodeId: string) => RefereeNomination[]
 }
 
 function makeNet(opts: NetOpts): {
@@ -189,6 +192,7 @@ function makeNet(opts: NetOpts): {
 		verifier,
 		resourceFor,
 		conditions: opts.conditions,
+		nomineesFor: opts.nomineesFor,
 		trace: (event) => traces.push(event),
 	})
 	return { net, traces, doubles }
@@ -878,6 +882,139 @@ describe('consensus end to end — originator proceed / abort', () => {
 		expect(await net.consensusNode('P0').outcome(tx)).toBe('commit')
 		expect(doubles.get('P0')!.releaseSuccesses).toEqual([true]) // unchanged
 		expect(net.clock.pendingTimers).toBe(0)
+	})
+})
+
+describe('consensus end to end — a discovered referee reaches the vote count (real plan, no shortcut)', () => {
+	// The headline the regression check asked for: a voter nominated *during a real route search* travels
+	// discovery → topology → the vote count, with no buildLift spec shortcut for the voter set. Every member
+	// a real `discover` emits is `[P]` (see makeFindAddress), so the ONLY way a `[V]` member enters a
+	// discovered plan is a participant's `dependsOn` nomination — which makes the nominated referee the
+	// *sole* voter and gives us clean outcome control. The referee rides no tally link; its vote reaches the
+	// originator over the originator's stamped contact point.
+	const PAYEE: Target = { address: { key: 'Z' } }
+	const INTENTS: Record<string, Terms> = { L: { balance: 100 } }
+
+	/** The line O—A—B—Z plus an edge-less R; nominated by whichever nodes `nomineesFor` names. */
+	function lineToZ(): NetworkGraph<Terms> {
+		return makeGraph(['O', 'A', 'B', 'Z', 'R'], [['oa', 'O', 'A'], ['ab', 'A', 'B'], ['bz', 'B', 'Z']])
+	}
+
+	/** Run a real search O→Z, driving the clock to settle it, and return the chosen plan + a mint query. */
+	async function searchToZ(net: InMemoryNetwork<Terms, Payload>): Promise<{ plan: Plan<Terms, Payload>; query: UniQuery<Terms> }> {
+		const search = net.discover('O', PAYEE, INTENTS)
+		await net.clock.runUntilIdle()
+		const result = await search
+		expect(result.plans.length).toBeGreaterThan(0) // the route must be found for the mint to mean anything
+		const query: UniQuery<Terms> = {
+			target: PAYEE,
+			sessionCode: result.sessionCode,
+			intents: INTENTS,
+			maxDepth: 7,
+			method: DEFAULT_CONSENSUS_METHOD,
+		}
+		return { plan: result.plans[0], query }
+	}
+
+	/** Whether any topology link touches `key` as a source or target. */
+	function ridesALink(record: TrxRecord<Terms, Payload>, key: string): boolean {
+		return Object.values(record.topology.links).some((link) => link.source === key || link.target === key)
+	}
+
+	it('a referee nominated mid-search is a V member riding no link, and its lone C commits the whole route', async () => {
+		const { net } = makeNet({ graph: lineToZ(), nomineesFor: (name) => (name === 'A' ? [{ name: 'R' }] : []) })
+		const { plan, query } = await searchToZ(net)
+		const { record, transactionCode: tx } = net.mintFromPlan('O', query, plan, PAYLOAD)
+		await net.consensusNode('O').start(record)
+		await net.clock.runUntilIdle()
+
+		const refKey = net.memberKey('R')
+		const refMember = record.topology.members.find((member) => member.address.key === refKey)
+		expect(refMember).toBeDefined()
+		expect(refMember!.types).toContain(VOTER) // folded in as a voter through prependMatch, from A's dependsOn
+		expect(record.topology.members.filter((member) => member.types.includes(VOTER))).toHaveLength(1) // R is the sole voter
+		expect(ridesALink(record, refKey)).toBe(false) // a referee rides no tally edge
+		expect(await outcomes(net, ['O', 'A', 'B', 'Z', 'R'], tx)).toEqual(['commit', 'commit', 'commit', 'commit', 'commit'])
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it("the referee's NC flips the outcome: as the sole voter, its no-commit voids the whole route", async () => {
+		const { net } = makeNet({
+			graph: lineToZ(),
+			nomineesFor: (name) => (name === 'A' ? [{ name: 'R' }] : []),
+			resourceSpecs: { R: { shouldCommit: false } },
+		})
+		const { plan, query } = await searchToZ(net)
+		const { record, transactionCode: tx } = net.mintFromPlan('O', query, plan, PAYLOAD)
+		await net.consensusNode('O').start(record)
+		await net.clock.runUntilIdle()
+
+		expect(await outcomes(net, ['O', 'A', 'B', 'Z', 'R'], tx)).toEqual(['void', 'void', 'void', 'void', 'void'])
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('nominated by two participants, the referee is folded in once and counted once (still commits)', async () => {
+		const { net } = makeNet({
+			graph: lineToZ(),
+			nomineesFor: (name) => (name === 'A' || name === 'B' ? [{ name: 'R' }] : []),
+		})
+		const { plan, query } = await searchToZ(net)
+		const { record, transactionCode: tx } = net.mintFromPlan('O', query, plan, PAYLOAD)
+		await net.consensusNode('O').start(record)
+		await net.clock.runUntilIdle()
+
+		const voters = record.topology.members.filter((member) => member.types.includes(VOTER))
+		expect(voters).toHaveLength(1) // prependMatch de-duped the two nominations into one member
+		expect(voters[0].address.key).toBe(net.memberKey('R'))
+		// If R were double-weighted the voter set would be size 2, its single counted vote (commits dedupe by
+		// address) would be 1/2 — no majority — and the route would stay `pending`. `commit` proves single weight.
+		expect(await outcomes(net, ['O', 'A', 'B', 'Z', 'R'], tx)).toEqual(['commit', 'commit', 'commit', 'commit', 'commit'])
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('a circular originator (payee = self) mints a valid two-link ring and commits (hand-built plan)', async () => {
+		// A real `discover` toward literally-self degenerates to a round-0 self-match (path:[], members:[O];
+		// see discovery.test.ts "self is the target") — no ring path. So the circular case is built by hand
+		// and fed through mintFromPlan, which proves the two-link mint shape settles. A 2-node ring needs two
+		// PARALLEL edges: makeNonce depends only on the link id, so one edge would collide both ring links.
+		const graph: NetworkGraph<Terms> = {
+			nodes: ['O', 'X'],
+			links: [
+				{ id: 'ox1', node1: 'O', node2: 'X', intents: { L: { balance: 100 } } },
+				{ id: 'ox2', node1: 'O', node2: 'X', intents: { L: { balance: 100 } } },
+			],
+		}
+		const { net } = makeNet({ graph })
+		const session = generate(DEFAULT_TTL, { now: net.clock.now(), random: new SeededRandom(5) })
+		const plan: Plan<Terms, Payload> = {
+			members: [
+				{ types: [PART, VOTER], address: { key: 'O' } },
+				{ types: [PART], address: { key: 'X' } },
+			],
+			path: [
+				{ nonce: makeNonce(session, 'ox1'), intents: { L: { balance: 100 } } },
+				{ nonce: makeNonce(session, 'ox2'), intents: { L: { balance: 100 } } },
+			],
+		}
+		const query: UniQuery<Terms> = {
+			target: { address: { key: 'O' } },
+			sessionCode: session,
+			intents: INTENTS,
+			maxDepth: 8,
+			method: DEFAULT_CONSENSUS_METHOD,
+		}
+		const { record, transactionCode: tx } = net.mintFromPlan('O', query, plan, PAYLOAD)
+		expect(Object.keys(record.topology.links)).toHaveLength(2) // ring: O→X (ox1) and X→O (ox2)
+
+		await net.consensusNode('O').start(record)
+		await net.clock.runUntilIdle()
+
+		expect(await outcomes(net, ['O', 'X'], tx)).toEqual(['commit', 'commit'])
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
 	})
 })
 

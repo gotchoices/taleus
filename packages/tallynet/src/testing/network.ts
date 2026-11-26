@@ -44,6 +44,7 @@ import { makeNonce } from '../nonce.js'
 import { generate } from '../session-code.js'
 import type { TraceSink } from '../trace.js'
 import { ConsensusNode } from '../consensus/engine.js'
+import { mintRecord } from '../consensus/mint.js'
 import type { Logger } from '../consensus/participant.js'
 import type { TrxParticipantResource } from '../consensus/resource.js'
 import { MemoryTrxStore } from '../consensus/store.js'
@@ -61,11 +62,14 @@ import {
 	type DependentMember,
 	type FindAddressFunc,
 	type FindResult,
+	type IdentifiedMember,
 	type MemberType,
+	type Plan,
 	type QueryPeerFunc,
 	type QueryRequest,
 	type QueryResponse,
 	type Target,
+	type UniQuery,
 } from '../discovery/types.js'
 import { VirtualClock } from './clock.js'
 import type { SeededRandom } from './random.js'
@@ -140,6 +144,22 @@ export interface InMemoryNetworkConfig<TTerms, TPayload> {
 	resourceFor?: (nodeId: string) => TrxParticipantResource<TTerms, TPayload>
 	/** Per-node consensus logger (refusals, rejections, push failures). Default: no-op. */
 	consensusLog?: (nodeId: string) => Logger
+	/**
+	 * Optional per-node referee nomination. When node `nodeId` resolves its own `self` {@link Match}, it
+	 * attaches `dependsOn: [...]` listing voter-only referees — exactly a real participant nominating a
+	 * referee in discovery. {@link prependMatch} folds each into the plan's `members` as a `V` member on
+	 * the return trip. A nominee MUST be voter-only and SHOULD be a graph node with a physical contact
+	 * point. Returns `[]` (or `undefined`) for a node that nominates nobody.
+	 */
+	nomineesFor?: (nodeId: string) => RefereeNomination[]
+}
+
+/** A voter-only referee a node nominates during discovery (folded into the plan by {@link prependMatch}). */
+export interface RefereeNomination {
+	/** The referee's node NAME. Must be in `graph.nodes` so it gets a consensus signer + member key and can vote. */
+	name: string
+	/** Give it a `physical` dial address so every record-holder reaches it and its vote can return. Default true. */
+	physical?: boolean
 }
 
 /** One member of a lift, by node name: its roles (`[P]` / `[V]` / `[P,V]`) and whether it publishes a dial address. */
@@ -212,6 +232,8 @@ export class InMemoryNetwork<TTerms, TPayload> {
 	private readonly hasher: Hasher
 	private readonly invertTerms: (t: TTerms) => TTerms
 	private readonly conditions?: Record<string, LinkCondition> | ((linkId: string) => LinkCondition | undefined)
+	/** Per-node referee nominations, read by {@link makeFindAddress} at construction time. */
+	private readonly nomineesFor?: (nodeId: string) => RefereeNomination[]
 	private readonly adjacency = new Map<string, AdjacencyEntry<TTerms>[]>()
 	private readonly linkLookup = new Map<string, Map<string, string>>()
 	private readonly nodeByName = new Map<string, DiscoveryNode<TTerms, TPayload>>()
@@ -238,6 +260,7 @@ export class InMemoryNetwork<TTerms, TPayload> {
 		this.hasher = config.hasher ?? nobleHasher
 		this.invertTerms = config.invertTerms ?? ((t) => t)
 		this.conditions = config.conditions
+		this.nomineesFor = config.nomineesFor // read by makeFindAddress in the buildNode loop below
 
 		const nodeSet = new Set(config.graph.nodes)
 		for (const name of config.graph.nodes) {
@@ -459,6 +482,88 @@ export class InMemoryNetwork<TTerms, TPayload> {
 	}
 
 	/**
+	 * Mint a lift record from a **discovered** plan — the discovery-plan analogue of {@link buildLift}
+	 * (kept distinct: `buildLift` assembles a record from a hand-written {@link LiftSpec}; this one folds
+	 * the name-keyed {@link Plan} a real `discover` returns). It (a) translates the plan's member keys
+	 * (and `dependsOn` addresses) from discovery NAME space into ed25519-key space, stamping the
+	 * originator a contact point so a voter-only referee's vote can return (docs/design.md § Contact
+	 * points); (b) runs Part 1's {@link mintRecord} over the translated plan with the query's reused
+	 * session code; and (c) re-derives and populates every involved node's live nonce→linkId map from the
+	 * graph edges, so each participant's resource context resolves real link ids. Feed the returned
+	 * `record` to `consensusNode(originatorName).start(record)` (or the originator's `proceed`).
+	 */
+	mintFromPlan(
+		originatorName: string,
+		query: UniQuery<TTerms>,
+		plan: Plan<TTerms, TPayload>,
+		payload: TPayload,
+		opts?: { ttlMs?: number; transactionCode?: string },
+	): { record: TrxRecord<TTerms, TPayload>; sessionCode: string; transactionCode: string } {
+		this.requireConsensus()
+		const sessionCode = query.sessionCode
+		const ttlMs = opts?.ttlMs ?? 600_000
+		const transactionCode = opts?.transactionCode ?? generate(ttlMs, { now: this.clock.now(), random: this.random })
+		const translated = this.translatePlanToKeys(originatorName, plan)
+		const record = mintRecord({ plan: translated, query, payload, transactionCode })
+		this.populateNonceMaps(record, sessionCode)
+		return { record, sessionCode, transactionCode }
+	}
+
+	/**
+	 * Translate a discovery NAME-keyed plan into ed25519-key space (every `member.address.key` and every
+	 * `dependsOn` address is a node name a real `discover` emitted), and stamp the originator a `physical`
+	 * contact point when it lacks one — so a voter-only referee, which rides no lift link, can still
+	 * return its vote to the originator (docs/design.md § Contact points). The referee's own `physical`
+	 * rides through from its nomination; path nonces are left untouched (they are session-salted, already
+	 * equal to the consensus link nonces, and carry no name/key).
+	 */
+	private translatePlanToKeys(originatorName: string, plan: Plan<TTerms, TPayload>): Plan<TTerms, TPayload> {
+		const originatorKey = this.memberKeyFor(originatorName)
+		const members: DependentMember[] = plan.members.map((member) => {
+			const key = this.memberKeyFor(member.address.key) // member.address.key is a NAME
+			const translated: DependentMember = {
+				...member,
+				address: { key },
+				...(member.dependsOn ? { dependsOn: member.dependsOn.map((address) => ({ key: this.memberKeyFor(address.key) })) } : {}),
+			}
+			if (key === originatorKey && !translated.physical) {
+				translated.physical = `dial:${originatorName}`
+			}
+			return translated
+		})
+		return { ...plan, members }
+	}
+
+	/**
+	 * Populate every involved consensus node's live nonce→linkId map from the record's links, re-deriving
+	 * each link id from the graph edges. For each `[nonce, link]` the source/target keys are mapped back
+	 * to names, and the graph edge between them whose own session nonce equals this nonce is found (the
+	 * nonce match disambiguates parallel edges), then both ends record `nonce → edge.id`. Keeping the maps
+	 * populated is for realism (resource contexts resolve real link ids); settlement does not depend on it,
+	 * since `ourLinks` treats `linkId` as optional.
+	 */
+	private populateNonceMaps(record: TrxRecord<TTerms, TPayload>, sessionCode: string): void {
+		// NOTE: re-derives each link's nonce by scanning the source's adjacency, O(links × degree) per mint.
+		// Fine at lift scale (a handful of links); if a sim ever mints over large discovered topologies, index
+		// the per-session nonce→linkId once at graph-build time and look it up here instead.
+		for (const [nonce, link] of Object.entries(record.topology.links)) {
+			const sourceName = this.nameByMemberKey.get(link.source)
+			const targetName = this.nameByMemberKey.get(link.target)
+			if (!sourceName || !targetName) {
+				throw new Error(`mintFromPlan: link endpoint is not a known consensus node (${link.source} -> ${link.target})`)
+			}
+			const edge = (this.adjacency.get(sourceName) ?? []).find(
+				(candidate) => candidate.neighbour === targetName && makeNonce(sessionCode, candidate.id, this.hasher) === nonce,
+			)
+			if (!edge) {
+				throw new Error(`mintFromPlan: no graph edge ${sourceName}--${targetName} matching a path nonce`)
+			}
+			this.nonceToLinkIdByName.get(sourceName)![nonce] = edge.id
+			this.nonceToLinkIdByName.get(targetName)![nonce] = edge.id
+		}
+	}
+
+	/**
 	 * Wire one node's consensus `updatePeer`. **Fire-and-forget**: it schedules the delivery on the clock
 	 * and resolves immediately. It must NOT await the neighbour's `update` — consensus reachability has a
 	 * 2-cycle on every tally link (both ends push to each other), so awaiting would re-enter a node before
@@ -569,11 +674,25 @@ export class InMemoryNetwork<TTerms, TPayload> {
 		})
 	}
 
-	/** Resolve this node's role for a query from its adjacency, in O(degree). Mirrors ChipNet's `uni-scenario`. */
+	/**
+	 * Resolve this node's role for a query from its adjacency, in O(degree). Mirrors ChipNet's
+	 * `uni-scenario`. When {@link InMemoryNetworkConfig.nomineesFor} names referees for this node, `self`
+	 * carries them as `dependsOn` (voter-only, name-keyed, physical by default) so {@link prependMatch}
+	 * folds each as a `V` member onto every plan this node rides — exactly a participant nominating a
+	 * referee. The nominations are fixed at construction time (read once, outside the returned closure).
+	 */
 	private makeFindAddress(name: string, adjacency: AdjacencyEntry<TTerms>[]): FindAddressFunc<TTerms, TPayload> {
+		const nominees = this.nomineesFor?.(name) ?? []
+		const dependsOn: IdentifiedMember[] | undefined = nominees.length
+			? nominees.map((nominee) => ({
+					types: [MemberTypes.voter],
+					address: { key: nominee.name },
+					...((nominee.physical ?? true) ? { physical: `dial:${nominee.name}` } : {}),
+				}))
+			: undefined
 		return (query, _inLinkId) =>
 			Promise.resolve<FindResult<TTerms, TPayload>>({
-				self: { member: { types: [MemberTypes.participant], address: { key: name } } },
+				self: { member: { types: [MemberTypes.participant], address: { key: name } }, ...(dependsOn ? { dependsOn } : {}) },
 				selfIsMatch: query.target.address.key === name,
 				peerMatch: adjacency
 					.filter((edge) => edge.neighbour === query.target.address.key)
