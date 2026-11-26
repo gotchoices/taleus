@@ -1,5 +1,5 @@
 description: Let the network simulator hold tallies in several currencies and have some simulated people convert between them at their own private rates, to test and measure TallyNet's currency-crossing lifts before Taleus's real conversion code is connected.
-prereq: tallynet-voter-model
+prereq: tallynet-record-availability
 files: packages/tallysim/, packages/tallynet/src/discovery/hooks.ts, packages/tallynet/docs/design.md, docs/architecture.md (§ Denominations and Exchange), packages/taleus-core/src/lift/convert.ts (read only)
 ----
 

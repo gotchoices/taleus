@@ -1,5 +1,5 @@
 description: Make a lift that stalls end cleanly by itself instead of leaving everyone's reserved credit tied up: before everyone has promised, by voiding; after everyone has promised, by making sure the voters reach a decision and the result reaches every cooperating member.
-prereq: tallynet-voter-model
+prereq: tallynet-record-availability
 files: packages/tallynet/src/consensus/, packages/tallynet/docs/design.md, packages/tallynet/docs/chipnet-review.md, packages/tallynet/docs/STATUS.md, packages/tallysim/, tickets/backlog/feat-lift-timeout-release.md, ../chipnet/doc/cluster.md
 difficulty: hard
 ----
