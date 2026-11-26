@@ -7,7 +7,7 @@ import type { TraceEvent } from '../trace.js'
 import { DEFAULT_CONSENSUS_METHOD, MemberTypes, type ConsensusMethod, type DependentMember, type MemberType } from '../discovery/types.js'
 import { signRecord } from './signature.js'
 import { MemoryTrxStore, type TrxStore } from './store.js'
-import { MAX_PENDING_COMMITS_PER_VOTER, TrxParticipant, type Logger, type UpdatePeerFunc } from './participant.js'
+import { MAX_PENDING_COMMITS_PER_VOTER, TrxParticipant, type FetchRecordFunc, type Logger, type UpdatePeerFunc } from './participant.js'
 import type { ResourceContext, TrxParticipantResource } from './resource.js'
 import type { Signature, SignatureType, TrxLink, TrxRecord } from './types.js'
 
@@ -242,6 +242,7 @@ interface HarnessOpts {
 	clock?: MutableClock
 	resource?: TrxParticipantResource<TTerms, TPayload>
 	updatePeer?: UpdatePeerFunc<TTerms, TPayload>
+	fetchRecord?: FetchRecordFunc<TTerms, TPayload>
 	nonceToLinkId?: Record<string, string>
 	selfKeyOverride?: string
 }
@@ -269,6 +270,7 @@ function harness(opts: HarnessOpts): Harness {
 		store,
 		resource: opts.resource ?? makeResource().resource,
 		updatePeer,
+		fetchRecord: opts.fetchRecord,
 		nonceToLinkId: opts.nonceToLinkId ?? {},
 		clock,
 		random: harnessRandom,

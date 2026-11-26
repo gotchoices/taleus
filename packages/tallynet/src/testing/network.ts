@@ -45,7 +45,7 @@ import { generate } from '../session-code.js'
 import type { TraceSink } from '../trace.js'
 import { ConsensusNode } from '../consensus/engine.js'
 import { mintRecord } from '../consensus/mint.js'
-import type { Logger } from '../consensus/participant.js'
+import type { FetchRecordFunc, Logger } from '../consensus/participant.js'
 import type { TrxParticipantResource } from '../consensus/resource.js'
 import { MemoryTrxStore } from '../consensus/store.js'
 import type { TrxLink, TrxRecord } from '../consensus/types.js'
@@ -145,6 +145,19 @@ export interface InMemoryNetworkConfig<TTerms, TPayload> {
 	/** Per-node consensus logger (refusals, rejections, push failures). Default: no-op. */
 	consensusLog?: (nodeId: string) => Logger
 	/**
+	 * A non-cooperating member that **refuses to relay the commit phase**: it still delivers and receives
+	 * promise-phase records (so its own promise propagates and the promise phase completes), but drops every
+	 * commit-phase record it would send or forward, and serves no pulls. Models the interior refuser a pull
+	 * must route around (docs/design.md § Record availability). Default: every node cooperates.
+	 */
+	refuseRelay?: (nodeId: string) => boolean
+	/**
+	 * A member that **goes silent after it has promised**: it neither sends nor receives any commit-phase
+	 * record (promise-phase delivery still flows, so its promise reaches the others), and serves no pulls.
+	 * Models an originator or payee offline once minting has happened. Default: every node stays reachable.
+	 */
+	silentAfterPromise?: (nodeId: string) => boolean
+	/**
 	 * Optional per-node referee nomination. When node `nodeId` resolves its own `self` {@link Match}, it
 	 * attaches `dependsOn: [...]` listing voter-only referees — exactly a real participant nominating a
 	 * referee in discovery. {@link prependMatch} folds each into the plan's `members` as a `V` member on
@@ -234,6 +247,10 @@ export class InMemoryNetwork<TTerms, TPayload> {
 	private readonly conditions?: Record<string, LinkCondition> | ((linkId: string) => LinkCondition | undefined)
 	/** Per-node referee nominations, read by {@link makeFindAddress} at construction time. */
 	private readonly nomineesFor?: (nodeId: string) => RefereeNomination[]
+	/** A node that refuses to relay the commit phase (and serves no pulls). Default: nobody. */
+	private readonly refuseRelay: (nodeId: string) => boolean
+	/** A node that goes silent after promising (and serves no pulls). Default: nobody. */
+	private readonly silentAfterPromise: (nodeId: string) => boolean
 	private readonly adjacency = new Map<string, AdjacencyEntry<TTerms>[]>()
 	private readonly linkLookup = new Map<string, Map<string, string>>()
 	private readonly nodeByName = new Map<string, DiscoveryNode<TTerms, TPayload>>()
@@ -261,6 +278,8 @@ export class InMemoryNetwork<TTerms, TPayload> {
 		this.invertTerms = config.invertTerms ?? ((t) => t)
 		this.conditions = config.conditions
 		this.nomineesFor = config.nomineesFor // read by makeFindAddress in the buildNode loop below
+		this.refuseRelay = config.refuseRelay ?? (() => false)
+		this.silentAfterPromise = config.silentAfterPromise ?? (() => false)
 
 		const nodeSet = new Set(config.graph.nodes)
 		for (const name of config.graph.nodes) {
@@ -320,6 +339,7 @@ export class InMemoryNetwork<TTerms, TPayload> {
 			store,
 			resource: config.resourceFor ? config.resourceFor(name) : cooperativeResource<TTerms, TPayload>(),
 			updatePeer: this.makeUpdatePeer(name),
+			fetchRecord: this.makeFetchRecord(name),
 			nonceToLinkId,
 			clock: this.clock,
 			random: this.random,
@@ -578,6 +598,13 @@ export class InMemoryNetwork<TTerms, TPayload> {
 			if (!toName) {
 				return Promise.reject(new Error(`no consensus node for member ${to.key}`))
 			}
+			// A refuser drops the commit phase it would forward; a silent-after-promise node neither sends nor
+			// receives it. Promise-phase records (no commits yet) always deliver, so every member's promise still
+			// propagates and only the commit evidence is withheld. See docs/design.md § Record availability.
+			const commitPhase = record.commits.length > 0
+			if (commitPhase && (this.refuseRelay(fromName) || this.silentAfterPromise(fromName) || this.silentAfterPromise(toName))) {
+				return Promise.resolve()
+			}
 			const condition = this.pushCondition(fromName, toName)
 			if (condition?.drop) {
 				return Promise.resolve() // dropped: schedule no delivery; the record must arrive another way or stall
@@ -602,6 +629,29 @@ export class InMemoryNetwork<TTerms, TPayload> {
 				condition?.latencyMs ?? 0,
 			)
 			return Promise.resolve()
+		}
+	}
+
+	/**
+	 * Wire one node's consensus `fetchRecord` (the pull's requester transport). Resolves **immediately** (a
+	 * microtask, no clock timer) with a shallow clone of the target's served record — so `await fetchOutcome`
+	 * completes and settles the puller without driving the clock first; the pushes that settlement then
+	 * schedules still need `runUntilIdle`. Serves `undefined` when the target refuses to relay, is silent
+	 * after promising, or sits behind a `drop` link on the direct puller↔target edge. A pull over a `physical`
+	 * contact point has no direct edge → `pushCondition` is `undefined` → the pull succeeds (how a cut-off
+	 * member reaches a voter/originator around an interior refuser).
+	 */
+	private makeFetchRecord(pullerName: string): FetchRecordFunc<TTerms, TPayload> {
+		return async (transactionCode, from) => {
+			const targetName = this.nameByMemberKey.get(from.key)
+			if (!targetName || this.refuseRelay(targetName) || this.silentAfterPromise(targetName)) {
+				return undefined // a non-cooperating member serves no pulls
+			}
+			if (this.pushCondition(pullerName, targetName)?.drop) {
+				return undefined // the direct edge to the target is down
+			}
+			const served = await this.consensusByName.get(targetName)!.serveRecord(transactionCode)
+			return served ? { ...served, promises: [...served.promises], commits: [...served.commits] } : undefined
 		}
 	}
 

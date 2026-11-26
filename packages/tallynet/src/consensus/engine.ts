@@ -17,10 +17,10 @@ import type { Hasher, RandomSource, Signer, Verifier } from '../crypto.js'
 import type { TraceSink } from '../trace.js'
 import type { SessionCodeValidators } from '../discovery/participant.js'
 import type { Address } from '../discovery/types.js'
-import { TrxParticipant, type Logger, type ProceedArgs, type UpdatePeerFunc } from './participant.js'
+import { TrxParticipant, type FetchRecordFunc, type Logger, type ProceedArgs, type UpdatePeerFunc } from './participant.js'
 import type { TrxParticipantResource } from './resource.js'
 import type { TrxStore } from './store.js'
-import type { TrxRecord } from './types.js'
+import type { Signature, TrxRecord } from './types.js'
 
 /** Everything a {@link ConsensusNode} is constructed with. Passed straight through to the state machine. */
 export interface ConsensusNodeDeps<TTerms, TPayload> {
@@ -36,6 +36,12 @@ export interface ConsensusNodeDeps<TTerms, TPayload> {
 	resource: TrxParticipantResource<TTerms, TPayload>
 	/** Host port: send the record to a peer over its transport. */
 	updatePeer: UpdatePeerFunc<TTerms, TPayload>
+	/**
+	 * Host port: pull the current record for a `transactionCode` from a reachable peer (the record-availability
+	 * requester). Default: a port that holds nothing, making {@link ConsensusNode.fetchOutcome} a no-op beyond
+	 * reading our own stored outcome.
+	 */
+	fetchRecord?: FetchRecordFunc<TTerms, TPayload>
 	/** Our discovery session's nonce→linkId map; identifies the links we own. */
 	nonceToLinkId: Record<string, string>
 	/** All wall-clock time (for code-expiry checks, and the `now` a `proceed` transaction code expires from). */
@@ -66,6 +72,7 @@ export class ConsensusNode<TTerms, TPayload> {
 			store: deps.store,
 			resource: deps.resource,
 			updatePeer: deps.updatePeer,
+			fetchRecord: deps.fetchRecord,
 			nonceToLinkId: deps.nonceToLinkId,
 			clock: deps.clock,
 			random: deps.random,
@@ -112,5 +119,30 @@ export class ConsensusNode<TTerms, TPayload> {
 	/** Read the settled outcome of a transaction (commit / void / pending) from our store. */
 	outcome(transactionCode: string): Promise<'commit' | 'void' | 'pending'> {
 		return this.participant.outcome(transactionCode)
+	}
+
+	/** Responder: our current merged record for `transactionCode`, or undefined — the pull's serving end. */
+	serveRecord(transactionCode: string): Promise<TrxRecord<TTerms, TPayload> | undefined> {
+		return this.participant.serveRecord(transactionCode)
+	}
+
+	/** Requester: pull the record from every reachable peer, merge each reply, and return our resulting outcome. */
+	fetchOutcome(transactionCode: string): Promise<'commit' | 'void' | 'pending'> {
+		return this.participant.fetchOutcome(transactionCode)
+	}
+
+	/** Retained equivocation-proof faces for `signerKey` on `transactionCode` (both faces when it equivocated). */
+	equivocationProof(transactionCode: string, signerKey: string): Promise<Signature[]> {
+		return this.participant.equivocationProof(transactionCode, signerKey)
+	}
+
+	/** Every signer key that retained equivocation proof on `transactionCode`. */
+	equivocators(transactionCode: string): Promise<string[]> {
+		return this.participant.equivocators(transactionCode)
+	}
+
+	/** Whether a settled-outcome contradiction has been observed on `transactionCode`. */
+	contradicts(transactionCode: string): Promise<boolean> {
+		return this.participant.contradicts(transactionCode)
 	}
 }

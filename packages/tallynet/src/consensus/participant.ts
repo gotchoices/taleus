@@ -186,6 +186,9 @@ export class TrxParticipant<TTerms, TPayload> {
 				/* keep advancing */
 			}
 		}
+		// `record` is the raw incoming copy (validateAndMerge never mutates incoming.promises/commits), so it
+		// still classifies as "theirs" against our merged copy — surface a settled-outcome contradiction if any.
+		await this.detectContradiction(record, merged)
 		await this.push(merged)
 		return merged
 	}
@@ -204,8 +207,92 @@ export class TrxParticipant<TTerms, TPayload> {
 		if (!record) {
 			return 'pending'
 		}
+		return this.recordOutcome(record)
+	}
+
+	/** The settled outcome of an in-hand record (the classifier's terminal states), with no store read. */
+	private async recordOutcome(record: TrxRecord<TTerms, TPayload>): Promise<'commit' | 'void' | 'pending'> {
 		const state = await this.getRecordState(record)
 		return state === 'consensus' ? 'commit' : state === 'rejected' ? 'void' : 'pending'
+	}
+
+	/* ── record availability (pull + responder) + contradiction ─────────────────────────── */
+
+	/**
+	 * Responder (the pull's serving end): our current merged record for `transactionCode`, or undefined if
+	 * we hold none. Safe to serve anyone — the record is self-authenticating (every signature verifies on
+	 * merge) and the requester's union merge makes a stale or duplicate reply harmless. See docs/design.md
+	 * § Record availability.
+	 */
+	serveRecord(transactionCode: string): Promise<TrxRecord<TTerms, TPayload> | undefined> {
+		return this.store.getRecord(transactionCode)
+	}
+
+	/**
+	 * Requester (the pull's asking end): pull the record for `transactionCode` from every reachable peer and
+	 * {@link update} each reply (an idempotent merge that cannot inject unverified state), then return our
+	 * resulting outcome. With no stored record we return `pending` and pull nothing — without the record we
+	 * hold no topology, so we cannot even address a pull; the timer-driven recovery loop that would catch a
+	 * never-seen record up is `tallynet-propagation-timeouts` (a seam, not built here). The reachable set is
+	 * read once from our own stored record; topology is immutable, so it is stable across the merges the pull
+	 * triggers. Each reply is merged with the peer as `fromAddress`, which primes the push skip-test so we do
+	 * not echo it straight back.
+	 */
+	async fetchOutcome(transactionCode: string): Promise<'commit' | 'void' | 'pending'> {
+		const record = await this.store.getRecord(transactionCode)
+		if (!record) {
+			return 'pending'
+		}
+		for (const peer of this.reachablePeers(record)) {
+			const reply = await this.fetchRecord(transactionCode, peer)
+			if (reply) {
+				await this.update(reply, peer) // peer as fromAddress → primes the skip-test, no echo back
+			}
+		}
+		return this.outcome(transactionCode)
+	}
+
+	/**
+	 * Surface a settled-outcome contradiction: our own settled outcome (`commit`/`void`) against a reachable
+	 * copy that settled the opposite way — only possible when voters equivocated (a single node's union keeps
+	 * one face per voter, so it is always self-consistent; two nodes that saw opposite faces first disagree).
+	 * We flag it and trace it; the remedy is host policy (ChipNet § Lying referees), not built here. A no-op
+	 * unless we are settled, the two outcomes genuinely contradict, and we have not already flagged it.
+	 */
+	private async detectContradiction(received: TrxRecord<TTerms, TPayload>, merged: TrxRecord<TTerms, TPayload>): Promise<void> {
+		const ours = await this.recordOutcome(merged)
+		if (ours !== 'commit' && ours !== 'void') {
+			return
+		}
+		// NOTE: recordOutcome(received) reads the RAW incoming record. Its commit/void-by-majority signal is
+		// verified (countVerifiedCommits re-verifies each commit), but its promise-phase void signal (an NP in
+		// received.promises) is NOT verified here — a hostile peer could set this flag spuriously with a forged
+		// NP. This is observational only (settlement is untouched; the flag's consumer is the future
+		// feat-tallynet-hostile-peers); if that ticket ever acts on the flag, verify received's NP first.
+		const theirs = await this.recordOutcome(received)
+		const contradicts = (ours === 'commit' && theirs === 'void') || (ours === 'void' && theirs === 'commit')
+		if (!contradicts || (await this.store.hasContradiction(merged.transactionCode))) {
+			return
+		}
+		await this.store.setContradiction(merged.transactionCode)
+		const peerOutcome: 'commit' | 'void' = ours === 'commit' ? 'void' : 'commit'
+		this.traceSink({ ...this.traceBase(merged), type: 'contradiction-detected', transactionCode: merged.transactionCode, ourOutcome: ours, peerOutcome })
+		this.log('tallynet consensus: settled-outcome contradiction on transaction %s (we %s, a peer %s)', merged.transactionCode, ours, peerOutcome)
+	}
+
+	/** Retained equivocation-proof faces for `signerKey` (both signed faces when it equivocated; `[]` otherwise). */
+	equivocationProof(transactionCode: string, signerKey: string): Promise<Signature[]> {
+		return this.store.getProof(transactionCode, signerKey)
+	}
+
+	/** Every signer key that retained equivocation proof on `transactionCode` (so a simulator can count equivocators). */
+	equivocators(transactionCode: string): Promise<string[]> {
+		return this.store.getProofSigners(transactionCode)
+	}
+
+	/** Whether a settled-outcome contradiction has been observed (the remedy is host policy, not built here). */
+	contradicts(transactionCode: string): Promise<boolean> {
+		return this.store.hasContradiction(transactionCode)
 	}
 
 	/* ── originate ──────────────────────────────────────────────────────────────────────── */
@@ -368,6 +455,9 @@ export class TrxParticipant<TTerms, TPayload> {
 			if (existing.type === signature.type && existing.value === signature.value) {
 				return // identical re-delivery: dedupe silently (idempotent)
 			}
+			if (existing.type !== signature.type) {
+				await this.retainEquivocationProof(merged, existing, signature) // a contradicting face (P&NP): keep both as proof
+			}
 			return this.rejectSignature(merged, existing.type === signature.type ? 'changed' : 'equivocation')
 		}
 		// A promise's preimage never depends on the promise set, so it verifies the same at any time.
@@ -431,6 +521,9 @@ export class TrxParticipant<TTerms, TPayload> {
 		if (existing) {
 			if (existing.type === signature.type && existing.value === signature.value) {
 				return // identical re-delivery: dedupe silently (idempotent)
+			}
+			if (existing.type !== signature.type) {
+				await this.retainEquivocationProof(merged, existing, signature) // a contradicting face (C&NC): keep both as proof
 			}
 			return this.rejectSignature(merged, existing.type === signature.type ? 'changed' : 'equivocation')
 		}
@@ -499,6 +592,22 @@ export class TrxParticipant<TTerms, TPayload> {
 	private rejectSignature(merged: TrxRecord<TTerms, TPayload>, reason: SignatureRejectReason): void {
 		this.traceSink({ ...this.traceBase(merged), type: 'signature-rejected', transactionCode: merged.transactionCode, reason })
 		this.log('tallynet consensus: dropped signature (%s) on transaction %s', reason, merged.transactionCode)
+	}
+
+	/**
+	 * Retain an equivocation as proof: `existing` (the authoritative first face, already verified) plus
+	 * `incoming` (the opposite face) — but only when `incoming` itself VERIFIES (a forged opposite face is not
+	 * proof; the signer never signed it). Pure side state: it is stored in the equivocation proof store, never
+	 * merged into the authoritative sets, never pushed, never digested, so settlement is unchanged. Emits
+	 * `equivocation-proof-kept`. See docs/design.md § Equivocation proof kept.
+	 */
+	private async retainEquivocationProof(merged: TrxRecord<TTerms, TPayload>, existing: Signature, incoming: Signature): Promise<void> {
+		if (!(await verifySignature(this.verifier, incoming, merged, this.hasher))) {
+			return // a forged opposite face is not evidence of equivocation
+		}
+		await this.store.saveProof(merged.transactionCode, existing)
+		await this.store.saveProof(merged.transactionCode, incoming)
+		this.traceSink({ ...this.traceBase(merged), type: 'equivocation-proof-kept', transactionCode: merged.transactionCode, signer: incoming.address })
 	}
 
 	/* ── classify ─────────────────────────────────────────────────────────────────────── */
