@@ -831,7 +831,13 @@ identically**. The format and its read/write machinery live in `sim/trace-format
 - **line 1 — `header`**: the trace-format version, the tallysim and tallynet package versions, the full
   `SimScenario` the run was built from (so the run is reproducible from the file alone), the run seed, and
   one `queries[]` entry per recorded query — `{ sessionCode, from, to, amount, depth }` — so a reader joins
-  any event back to its query by `event.sessionCode` without splitting the stream.
+  any event back to its query by `event.sessionCode` without splitting the stream. On a **consensus** run
+  (a scenario carrying a `consensus` block) the header also carries `lifts[]` — one `TraceLiftEntry` per
+  recorded query that found a route — `{ sessionCode, transactionCode, route, tallyPath, memberKeys, amount }`.
+  A consensus event addresses nodes by **member key** (an ed25519 public key), not entity id, and the route
+  a lift took is not recoverable from the discovery event stream; so each lift's route plus its member-key →
+  entity-id map rides in the header, letting a reader place consensus events on the graph and show the chosen
+  route. The field is **absent** on a v1 file and on a discovery-only v2 run (no empty array).
 - **line 2 — `network`**: the serialised `Network`, reusing the model's one `Infinity ↔ null` encoding
   (`networkToSerialized`/`networkFromSerialized`), so the reader rebuilds a byte-identical graph.
 - **lines 3+ — `event`**: one `tallynet` `TraceEvent` per line, verbatim, in emission order — which is time
@@ -839,10 +845,12 @@ identically**. The format and its read/write machinery live in `sim/trace-format
 
 The header and network come first so a streaming reader can set up before the events arrive.
 
-**Versioning.** `traceFormatVersion` is checked on read; any other value is rejected with a message naming
-the found vs the supported version (the viewer relies on this). Bump it only when a **line envelope** above
-changes. The `TraceEvent` union already spans discovery *and* consensus, so the consensus events ticket 3.7
-adds need **no** bump — the writer and reader pass the whole union through unchanged.
+**Versioning.** `traceFormatVersion` is checked on read; an unsupported value is rejected with a message
+naming the found version and the supported set (the viewer relies on this). The reader currently accepts
+**v1 and v2**. Bump it only when a **line envelope** above changes. A new *event kind* never forces a bump:
+the `TraceEvent` union already spans discovery *and* consensus, so the writer and reader pass the whole union
+through unchanged. The v1 → v2 bump was a **header** change — the new optional `lifts[]` field — not an event
+change; a hand-built consensus event still round-trips under v1.
 
 **Streaming, both ways.** Writing is append-only: `makeTraceWriter(header, snapshot, out)` emits the header
 and network up front, then serialises each event to one line and hands it to the caller's `LineSink` *as it
@@ -864,7 +872,15 @@ header, network snapshot, and every event line in the same order. This rests on 
 session code is minted *inside* `discover()` and is not knowable until a query has run, the `cli/trace.ts`
 driver runs the batch twice: pass 1 learns the session codes (collecting codes only, so memory stays flat),
 pass 2 rebuilds an identical network and reruns the same queries, streaming their events — the rerun
-reproduces the same codes and events exactly, which is this determinism guarantee in action.
+reproduces the same codes and events exactly, which is this determinism guarantee in action. On a consensus
+run each pass also drives every found query's **lift** to settlement: pass 1 records the `lifts[]` header
+entries (transaction code, route, member map), pass 2 reruns the lifts so their consensus events stream into
+the file and join back by `transactionCode`. The consensus trace builds **one** sim per pass (session and
+transaction codes keep minting on a single RNG, so they stay unique across the pass) and discards each lift's
+balance move against a throwaway `cloneNetwork` copy, leaving the recorded network snapshot the pristine
+initial graph — it deliberately does **not** model capacity depletion, unlike the consensus *metrics* sweep
+(§ Consensus simulation), which rebuilds per query and mutates one kept network. The two are each internally
+deterministic and need not agree, exactly as the discovery trace already seeds differently from the sweep.
 
 A **late answer** (`late-answer-folded`) appears in the stream at its own clock time with its round, so a
 reader sees it folded into a later round — not dropped, not duplicated. An **empty run** (a query that finds

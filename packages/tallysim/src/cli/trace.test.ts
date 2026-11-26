@@ -213,4 +213,24 @@ describe('recordTrace — consensus', () => {
 		expect(parseTrace(lines).header.lifts).toBeUndefined()
 		expect(JSON.parse(lines[0])).not.toHaveProperty('lifts')
 	})
+
+	it('a voiding lift (every entity refuses) still records its entry and joined consensus events', async () => {
+		// refuserFraction 1 ⇒ every node signs no-promise, so each found lift voids. Discovery is unaffected
+		// (refusers act only in the consensus phase), so a route is still found: the lift's header entry and
+		// its (void) consensus events must still be recorded and still join by transactionCode.
+		const refusing: SimScenario = { ...scenario, consensus: { refuserFraction: 1 } }
+		const lines: string[] = []
+		await recordTrace(refusing, { seed: 0, queries: [] }, versions, intoArray(lines))
+		const parsed = parseTrace(lines)
+
+		const lifts = parsed.header.lifts
+		expect(lifts).toBeDefined()
+		expect(lifts!.length).toBeGreaterThanOrEqual(1) // a found route records an entry regardless of outcome
+		const liftTxCodes = new Set(lifts!.map((l) => l.transactionCode))
+		const txCodes = eventTxCodes(parsed)
+		expect(txCodes.size).toBeGreaterThanOrEqual(1) // the void produced consensus events
+		for (const tx of txCodes) {
+			expect(liftTxCodes.has(tx)).toBe(true) // every consensus event joins back to a recorded lift
+		}
+	})
 })
