@@ -180,6 +180,10 @@ export class UniOriginator<TTerms, TPayload> {
 			const satisfying = (response.plans ?? []).filter((plan) => this.hooks.planSatisfies(query, plan))
 			if (satisfying.length) {
 				// Trace every satisfying plan found this round (before ranking), then rank+filter and return.
+				// NOTE: a `plan-found` is traced per satisfying plan, but `rankPlans` may then drop some (or
+				// all) by score, so the trace count can exceed `plans.length`. Fine today (trace is
+				// informational); if a viewer ever counts `plan-found` to show "route found", reconcile it
+				// against the returned plans rather than the trace.
 				for (let i = 0; i < satisfying.length; i++) {
 					this.traceSink({ ...this.base(sessionCode), type: 'plan-found' })
 				}

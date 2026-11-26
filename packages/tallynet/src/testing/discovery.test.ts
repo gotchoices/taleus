@@ -568,4 +568,25 @@ describe('discovery end to end — voter-model policy hooks', () => {
 		expect(result.plans).toHaveLength(1) // just the rejected plan was dropped, not both
 		expect(result.plans[0].members.some((member) => member.address.key === 'bad0')).toBe(false) // the survivor is the lean route
 	})
+
+	it('negotiatePlan returning undefined at an intermediate node drops that node’s route, leaving the sibling', async () => {
+		// The previous case refuses at the originator's own fold. This one proves the SAME drop works a hop
+		// in: B (an intermediate on the A→B→T arm) refuses every plan on its return trip, while C marks its
+		// arm with a voter `cv0`. Only the C route must survive — a mid-chain `negotiatePlan` drop removes
+		// exactly that one arm and the search still returns the sibling.
+		const hooks = (name: string): DiscoveryHooks<Terms, Payload> => {
+			if (name === 'B') {
+				return { ...defaultHooks<Terms, Payload>(), negotiatePlan: () => undefined }
+			}
+			if (name === 'C') {
+				return stackingHooks(1, 'cv')
+			}
+			return defaultHooks<Terms, Payload>()
+		}
+		const { net } = makeNet(diamond, { hooks })
+		const result = await runDiscovery(net, 'A', { address: { key: 'T' } }, liftTerms(100))
+
+		expect(result.plans).toHaveLength(1) // B's arm was dropped at B, not at the originator; only C's survives
+		expect(result.plans[0].members.some((member) => member.address.key === 'cv0')).toBe(true) // the survivor is the C route
+	})
 })
