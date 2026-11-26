@@ -89,6 +89,15 @@ export function makeNomineesFor(
 	wellKnown: Set<number>,
 	policy: NominationPolicy,
 ): (entityId: number) => RefereeNomination[] {
+	// NOTE: the harness folds a nominee as a SEPARATE voter-only (`[V]`) member (prependMatch) and only
+	// de-duplicates against members already on the plan. Nominating a node that is ALSO on the money path
+	// therefore does not upgrade it to `[P,V]`: `self` nominates the node itself, which at its own prepend
+	// is not yet present, so it is added twice (`[P]` + `[V]`, same key) → tallynet's NoDuplicateMembers
+	// rule rejects the record and the lift never forms; `well-known` nominates a high-degree hub that is
+	// frequently an on-path participant, so its vote is silently dropped (stays `[P]`). Both are fine ONLY
+	// when the nominee is OFF the route. When the harness-drive ticket wires these, the voter-set model must
+	// mark participants `[P,V]` directly rather than route on-path votes through referee nomination — see
+	// tickets/backlog/debt-voter-nomination-on-path-composition.md.
 	switch (policy) {
 		case 'self': {
 			return (id) => [{ name: entityName(id) }]
