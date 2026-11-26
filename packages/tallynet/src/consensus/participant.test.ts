@@ -139,6 +139,10 @@ function makeClock(start = NOW): MutableClock {
 /* ── resource double ─────────────────────────────────────────────────────────────────── */
 
 interface ResourceOpts {
+	/** Provide an `acceptsProposal` gate returning this value. Omitted → the hook is absent (engine defaults true). */
+	acceptsProposal?: boolean
+	/** `acceptsProposal` throws (treated as a refusal → `NP`, logged). */
+	proposalThrows?: boolean
 	/** Provide a `shouldPromise` gate returning this value. Omitted → the hook is absent (engine defaults true). */
 	shouldPromise?: boolean
 	/** `promise` throws (a host refusal after the gate passed). */
@@ -155,6 +159,8 @@ interface ResourceDouble {
 	resource: TrxParticipantResource<TTerms, TPayload>
 	/** Contexts seen by `promise` (the hold). Empty ⇒ nothing was ever held. */
 	promiseCtxs: ResourceContext<TTerms, TPayload>[]
+	/** Contexts seen by the `acceptsProposal` gate. */
+	acceptsProposalCtxs: ResourceContext<TTerms, TPayload>[]
 	/** Contexts seen by the `shouldPromise` gate. */
 	shouldPromiseCtxs: ResourceContext<TTerms, TPayload>[]
 	/** Contexts seen by the `shouldCommit` gate. */
@@ -165,6 +171,7 @@ interface ResourceDouble {
 
 function makeResource(opts: ResourceOpts = {}): ResourceDouble {
 	const promiseCtxs: ResourceContext<TTerms, TPayload>[] = []
+	const acceptsProposalCtxs: ResourceContext<TTerms, TPayload>[] = []
 	const shouldPromiseCtxs: ResourceContext<TTerms, TPayload>[] = []
 	const shouldCommitCtxs: ResourceContext<TTerms, TPayload>[] = []
 	const releaseSuccesses: boolean[] = []
@@ -188,6 +195,15 @@ function makeResource(opts: ResourceOpts = {}): ResourceDouble {
 			releaseSuccesses.push(ctx.success)
 		},
 	}
+	if (opts.acceptsProposal !== undefined || opts.proposalThrows) {
+		resource.acceptsProposal = (ctx) => {
+			acceptsProposalCtxs.push(ctx)
+			if (opts.proposalThrows) {
+				throw new Error('proposal gate refused by host')
+			}
+			return opts.acceptsProposal ?? true
+		}
+	}
 	if (opts.shouldPromise !== undefined) {
 		resource.shouldPromise = (ctx) => {
 			shouldPromiseCtxs.push(ctx)
@@ -203,7 +219,7 @@ function makeResource(opts: ResourceOpts = {}): ResourceDouble {
 	if (opts.attachment !== undefined) {
 		resource.resolveAttachment = () => opts.attachment
 	}
-	return { resource, promiseCtxs, shouldPromiseCtxs, shouldCommitCtxs, releaseSuccesses }
+	return { resource, promiseCtxs, acceptsProposalCtxs, shouldPromiseCtxs, shouldCommitCtxs, releaseSuccesses }
 }
 
 /* ── participant harness ─────────────────────────────────────────────────────────────── */
@@ -544,6 +560,55 @@ describe('TrxParticipant — promise phase', () => {
 		expect(resource.promiseCtxs).toEqual([]) // expiry refuses before any gate/hold
 		expect(eventsOfType(events, 'promise-signed').map((e) => e.signatureType)).toEqual(['NP'])
 		expect(resource.releaseSuccesses).toEqual([false])
+	})
+
+	it('a refused proposal (acceptsProposal=false) signs NP before shouldPromise is even consulted, and voids', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		// shouldPromise is present AND would pass — the test proves acceptsProposal runs first and short-circuits it.
+		const resource = makeResource({ acceptsProposal: false, shouldPromise: true })
+		const { participant, events } = harness({ self: alice, resource: resource.resource })
+		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])], {
+			n1: link(alice, bob),
+		})
+		await participant.update(record)
+		expect(resource.acceptsProposalCtxs).toHaveLength(1) // the proposal gate was consulted
+		expect(resource.shouldPromiseCtxs).toEqual([]) // …and short-circuited the terms gate (ordering: proposal → terms)
+		expect(resource.promiseCtxs).toEqual([]) // nothing was ever held
+		expect(eventsOfType(events, 'promise-signed').map((e) => e.signatureType)).toEqual(['NP'])
+		expect(resource.releaseSuccesses).toEqual([false]) // any NP voids the lift
+	})
+
+	it('a throwing proposal gate (acceptsProposal throws) signs NP, logs, and voids', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const resource = makeResource({ proposalThrows: true, shouldPromise: true })
+		const { participant, events, logs } = harness({ self: alice, resource: resource.resource })
+		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])], {
+			n1: link(alice, bob),
+		})
+		await participant.update(record)
+		expect(resource.acceptsProposalCtxs).toHaveLength(1)
+		expect(resource.shouldPromiseCtxs).toEqual([]) // a gate throw short-circuits just like a false
+		expect(resource.promiseCtxs).toEqual([]) // nothing held
+		expect(eventsOfType(events, 'promise-signed').map((e) => e.signatureType)).toEqual(['NP'])
+		expect(resource.releaseSuccesses).toEqual([false])
+		expect(logs.length).toBeGreaterThan(0) // the throw is logged, never swallowed silently
+	})
+
+	it('an accepted proposal consults both gates in order (proposal → terms) and then holds, signing P', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const resource = makeResource({ acceptsProposal: true, shouldPromise: true })
+		const { participant } = harness({ self: alice, resource: resource.resource })
+		const record = makeRecord([member(alice, [MemberTypes.participant]), member(bob, [MemberTypes.participant, MemberTypes.voter])], {
+			n1: link(alice, bob),
+		})
+		const merged = await participant.update(record)
+		expect(resource.acceptsProposalCtxs).toHaveLength(1)
+		expect(resource.shouldPromiseCtxs).toHaveLength(1) // both gates ran once, proposal before terms
+		expect(resource.promiseCtxs).toHaveLength(1) // the hold ran after both gates passed
+		expect(merged.promises.map((s) => s.type)).toEqual(['P'])
 	})
 })
 

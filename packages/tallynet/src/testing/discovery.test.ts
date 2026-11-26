@@ -42,10 +42,10 @@ import {
 	type NetworkGraph,
 	type NetworkLink,
 } from './network.js'
-import type { DiscoveryHooks } from '../discovery/hooks.js'
-import type { DiscoveryResult, OriginatorOptions } from '../discovery/originator.js'
+import { defaultHooks, type DiscoveryHooks } from '../discovery/hooks.js'
+import type { DiscoveryResult, OriginatorOptions, ScorePlan } from '../discovery/originator.js'
 import type { ParticipantOptions } from '../discovery/participant.js'
-import type { Plan, Target } from '../discovery/types.js'
+import { MemberTypes, type DependentMember, type Plan, type Target } from '../discovery/types.js'
 import type { TraceEvent } from '../trace.js'
 
 type Terms = { balance: number }
@@ -54,7 +54,8 @@ type Payload = string
 /* ── harness helpers ──────────────────────────────────────────────────────────────────────────── */
 
 interface NetConfig {
-	hooks?: DiscoveryHooks<Terms, Payload>
+	hooks?: DiscoveryHooks<Terms, Payload> | ((nodeId: string) => DiscoveryHooks<Terms, Payload>)
+	scorePlan?: ScorePlan<Terms, Payload>
 	conditions?: Record<string, LinkCondition>
 	options?: Partial<OriginatorOptions & ParticipantOptions>
 	seed?: number
@@ -69,6 +70,7 @@ function makeNet(graph: NetworkGraph<Terms>, config: NetConfig = {}): { net: InM
 		random: new SeededRandom(config.seed ?? 1),
 		invertTerms: negateNumericTerms,
 		hooks: config.hooks,
+		scorePlan: config.scorePlan,
 		conditions: config.conditions,
 		options: config.options,
 		trace: (event) => traces.push(event),
@@ -469,4 +471,101 @@ describe('discovery end to end — 1,000-node scale', () => {
 		}
 		expect(net.clock.pendingTimers).toBe(0)
 	}, 120_000)
+})
+
+/* ── voter-model policy: scorePlan, acceptsQuery, negotiatePlan voter-set refusal ───────────────── */
+
+describe('discovery end to end — voter-model policy hooks', () => {
+	// A symmetric diamond: A→B→T and A→C→T, both 2 hops, found in the same round.
+	const diamond: NetworkGraph<Terms> = {
+		nodes: ['A', 'B', 'C', 'T'],
+		links: [
+			{ id: 'AB', node1: 'A', node2: 'B', intents: liftTerms(500) },
+			{ id: 'AC', node1: 'A', node2: 'C', intents: liftTerms(500) },
+			{ id: 'BT', node1: 'B', node2: 'T', intents: liftTerms(500) },
+			{ id: 'CT', node1: 'C', node2: 'T', intents: liftTerms(500) },
+		],
+	}
+
+	/** Count the `V` members on a plan (the default harness marks every real node `[P]`, so this is the added voters). */
+	function voterCount(plan: Plan<Terms, Payload>): number {
+		return plan.members.filter((member) => member.types.includes(MemberTypes.voter)).length
+	}
+
+	/** Default hooks that also staple `count` extra voter-only members onto every plan this node returns. */
+	function stackingHooks(count: number, keyPrefix: string): DiscoveryHooks<Terms, Payload> {
+		const extras: DependentMember[] = Array.from({ length: count }, (_, i) => ({
+			types: [MemberTypes.voter],
+			address: { key: `${keyPrefix}${i}` },
+		}))
+		return {
+			...defaultHooks<Terms, Payload>(),
+			negotiatePlan: (plan) => ({ ...plan, members: [...plan.members, ...extras] }),
+		}
+	}
+
+	it('default scorePlan ranks the lean voter set ahead of a stacked one (winner at plans[0])', async () => {
+		// B stacks two extra voters onto its route; C leaves its route lean. Both routes are 2 hops, so the
+		// voter count is the only differentiator and the lean (C) route must win.
+		const hooks = (name: string): DiscoveryHooks<Terms, Payload> => (name === 'B' ? stackingHooks(2, 'bv') : defaultHooks<Terms, Payload>())
+		const { net } = makeNet(diamond, { hooks })
+		const result = await runDiscovery(net, 'A', { address: { key: 'T' } }, liftTerms(100))
+
+		expect(result.plans).toHaveLength(2) // both routes surface; scoring ranks, it does not drop here
+		expect(voterCount(result.plans[0])).toBe(0) // winner: the lean route
+		expect(voterCount(result.plans[1])).toBe(2) // passed over: the stacked route, after the winner
+	})
+
+	it('a scorePlan that rejects every plan (-Infinity) yields no route, without throwing', async () => {
+		const direct: NetworkGraph<Terms> = { nodes: ['A', 'B'], links: [{ id: 'AB', node1: 'A', node2: 'B', intents: liftTerms(500) }] }
+		// Baseline: the route IS found by default.
+		const baseline = await runDiscovery(makeNet(direct).net, 'A', { address: { key: 'B' } }, liftTerms(100))
+		expect(baseline.plans).toHaveLength(1)
+		// With a rejecting scorer, the same found plan is dropped → empty result, no throw.
+		const rejectAll: ScorePlan<Terms, Payload> = () => Number.NEGATIVE_INFINITY
+		const { net } = makeNet(direct, { scorePlan: rejectAll })
+		const result = await runDiscovery(net, 'A', { address: { key: 'B' } }, liftTerms(100))
+		expect(result.plans).toEqual([])
+	})
+
+	it('acceptsQuery=false at a node drops every search through it (no plans, no reentrance)', async () => {
+		const line: NetworkGraph<Terms> = {
+			nodes: ['A', 'B', 'T'],
+			links: [
+				{ id: 'AB', node1: 'A', node2: 'B', intents: liftTerms(500) },
+				{ id: 'BT', node1: 'B', node2: 'T', intents: liftTerms(500) },
+			],
+		}
+		// Control: with B accepting, the only route A→B→T is found.
+		const control = await runDiscovery(makeNet(line).net, 'A', { address: { key: 'T' } }, liftTerms(100))
+		expect(control.plans).toHaveLength(1)
+		// B refuses the query → it answers nothing and is pruned; the sole route dies.
+		const refusingAtB = (name: string): DiscoveryHooks<Terms, Payload> =>
+			name === 'B' ? { ...defaultHooks<Terms, Payload>(), acceptsQuery: () => false } : defaultHooks<Terms, Payload>()
+		const { net } = makeNet(line, { hooks: refusingAtB })
+		const result = await runDiscovery(net, 'A', { address: { key: 'T' } }, liftTerms(100))
+		expect(result.plans).toEqual([])
+	})
+
+	it('negotiatePlan returning undefined drops just the plan whose voter set it rejects', async () => {
+		// B stacks a voter `bad0`; C stays lean. The originator A rejects any plan carrying `bad0`, so the
+		// B route is dropped and only the lean C route survives.
+		const hooks = (name: string): DiscoveryHooks<Terms, Payload> => {
+			if (name === 'B') {
+				return stackingHooks(1, 'bad')
+			}
+			if (name === 'A') {
+				return {
+					...defaultHooks<Terms, Payload>(),
+					negotiatePlan: (plan) => (plan.members.some((member) => member.address.key === 'bad0') ? undefined : plan),
+				}
+			}
+			return defaultHooks<Terms, Payload>()
+		}
+		const { net } = makeNet(diamond, { hooks })
+		const result = await runDiscovery(net, 'A', { address: { key: 'T' } }, liftTerms(100))
+
+		expect(result.plans).toHaveLength(1) // just the rejected plan was dropped, not both
+		expect(result.plans[0].members.some((member) => member.address.key === 'bad0')).toBe(false) // the survivor is the lean route
+	})
 })

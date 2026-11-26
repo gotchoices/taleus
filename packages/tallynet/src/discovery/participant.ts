@@ -201,6 +201,15 @@ export class Participant<TTerms, TPayload> {
 		const inboundNonce = inLinkId ? makeNonce(session, inLinkId, this.hasher) : undefined
 		this.traceSink({ ...this.base(session), type: 'query-received', nonce: inboundNonce ?? '', depth: 1, round: 0 })
 
+		if (!(this.hooks.acceptsQuery?.(query) ?? true)) {
+			// Proposal policy: we decline this method/contract, so we do not join the search. Answer with no
+			// plans and no reentrance — never throw (the originator's own `enter` runs here too, and the
+			// originator never throws for "not found"); the upstream node then prunes us `no-reentrance`.
+			// `acceptsQuery` can only gate here: `reenter` has no access to the full query (only the stored
+			// context), and a refused node never built one.
+			return { stats: { earliest: 0, latest: 0, gross: 0, outstanding: 0 } }
+		}
+
 		const context = await this.createContext(plan, query, inLinkId, inboundNonce)
 		await this.store.saveContext(context, pathToHere)
 

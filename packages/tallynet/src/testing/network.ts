@@ -50,7 +50,7 @@ import { MemoryTrxStore } from '../consensus/store.js'
 import type { TrxLink, TrxRecord } from '../consensus/types.js'
 import { DiscoveryNode } from '../discovery/engine.js'
 import { defaultHooks, type DiscoveryHooks } from '../discovery/hooks.js'
-import type { DiscoveryResult, OriginatorOptions } from '../discovery/originator.js'
+import type { DiscoveryResult, OriginatorOptions, ScorePlan } from '../discovery/originator.js'
 import type { ParticipantOptions, SessionCodeValidators } from '../discovery/participant.js'
 import { MemoryParticipantStore } from '../discovery/store.js'
 import {
@@ -101,6 +101,13 @@ export interface InMemoryNetworkConfig<TTerms, TPayload> {
 	random: SeededRandom
 	/** Negotiation hooks, one object for all nodes or a per-node factory. Default: {@link defaultHooks}. */
 	hooks?: DiscoveryHooks<TTerms, TPayload> | ((nodeId: string) => DiscoveryHooks<TTerms, TPayload>)
+	/**
+	 * Originator-only plan scorer, shared by every node that starts a search. It is NOT a per-node
+	 * factory: a `ScorePlan` is itself a function, so a factory could not be told apart from a scorer
+	 * at runtime (the same ambiguity `trace` has). A scorer that switches on the plan is enough for a
+	 * test. Default: the originator's own {@link defaultScorePlan}.
+	 */
+	scorePlan?: ScorePlan<TTerms, TPayload>
 	/** Invert one edge's terms for the `node2 -> node1` view. Default: identity. See {@link negateNumericTerms}. */
 	invertTerms?: (t: TTerms) => TTerms
 	/** Per-link conditions, as a map or a function. Links with no entry deliver instantly and reliably. */
@@ -553,6 +560,7 @@ export class InMemoryNetwork<TTerms, TPayload> {
 			hasher: this.hasher,
 			findAddress: this.makeFindAddress(name, adjacency),
 			hooks: this.resolveHooks(config.hooks, name),
+			scorePlan: config.scorePlan,
 			queryPeer: this.makeQueryPeer(name),
 			options,
 			trace: config.trace,

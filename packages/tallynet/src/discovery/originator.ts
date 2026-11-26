@@ -32,7 +32,7 @@ import type { RandomSource } from '../crypto.js'
 import { generate } from '../session-code.js'
 import { noopTraceSink, safeTraceSink, type TraceBase, type TraceSink } from '../trace.js'
 import type { DiscoveryHooks } from './hooks.js'
-import { DEFAULT_CONSENSUS_METHOD, type ConsensusMethod, type Plan, type QueryRequest, type QueryResponse, type Target, type UniQuery } from './types.js'
+import { DEFAULT_CONSENSUS_METHOD, MemberTypes, type ConsensusMethod, type Plan, type QueryRequest, type QueryResponse, type Target, type UniQuery } from './types.js'
 
 /**
  * Originator tuning. The whole time budget lives here: a round's budget is
@@ -70,6 +70,29 @@ export interface DiscoveryResult<TTerms, TPayload> {
 }
 
 /**
+ * Score a returned plan for the originator's own choice among the routes a round found. **Higher is
+ * better**: the originator drives the highest-scoring plan. A score of `-Infinity` (or `NaN`) means
+ * "never pick this one" — it is dropped from the result entirely. Pure **originator** policy: it never
+ * crosses a hop, so it is NOT a {@link DiscoveryHooks} entry; each node's per-hop refusals live in the
+ * hooks (`acceptsQuery`, `negotiatePlan`). The **default** is {@link defaultScorePlan}.
+ */
+export type ScorePlan<TTerms, TPayload> = (plan: Plan<TTerms, TPayload>, query: UniQuery<TTerms>) => number
+
+/**
+ * The default plan score: prefer **fewer voters**, then a **shorter path**, then first-found. Returned
+ * as one scalar so "fewer voters" strictly dominates "shorter path": the hop term is divided by
+ * `maxDepth + 1`, and a plan's path length never exceeds `maxDepth`, so the fractional hop penalty is
+ * always `< 1` and can never outweigh one extra voter. Negated so higher = better. A lean voter set
+ * therefore outranks a stacked one, and among equal voter counts the shorter route wins; exact ties
+ * (same voters, same hops) fall to the first-found tiebreak the ranker applies.
+ */
+export function defaultScorePlan<TTerms, TPayload>(plan: Plan<TTerms, TPayload>, query: UniQuery<TTerms>): number {
+	const voters = plan.members.filter((member) => member.types.includes(MemberTypes.voter)).length
+	const hops = plan.path.length
+	return -(voters + hops / (query.maxDepth + 1))
+}
+
+/**
  * The originator's one dependency on its node: a function that runs the node's **own** participant
  * `query` for a request (always with no inbound link -- the originator is the start of the route).
  * {@link DiscoveryNode} wires this to its local participant.
@@ -85,6 +108,8 @@ export interface OriginatorConfig<TTerms, TPayload> {
 	random: RandomSource
 	/** Negotiation hooks; the originator reads {@link DiscoveryHooks.planSatisfies} to decide when to stop. */
 	hooks: DiscoveryHooks<TTerms, TPayload>
+	/** Scores returned plans so the originator can rank and choose among them. Default: {@link defaultScorePlan}. */
+	scorePlan?: ScorePlan<TTerms, TPayload>
 	/** Runs the node's own participant query (see {@link LocalQuery}). */
 	localQuery: LocalQuery<TTerms, TPayload>
 	/** Tuning overrides merged over {@link defaultOriginatorOptions}. */
@@ -98,6 +123,7 @@ export class UniOriginator<TTerms, TPayload> {
 	private readonly clock: Clock
 	private readonly random: RandomSource
 	private readonly hooks: DiscoveryHooks<TTerms, TPayload>
+	private readonly scorePlan: ScorePlan<TTerms, TPayload>
 	private readonly localQuery: LocalQuery<TTerms, TPayload>
 	private readonly nodeId: string
 	private readonly traceSink: TraceSink
@@ -107,6 +133,7 @@ export class UniOriginator<TTerms, TPayload> {
 		this.clock = config.clock
 		this.random = config.random
 		this.hooks = config.hooks
+		this.scorePlan = config.scorePlan ?? defaultScorePlan
 		this.localQuery = config.localQuery
 		this.nodeId = config.nodeId
 		this.traceSink = safeTraceSink(config.trace ?? noopTraceSink)
@@ -116,6 +143,12 @@ export class UniOriginator<TTerms, TPayload> {
 	 * Run one unidirectional search for `target` carrying `intents`. Drives the local participant in
 	 * rounds on the linear time budget; stops at the first round that yields a satisfying plan, when
 	 * the search is exhausted, or at `maxDepth`. Never throws for "not found" -- returns empty plans.
+	 *
+	 * The result's `plans` are returned **best-first**: `plans[0]` is the winner (the plan
+	 * {@link ScorePlan} scored highest), and `plans[1..]` are the passed-over routes, still best-first.
+	 * That ordering is how a simulator or viewer reads which plan won and which were passed over, with
+	 * no new trace event. Plans the score rejected (`-Infinity`/`NaN`) are dropped; if every satisfying
+	 * plan is rejected, `plans` is empty (a "no acceptable route" result, never a throw).
 	 */
 	async discover(
 		target: Target,
@@ -146,10 +179,11 @@ export class UniOriginator<TTerms, TPayload> {
 
 			const satisfying = (response.plans ?? []).filter((plan) => this.hooks.planSatisfies(query, plan))
 			if (satisfying.length) {
+				// Trace every satisfying plan found this round (before ranking), then rank+filter and return.
 				for (let i = 0; i < satisfying.length; i++) {
 					this.traceSink({ ...this.base(sessionCode), type: 'plan-found' })
 				}
-				return { sessionCode, plans: satisfying }
+				return { sessionCode, plans: this.rankPlans(satisfying, query) }
 			}
 			if (!response.reentrance) {
 				break // the search is exhausted: no node has a deeper step to take
@@ -157,6 +191,20 @@ export class UniOriginator<TTerms, TPayload> {
 			request = { reentrance: response.reentrance, budgetMs }
 		}
 		return { sessionCode, plans: [] }
+	}
+
+	/**
+	 * Rank the satisfying plans best-first via {@link ScorePlan}, dropping any the score rejects. A plan
+	 * is rejected when its score is not strictly greater than `-Infinity` — which drops both `-Infinity`
+	 * ("never pick") and `NaN` (a `> -Infinity` test is false for `NaN`), while letting `+Infinity`
+	 * through. Survivors sort by score **descending**; exact ties fall back to the original index
+	 * (ascending), so the first plan found wins a tie deterministically (no reliance on sort stability).
+	 */
+	private rankPlans(plans: Plan<TTerms, TPayload>[], query: UniQuery<TTerms>): Plan<TTerms, TPayload>[] {
+		const scored = plans.map((plan, index) => ({ plan, index, score: this.scorePlan(plan, query) }))
+		const acceptable = scored.filter((entry) => entry.score > Number.NEGATIVE_INFINITY)
+		acceptable.sort((a, b) => (a.score !== b.score ? (a.score > b.score ? -1 : 1) : a.index - b.index))
+		return acceptable.map((entry) => entry.plan)
 	}
 
 	private base(sessionCode: string): TraceBase {

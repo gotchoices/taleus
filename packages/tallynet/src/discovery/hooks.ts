@@ -14,6 +14,17 @@ import type { Match, Plan, UniQuery } from './types.js'
 
 export interface DiscoveryHooks<TTerms, TPayload> {
 	/**
+	 * Proposal gate at discovery time: accept this search's proposal parameters (`query.method`, the
+	 * consensus method/threshold, and `query.liftContract`, the written-contract CID) before this node
+	 * joins the search. `false` → we drop the search at this node: we answer with **no plans and no
+	 * reentrance** (never a throw), and the upstream node prunes us `no-reentrance`. This is the
+	 * discovery-time mirror of the promise-time {@link TrxParticipantResource.acceptsProposal} — a node
+	 * that will later refuse the proposal can decline it up front rather than relay a search it will not
+	 * honour. Synchronous (like the other discovery hooks). The **default** is to accept every query.
+	 */
+	acceptsQuery?(query: UniQuery<TTerms>): boolean
+
+	/**
 	 * Constrain one candidate link's terms for one intent code, given the hop.
 	 *
 	 * - `code` is the intent code (e.g. a lift or comms code).
@@ -48,15 +59,25 @@ export interface DiscoveryHooks<TTerms, TPayload> {
 	 * where ChipNet calls `prependMatch`, and **before** that prepend. `inboundNonce` is the nonce of
 	 * the link this node was reached by (`undefined` at the originator). This is where the
 	 * multi-denomination work computes `req_in` from `req_out` with a node's private quote, so the
-	 * quote never leaves the node; only the resulting integer amounts are disclosed.
+	 * quote never leaves the node; only the resulting integer amounts are disclosed. The plan also
+	 * carries `plan.members` — the voters-so-far — so a node that vets the voter set can read it here
+	 * too (see {@link negotiatePlan}, the hook that amends or refuses it).
 	 *
 	 * @returns the (possibly amended) plan, or `undefined` to drop it. The **default** is identity.
 	 */
 	annotateReturn?(ctx: { plan: Plan<TTerms, TPayload>; self: Match; inboundNonce?: string }): Plan<TTerms, TPayload> | undefined
 
 	/**
-	 * Optional whole-plan vetting/extension (e.g. add voters). ChipNet's `NegotiatePlanFunc`.
-	 * @returns the revised plan, or `undefined` to reject it. The **default** is identity.
+	 * Whole-plan vetting/extension on the **return trip** — ChipNet's `NegotiatePlanFunc`, called once
+	 * per plan this node is about to prepend itself onto. `plan.members` is the **voters-so-far**: the
+	 * participants and nominated `V` members folded in downstream, each with its `types` and `dependsOn`.
+	 * A node uses this hook to either (a) **add voters it nominates** (return a plan with extra `V`
+	 * members), or (b) **refuse a plan whose voter-set-so-far it rejects** — e.g. a thin or a stacked
+	 * set — by returning `undefined`, which drops that one plan (the others continue). The set is
+	 * **partial** during the search: a node sees only the members folded in by the time the plan reaches
+	 * it, not the final set. The **default** is identity (accept every plan unchanged).
+	 *
+	 * @returns the revised plan, or `undefined` to reject it.
 	 */
 	negotiatePlan?(plan: Plan<TTerms, TPayload>): Plan<TTerms, TPayload> | undefined
 }
@@ -64,15 +85,17 @@ export interface DiscoveryHooks<TTerms, TPayload> {
 /**
  * The single-unit default hooks (ChipNet's behaviour):
  *
+ * - `acceptsQuery`: accept every query (never drop a search on its proposal parameters).
  * - `negotiateIntent`: pass the candidate link's terms through for any code the query carries; drop
  *   codes the query doesn't carry. Ignores the hop context.
  * - `planSatisfies`: every code in the query is present on every link of the plan (values ignored).
  * - `annotateReturn` / `negotiatePlan`: identity.
  *
- * A host overrides any subset; the engine tolerates a hooks object that omits the two optional ones.
+ * A host overrides any subset; the engine tolerates a hooks object that omits the optional ones.
  */
 export function defaultHooks<TTerms, TPayload>(): DiscoveryHooks<TTerms, TPayload> {
 	return {
+		acceptsQuery: () => true,
 		negotiateIntent: ({ code, linkTerms, query }) =>
 			Object.prototype.hasOwnProperty.call(query.intents, code) ? linkTerms : undefined,
 		planSatisfies: (query, plan) =>

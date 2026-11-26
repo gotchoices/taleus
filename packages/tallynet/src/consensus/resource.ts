@@ -52,9 +52,36 @@ export interface ResourceContext<TTerms, TPayload> {
  */
 export interface TrxParticipantResource<TTerms, TPayload> {
 	/**
-	 * Policy gate — runs **first**, before any value is held. `false` → we sign `NP` (no-promise) and
-	 * nothing is held. Default when omitted: `true`. This is the host's promise-time terms check (does
-	 * the record's edge terms match our current quote/trading variables?).
+	 * Proposal gate — the **first** policy check at promise time (only an expired code refuses ahead of
+	 * it), before {@link shouldPromise}. Accept the record's **proposal parameters for OUR
+	 * participation**: its voter set, its consensus method, and its lift contract, weighed together.
+	 * `false` → we sign `NP` (no-promise) and nothing is held; any `NP` voids the lift. Default when
+	 * omitted: `true` (accept — today's behaviour). A thrown error is treated exactly as `false` (`NP`,
+	 * logged).
+	 *
+	 * Pure host **policy**: TallyNet enforces only verified signatures, the strict-majority+threshold
+	 * invariant and (later) the deadline. "Refuse a thin/stacked voter set" lives HERE (e.g. the
+	 * simulator's voter-model policy), never in the protocol — the protocol will settle even a
+	 * lone-voter set per the threshold.
+	 *
+	 * The {@link ResourceContext} (shared with {@link shouldPromise}) exposes everything principle 0
+	 * ("no global rules; each node decides") needs:
+	 *   - the full **voter set** — `ctx.record.topology.members` whose `types` include `'V'` (a referee
+	 *     is a `'V'` that is not also `'P'`);
+	 *   - the **consensus method + threshold** — `ctx.record.method` (`{ weighting, thresholdNum, thresholdDen }`);
+	 *   - the **deadline** — `expiresAt(ctx.record.transactionCode)`;
+	 *   - the **lift contract CID** — `ctx.record.liftContract` (absent when none);
+	 *   - our **own edge terms** — the negotiated per-intent terms on `ctx.inLinks` / `ctx.outLinks`.
+	 */
+	acceptsProposal?(ctx: ResourceContext<TTerms, TPayload>): boolean | Promise<boolean>
+
+	/**
+	 * Terms gate — runs **after** {@link acceptsProposal}, before any value is held. `false` → we sign
+	 * `NP` (no-promise) and nothing is held. Default when omitted: `true`. This is the host's
+	 * promise-time terms check (does the record's edge terms match our current quote/trading
+	 * variables?). See {@link acceptsProposal} for the full list of what the shared
+	 * {@link ResourceContext} exposes (voter set, method + threshold, deadline, contract CID, per-link
+	 * terms). A thrown error is treated exactly as `false` (`NP`, logged).
 	 */
 	shouldPromise?(ctx: ResourceContext<TTerms, TPayload>): boolean | Promise<boolean>
 

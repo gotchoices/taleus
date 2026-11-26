@@ -41,7 +41,7 @@ import type { Hasher, RandomSource } from '../crypto.js'
 import type { TraceSink } from '../trace.js'
 import type { DiscoveryHooks } from './hooks.js'
 import { Participant, type ParticipantOptions, type SessionCodeValidators } from './participant.js'
-import { UniOriginator, type DiscoveryResult, type OriginatorOptions } from './originator.js'
+import { UniOriginator, type DiscoveryResult, type OriginatorOptions, type ScorePlan } from './originator.js'
 import type { ParticipantStore } from './store.js'
 import type { FindAddressFunc, QueryPeerFunc, QueryRequest, QueryResponse, Target } from './types.js'
 
@@ -61,6 +61,11 @@ export interface DiscoveryNodeDeps<TTerms, TPayload> {
 	findAddress: FindAddressFunc<TTerms, TPayload>
 	/** Negotiation hooks, shared by both roles (`defaultHooks` for single-unit behaviour). */
 	hooks: DiscoveryHooks<TTerms, TPayload>
+	/**
+	 * Originator-only plan scorer, used when this node starts its own search to rank and choose among
+	 * returned routes. NOT a per-hop hook — it never crosses a link. Default: {@link defaultScorePlan}.
+	 */
+	scorePlan?: ScorePlan<TTerms, TPayload>
 	/** Host callback: send a sub-request across a link. */
 	queryPeer: QueryPeerFunc<TTerms, TPayload>
 	/** Tuning overrides, merged over the participant's and originator's own defaults. */
@@ -96,6 +101,7 @@ export class DiscoveryNode<TTerms, TPayload> {
 			clock: deps.clock,
 			random: deps.random,
 			hooks: deps.hooks,
+			scorePlan: deps.scorePlan,
 			// The originator drives this node's own participant with no inbound link.
 			localQuery: (request) => this.participant.query(request),
 			options: deps.options,

@@ -108,6 +108,8 @@ function corruptAt(signature: Signature, index: number): Signature {
 /* ── resource doubles (one per node; the test reads back what each held/released) ────────────────── */
 
 interface ResourceOpts {
+	/** `acceptsProposal` gate value. Omitted → the hook is absent (engine defaults true → accepts). */
+	acceptsProposal?: boolean
 	/** `shouldPromise` gate value. Omitted → the hook is absent (engine defaults true → promises). */
 	shouldPromise?: boolean
 	/** `shouldCommit` gate value for a voter. Omitted → the hook is absent (engine defaults true → C). */
@@ -132,6 +134,9 @@ function makeResource(opts: ResourceOpts = {}): ResourceDouble {
 		release: (ctx) => {
 			releaseSuccesses.push(ctx.success)
 		},
+	}
+	if (opts.acceptsProposal !== undefined) {
+		resource.acceptsProposal = () => opts.acceptsProposal as boolean
 	}
 	if (opts.shouldPromise !== undefined) {
 		resource.shouldPromise = () => opts.shouldPromise as boolean
@@ -256,6 +261,21 @@ describe('consensus end to end — a refusal voids the whole route', () => {
 			expect(doubles.get(name)!.releaseSuccesses).toEqual([false]) // released once, as a void
 		}
 		expect(doubles.get('P1')!.promiseCtxs).toEqual([]) // the refuser's gate declined → nothing was ever held
+		expect(rejectReasons(traces)).toEqual([]) // an NP is a valid signature, not a rejected one
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('a middle participant that refuses the proposal (acceptsProposal=false) voids the whole route', async () => {
+		const { names, graph, members } = linear(3) // P0 (origin) — P1 (proposal-refuser) — P2 ([P,V])
+		const { net, doubles, traces } = makeNet({ graph, resourceSpecs: { P1: { acceptsProposal: false } } })
+		const tx = await runLift(net, { members, route: names, payload: PAYLOAD })
+
+		expect(await outcomes(net, names, tx)).toEqual(['void', 'void', 'void'])
+		for (const name of names) {
+			expect(doubles.get(name)!.releaseSuccesses).toEqual([false]) // released once, as a void
+		}
+		expect(doubles.get('P1')!.promiseCtxs).toEqual([]) // the proposal gate declined → nothing was ever held
 		expect(rejectReasons(traces)).toEqual([]) // an NP is a valid signature, not a rejected one
 		expect(net.clock.pendingTimers).toBe(0)
 		expect(net.deliveryErrors).toEqual([])

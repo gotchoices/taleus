@@ -537,27 +537,47 @@ export class TrxParticipant<TTerms, TPayload> {
 	}
 
 	/**
-	 * Cast our promise. Expiry refuses first (`NP`, never approve). Else the host's `shouldPromise` gate
-	 * (default true); false → `NP`. True → hold via `resource.promise` — a throw means nothing was held
-	 * (the gate already passed), so we sign `NP` and log the reason. Success → `P`.
+	 * Cast our promise: decide `P` vs `NP` (via {@link promiseDecision}), sign it, and trace it. The
+	 * `promise-signed` trace already carries the `'P'`/`'NP'` face, so the refusal is observable without
+	 * a new trace field.
 	 */
 	private async castPromise(record: TrxRecord<TTerms, TPayload>): Promise<void> {
 		const context = this.resourceContext(record)
-		let decision: SignatureType = SignatureTypesLocal.promise
-		if (this.anyCodeExpired(record)) {
-			decision = SignatureTypesLocal.noPromise
-		} else if (!(await (this.resource.shouldPromise?.(context) ?? true))) {
-			decision = SignatureTypesLocal.noPromise
-		} else {
-			try {
-				await this.resource.promise(context)
-			} catch (error) {
-				decision = SignatureTypesLocal.noPromise
-				this.log('tallynet consensus: promise refused on transaction %s: %o', record.transactionCode, error)
-			}
-		}
+		const decision = await this.promiseDecision(record, context)
 		await this.sign(record, decision, 'promises')
 		this.traceSink({ ...this.traceBase(record), type: 'promise-signed', transactionCode: record.transactionCode, signatureType: decision })
+	}
+
+	/**
+	 * `P` vs `NP`: expiry first, then {@link TrxParticipantResource.acceptsProposal} (the proposal
+	 * gate), then {@link TrxParticipantResource.shouldPromise} (the terms gate), then the hold
+	 * (`promise`). The first refusal — a `false` result OR a throw from either gate, or a throwing hold
+	 * — signs `NP` and holds nothing. A gate throw is caught here (a declined promise must never leave
+	 * value held, nor propagate), logged, and treated as `NP`.
+	 */
+	private async promiseDecision(record: TrxRecord<TTerms, TPayload>, context: ResourceContext<TTerms, TPayload>): Promise<'P' | 'NP'> {
+		if (this.anyCodeExpired(record)) {
+			return SignatureTypesLocal.noPromise
+		}
+		try {
+			if (!(await (this.resource.acceptsProposal?.(context) ?? true))) {
+				this.log('tallynet consensus: proposal refused (voter set / method / contract) on transaction %s', record.transactionCode)
+				return SignatureTypesLocal.noPromise
+			}
+			if (!(await (this.resource.shouldPromise?.(context) ?? true))) {
+				return SignatureTypesLocal.noPromise
+			}
+		} catch (error) {
+			this.log('tallynet consensus: a promise gate threw on transaction %s; signing NP: %o', record.transactionCode, error)
+			return SignatureTypesLocal.noPromise
+		}
+		try {
+			await this.resource.promise(context)
+		} catch (error) {
+			this.log('tallynet consensus: promise refused on transaction %s: %o', record.transactionCode, error)
+			return SignatureTypesLocal.noPromise
+		}
+		return SignatureTypesLocal.promise
 	}
 
 	/**
