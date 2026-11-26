@@ -20,6 +20,14 @@ TallyNet is developed, tested and measured on its own, with `tallysim` and `tall
 - **tallysim**: seeded network generators, whole-graph oracle, sweep runner and CLI, route-existence experiment, the real discovery protocol on simulated time with replayable traces and found-vs-oracle metrics, discovery experiment; consensus in the simulator (in progress).
 - **tallysim-viewer**: graph view, trace replay, live runs in the page, sweep charts; consensus animation (in progress).
 
+## ChipNet regression check (done 2026-11-25)
+
+The feature-by-feature check that the rewrite kept everything ChipNet got right is in [chipnet-review.md § Regression check](chipnet-review.md#regression-check-tallynet-vs-chipnet-feature-by-feature). Outcome: **no correctness regression** — discovery and consensus are a faithful superset, improved on every known-defect axis. It turned up:
+- **One minor silent regression** — ChipNet saved an inbound peer record before processing, suppressing an echo of an unchanged record back to its sender; TallyNet lost that. Ticket `bug-tallynet-push-echo-suppression` (fix/).
+- **Designed-but-unbuilt features no ticket owned** — target-signature verification + "whispering" identity checks (`feat-tallynet-identity-verification`), and discovery path/address caching (`feat-tallynet-discovery-caching`), both new in backlog. Everything else ChipNet only designed is already owned by a step above (voter model, propagation timeouts, hostile actors, query economics, bidirectional, adaptive budget).
+- **Test-coverage gaps** — no 10k-node discovery run and no mixed-intent (`C`) route test: `debt-tallynet-discovery-scale-intent-tests` (backlog).
+- **Design-question inputs** for the next step (plan→topology voter-set assembly and its end-to-end test; record availability around a non-cooperating member; equivocation "proof kept" is still aspirational) recorded in `tallynet-voter-model`.
+
 ## Sequence
 
 | # | Step | Ticket(s) |

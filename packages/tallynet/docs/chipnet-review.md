@@ -163,3 +163,84 @@ All three, like ChipNet, are CommonJS in practice (`"target": "module"` is a typ
 - A self-describing record (payload + topology + signature lists) merged by union, so the protocol tolerates any delivery order.
 - The `RuleSet` helper for explainable validation.
 - The Pareto/histogram time-budget idea (once it is actually wired and its stats validated).
+
+## Regression check: TallyNet vs ChipNet, feature by feature
+
+TallyNet was rewritten from ChipNet rather than adopted (ChipNet's code had the defects above). This section is the systematic check that the rewrite **kept everything ChipNet got right** — done by reading both code bases and ChipNet's `doc/` in full (`tallynet-chipnet-regression`, 2026-11-25). Both discovery (`../chipnet/src/unidirectional/` ↔ `src/discovery/`) and consensus (`../chipnet/src/transaction/` ↔ `src/consensus/`) were compared line by line.
+
+**Headline:** no correctness regression. Every ChipNet behaviour that actually *did* something is preserved or improved; everything dropped was a no-op, dead code, or a deliberately-removed attack surface with a stated reason (see the table). The audit surfaced exactly **one** silent behavioural loss (push echo-suppression), a handful of ChipNet-designed-but-never-built features that no TallyNet ticket yet owns, and two test-coverage gaps. These are ticketed below the table.
+
+Status legend: **kept** (same behaviour), **improved** (TallyNet better, by design), **dropped-reason** (removed deliberately, reason stated), **regression** (ChipNet working behaviour lost with no stated reason), **not-built** (designed in ChipNet's *docs* only; built in neither — names the TallyNet ticket that picks it up, or flags it unowned).
+
+### Discovery
+
+| Feature | ChipNet code | TallyNet | Status |
+|---|---|---|---|
+| Round/level accounting (`≤ maxDepth`, one level per round, reach `= L` hops) | `unidirectional/originator.ts:32`, `participant.ts:157,310` | `discovery/originator.ts:128`, `participant.ts:343,361` | kept |
+| `maxDepth` authoritative on the query (every node agrees on the ceiling) | local participant option only (`participant.ts:311`) | rides on `UniQuery` (`discovery/types.ts:90`) | improved |
+| Behaviour at the depth ceiling | **throws** out of `discover` (`participant.ts:311`), breaking the never-throw-for-not-found contract | `concludeMaxDepth` returns accumulated plans, no reentrance (`participant.ts:526`) | improved (ChipNet bug) |
+| Cycle removal | **no-op** (set of linkIds filtered by nonce, `participant.ts:233-244`) | real prune, `candidate-pruned`/`cycle` (`participant.ts:234-238`) | improved (fixed) |
+| Failed-candidate prune | **no-op** (`!r\|\|!r.isError\|\|…` keeps all, `:113`) | `pruneCandidates` drops `failed`/`no-reentrance` (`participant.ts:491`) | improved (fixed) |
+| Duplicate-query rejection | **no-op** (flat key vs nested map, `memory-participant-state.ts:25`) | one `contextKey` throughout (`discovery/store.ts:79`) | improved (fixed) |
+| `prependMatch` member assembly (self + `dependsOn` nominees on return) | `participant.ts:339-365` | `participant.ts:697-725` (near line-for-line) | kept |
+| Return-path annotation hook (`annotateReturn`) — amend own in-edge before prepend | — | `discovery/hooks.ts:55`, `participant.ts:478` | improved (new; multi-denomination seam) |
+| `negotiateIntent` with hop context (`inboundTerms`) | per-link vs original query only (`query-struct.ts:62`) | `hooks.ts:31`; default ignores hop (single-unit parity) | improved |
+| Plan satisfaction | per-link same-terms; codes can be split across plans (`intent.ts:11`) | whole-plan `planSatisfies`, one plan carries all codes (`hooks.ts:44`) | improved (fixes cross-plan quirk) |
+| `negotiatePlan` whole-plan vet/extend (add referees) | `query-struct.ts` opt | `hooks.ts:61` | kept |
+| Peer-match terminus (neighbour is the target; final hop same round) | `participant.ts:159-173` | `participant.ts:278-297` | kept |
+| Late-answer folding / sleeping nodes across rounds | `participant.ts:101` (budget hard-coded `1000`) | `harvest` + `late-answer-folded` trace (`participant.ts:375`); real budget | kept (budget fixed) |
+| `budgetedStep` timer hygiene | leaks one `setTimeout` per step (`sequencing.ts:9`) | clears in `finally`, abort signal (`sequencing.ts`) | improved (fixed) |
+| Plan dedupe (by path) | none — can emit duplicates (`participant.ts:121`) | `foldPlans` `seen` set (`participant.ts:443,728`) | improved (new) |
+| Histogram/Pareto adaptive budget + trusting peer `QueryStats` | `originator.ts:62-112`, `validatedStats` stub trusts peers | linear budget; `QueryStats` informational-only (`types.ts:108`) | dropped-reason (design.md § Time budget; `feat-tallynet-adaptive-budget`) |
+| `recordGrowth`/`UniOriginatorState`, `reportOverhead`, `reportTimingViolation` | present but **dead/untrusted** (never wired into control flow) | dropped (`discovery/store.ts:16`) | dropped-reason |
+| Target-secret encryption inside `discover` | `originator.ts:27` (AsymmetricVault) | host pre-encrypts `Target.secret`, passed through | dropped-reason (seam moved host-side) |
+| `getNonceToLinkMap` (nonce→link for the commit engine) | `memory-participant-state.ts:78` | `discovery/store.ts:108` | kept |
+| Whole-path intent **trimming** at a match node (rewrite every link to the code intersection) | `processAndFilterPlans` (`participant.ts:187-212`) | not ported — negotiates only own links | **not-built (conditional)** — a no-op for single-denomination (one `L` code); only differs for multi-intent plans. Belongs to `feat-tallynet-multi-denomination`; see NOTE there. TallyNet's non-rewrite is arguably *more* correct (a node re-negotiating another node's terms is an ownership oddity) |
+
+### Consensus
+
+| Feature | ChipNet code | TallyNet | Status |
+|---|---|---|---|
+| Voter/referee set = members whose `types` include `R`; majority over distinct referees | `getReferees`, `isConsensus` (`transaction/participant.ts:285,293`) | `membersWithRole('R')`, strict `>R/2` (`consensus/participant.ts:421,433`) | kept |
+| Strict majority both ways; empty referee set invalid; even split settles neither | `isConsensus(n,total)=n≥⌈total/2⌉`: `(0,0)=true`, even split satisfies both, reject tested first (`:261,285`) | strict `>R/2` both ways; `NonEmptyRefereeSet` rule; order-independent (`:433,769`) | improved (fixes even-split + majority-of-zero) |
+| `dependsOn` nominees folded into `plan.members` (discovery return trip) | `prependMatch` (`unidirectional/participant.ts:362`) | `prependMatch` (`discovery/participant.ts:722`) | kept (identical) |
+| Plan → `TrxRecord.topology` assembly (union self-votes + `dependsOn` into the member set) | **absent as library code** (only the non-compiling `test/trx-scenario.ts`) | **absent as library code**; harness `buildLift` builds members from a spec (`testing/network.ts:392`) | not-built (symmetric; **not** a regression — the originator's job, owned by `tallynet-voter-model` + `feat-tallynet-bind-taleus-core`; today untested end-to-end) |
+| `reachablePeers` (members with `physical` + both link directions) | `participant.ts:140-148` (dups, unsorted, no self-guard) | `participant.ts:649-668` (deduped, self-excluded, sorted) | improved (identical set; deterministic + self-push guard) |
+| Evidence propagates from wherever a majority first assembles; nothing routes through originator | `reachablePeers` push | `reachablePeers` push (same) | kept |
+| Release-once, success gate, flag set only after `release` resolves | `releaseResource` (`:90-99`) | `releaseOnce` (`:571-585`) | kept |
+| Record/signature shape | `record.ts:7-20` | adds opaque `attachment`; one link shape; `Address` drops `cuid` (`consensus/types.ts`) | improved / dropped-reason |
+| Merge of a bad/changed/duplicate signature | **throws the whole `update`** (`mergeSignatures:326`, `getRecordState:218,250`) | drops the single signature, continues (`rejectSignature`); core-change still throws | improved (per-signature robustness) |
+| Out-of-order commit (arrives before all promises) | **throws** "commit on un-promised transaction" (`:241`) | durable per-referee side pool, promoted after verifying vs complete promise set (`:309,366`) | improved (forged-commit-shadows-vote fix) |
+| Signed preimage | `sha256(hashDeep(...))`, commit adds `JSON.stringify(promises)` (`:297-318`) | DAG-CBOR canonical, kind bound in, commit binds canonical promise set (`digest.ts`) | improved (safe preimage; every verify awaited) |
+| State machine states | `promising/ourPromiseNeeded/ourCommitNeeded/consensus/rejected/propagating` | identical enum (`participant.ts:97`) | kept (1:1) |
+| Circular lift through originator (member on >1 link) | **throws** on 2nd occurrence (`findOurMember:105`) | one member entry, many links allowed; duplicate *member key* is the invalid case | improved |
+| Expiry / missing hook ⇒ refuse (never approve) | precedence bug approves on expiry/absent hook (`:151,169`) | expiry signs `NP`/`NC` first; absent hook defaults true only when not expired (`:531,554`) | improved |
+| Hold resources only after the gate decides | `resource.promise` runs before `shouldPromise` (`:75-77`) | `shouldPromise` then `promise` (`:528-543`) | improved |
+| Inbound peer-record save (suppress echoing an unchanged record back to its sender) | `update` saves `savePeerRecord(fromAddress, record)` first (`:34`) | `fromAddress` used only for the trace; peer record saved only after an outbound push (`:627`) | **regression** (minor; `bug-tallynet-push-echo-suppression`) |
+| Invalid-record logging | `logInvalid` logs the whole record on any validation throw (`:65`) | `update` has no try/catch; only `core-mismatch` emits a trace; rule throw propagates unlogged at the participant boundary | **regression** (minor, logging; folded into `bug-tallynet-push-echo-suppression`) |
+| Equivocation (a voter signs both faces) keeps **both** as proof | throws the whole record (keeps nothing) | refuses 2nd face, keeps 1st, **drops** 2nd (`rejectSignature`) | not-built — design.md § Lift design principles says "its proof kept"; that is **aspirational**, built by `tallynet-voter-model` + `feat-tallynet-hostile-peers`. Not a ChipNet regression (ChipNet kept no proof either) |
+| Expanded new-record validation (members, links, participant/referee non-empty, self-consistency, encodability) | tx/session code validity only (`:199`) | `RuleSet` of 8 rules (`:751`) | improved |
+
+### Designed in ChipNet's docs, built in neither — ticket coverage
+
+From `../chipnet/doc/{discovery,cluster}.md` and the two `todo.md` files. Each is **docs-only** in ChipNet (its code never built them). "Owner" is the TallyNet ticket that picks it up; **unowned** means no ticket and no recorded decision-not-to-build.
+
+| Designed feature | What it is (plain language) | Owner |
+|---|---|---|
+| Bidirectional / omnidirectional search | Payer and payee both search; frontiers meet — far faster | `feat-tallynet-bidirectional-search` |
+| Ring/star propagation + convergence node | Promise/commit travels both ways around the loop, meeting at one node | `tallynet-propagation-timeouts` (decides if needed vs circuit+fetch) |
+| Pre-promise void on timeout; void-on-timeout at commit; timeout backoff | A party that waits too long signs void; deadline resolves a stuck tie | `tallynet-propagation-timeouts` |
+| Stalled-transaction recovery (periodic re-reach / fetch record) | Keep re-reaching peers until the record settles | `tallynet-propagation-timeouts` (+ schema half `feat-lift-timeout-release`) |
+| Dead referees / network splits | Majority of voters offline, or an island with a minority, stalls until a link returns | `tallynet-propagation-timeouts`; inconsistent-resolution repair `feat-lift-healing` |
+| Referee "extra votes" (require added peer voters as a term) | A node can demand extra voters to take part | `tallynet-voter-model` |
+| Lying referees (equivocation) + remedies | A voter commits to some, voids to others; keep proof, repair | `tallynet-voter-model` + `feat-tallynet-hostile-peers`; measured by `tallysim-hostile-actors` |
+| Query economics / policing / quotas; "don't escalate depth while all candidates in-flight" | Charge queries, cap fan-out, down-rank slow peers, rate-limit neighbours | `debt-tallynet-query-economics` + `feat-tallynet-hostile-peers` |
+| Advertising open balances to neighbours | Push open lift capacity so searches start warm | `debt-tallynet-query-economics` (names it) |
+| THIST time-sync / adaptive logical clock | Cross-node clock offsets; order-based clock for time-travel testing | adaptive budget → `feat-tallynet-adaptive-budget`; the logical clock is effectively **built** (`src/testing/clock.ts` `VirtualClock` + injected `Clock` port) |
+| Verify the target's signature against its address; "whispering" identity checks | Confirm the party answering as the target actually holds that key; peer-of-peer identity confirmation | **unowned → `feat-tallynet-identity-verification` (new backlog)** |
+| Path / address caching | Cache disclosed addresses to shorten future searches | **unowned → `feat-tallynet-discovery-caching` (new backlog)** |
+| Portals; comms-vs-lift intent priority; target anonymising nonce; stale-query GC; B+Tree state | Smaller discovery refinements | soft-adjacent to `feat-tallynet-bidirectional-search` / `feat-tallynet-lift-identity-options`; minor — no ticket until a step needs them |
+
+### Tests ChipNet exercises that TallyNet's don't
+
+ChipNet's consensus tests never compiled or ran (`test/transaction.test.ts` commented out; `test/trx-scenario.ts` does not compile), so TallyNet's consensus suite has no ChipNet counterpart to regress against — it vastly exceeds it. For discovery, the one scenario ChipNet ran that TallyNet does not is **scale**: ChipNet's 10 000-node / 70 000-link graph (which asserted nothing, on unseeded randomness) vs TallyNet's largest **seeded, asserting** graph at 1 000 nodes / 2 000 links — an order of magnitude smaller and ~3.5× sparser. Mixed/comms-intent (`C`, or `L`+`C`) routes are untested on **both** sides despite TallyNet's extensible intent codes. Both are coverage gaps, not regressions → `debt-tallynet-discovery-scale-intent-tests`.
