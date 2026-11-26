@@ -19,6 +19,7 @@
  * - `protocol-metrics.ts` — pure measurement: trace + outcome + oracle verdict → per-query / per-run metrics.
  * - `consensus-metrics.ts` — pure measurement: consensus trace + lift result → per-lift / per-run commit metrics.
  * - `sim-runner.ts` — the discovery sweep runner (mirrors `runner.ts`): one record per (cell × seed).
+ * - `consensus-runner.ts` — the sequential consensus sweep runner: one commit-metrics record per (cell × seed).
  */
 
 export * from './naming.js'
@@ -35,3 +36,4 @@ export * from './trace-format.js'
 export * from './trace-writer.js'
 export * from './protocol-metrics.js'
 export * from './sim-runner.js'
+export * from './consensus-runner.js'

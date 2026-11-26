@@ -22,6 +22,7 @@
 		"build": "tsc -p tsconfig.build.json && tsc -p tsconfig.cli.json",
 		"sweep": "node dist/cli/sweep.js",
 		"simulate": "node dist/cli/simulate.js",
+		"consensus": "node dist/cli/consensus.js",
 		"trace": "node dist/cli/trace.js",
 		"test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
 		"lint": "eslint ./src"
