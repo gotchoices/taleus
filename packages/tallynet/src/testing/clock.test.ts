@@ -101,3 +101,21 @@ describe('VirtualClock guards', () => {
 		await expect(clock.runUntilIdle(100)).rejects.toThrow(/exceeded/)
 	})
 })
+
+describe('VirtualClock long-continuation-chain drain', () => {
+	// A timer whose callback schedules the NEXT timer only after a detached chain of N microtask hops.
+	// A microtask-hop drain heuristic (the old design) silently dropped the second timer once N outran
+	// its threshold; the macrotask drain flushes the whole chain in one hop, so chain length can't fool it.
+	const hops = async (n: number): Promise<void> => { for (let i = 0; i < n; i++) { await Promise.resolve() } }
+	it.each([8, 64, 200, 2000])('fires a timer scheduled after %i continuation hops', async (n) => {
+		const clock = new VirtualClock()
+		const fired: string[] = []
+		clock.setTimer(() => {
+			fired.push('first')
+			void hops(n).then(() => { clock.setTimer(() => fired.push('second'), 5) })
+		}, 10)
+		await clock.runUntilIdle()
+		expect(fired).toEqual(['first', 'second'])
+		expect(clock.pendingTimers).toBe(0)
+	})
+})
