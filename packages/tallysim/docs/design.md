@@ -13,9 +13,10 @@ one tier at a time. This file currently covers the **network-model tier** (the d
 model, the generators, and the structural utilities), the **oracle**, the **runner / experiments** tier
 (the scenario/sweep model, the sweep runner, the metrics, the output serialisers, the CLI, and the first
 checked-in experiment), and the **discovery-simulation** tier (the wiring that runs the real `tallynet`
-protocol over a simulated network and runs one payment query to completion). The trace & replay format and
-the protocol metrics / sweep fill the remaining stubbed section. The **consensus-simulation** tier (driving a
-found route through the real sign-and-settle lift and moving money on commit) lands on top of discovery.
+protocol over a simulated network and runs one payment query to completion). It also covers the **discovery
+and consensus metrics**, their sweep runners and CLIs, and the **trace & replay format**. The
+**consensus-simulation** tier builds on discovery: it drives a found route through the real sign-and-settle
+lift, records whether the lift commits / voids / stalls (and why), and moves money on commit.
 
 Read first: [`docs/architecture.md`](../../../docs/architecture.md) (the Taleus system overview) and
 [`packages/tallynet/docs/design.md`](../../tallynet/docs/design.md) (the lift protocol this simulator
@@ -758,6 +759,51 @@ mirroring the `materializeNetwork` NOTE — otherwise one run's committed lifts 
 `(network, identity, workload, conditions)` seeds ⇒ identical member keys, outcome, and resulting balances; the
 dedicated identity-seed stream is the determinism guard.
 
+### Failure injection in the consensus phase
+
+Two independent dials degrade sign-and-settle, so an experiment can ask *how often a found route actually
+commits, and why the rest don't*:
+
+- **Refusers — a consensus-only dial with its own seed stream.** `consensus.refuserFraction` marks exactly
+  `round(fraction · entityCount)` entities as **refusers** (`compileConsensusConditions`, reusing the same
+  count-based partial-shuffle selector § Network conditions uses). A refuser that lands on a taken route
+  declines to promise — its resource port signs `NP` (no-promise) — so that lift **voids** with reason
+  `refused-promise`. The selection is drawn from a **dedicated** `SeededRandom` stream (the *refuser* seed,
+  `consensusSeed`), independent of the network / workload / conditions / identity streams — the same
+  discipline the conditions stream follows, and for the same reason: *do not perturb the discovery streams.*
+  Turning refusers up must not shift which network a run builds or which queries it draws (nor, via the
+  separate `consensus.identitySeed` stream, anyone's keys).
+
+- **Network conditions degrade BOTH phases.** The discovery `conditions` block (sleeping nodes, dropped
+  links, latency — § Network conditions) is **not** re-drawn for consensus; the one compiled per-link
+  condition map governs both. Discovery's `queryPeer` and the consensus engine's record *push*
+  (`updatePeer`) resolve a link's `drop` / `latencyMs` through the **same** map (`tallynet`'s
+  `InMemoryNetwork.pushCondition` reuses `resolveCondition`). So a sleeping or dropped link that blocks a
+  discovery delivery **also** drops the consensus record push across it, and a late link that slows a query
+  **also** slows the push — and a push delayed past a code's time-to-live (600 000 ms of virtual time, § the
+  experiment below) expires it, so the lift **voids** with reason `expired` rather than merely settling late.
+
+**The sleeping/dropped-target stall (the one asymmetry worth knowing).** Discovery and consensus treat the
+*final hop to the payee* differently, and that difference is where a found route can still fail to settle:
+
+- In discovery the payee surfaces as a **peer-match terminus**: the payee's *neighbour* recognises it from
+  its own adjacency and resolves the last hop without ever delivering a message to the payee. So a route to a
+  sleeping (or dropped-link) payee is still **found** — that dark final link is never exercised.
+- In consensus the lift record **must** reach every participant, the payee included, and that push crosses
+  the very link discovery skipped. If the link drops, the record never arrives and the lift **stalls** — it
+  settles nowhere and is surfaced as `pending` (reason `stalled`).
+
+So a sleeping/dropped **target** yields a found-but-stalled lift on a single build, whereas a sleeping/dropped
+**relay** severs the route back in discovery (no route found, no lift at all). Either way the dark node costs
+a payment, but it reaches the metrics by a different path — a missing `found` versus a `pending`.
+
+**v1 has no recovery — a stalled push is a dead lift.** The v1 commit engine has **no propagation timeout**:
+a dropped push on a needed edge stalls the whole lift indefinitely (the `VirtualClock` simply runs out of
+timers and the outcome stays `pending`). The more forgiving behaviour — *a refuser or a dead edge takes only
+itself out of the running, and the lift re-routes, or a referee times the stall out and voids it cleanly* — is
+**phase-2** work, explicitly out of v1. Until it lands, read every `pending` as "a needed message was lost and
+nothing timed it out." That timeout/retry design is tracked in `tallynet-propagation-timeouts`.
+
 ### Consensus metrics
 
 `sim/consensus-metrics.ts` is the consensus tier's measurement layer — **recorded lift in, metrics out** —
@@ -775,7 +821,8 @@ lift's events it derives: `messages` = count of `record-pushed` (the push is the
 `pending` ⇒ always `'stalled'` (a stray `NP`/`NC` that never reached a decision does not override it); `void`
 ⇒ the first of `expired` (a `signature-rejected`), `'refused-promise'` (a `promise-signed` `NP`), or
 `'voted-no-commit'` (a `referee-vote` `NC`). (`zeroVoidReasons()` is the compile-checked source of truth for
-the reason set; `ALL_VOID_REASONS` derives from it, so the two cannot drift.)
+the reason set; `ALL_VOID_REASONS` derives from it, so the two cannot drift — the same `pruneReasons` pattern
+the discovery tier's § *Protocol metrics* uses for its reason set.)
 
 `summarizeConsensusMetrics(lifts, structural, queryCount)` aggregates a run into `ConsensusRunMetrics`. The
 headline is **`pCommitGivenFound`** = `commitCount / liftCount` — P(commit | a route was found and a lift
@@ -805,7 +852,11 @@ draws the payment workload, then drives **each** query through the whole pipelin
   needs a rebuild*), so each query rebuilds `buildSimNetwork` from the mutated network with a fresh events array;
   `analyzeLift` filters by this lift's `transactionCode`, so session/transaction-code collisions across rebuilds
   never mix lifts. Refusers are compiled once per run (`compileConsensusConditions`) and the resource port is
-  built once (its promise/commit gates are stateless), so the refuser set stays stable across rebuilds.
+  built once (its promise/commit gates are stateless), so the refuser set stays stable across rebuilds. This
+  rebuild-per-query-on-one-mutated-network design is the **deliberate opposite** of the consensus *trace*
+  (§ Trace & replay format), which drives each lift against a throwaway `cloneNetwork` copy and so models **no**
+  capacity depletion: the metrics sweep measures how committed lifts deplete capacity over a run, the trace
+  only records one representative pass. The two are each internally deterministic and need not agree.
 - **Seed streams.** Every base seed is offset by the run seed, mirroring `sim-runner.ts` plus the two consensus
   streams: network, workload, conditions (`conditionsSeed`), refuser (`consensusSeed`) and identity
   (`consensus.identitySeed ?? DEFAULT_CONSENSUS_IDENTITY_SEED`). The refuser/identity streams are independent of
@@ -818,6 +869,37 @@ draws the payment workload, then drives **each** query through the whole pipelin
 The sweep-plumbing helpers (`validateConsensusSweep`, `applyVary`, `cloneSimScenario`, `cloneConditions`,
 `cloneCapacity`) are presently **duplicated** from `sim-runner.ts` (private there) rather than shared, to keep the
 pinned byte-identical discovery sweep untouched; extracting a common module is tracked as follow-up tech debt.
+
+### Commit vs. found — the consensus experiment
+
+`experiments/commit-vs-found/` is this tier's first checked-in result, the consensus counterpart to the
+discovery tier's § *Found vs. oracle*. It asks **of the routes the protocol finds, how many commit, and why do
+the rest fail**, over two one-dimensional sweeps at one fixed mid-degree topology (`scale-free`,
+`edgesPerNode = 3`, mean degree ≈ 6, **unlimited** capacity so a non-commit is always a failure-injection
+effect, never a depleted tally), 50 queries, seeds `[1, 2]`, consensus enabled. The headline is
+`pCommitGivenFound`. `regenerate.sh` reproduces the committed `out/*.{jsonl,csv}` and the combined
+`commit-vs-found.jsonl` byte-identically and runs in ≈ 2 minutes.
+
+**What the data shows** (averaged over seeds).
+
+1. **Refusers void found routes, faster than linearly.** Sweeping `consensus.refuserFraction ∈ {0..0.5}` (its
+   own seed stream, so discovery is untouched — `liftCount` holds at 50), `pCommitGivenFound` falls
+   `1.00 → 0.68 → 0.51 → 0.26 → 0.19 → 0.09`. A refuser *anywhere* on a route voids the whole lift, so survival
+   compounds ≈ `(1 − fraction)^(route length)` — 10 % refusers already cost a third of commits. Every non-commit
+   is a clean `void` (`refused-promise`); a refusal is detected and the lift abandoned in order.
+
+2. **Dropped links cost twice — fewer routes found, and found routes stall.** Sweeping
+   `conditions.dropFraction ∈ {0..0.5}` (the shared conditions map, degrading both phases), routes found fall
+   `50 → 33.5` while, among those found, `pending` stalls rise `0 → 14.5` — the sleeping/dropped-target
+   asymmetry (§ *Failure injection in the consensus phase*): discovery peer-matches a dark terminus and still
+   finds the route, but the consensus push over the dropped link is lost and, with no v1 timeout, the lift
+   settles nowhere. `pCommitGivenFound` falls `1.00 → 0.57`; every non-commit here is a `stalled` pending (no
+   refusals).
+
+The headline for Taleus: **a found route is not a committed payment** — a cooperative, reliable network commits
+every route it finds (the correctness floor, `pCommitGivenFound = 1`), but refusing nodes abandon lifts
+*cleanly* while lost messages leave them *hanging*, and until `tallynet-propagation-timeouts` lands a single
+lost push strands an otherwise-valid lift.
 
 ## Trace & replay format
 

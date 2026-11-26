@@ -1,0 +1,13 @@
+{
+	"_note": "Commit-vs-found REFUSER sweep: scale-free (Barabasi-Albert) networks, edgesPerNode=3 (mean degree ~6), UNLIMITED capacity, IDEAL network conditions (no drops/latency/sleeping), 50 queries, N=100, depth D=6. The consensus block is ON (its presence drives the sign-and-settle lift for every found route). Sweeps consensus.refuserFraction - the fraction of entities that decline to promise - drawn from the DEDICATED consensusSeed stream, independent of the discovery (network/workload/conditions) streams, so raising it never shifts which routes are found. A refuser on a taken route signs NP, voiding that lift (voidReasons.refused-promise). With ideal conditions every query's route is found, so liftCount stays ~50 and the headline pCommitGivenFound = commitCount/liftCount falls purely because refusers void lifts. No latency is set, so codes never expire (see ../README.md on the 600000ms code TTL ceiling). Question: how far does P(commit | a route was found) fall as more of the network refuses, and what void reason dominates? See ../README.md and packages/tallysim/docs/design.md.",
+	"base": {
+		"network": { "generator": "scale-free", "params": { "entityCount": 100, "edgesPerNode": 3 }, "capacity": { "kind": "unlimited" }, "seed": 1000 },
+		"workload": { "kind": "payment", "queries": 50, "amount": { "dist": "constant", "params": { "value": 10 } }, "depth": 6, "seed": 2000 },
+		"consensus": { "refuserFraction": 0 },
+		"consensusSeed": 4000
+	},
+	"vary": [
+		{ "path": "consensus.refuserFraction", "values": [0, 0.1, 0.2, 0.3, 0.4, 0.5] }
+	],
+	"seeds": [1, 2]
+}

@@ -1,0 +1,15 @@
+{
+	"_note": "Commit-vs-found DROP sweep: scale-free edgesPerNode=3 (mean degree ~6), UNLIMITED capacity, 50 queries, N=100, depth D=6, consensus ON, NO refusers. Sweeps conditions.dropFraction - the fraction of links (not incident to a sleeping/late node) that drop every delivery. Unlike refuserFraction, a dropped link degrades BOTH phases through the one shared per-link conditions map: it severs some discovery routes (liftCount falls below 50) AND, where discovery peer-matched a dark terminus or crossed a now-dropped needed edge, the consensus record push over that link is lost and the lift STALLS (pending, voidReasons.stalled) because v1 has no propagation timeout. So pCommitGivenFound = commitCount/liftCount falls for a second reason beyond fewer routes: found-but-unsettlable lifts. No latency is set, so codes never expire (see ../README.md on the 600000ms code TTL ceiling). Question: as links drop, how do found-count, commit-rate and stalls move together? See ../README.md and packages/tallysim/docs/design.md.",
+	"base": {
+		"network": { "generator": "scale-free", "params": { "entityCount": 100, "edgesPerNode": 3 }, "capacity": { "kind": "unlimited" }, "seed": 1000 },
+		"workload": { "kind": "payment", "queries": 50, "amount": { "dist": "constant", "params": { "value": 10 } }, "depth": 6, "seed": 2000 },
+		"conditions": { "dropFraction": 0 },
+		"conditionsSeed": 3000,
+		"consensus": { "refuserFraction": 0 },
+		"consensusSeed": 4000
+	},
+	"vary": [
+		{ "path": "conditions.dropFraction", "values": [0, 0.1, 0.2, 0.3, 0.4, 0.5] }
+	],
+	"seeds": [1, 2]
+}
