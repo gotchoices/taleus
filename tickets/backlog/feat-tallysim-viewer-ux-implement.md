@@ -4,4 +4,4 @@ files: packages/tallysim-viewer/, packages/tallysim-viewer/docs/ux.md, packages/
 difficulty: hard
 ----
 
-Implement `packages/tallysim-viewer/docs/ux.md` (from `tallysim-viewer-ux-spec`) in priority order, in tess as normal. When planning, split it along the spec's priority list. Keep the headless core unit-tested, and keep rendering changes behind it. Before closing, ask the developer to drive the result: the browser-only pieces can't be checked by a headless agent (see `debt-viewer-consensus-visual-qa`).
+Implement `packages/tallysim-viewer/docs/ux.md` (from `tallysim-viewer-ux-spec`) in priority order, in tess as normal. When planning, split it along the spec's priority list. Keep the headless core unit-tested, and keep rendering changes behind it. Before closing, hand the developer a short, click-level checklist to drive the result (run one command, choose a named sample, press a named button, what they should see; no file editing or CLI work). The browser-only pieces can't be checked by a headless agent; `debt-viewer-consensus-visual-qa` shows the shape.
