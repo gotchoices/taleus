@@ -975,6 +975,31 @@ describe('consensus end to end — a discovered referee reaches the vote count (
 		expect(net.deliveryErrors).toEqual([])
 	})
 
+	it('two participants nominating distinct referees assemble a two-voter set through the real search, and commit', async () => {
+		// The one real-`discover` shape the single-referee tests above cannot reach: a *multi-voter* set
+		// assembled by discovery. A folds in R1, B folds in R2 — two different nominees, so prependMatch
+		// appends each as its own missing member (not the de-dup/upgrade path of the "nominated by two" test).
+		// Both commit → strict 2/2 majority → the whole route commits, proving the folding of multiple distinct
+		// discovered voters and the majority count over them (the stall side of that count lives in the
+		// buildLift "voter set sizes" tests, which already cover a 1/2 split settling neither way).
+		const graph = makeGraph(['O', 'A', 'B', 'Z', 'R1', 'R2'], [['oa', 'O', 'A'], ['ab', 'A', 'B'], ['bz', 'B', 'Z']])
+		const { net } = makeNet({
+			graph,
+			nomineesFor: (name) => (name === 'A' ? [{ name: 'R1' }] : name === 'B' ? [{ name: 'R2' }] : []),
+		})
+		const { plan, query } = await searchToZ(net)
+		const { record, transactionCode: tx } = net.mintFromPlan('O', query, plan, PAYLOAD)
+		await net.consensusNode('O').start(record)
+		await net.clock.runUntilIdle()
+
+		const voterKeys = record.topology.members.filter((member) => member.types.includes(VOTER)).map((member) => member.address.key)
+		expect(voterKeys).toHaveLength(2) // two distinct referees, each folded in once
+		expect(new Set(voterKeys)).toEqual(new Set([net.memberKey('R1'), net.memberKey('R2')]))
+		expect(await outcomes(net, ['O', 'A', 'B', 'Z', 'R1', 'R2'], tx)).toEqual(['commit', 'commit', 'commit', 'commit', 'commit', 'commit'])
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+
 	it('a circular originator (payee = self) mints a valid two-link ring and commits (hand-built plan)', async () => {
 		// A real `discover` toward literally-self degenerates to a round-0 self-match (path:[], members:[O];
 		// see discovery.test.ts "self is the target") — no ring path. So the circular case is built by hand
