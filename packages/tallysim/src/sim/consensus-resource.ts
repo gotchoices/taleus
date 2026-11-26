@@ -12,7 +12,7 @@
  * {@link buildSimNetwork}'s consensus wiring adapts entity-id → node-name at the harness boundary.
  */
 
-import { MemberTypes, type DependentMember, type ResourceContext, type TrxParticipantResource } from 'tallynet'
+import { MemberTypes, type DependentMember, type Plan, type ResourceContext, type TrxParticipantResource } from 'tallynet'
 import type { LiftTerms } from './terms.js'
 
 /**
@@ -132,6 +132,20 @@ function makeSimResource(spec: SimResourceSpec): SimResourceHandle {
 		}
 	}
 	return handle
+}
+
+/**
+ * A discovery-time `negotiatePlan` hook that **refuses a stacked voter set** on a found plan: it drops the
+ * plan (returns `undefined`) when the plan's `members` are stacked under `policy`, and passes it through
+ * otherwise. This is the discovery-time twin of the promise-time `acceptsProposal` gate ({@link
+ * SimResourceSpec.refuseStackedVoters}) — both read the one predicate {@link refusesStackedVoterSet} — so a
+ * payer can refuse a padded quorum at the earliest point, before ever driving the lift.
+ *
+ * Wire it per node through {@link ConsensusConfig.negotiatePlanFor}. In a **discovery** plan a member's
+ * `address.key` IS its node name, so the policy's `memberEntity` is `(m) => Number(m.address.key)`.
+ */
+export function refuseStackedPlanHook(policy: StackedVoterPolicy): (plan: Plan<LiftTerms, unknown>) => Plan<LiftTerms, unknown> | undefined {
+	return (plan) => (refusesStackedVoterSet(plan.members, policy) ? undefined : plan)
 }
 
 /**

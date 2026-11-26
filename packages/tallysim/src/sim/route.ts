@@ -17,6 +17,7 @@
 import { makeNonce } from 'tallynet'
 import type { Plan } from 'tallynet'
 import type { Network } from '../model.js'
+import type { QueryOutcome } from './harness.js'
 import { linkIdForTally } from './naming.js'
 import type { LiftTerms } from './terms.js'
 
@@ -65,4 +66,95 @@ function buildNonceToTally(network: Network, sessionCode: string): Map<string, n
 		map.set(makeNonce(sessionCode, linkIdForTally(i)), i)
 	}
 	return map
+}
+
+/**
+ * Build a **circular** {@link QueryOutcome} directly from the known graph: find the shortest simple cycle
+ * through `origin` and encode it as a one-plan outcome whose `path` nonces are this `sessionCode`'s, ready
+ * for {@link reconstructRoute} + {@link runLiftForOutcome}. Returns `undefined` when `origin` is on no cycle.
+ *
+ * Real **clearing discovery** — a node *finding* a cycle back to itself over the decentralised protocol — is
+ * deferred (`feat-tallysim-clearing-discovery`). Constructing the ring straight from the graph the simulator
+ * already holds is the stand-in, so the circular *consensus* path (and "a ring routes around a non-relayer")
+ * is exercisable now without waiting on that discovery work. The `from` passed to {@link reconstructRoute}
+ * must equal `origin`.
+ */
+export function buildCircularOutcome(network: Network, sessionCode: string, origin: number): QueryOutcome | undefined {
+	const cycle = findCycleThrough(network, origin)
+	if (!cycle) {
+		return undefined
+	}
+	const path = cycle.map((tally) => ({ nonce: makeNonce(sessionCode, linkIdForTally(tally)), intents: {} }))
+	return { sessionCode, plans: [{ path, members: [] }], found: true }
+}
+
+/** One incident edge as an entity sees it: the tally index crossed and the entity on the far end. */
+interface IncidentEdge {
+	tally: number
+	other: number
+}
+
+/**
+ * Every entity's incident tallies, in **tally-array order** (so the cycle search is deterministic). A tally
+ * `{ stock, foil }` is listed under both endpoints; a self-loop (`stock === foil`, which generators avoid)
+ * is listed once and can never form a cycle (it would need a second distinct edge back).
+ */
+function incidentTallies(network: Network): IncidentEdge[][] {
+	const incident: IncidentEdge[][] = Array.from({ length: network.entityCount }, () => [])
+	network.tallies.forEach((tally, index) => {
+		incident[tally.stock].push({ tally: index, other: tally.foil })
+		if (tally.foil !== tally.stock) {
+			incident[tally.foil].push({ tally: index, other: tally.stock })
+		}
+	})
+	return incident
+}
+
+/**
+ * The shortest simple cycle through `origin`, as an ordered list of tally indices (first found on a length
+ * tie, iterating each entity's incident tallies in tally-array order). A cycle uses each edge at most once
+ * and each interior entity at most once, needs at least two distinct edges (so it handles a 2-cycle over
+ * **parallel** tallies between the same pair), and never passes back through `origin`. `undefined` when
+ * `origin` lies on no cycle.
+ *
+ * NOTE: a depth-first search, bounded by `visited` to simple paths and pruned against the best cycle so far.
+ * It is exponential on a dense graph — fine for the small hand-built rings this serves (the
+ * clearing-discovery stand-in), but NOT for large generated networks; a real finder replaces it later.
+ */
+function findCycleThrough(network: Network, origin: number): number[] | undefined {
+	const incident = incidentTallies(network)
+	const visited = new Set<number>([origin])
+	const pathTallies: number[] = []
+	let best: number[] | undefined
+
+	const visit = (current: number): void => {
+		for (const { tally, other } of incident[current] ?? []) {
+			if (pathTallies.includes(tally)) {
+				continue // each edge at most once (also rules out retracing the arrival edge)
+			}
+			if (other === origin) {
+				// Closing the loop: valid only with at least one prior edge (two distinct edges in all).
+				if (pathTallies.length >= 1) {
+					const cycle = [...pathTallies, tally]
+					if (best === undefined || cycle.length < best.length) {
+						best = cycle
+					}
+				}
+				continue // never recurse through the origin
+			}
+			if (visited.has(other)) {
+				continue // keep interior entities distinct (a simple cycle)
+			}
+			if (best !== undefined && pathTallies.length + 2 >= best.length) {
+				continue // this branch's shortest possible cycle can't beat the incumbent
+			}
+			visited.add(other)
+			pathTallies.push(tally)
+			visit(other)
+			pathTallies.pop()
+			visited.delete(other)
+		}
+	}
+	visit(origin)
+	return best
 }

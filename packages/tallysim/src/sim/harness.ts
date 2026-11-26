@@ -32,8 +32,17 @@ import {
 	type InMemoryNetworkConfig,
 	type NetworkGraph,
 	type NetworkLink,
+	type RefereeNomination,
 } from 'tallynet/testing'
-import type { OriginatorOptions, ParticipantOptions, Plan, TraceSink, TrxParticipantResource } from 'tallynet'
+import type {
+	DiscoveryHooks,
+	OriginatorOptions,
+	ParticipantOptions,
+	Plan,
+	ScorePlan,
+	TraceSink,
+	TrxParticipantResource,
+} from 'tallynet'
 import { capFoilToStock, capStockToFoil } from '../capacity.js'
 import type { Network } from '../model.js'
 import type { WorkloadSpec } from '../scenario.js'
@@ -75,6 +84,38 @@ export interface ConsensusConfig {
 	 * (promise, release, vote commit; hold nothing). See {@link makeSimResources}.
 	 */
 	resourceFor?: (entityId: number) => TrxParticipantResource<LiftTerms, unknown>
+	/**
+	 * The originator's discovery plan scorer (higher is better; e.g. {@link voterAwareScorePlan}). It is
+	 * **shared** by every node that starts a search — a `ScorePlan` is itself a function, so `InMemoryNetwork`
+	 * cannot tell a per-node factory from a scorer. Omit ⇒ the originator's default (first-found order).
+	 */
+	scorePlan?: ScorePlan<LiftTerms, unknown>
+	/**
+	 * Per-node discovery voter-set gate, keyed by **entity id**: the `negotiatePlan` hook node `entityId`
+	 * runs on every plan it is about to fold itself into (return the plan to accept, `undefined` to drop that
+	 * one plan — e.g. {@link refuseStackedPlanHook}). Return `undefined` for a node that vets nothing. When
+	 * NO node supplies a gate the harness keeps the single shared capacity-hooks object (the discovery-only
+	 * path stays byte-for-byte identical); any gate turns the hooks into a per-node factory.
+	 */
+	negotiatePlanFor?: (entityId: number) => DiscoveryHooks<LiftTerms, unknown>['negotiatePlan']
+	/**
+	 * Per-node referee nomination, keyed by **entity id** (adapted to the harness's node-name key). Each node
+	 * folds the returned voter-only referees into a discovered plan as `[V]` members. See {@link makeNomineesFor}.
+	 */
+	nomineesFor?: (entityId: number) => RefereeNomination[]
+	/**
+	 * The **non-relayer**, keyed by **entity id**: `true` ⇒ node `entityId` promises normally but drops every
+	 * commit-phase record it would send or forward, and serves no pulls (the interior refuser a pull routes
+	 * around). Omit ⇒ every node relays. Keep this in step with a lift's `nonCooperating` so the pull pass
+	 * skips the node that will never recover.
+	 */
+	refuseRelayFor?: (entityId: number) => boolean
+	/**
+	 * Goes-silent-after-promising, keyed by **entity id**: `true` ⇒ node `entityId` neither sends nor receives
+	 * any commit-phase record once it has promised, and serves no pulls (an originator or payee offline after
+	 * minting). Omit ⇒ every node stays reachable.
+	 */
+	silentAfterPromiseFor?: (entityId: number) => boolean
 }
 
 /** One payment query to run: pay `amount` from entity `from` to entity `to`, within `depth` hops. */
@@ -133,7 +174,7 @@ export function buildSimNetwork(
 		graph,
 		clock: new VirtualClock(),
 		random: new SeededRandom(SESSION_CODE_SEED),
-		hooks: makeCapacityHooks(),
+		hooks: consensusHooks(consensus),
 		invertTerms: invertLiftTerms,
 		conditions: compiled.conditions,
 		trace,
@@ -144,22 +185,55 @@ export function buildSimNetwork(
 }
 
 /**
+ * The discovery hooks for the harness. Without a `negotiatePlanFor` gate (the common case — every discovery
+ * run, and every consensus run that does not vet voter sets) this is the single shared {@link makeCapacityHooks}
+ * object, byte-for-byte what the harness passed before consensus existed, so the pinned discovery sweep never
+ * moves. When at least one node supplies a gate it becomes a per-node factory: the gated node's capacity hooks
+ * gain its `negotiatePlan`, every other node keeps the plain shared object.
+ */
+function consensusHooks(
+	consensus: ConsensusConfig | undefined,
+): DiscoveryHooks<LiftTerms, unknown> | ((nodeId: string) => DiscoveryHooks<LiftTerms, unknown>) {
+	const base = makeCapacityHooks()
+	const negotiatePlanFor = consensus?.negotiatePlanFor
+	if (!negotiatePlanFor) {
+		return base
+	}
+	return (name: string) => {
+		const negotiatePlan = negotiatePlanFor(entityId(name))
+		return negotiatePlan ? { ...base, negotiatePlan } : base
+	}
+}
+
+/**
  * The harness ports that turn consensus on, or `{}` when `consensus` is omitted. `signerFor` + `verifier`
- * together switch {@link InMemoryNetwork} from discovery-only to consensus; the entity-id-keyed
- * `resourceFor` is adapted to the node-name key the harness calls with. Returning `{}` when off keeps the
- * discovery-only config byte-for-byte unchanged (nothing new is passed to the harness).
+ * together switch {@link InMemoryNetwork} from discovery-only to consensus; the three entity-id-keyed ports
+ * (`resourceFor`, `nomineesFor`, `refuseRelay`, `silentAfterPromise`) are each adapted to the node-name key
+ * the harness calls with, and the shared `scorePlan` is passed through as-is. Each is spread only when the
+ * config supplies it, and the whole thing is `{}` when consensus is off — so the discovery-only config is
+ * byte-for-byte unchanged (nothing new is passed to the harness) and a consensus run that sets none of the
+ * voter-model ports adds no keys beyond `signerFor`/`verifier`.
  */
 function consensusPorts(
 	consensus: ConsensusConfig | undefined,
-): Pick<InMemoryNetworkConfig<LiftTerms, unknown>, 'signerFor' | 'verifier' | 'resourceFor'> | Record<string, never> {
+):
+	| Pick<
+			InMemoryNetworkConfig<LiftTerms, unknown>,
+			'signerFor' | 'verifier' | 'resourceFor' | 'scorePlan' | 'nomineesFor' | 'refuseRelay' | 'silentAfterPromise'
+	  >
+	| Record<string, never> {
 	if (!consensus) {
 		return {}
 	}
-	const resourceFor = consensus.resourceFor
+	const { resourceFor, scorePlan, nomineesFor, refuseRelayFor, silentAfterPromiseFor } = consensus
 	return {
 		signerFor: signerForSeed(consensus.identitySeed),
 		verifier: simVerifier,
 		...(resourceFor ? { resourceFor: (name: string) => resourceFor(entityId(name)) } : {}),
+		...(scorePlan ? { scorePlan } : {}),
+		...(nomineesFor ? { nomineesFor: (name: string) => nomineesFor(entityId(name)) } : {}),
+		...(refuseRelayFor ? { refuseRelay: (name: string) => refuseRelayFor(entityId(name)) } : {}),
+		...(silentAfterPromiseFor ? { silentAfterPromise: (name: string) => silentAfterPromiseFor(entityId(name)) } : {}),
 	}
 }
 
