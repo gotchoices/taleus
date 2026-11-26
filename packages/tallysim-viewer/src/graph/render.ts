@@ -402,6 +402,10 @@ function panCamera(camera: Camera, dx: number, dy: number): void {
  * descendant other than the container's own camera controls would otherwise lose a keystroke — scoping is by
  * construction, since this listener fires only when `container` (or a descendant, e.g. a control button) has
  * focus, never while a panel input elsewhere in the shell is focused.
+ *
+ * NOTE: this and `panCamera` are pure (a `Camera` + a key in, camera calls out — no browser globals), so if the
+ * key map ever churns they are the one piece of this module worth extracting behind a type-only `Camera` import
+ * and node-testing, or folding into the deferred headless-WebGL smoke test the jest config mentions.
  */
 function handleCameraKeydown(camera: Camera, event: KeyboardEvent): void {
 	switch (event.key) {
