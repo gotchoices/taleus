@@ -17,6 +17,7 @@
  * - `trace-format.ts` — the versioned NDJSON trace-line union, `serializeTraceLine` and `parseTrace`.
  * - `trace-writer.ts` — `makeTraceWriter`: stream a header + network + per-event lines to a `LineSink`.
  * - `protocol-metrics.ts` — pure measurement: trace + outcome + oracle verdict → per-query / per-run metrics.
+ * - `consensus-metrics.ts` — pure measurement: consensus trace + lift result → per-lift / per-run commit metrics.
  * - `sim-runner.ts` — the discovery sweep runner (mirrors `runner.ts`): one record per (cell × seed).
  */
 
@@ -29,6 +30,7 @@ export * from './harness.js'
 export * from './plan-select.js'
 export * from './route.js'
 export * from './consensus-harness.js'
+export * from './consensus-metrics.js'
 export * from './trace-format.js'
 export * from './trace-writer.js'
 export * from './protocol-metrics.js'
