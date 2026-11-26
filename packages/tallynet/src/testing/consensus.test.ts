@@ -797,6 +797,9 @@ describe('consensus end to end — originator proceed / abort', () => {
 	})
 
 	it('abort is refused once every participant has promised — no-op, the settled commit stands', async () => {
+		// Note: for the originator this reaches abort's `isReleased` (already-settled) guard — runLift
+		// drives P0 to commit AND release before we abort, so the earlier guard fires. The distinct
+		// promise-phase-complete guard (complete promises, not yet released) is exercised below.
 		const { names, graph, members } = linear(3)
 		const { net, doubles } = makeNet({ graph })
 		const tx = await runLift(net, { members, route: names, payload: PAYLOAD })
@@ -810,6 +813,28 @@ describe('consensus end to end — originator proceed / abort', () => {
 		expect(after!.promises).toEqual(before!.promises) // no NP appended
 		expect(await net.consensusNode('P0').outcome(tx)).toBe('commit')
 		expect(doubles.get('P0')!.releaseSuccesses).toEqual([true]) // no second release
+		expect(net.clock.pendingTimers).toBe(0)
+	})
+
+	it('abort no-ops on a fully-promised but unreleased record (the promise-phase-complete guard)', async () => {
+		// Seed a record whose promise phase is already complete (every participant signed P) but which
+		// has not settled or released — the one state that reaches abort's promise-phase-complete guard
+		// distinctly from the already-settled guard (cases above) and the atomicity guard (case below).
+		const { names, graph, members } = linear(3)
+		const { net, doubles } = makeNet({ graph })
+		const { record, transactionCode: tx } = net.buildLift({ members, route: names, payload: PAYLOAD })
+		for (const name of names) {
+			record.promises.push(await signRecord(makeSigner('seed', name), 'P', record)) // a promise preimage ignores the promise set, so order is irrelevant
+		}
+		await net.consensusStoreOf('P0').saveRecord(record)
+
+		await net.consensusNode('P0').abort(tx)
+		await net.clock.runUntilIdle()
+
+		const stored = await net.consensusStoreOf('P0').getRecord(tx)
+		expect(stored!.promises.some((signature) => signature.type === 'NP')).toBe(false) // refused: no NP appended
+		expect(stored!.promises).toHaveLength(names.length) // promise set untouched
+		expect(doubles.get('P0')!.releaseSuccesses).toEqual([]) // nothing released
 		expect(net.clock.pendingTimers).toBe(0)
 	})
 

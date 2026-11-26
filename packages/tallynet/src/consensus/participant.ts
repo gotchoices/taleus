@@ -236,6 +236,10 @@ export class TrxParticipant<TTerms, TPayload> {
 			this.log('tallynet consensus: abort by a non-participant on transaction %s (no-op)', transactionCode)
 			return
 		}
+		// NOTE: by here we are a confirmed participant, so a complete promise phase implies we hold a P —
+		// this guard is subsumed behaviour-wise by `weHaveSigned` below (both no-op). It is kept distinct
+		// to state principle 3 explicitly and log the past-abort case separately; don't treat it as the
+		// sole thing stopping a post-promise abort — the weHaveSigned guard backstops it.
 		if (this.promisePhaseComplete(record)) {
 			this.log('tallynet consensus: abort refused — every participant has promised on transaction %s', transactionCode)
 			return // principle 3: the lift is past the point an abort may void it
