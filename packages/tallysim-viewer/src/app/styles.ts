@@ -359,6 +359,47 @@ html, body, #app {
 	max-width: 16rem;
 }
 
+#tsv-graph:focus-visible {
+	outline: 2px solid var(--tsv-text-secondary);
+	outline-offset: -2px;
+}
+
+.tsv-camera-controls {
+	position: absolute;
+	right: 0.75rem;
+	bottom: 0.75rem;
+	z-index: 5;
+	display: flex;
+	gap: 0.3rem;
+}
+
+.tsv-camera-controls button {
+	min-width: 2rem;
+}
+
+.tsv-camera-hint {
+	position: absolute;
+	left: 0.75rem;
+	bottom: 0.75rem;
+	z-index: 5;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	background: var(--tsv-surface);
+	color: var(--tsv-text-secondary);
+	border: 1px solid var(--tsv-border);
+	border-radius: 4px;
+	padding: 0.35rem 0.5rem;
+	font-size: 0.8rem;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+#tsv-app .tsv-camera-hint-dismiss {
+	min-width: 0;
+	padding: 0 0.3rem;
+	line-height: 1.2;
+}
+
 .tsv-webgl-missing {
 	position: absolute;
 	inset: 0;

@@ -29,7 +29,7 @@
  * stays free of replay meaning.
  */
 
-import Sigma from 'sigma'
+import Sigma, { Camera } from 'sigma'
 import type { EdgeDisplayData, NodeDisplayData } from 'sigma/types'
 import type { TallyGraph, TallyEdgeAttributes, TallyNodeAttributes } from './model.js'
 import type { Palette } from '../app/theme.js'
@@ -96,6 +96,16 @@ const NODE_SIZE = 4
 const NODE_SIZE_LIT = 9
 /** Extra thickness and a raised depth bucket for a hovered/selected edge. */
 const EDGE_SIZE_BOOST = 2
+
+/** Rotate-button/key step, one press = 15°. */
+const ROTATE_STEP = Math.PI / 12
+/** Arrow-key pan step, as a fraction of the camera's current ratio — keeps pan speed proportional to zoom level. */
+const PAN_STEP_FRACTION = 0.1
+/** Duration (ms) for every button/key-triggered camera animation: short, so repeated presses feel snappy, not laggy. */
+const CAMERA_ANIMATE_DURATION = 200
+
+/** `localStorage` key for the dismissed mouse-gesture hint (the same small try/catch pattern as `theme.ts`). */
+const CAMERA_HINT_STORAGE_KEY = 'tallysim-viewer:camera-hint-dismissed'
 
 /** Is WebGL2 available in this document? A dev tool must degrade to a message, not a blank canvas. */
 function webgl2Supported(): boolean {
@@ -294,6 +304,160 @@ function showTooltip(tooltip: HTMLDivElement, text: string, x: number, y: number
 	tooltip.style.display = 'block'
 }
 
+/** Has the mouse-gesture hint already been dismissed? Best-effort — a disabled `localStorage` reads as "no". */
+function isCameraHintDismissed(): boolean {
+	try {
+		return localStorage.getItem(CAMERA_HINT_STORAGE_KEY) === '1'
+	} catch {
+		return false
+	}
+}
+
+/** Persist the hint dismissal (best-effort — a disabled `localStorage` must not break the app). */
+function storeCameraHintDismissed(): void {
+	try {
+		localStorage.setItem(CAMERA_HINT_STORAGE_KEY, '1')
+	} catch {
+		// localStorage can be disabled/full; the hint reappearing next load is non-essential.
+	}
+}
+
+/** One on-screen camera-control button: its glyph, its `aria-label`, and the camera action it triggers. */
+interface CameraControlSpec {
+	label: string
+	ariaLabel: string
+	run: (camera: Camera) => void
+}
+
+const CAMERA_CONTROLS: readonly CameraControlSpec[] = [
+	{ label: '+', ariaLabel: 'Zoom in', run: (camera) => void camera.zoomIn({ duration: CAMERA_ANIMATE_DURATION }) },
+	{ label: '−', ariaLabel: 'Zoom out', run: (camera) => void camera.zoomOut({ duration: CAMERA_ANIMATE_DURATION }) },
+	{
+		label: 'Fit',
+		ariaLabel: 'Fit to graph',
+		run: (camera) => void camera.animate({ x: 0.5, y: 0.5, ratio: 1 }, { duration: CAMERA_ANIMATE_DURATION }),
+	},
+	{ label: 'Reset', ariaLabel: 'Reset view', run: (camera) => void camera.reset({ duration: CAMERA_ANIMATE_DURATION }) },
+	{
+		label: '↺',
+		ariaLabel: 'Rotate left',
+		run: (camera) => void camera.animate({ angle: camera.angle - ROTATE_STEP }, { duration: CAMERA_ANIMATE_DURATION }),
+	},
+	{
+		label: '↻',
+		ariaLabel: 'Rotate right',
+		run: (camera) => void camera.animate({ angle: camera.angle + ROTATE_STEP }, { duration: CAMERA_ANIMATE_DURATION }),
+	},
+]
+
+/** Build the on-screen camera-control cluster (zoom/fit/reset/rotate) and append it to `container`. */
+function createCameraControls(container: HTMLElement, camera: Camera): HTMLDivElement {
+	const cluster = document.createElement('div')
+	cluster.className = 'tsv-camera-controls'
+	for (const spec of CAMERA_CONTROLS) {
+		const button = document.createElement('button')
+		button.type = 'button'
+		button.textContent = spec.label
+		button.setAttribute('aria-label', spec.ariaLabel)
+		button.addEventListener('click', () => {
+			spec.run(camera)
+		})
+		cluster.append(button)
+	}
+	container.append(cluster)
+	return cluster
+}
+
+/** Build the dismissible mouse-gesture hint overlay and append it to `container`, unless already dismissed. */
+function createCameraHint(container: HTMLElement): HTMLDivElement | undefined {
+	if (isCameraHintDismissed()) {
+		return undefined
+	}
+	const hint = document.createElement('div')
+	hint.className = 'tsv-camera-hint'
+	const text = document.createElement('span')
+	text.textContent = 'Drag to pan. Scroll or pinch to zoom.'
+	const dismiss = document.createElement('button')
+	dismiss.type = 'button'
+	dismiss.className = 'tsv-camera-hint-dismiss'
+	dismiss.textContent = '×'
+	dismiss.setAttribute('aria-label', 'Dismiss hint')
+	dismiss.addEventListener('click', () => {
+		storeCameraHintDismissed()
+		hint.remove()
+	})
+	hint.append(text, dismiss)
+	container.append(hint)
+	return hint
+}
+
+/** Pan the camera by `PAN_STEP_FRACTION` of its current ratio, in graph-space `(dx, dy)` units. */
+function panCamera(camera: Camera, dx: number, dy: number): void {
+	const step = PAN_STEP_FRACTION * camera.ratio
+	void camera.animate({ x: camera.x + dx * step, y: camera.y + dy * step }, { duration: CAMERA_ANIMATE_DURATION })
+}
+
+/**
+ * The graph container's `keydown` handler: the camera key mapping (zoom/reset/pan/rotate), inert while any
+ * descendant other than the container's own camera controls would otherwise lose a keystroke — scoping is by
+ * construction, since this listener fires only when `container` (or a descendant, e.g. a control button) has
+ * focus, never while a panel input elsewhere in the shell is focused.
+ */
+function handleCameraKeydown(camera: Camera, event: KeyboardEvent): void {
+	switch (event.key) {
+		case '+':
+		case '=': {
+			event.preventDefault()
+			void camera.zoomIn({ duration: CAMERA_ANIMATE_DURATION })
+			break
+		}
+		case '-':
+		case '_': {
+			event.preventDefault()
+			void camera.zoomOut({ duration: CAMERA_ANIMATE_DURATION })
+			break
+		}
+		case '0': {
+			event.preventDefault()
+			void camera.reset({ duration: CAMERA_ANIMATE_DURATION })
+			break
+		}
+		case 'ArrowUp': {
+			event.preventDefault()
+			panCamera(camera, 0, -1)
+			break
+		}
+		case 'ArrowDown': {
+			event.preventDefault()
+			panCamera(camera, 0, 1)
+			break
+		}
+		case 'ArrowLeft': {
+			event.preventDefault()
+			panCamera(camera, -1, 0)
+			break
+		}
+		case 'ArrowRight': {
+			event.preventDefault()
+			panCamera(camera, 1, 0)
+			break
+		}
+		case '[': {
+			event.preventDefault()
+			void camera.animate({ angle: camera.angle - ROTATE_STEP }, { duration: CAMERA_ANIMATE_DURATION })
+			break
+		}
+		case ']': {
+			event.preventDefault()
+			void camera.animate({ angle: camera.angle + ROTATE_STEP }, { duration: CAMERA_ANIMATE_DURATION })
+			break
+		}
+		default: {
+			break
+		}
+	}
+}
+
 /** Render the WebGL-absent fallback into the container and return the element so `destroy` can remove it. */
 function renderWebglMissing(container: HTMLElement): HTMLElement {
 	const message = document.createElement('div')
@@ -345,6 +509,11 @@ export function createGraphView(container: HTMLElement, graph: TallyGraph, initi
 	const tooltip = createTooltip()
 	container.append(tooltip)
 
+	// Keyboard shortcuts are scoped to the graph by attaching the listener to `container` itself (made
+	// focusable here) rather than `document` — a `keydown` on an element only fires when it or a descendant
+	// has focus, so this is automatically inert while the search box or any panel control is focused.
+	container.tabIndex = 0
+
 	const sigma = new Sigma<TallyNodeAttributes, TallyEdgeAttributes>(graph, container, {
 		settings: {
 			enableEdgeEvents: true,
@@ -377,6 +546,14 @@ export function createGraphView(container: HTMLElement, graph: TallyGraph, initi
 	sigma.on('leaveEdge', () => {
 		tooltip.style.display = 'none'
 	})
+
+	const camera = sigma.getCamera()
+	const cameraControls = createCameraControls(container, camera)
+	const cameraHint = createCameraHint(container)
+	const onCameraKeydown = (event: KeyboardEvent): void => {
+		handleCameraKeydown(camera, event)
+	}
+	container.addEventListener('keydown', onCameraKeydown)
 
 	let selected: string | undefined
 
@@ -427,8 +604,14 @@ export function createGraphView(container: HTMLElement, graph: TallyGraph, initi
 			sigma.refresh()
 		},
 		destroy(): void {
+			// `container` persists across loads (shell.ts only clears its children), so a listener attached
+			// directly to it — unlike the tooltip/controls/hint, which are children sigma.kill() and .remove()
+			// clean up — must be removed explicitly here, or every repeated load stacks another one.
+			container.removeEventListener('keydown', onCameraKeydown)
 			sigma.kill()
 			tooltip.remove()
+			cameraControls.remove()
+			cameraHint?.remove()
 		},
 	}
 }

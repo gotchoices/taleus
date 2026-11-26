@@ -125,6 +125,34 @@ recomputing anything structural:
   "lit route" will use *custom* state (`customNodeState` / `customEdgeState`), which composes with this because
   the two never touch the same flags.
 
+### Camera controls
+
+`render.ts` also owns the viewer's camera chrome — an on-screen button cluster, keyboard shortcuts, and a
+dismissible mouse-gesture hint — built against sigma's `Camera` (`x`, `y`, `angle`, `ratio`, `animate()`,
+`zoomIn()`/`zoomOut()`, `reset()`). The key insight that avoids any manual bounding-box math: sigma auto-scales
+the graph's node extent to fit exactly the normalized frame `{x: 0.5, y: 0.5, ratio: 1}`
+(`DEFAULT_CAMERA_STATE`), so that state *is* "whole graph, fitted to the viewport" — **Fit** is
+`camera.animate({x: 0.5, y: 0.5, ratio: 1})` (keeps the current rotation angle), and **Reset** is
+`camera.reset()`, the same state plus `angle: 0` (also exactly the camera's state right after mount). A rotated
+non-square graph can have its corners clipped by Fit's axis-aligned re-frame — an accepted trade-off for a dev
+tool, not a bug.
+
+- **On-screen cluster**: six buttons (zoom in/out, Fit, Reset, rotate left/right) absolutely positioned in the
+  graph container's bottom-right, each with an `aria-label`.
+- **Keyboard shortcuts**, scoped to the graph by attaching the `keydown` listener to the container itself
+  (`tabIndex = 0`) rather than `document` — a listener on an element only fires when it or a descendant has
+  focus, so this is inert while a panel input is focused, with no boolean tracking needed: `+`/`=` zoom in,
+  `-`/`_` zoom out, `0` reset, arrow keys pan (step scaled by the camera's current `ratio`, so pan speed stays
+  proportional to zoom level), `[`/`]` rotate. Reset (not Fit) takes `0` because it is the more complete action
+  — Fit stays reachable via its button for "re-frame without un-rotating".
+- **Mouse-gesture hint**: a dismissible overlay naming the drag-to-pan / wheel-to-zoom gestures (not the
+  keyboard shortcuts), persisted via a `tallysim-viewer:camera-hint-dismissed` `localStorage` key once
+  dismissed (the same try/catch pattern as `theme.ts`'s `storeTheme`).
+- **Cleanup gotcha**: the graph container is not recreated between loads (`shell.ts`'s `teardown()` only clears
+  its children), so the `keydown` listener attached directly to the container — unlike the tooltip/controls/
+  hint elements, which are children removed on `destroy()` — must be explicitly `removeEventListener`'d there,
+  or each repeated load stacks another listener.
+
 ### Worker layout + seeding
 
 ForceAtlas2 is a physics relaxation whose final shape depends on where nodes **start**, and it is O(n log n)
