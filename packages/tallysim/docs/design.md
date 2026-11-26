@@ -752,6 +752,33 @@ mirroring the `materializeNetwork` NOTE — otherwise one run's committed lifts 
 `(network, identity, workload, conditions)` seeds ⇒ identical member keys, outcome, and resulting balances; the
 dedicated identity-seed stream is the determinism guard.
 
+### Consensus metrics
+
+`sim/consensus-metrics.ts` is the consensus tier's measurement layer — **recorded lift in, metrics out** —
+pure like `protocol-metrics.ts` (no network / clock / filesystem), so it is testable from hand-built
+`LiftResult`s plus consensus `TraceEvent`s and reusable in a browser viewer. It is the consensus analogue of
+the discovery tier's § *Protocol metrics*: where that asks *did the protocol find a route*, this asks, of the
+routes it found and took, **did the lift commit, how fast, how many messages, and — for a non-commit — why?**
+
+`analyzeLift(events, result)` reduces **one** lift to a `ConsensusLiftMetrics`. It filters `events` by
+`result.transactionCode` internally — every consensus event carries a `transactionCode` and no discovery event
+does, so this cleanly drops discovery noise *and* every other lift's events in a concurrent batch. From this
+lift's events it derives: `messages` = count of `record-pushed` (the push is the consensus message);
+`timeToSettleMs` = last consensus-event time − first `record-pushed`/`promise-signed` time, **omitted for a
+`pending`** (nothing settled); and `voidReason`, by an **outcome-driven precedence** — `commit` ⇒ none;
+`pending` ⇒ always `'stalled'` (a stray `NP`/`NC` that never reached a decision does not override it); `void`
+⇒ the first of `expired` (a `signature-rejected`), `'refused-promise'` (a `promise-signed` `NP`), or
+`'voted-no-commit'` (a `referee-vote` `NC`). (`zeroVoidReasons()` is the compile-checked source of truth for
+the reason set; `ALL_VOID_REASONS` derives from it, so the two cannot drift.)
+
+`summarizeConsensusMetrics(lifts, structural, queryCount)` aggregates a run into `ConsensusRunMetrics`. The
+headline is **`pCommitGivenFound`** = `commitCount / liftCount` — P(commit | a route was found and a lift
+attempted), the consensus complement of the discovery tier's `pFoundGivenExists`, and **0 (never NaN)** when no
+lift ran. Cost distributions reuse `summarizeDistribution` from `metrics.ts`; `timeToSettleMs` is distributed
+over the settled lifts only (a pending contributes no sample), `messagesPerLift` over all lifts; `voidReasons`
+sums each non-commit lift's reason. `queryCount` and the `StructuralMetrics` carry through from the runner
+unchanged.
+
 ## Trace & replay format
 
 A simulation run can be recorded to a **versioned, newline-delimited JSON (NDJSON)** trace file — one that

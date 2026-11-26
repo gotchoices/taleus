@@ -221,6 +221,10 @@ export function analyzeLift(events: readonly TraceEvent[], result: LiftResult): 
 	}
 	// A settle time only for a lift that actually settled (commit|void). A pending gets none; a settled lift
 	// missing any push/promise event (degenerate, should not occur) also gets none rather than a bogus span.
+	// NOTE: maxTime spans to the LAST consensus event, which may be a post-`settled` `resources-released`, so
+	// this is really time-to-completion (cleanup included), not strictly to the `settled` event. Chosen over
+	// keying on `settled` for robustness: it yields a sample from any event, surviving a void path that emits
+	// no `settled`. Revisit against the real engine's event ordering once the consensus runner lands.
 	if (result.outcome !== 'pending' && minStartTime !== undefined && maxTime !== undefined) {
 		metrics.timeToSettleMs = maxTime - minStartTime
 	}
