@@ -306,8 +306,39 @@ within that window of the trace's last event, the flash can still show at `t = m
 lift, the found-routes list shows its chosen route from `liftRoute` (classified `path` or `loop` — a circular
 lift whose `route` returns to its origin) with an outcome **badge** from `liftOutcome` (committed / voided /
 stalled, the lift's final decision at its own `sessionEnd`); selecting it isolates the route via `liftIsolate`
-(exact nodes + tallies from the header, no decode) and dims the rest. Multiple lifts in one trace each animate
-on their own session/route; picking a session selects its lift.
+(exact nodes + tallies from the header, no decode) and dims the rest. A `stalled` lift (no settlement — a tie,
+or no decision reached) reads as **"unsettled"** in the panel, never a spinner: the non-spinning `promised`
+hops already carry that state on the graph. Multiple lifts in one trace each animate on their own session/route;
+picking a session selects its lift.
+
+**The voter model** (`timeline.ts` → `routes.ts`/`paint.ts` → `controls.ts`). On top of the sign-and-settle
+animation, the reducer classifies each `voter-vote` and records three member sets, all from the consensus
+events the prerequisite milestone added:
+
+- **Voters, participant vs referee.** A `voter-vote` key is a `participant` when it resolves to a route entity
+  (drawn as that route node, with its `C`/`NC` vote) and a `referee` when it does not. An off-route referee is
+  resolved **directly** (not through the malformed-key path), so it never pollutes `unresolved`. The side panel
+  lists the participant voters (id + vote) and shows `+N referee-only voters (stacked)` for the referees — so a
+  stacked voter set *looks* stacked — but they are **not placed on the graph**.
+- **Recovered-by-pull members** (`pulled`). A member the push could not reach that fetched the settled outcome
+  from a reachable peer (`record-pulled` with `ok:true`; the event is emitted per reachable peer, so the puller
+  recovered iff any of its pulls succeeded) takes the `pulled` node accent and a "recovered by pull" panel line.
+  The single `settled` event still settles the whole route — `pulled` is an orthogonal marker of *which* member
+  needed a pull, not a separate phase. This is how the linear-lift "interior non-relayer" edge case renders:
+  **with** contact points the far member recovers (a `pulled` mark); **without**, it simply stays `promised`
+  (stuck-pending, greyed, not errored). The viewer shows the **observable consequence** — pull-recovered vs
+  stuck-pending — because per-member contact points are not in the trace format.
+- **Equivocators and contradictions.** A signer caught emitting both faces (`equivocation-proof-kept.signer`)
+  takes the `equivocator` accent; the lift's settled `decision` shows which face won. A member whose outcome
+  disagreed with a peer's (`contradiction-detected.nodeId`) takes the `contradiction` accent. Both are backed by
+  a panel line, so colour is never the sole channel.
+
+**Format gaps, documented not fabricated.** Off-route referee voters and the nominator links that produced them
+do **not** reach the lift record (referees nominated at discovery are not carried into the route — a known
+simulator-side gap), so in the current format *all placeable voters are route participants*; an off-route
+referee is counted, never drawn, and nominator links are not shown at all. Per-member contact points are
+likewise absent from the format, so the "settles vs stalls on a linear lift with a refuser" distinction is shown
+as its observable consequence (pull-recovered vs stuck-pending), not as a per-member contact-point flag.
 
 ## Live-run tier (`src/live/`)
 

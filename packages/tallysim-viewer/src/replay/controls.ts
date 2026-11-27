@@ -25,7 +25,10 @@
  * the overlay animates the sign-and-settle phase (promises light the route, the vote previews, commit turns it
  * solid or void flashes then clears). The found-routes side list then shows the lift's **chosen route** — read
  * straight from the header, so this is *exact*, unlike the discovery gap above — with an outcome badge
- * (committed / voided / stalled); selecting it isolates the route. See `docs/design.md` § Consensus phase.
+ * (committed / voided / **unsettled** for a stalled lift); selecting it isolates the route. Below the route it
+ * renders the voter-model summary: participant voters (id + vote), a stacked count of off-route referee voters
+ * the format cannot place, and the pull-recovered / equivocating / contradiction-detecting members. See
+ * `docs/design.md` § Consensus phase.
  */
 
 import type { TraceQueryEntry } from 'tallysim'
@@ -49,11 +52,13 @@ import {
 	liftIsolate,
 	liftOutcome,
 	liftRoute,
+	liftVoterSummary,
 	reconstructRoute,
 	routeEdgeTallies,
 	sessionFoundState,
 	type LiftOutcome,
 	type LiftRoute,
+	type LiftVoterSummary,
 	type RouteInput,
 	type SessionFoundState,
 } from './routes.js'
@@ -306,12 +311,13 @@ export function mountReplayControls(params: {
 		const inputs = routeSource?.routesForSession(selected)
 		// A consensus trace: the selected session's settled lift (its chosen route + outcome badge, isolatable).
 		const lift = index.liftFor(selected)
-		// The outcome is the lift's final settled decision — derived at the end of its own events (the badge is
-		// stable regardless of the current head).
+		// The outcome and voter summary are the lift's FINAL state — derived at the end of its own events (both are
+		// stable regardless of the current head). One derivation feeds both.
 		// NOTE: derives the selected session's active set a third time per rebuild (on top of the twice-per-frame
 		// NOTE at renderFrame). Fine for planned trace sizes; if a large trace stutters, derive once and thread.
-		const outcome: LiftOutcome | undefined =
-			lift !== undefined ? liftOutcome(timelineFor(selected).deriveActiveSet(sessionEnd(selected)).consensus?.decision) : undefined
+		const finalConsensus = lift !== undefined ? timelineFor(selected).deriveActiveSet(sessionEnd(selected)).consensus : undefined
+		const outcome: LiftOutcome | undefined = lift !== undefined ? liftOutcome(finalConsensus?.decision) : undefined
+		const voterSummary = finalConsensus !== undefined ? liftVoterSummary(finalConsensus) : undefined
 		const signature = [
 			selected,
 			state.kind,
@@ -321,6 +327,7 @@ export function mountReplayControls(params: {
 			inputs === undefined,
 			lift !== undefined,
 			outcome ?? '',
+			voterSummaryFingerprint(voterSummary),
 		].join('|')
 		if (signature === lastFoundSignature) {
 			return
@@ -333,6 +340,7 @@ export function mountReplayControls(params: {
 			selected,
 			lift,
 			outcome,
+			voterSummary,
 		})
 	}
 
@@ -349,6 +357,7 @@ export function mountReplayControls(params: {
 			selected: string
 			lift: TraceLiftEntry | undefined
 			outcome: LiftOutcome | undefined
+			voterSummary: LiftVoterSummary | undefined
 		},
 	): void {
 		container.textContent = ''
@@ -359,7 +368,7 @@ export function mountReplayControls(params: {
 
 		// Consensus trace: the chosen lift route (exact, from the header) with an outcome badge; click isolates it.
 		if (info.lift !== undefined) {
-			renderLiftRoute(container, info.lift, info.outcome ?? 'stalled', info.markers.length)
+			renderLiftRoute(container, info.lift, info.outcome ?? 'stalled', info.markers.length, info.voterSummary)
 			return
 		}
 		if (info.inputs !== undefined) {
@@ -412,7 +421,13 @@ export function mountReplayControls(params: {
 	 * header (exact, no decode). Clicking it toggles isolate (dim the rest), like the discovery route list. Any
 	 * other discovery plans beyond the one that settled stay markers-only (the format carries no path for them).
 	 */
-	function renderLiftRoute(container: HTMLElement, lift: TraceLiftEntry, outcome: LiftOutcome, markerCount: number): void {
+	function renderLiftRoute(
+		container: HTMLElement,
+		lift: TraceLiftEntry,
+		outcome: LiftOutcome,
+		markerCount: number,
+		voterSummary: LiftVoterSummary | undefined,
+	): void {
 		const list = document.createElement('ul')
 		list.className = 'tsv-replay-routes'
 		const route = liftRoute(lift)
@@ -431,6 +446,9 @@ export function mountReplayControls(params: {
 		item.append(button)
 		list.append(item)
 		container.append(list)
+		if (voterSummary !== undefined) {
+			renderVoterSummary(container, voterSummary)
+		}
 		// Discovery may find several plans while only one settles into this lift; the rest have no recorded path.
 		if (markerCount > 1) {
 			const note = document.createElement('div')
@@ -438,6 +456,41 @@ export function mountReplayControls(params: {
 			note.textContent = `${markerCount - 1} other discovery plan${markerCount - 1 === 1 ? '' : 's'} found — markers only (exact path not recorded).`
 			container.append(note)
 		}
+	}
+
+	/**
+	 * Render the voter-model breakdown below the lift route: the participant voters (id + vote), a stacked count
+	 * of off-route referee voters the trace format cannot place, and the pull-recovered / equivocating /
+	 * contradiction-detecting members. Everything here is text, so colour (the graph accents) is never the sole
+	 * channel for a member's state.
+	 */
+	function renderVoterSummary(container: HTMLElement, summary: LiftVoterSummary): void {
+		const box = document.createElement('div')
+		box.className = 'tsv-replay-voters'
+		if (summary.participants.length > 0) {
+			const ul = document.createElement('ul')
+			ul.className = 'tsv-replay-voter-list'
+			for (const voter of summary.participants) {
+				const li = document.createElement('li')
+				li.textContent = `voter ${voter.node}${voter.vote === undefined ? '' : ` — ${voteWord(voter.vote)}`}`
+				ul.append(li)
+			}
+			box.append(ul)
+		}
+		if (summary.refereeOnlyCount > 0) {
+			// The format carries no place for off-route referees (see the design doc's gap) — counted, not drawn.
+			box.append(voterLine(`+${summary.refereeOnlyCount} referee-only voter${summary.refereeOnlyCount === 1 ? '' : 's'} (stacked)`))
+		}
+		if (summary.pulled.length > 0) {
+			box.append(voterLine(`recovered by pull: ${summary.pulled.join(', ')}`))
+		}
+		if (summary.equivocators.length > 0) {
+			box.append(voterLine(`equivocated (emitted both faces): ${summary.equivocators.join(', ')}`))
+		}
+		if (summary.contradictions.length > 0) {
+			box.append(voterLine(`contradiction detected: ${summary.contradictions.join(', ')}`))
+		}
+		container.append(box)
 	}
 
 	// ── Transport wiring ──
@@ -596,7 +649,39 @@ function routeLabel(route: ReturnType<typeof reconstructRoute>, index: number): 
 /** The label for the settled lift's route item: `route`/`loop`, hop count, and the outcome badge word. */
 function liftRouteLabel(route: LiftRoute, outcome: LiftOutcome): string {
 	const kind = route.kind === 'loop' ? 'loop' : 'route'
-	return `${kind}: ${route.hops} hop${route.hops === 1 ? '' : 's'} — ${outcome}`
+	return `${kind}: ${route.hops} hop${route.hops === 1 ? '' : 's'} — ${outcomeWord(outcome)}`
+}
+
+/** The badge word for an outcome — a `stalled` lift reads as **unsettled** (a tie / no settlement), never a spinner. */
+function outcomeWord(outcome: LiftOutcome): string {
+	return outcome === 'stalled' ? 'unsettled' : outcome
+}
+
+/** The human word for a vote: `C` commit-pending, `NC` no-commit. */
+function voteWord(vote: 'C' | 'NC'): string {
+	return vote === 'C' ? 'commit' : 'no-commit'
+}
+
+/** A plain text line for the voter-summary box. */
+function voterLine(text: string): HTMLDivElement {
+	const line = document.createElement('div')
+	line.className = 'tsv-replay-voter-line'
+	line.textContent = text
+	return line
+}
+
+/** A compact fingerprint of the voter summary so the found panel rebuilds when it changes (it rarely does). */
+function voterSummaryFingerprint(summary: LiftVoterSummary | undefined): string {
+	if (summary === undefined) {
+		return ''
+	}
+	return [
+		summary.participants.map((p) => `${p.node}${p.vote ?? ''}`).join(','),
+		summary.refereeOnlyCount,
+		summary.pulled.join(','),
+		summary.equivocators.join(','),
+		summary.contradictions.join(','),
+	].join(';')
 }
 
 /** Summarise per-link terms opaquely (the viewer must not couple to the lift's term shape). */

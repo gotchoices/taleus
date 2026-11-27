@@ -112,6 +112,10 @@ describe('buildOverlay — consensus layer', () => {
 			nodes: [{ node: 0, phase: 'settled' }, { node: 1, phase: 'settled' }, { node: 2, phase: 'settled', vote: 'C' }],
 			decision: 'commit',
 			settledTime: SETTLED,
+			voters: [],
+			pulled: [],
+			equivocators: [],
+			contradictions: [],
 			unresolved: [],
 		}
 		const overlay = buildOverlay({ active: emptyActive(), sleeping: new Set(), late: new Set(), palette: lightPalette, consensus, currentTime: 1000 })
@@ -133,6 +137,10 @@ describe('buildOverlay — consensus layer', () => {
 			nodes: [{ node: 0, phase: 'settled' }, { node: 2, phase: 'settled', vote: 'NC' }],
 			decision: 'void',
 			settledTime: SETTLED,
+			voters: [],
+			pulled: [],
+			equivocators: [],
+			contradictions: [],
 			unresolved: [],
 		}
 		// Inside the flash window: the released hop (and its nodes) flash the void colour.
@@ -153,6 +161,10 @@ describe('buildOverlay — consensus layer', () => {
 			nodes: [{ node: 0, phase: 'promised' }, { node: 1, phase: 'promised' }],
 			decision: undefined,
 			settledTime: undefined,
+			voters: [],
+			pulled: [],
+			equivocators: [],
+			contradictions: [],
 			unresolved: [],
 		}
 		const overlay = buildOverlay({ active: emptyActive(), sleeping: new Set(), late: new Set(), palette: lightPalette, consensus, currentTime: 1000 })
@@ -169,6 +181,10 @@ describe('buildOverlay — consensus layer', () => {
 			nodes: [{ node: 1, phase: 'voted', vote: 'C' }, { node: 2, phase: 'voted', vote: 'NC' }],
 			decision: undefined,
 			settledTime: undefined,
+			voters: [],
+			pulled: [],
+			equivocators: [],
+			contradictions: [],
 			unresolved: [],
 		}
 		const overlay = buildOverlay({ active: emptyActive(), sleeping: new Set(), late: new Set(), palette: lightPalette, consensus, currentTime: 20 })
@@ -187,6 +203,10 @@ describe('buildOverlay — consensus layer', () => {
 			nodes: [{ node: 0, phase: 'settled' }],
 			decision: 'commit',
 			settledTime: SETTLED,
+			voters: [],
+			pulled: [],
+			equivocators: [],
+			contradictions: [],
 			unresolved: [],
 		}
 		const overlay = buildOverlay({ active, sleeping: new Set(), late: new Set(), palette: lightPalette, consensus, currentTime: 1000 })
@@ -202,6 +222,10 @@ describe('buildOverlay — consensus layer', () => {
 			nodes: [{ node: 0, phase: 'settled' }],
 			decision: 'commit',
 			settledTime: SETTLED,
+			voters: [],
+			pulled: [],
+			equivocators: [],
+			contradictions: [],
 			unresolved: [],
 		}
 		const overlay = buildOverlay({
@@ -216,6 +240,80 @@ describe('buildOverlay — consensus layer', () => {
 		// Isolate wins: the edge is the found-route green, not the committed colour, and dim is set.
 		expect(overlay.edges.get('T3')?.color).toBe(lightPalette.found)
 		expect(overlay.dim).toEqual({ node: lightPalette.dimmed, edge: lightPalette.dimmed })
+	})
+})
+
+describe('buildOverlay — voter-model markers', () => {
+	/** A committed lift whose settled nodes the voter-model accents layer over; tests fill the marker fields. */
+	function markerConsensus(over: Partial<ConsensusState>): ConsensusState {
+		return {
+			transactionCode: 'TX1',
+			edges: [{ tally: 0, phase: 'committed' }, { tally: 1, phase: 'committed' }],
+			nodes: [{ node: 0, phase: 'settled' }, { node: 1, phase: 'settled' }, { node: 2, phase: 'settled', vote: 'C' }],
+			voters: [],
+			pulled: [],
+			equivocators: [],
+			contradictions: [],
+			decision: 'commit',
+			settledTime: 40,
+			unresolved: [],
+			...over,
+		}
+	}
+
+	test('a pulled member takes the recovery accent while keeping its settled size boost', () => {
+		const overlay = buildOverlay({
+			active: emptyActive(),
+			sleeping: new Set(),
+			late: new Set(),
+			palette: lightPalette,
+			consensus: markerConsensus({ pulled: [2] }),
+			currentTime: 1000,
+		})
+		// The pull accent recolours node 2 (recolour-only: the settled commit size boost underneath is kept).
+		expect(overlay.nodes.get('2')?.color).toBe(lightPalette.pulled)
+		expect(overlay.nodes.get('2')?.size).toBe(7)
+		// A non-pulled settled member keeps the plain committed colour.
+		expect(overlay.nodes.get('0')?.color).toBe(lightPalette.committed)
+	})
+
+	test('equivocator and contradiction members take their own accents', () => {
+		const overlay = buildOverlay({
+			active: emptyActive(),
+			sleeping: new Set(),
+			late: new Set(),
+			palette: lightPalette,
+			consensus: markerConsensus({ equivocators: [1], contradictions: [2] }),
+			currentTime: 1000,
+		})
+		expect(overlay.nodes.get('1')?.color).toBe(lightPalette.equivocator)
+		expect(overlay.nodes.get('2')?.color).toBe(lightPalette.contradiction)
+	})
+
+	test('a misbehaving mark wins over the recovery mark on a node that is both', () => {
+		const overlay = buildOverlay({
+			active: emptyActive(),
+			sleeping: new Set(),
+			late: new Set(),
+			palette: lightPalette,
+			consensus: markerConsensus({ pulled: [1], equivocators: [1] }),
+			currentTime: 1000,
+		})
+		// pulled is applied first, equivocator after — so the equivocation accent wins.
+		expect(overlay.nodes.get('1')?.color).toBe(lightPalette.equivocator)
+	})
+
+	test('an off-route referee voter (no node) produces no graph key', () => {
+		const overlay = buildOverlay({
+			active: emptyActive(),
+			sleeping: new Set(),
+			late: new Set(),
+			palette: lightPalette,
+			// A referee voter lives only in `voters` (no node); paint never reads `voters`, so no stray key appears.
+			consensus: markerConsensus({ nodes: [], voters: [{ key: 'mRef', role: 'referee', vote: 'NC' }], decision: undefined, settledTime: undefined }),
+			currentTime: 1000,
+		})
+		expect(overlay.nodes.size).toBe(0)
 	})
 })
 

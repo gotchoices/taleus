@@ -102,6 +102,27 @@ export interface ConsensusNodeState {
 }
 
 /**
+ * One voter that cast a `voter-vote`, classified by whether its member key sits on the lift's route:
+ *   - `participant` — the key resolves to a route entity (via the resolver's `memberKeys` map), so it has a
+ *     `node` id and is drawn on the graph (as a route node, with its phase/vote);
+ *   - `referee` — the key does **not** resolve: an off-route referee voter. The trace format carries no place
+ *     for it (referees nominated at discovery do not reach the lift record — see the design doc's format gap),
+ *     so it has no `node` and is **counted** in the side panel ("referee-only, stacked"), never placed on the
+ *     graph. Its key is kept out of {@link ConsensusState.unresolved}: an off-route voter is a known format gap,
+ *     not a malformed-trace event.
+ */
+export interface ConsensusVoter {
+	/** The member key the `voter-vote` carried (the one field always present, resolved or not). */
+	key: string
+	/** The route entity id, when the key resolved (a `participant`); `undefined` for an off-route `referee`. */
+	node?: number
+	/** Whether the voter sits on the lift's route (`participant`) or off it (`referee`). */
+	role: 'participant' | 'referee'
+	/** The vote cast — `C` (commit-pending) or `NC` (no-commit). */
+	vote?: 'C' | 'NC'
+}
+
+/**
  * The per-lift settlement state at `currentTime`, recomputed from scratch like the discovery active set — so a
  * scrub back before `settled` un-solidifies the route, and a scrub forward re-settles it. A **stalled** lift
  * (no `settled` event in the trace) leaves `decision`/`settledTime` undefined and its promised edges in
@@ -114,6 +135,23 @@ export interface ConsensusState {
 	edges: ConsensusEdgeState[]
 	/** Each route member node reached by a consensus event so far, with its phase. Sorted by entity id. */
 	nodes: ConsensusNodeState[]
+	/**
+	 * Every voter that cast a `voter-vote`, classified {@link ConsensusVoter.role participant/referee}. Sorted:
+	 * participants first by entity id, then referees by key. Deduped by key (a re-vote updates in place, latest
+	 * wins). Default `[]`.
+	 */
+	voters: ConsensusVoter[]
+	/**
+	 * Route entity ids that recovered via a **successful pull** — a member the push could not reach that fetched
+	 * the settled outcome from a reachable peer (`record-pulled` with `ok:true`; its puller is `nodeId`). Note the
+	 * single `settled` event still settles the whole route — `pulled` is an orthogonal marker of *which* member
+	 * needed a pull, not a separate phase. Sorted, deduped. Default `[]`.
+	 */
+	pulled: number[]
+	/** Route entity ids caught equivocating — a signer that emitted both faces (`equivocation-proof-kept.signer`). Sorted, deduped. Default `[]`. */
+	equivocators: number[]
+	/** Route entity ids that detected a contradiction — our-vs-peer outcome mismatch (`contradiction-detected.nodeId`). Sorted, deduped. Default `[]`. */
+	contradictions: number[]
 	/** The settled decision, if the head has reached the `settled` event; `undefined` while still in flight / stalled. */
 	decision?: ConsensusDecision
 	/** The time of the `settled` event, for `paint.ts`'s void flash window; `undefined` until settled. */
@@ -121,7 +159,8 @@ export interface ConsensusState {
 	/**
 	 * Member keys a consensus event carried that the lift's `memberKeys` map did not resolve — a malformed-trace
 	 * sentinel, surfaced (never silently dropped) so a well-formed self-recorded trace can be asserted to leave
-	 * it empty. Sorted for stability.
+	 * it empty. An off-route `referee` voter key is **not** counted here (that is a known format gap, not
+	 * malformed — see {@link ConsensusVoter}). Sorted for stability.
 	 */
 	unresolved: string[]
 }
@@ -177,6 +216,20 @@ function phaseOfRank(rank: number): ConsensusNodePhase {
 /** The distinct entity ids on a route, in ascending order (a circular route's repeated origin counted once). */
 function distinctRouteNodes(route: readonly number[]): number[] {
 	return [...new Set(route)].sort((a, b) => a - b)
+}
+
+/** Order voters deterministically: resolved participants first by entity id, then off-route referees by key. */
+function compareVoters(a: ConsensusVoter, b: ConsensusVoter): number {
+	if (a.node !== undefined && b.node !== undefined) {
+		return a.node - b.node
+	}
+	if (a.node !== undefined) {
+		return -1 // a participant sorts before a referee
+	}
+	if (b.node !== undefined) {
+		return 1
+	}
+	return a.key < b.key ? -1 : a.key > b.key ? 1 : 0
 }
 
 /** Does this event type carry a `nonce` (so it maps to an edge)? */
@@ -282,6 +335,10 @@ export function createTimeline(params: {
 		const promisedEdges = new Set<number>() // tally indices a record was pushed over, by now
 		const nodeRank = new Map<number, number>() // entity id → max PHASE_RANK reached
 		const nodeVote = new Map<number, 'C' | 'NC'>()
+		const voters = new Map<string, ConsensusVoter>() // member key → voter (a re-vote updates in place)
+		const pulled = new Set<number>() // entity ids recovered via a successful pull
+		const equivocators = new Set<number>() // entity ids caught signing both faces
+		const contradictions = new Set<number>() // entity ids that detected an outcome mismatch
 		const unresolved = new Set<string>()
 		let decision: ConsensusDecision | undefined
 		let settledTime: number | undefined
@@ -292,6 +349,8 @@ export function createTimeline(params: {
 				nodeRank.set(id, rank)
 			}
 		}
+		// Resolve a route-member key, surfacing a miss in `unresolved` (the malformed-trace sentinel). Used for the
+		// record/promise/settle events whose keys are always route members — a miss there genuinely is malformed.
 		const resolveMember = (key: string): number | undefined => {
 			const id = resolver.entityOfMember(key)
 			if (id === undefined) {
@@ -304,9 +363,9 @@ export function createTimeline(params: {
 			if (event.time > currentTime || !isConsensusEvent(event) || event.transactionCode !== lift.transactionCode) {
 				continue
 			}
-			const node = resolveMember(event.nodeId)
 			switch (event.type) {
 				case 'record-pushed': {
+					const node = resolveMember(event.nodeId)
 					const to = resolveMember(event.to)
 					if (node !== undefined && to !== undefined) {
 						const tally = resolver.tallyOfEdge(node, to)
@@ -320,23 +379,59 @@ export function createTimeline(params: {
 					break
 				}
 				case 'record-received': {
+					const node = resolveMember(event.nodeId)
 					if (node !== undefined) {
 						bumpNode(node, PHASE_RANK.promised)
+					}
+					break
+				}
+				case 'record-pulled': {
+					// Emitted once per reachable peer (`ok` for the one that served, not for the others). The puller
+					// (`nodeId`) recovered iff at least one of its pulls succeeded; the Set dedupes the ok:true ones.
+					const node = resolveMember(event.nodeId)
+					if (node !== undefined && event.ok) {
+						pulled.add(node)
 					}
 					break
 				}
 				case 'promise-signed': {
 					// A real promise (`P`) marks participation; a refusal (`NP`) does not promote the node — the void
 					// outcome (below) is what the refusal drives, and there is no distinct "refused" node phase in v1.
+					const node = resolveMember(event.nodeId)
 					if (node !== undefined && event.signatureType === 'P') {
 						bumpNode(node, PHASE_RANK.promised)
 					}
 					break
 				}
 				case 'voter-vote': {
+					// Classify via `entityOfMember` DIRECTLY — not `resolveMember`: an off-route referee voter
+					// legitimately does not map, and must stay out of `unresolved` (reserved for malformed
+					// route-member events). A participant also promotes/records its node phase + vote.
+					const node = resolver.entityOfMember(event.nodeId)
+					voters.set(
+						event.nodeId,
+						node === undefined
+							? { key: event.nodeId, role: 'referee', vote: event.decision }
+							: { key: event.nodeId, node, role: 'participant', vote: event.decision },
+					)
 					if (node !== undefined) {
 						bumpNode(node, PHASE_RANK.voted)
 						nodeVote.set(node, event.decision)
+					}
+					break
+				}
+				case 'equivocation-proof-kept': {
+					// The equivocator is the `signer` (the member that emitted both faces), not the keeper (`nodeId`).
+					const signer = resolveMember(event.signer)
+					if (signer !== undefined) {
+						equivocators.add(signer)
+					}
+					break
+				}
+				case 'contradiction-detected': {
+					const node = resolveMember(event.nodeId)
+					if (node !== undefined) {
+						contradictions.add(node)
 					}
 					break
 				}
@@ -368,6 +463,10 @@ export function createTimeline(params: {
 					return vote === undefined ? { node, phase: phaseOfRank(rank) } : { node, phase: phaseOfRank(rank), vote }
 				})
 				.sort((a, b) => a.node - b.node),
+			voters: [...voters.values()].sort(compareVoters),
+			pulled: [...pulled].sort((a, b) => a - b),
+			equivocators: [...equivocators].sort((a, b) => a - b),
+			contradictions: [...contradictions].sort((a, b) => a - b),
 			decision,
 			settledTime,
 			unresolved: [...unresolved].sort(),

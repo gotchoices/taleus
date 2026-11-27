@@ -5,12 +5,14 @@ import {
 	liftIsolate,
 	liftOutcome,
 	liftRoute,
+	liftVoterSummary,
 	reconstructRoute,
 	reconstructRoutes,
 	routeEdgeTallies,
 	sessionFoundState,
 	type RouteInput,
 } from './routes.js'
+import type { ConsensusState } from '../core/timeline.js'
 
 const SESSION = 'session-alpha'
 
@@ -149,12 +151,68 @@ describe('liftRoute / liftOutcome / liftIsolate — the settled lift from the he
 	it('maps the settled decision to the outcome badge', () => {
 		expect(liftOutcome('commit')).toBe('committed')
 		expect(liftOutcome('void')).toBe('voided')
+		// An unsettled lift (a tie / no settlement) is `stalled`; the panel renders this word as "unsettled".
 		expect(liftOutcome(undefined)).toBe('stalled')
 	})
 
 	it('isolates a lift to its exact nodes + tallies from the header', () => {
 		expect(liftIsolate(pathLift)).toEqual({ nodes: [0, 1, 2, 3], tallies: [0, 1, 2] })
 		expect(liftIsolate(loopLift)).toEqual({ nodes: [0, 1, 2, 0], tallies: [0, 1, 2] })
+	})
+})
+
+describe('liftVoterSummary — the voter-model side-panel data', () => {
+	/** A base ConsensusState with the voter-model fields defaulted empty; each test overrides what it exercises. */
+	function consensus(over: Partial<ConsensusState>): ConsensusState {
+		return {
+			transactionCode: 'TX1',
+			edges: [],
+			nodes: [],
+			voters: [],
+			pulled: [],
+			equivocators: [],
+			contradictions: [],
+			decision: 'commit',
+			settledTime: 40,
+			unresolved: [],
+			...over,
+		}
+	}
+
+	it('splits participant voters (id + vote) from an off-route referee-only count', () => {
+		const summary = liftVoterSummary(
+			consensus({
+				voters: [
+					{ key: 'm1', node: 1, role: 'participant', vote: 'C' },
+					{ key: 'm2', node: 2, role: 'participant', vote: 'NC' },
+					{ key: 'rA', role: 'referee', vote: 'C' },
+					{ key: 'rB', role: 'referee', vote: 'C' },
+				],
+			}),
+		)
+		expect(summary.participants).toEqual([
+			{ node: 1, vote: 'C' },
+			{ node: 2, vote: 'NC' },
+		])
+		// A stacked referee set is counted, not placed — so "a stacked voter set looks stacked".
+		expect(summary.refereeOnlyCount).toBe(2)
+	})
+
+	it('passes through the pulled / equivocator / contradiction member ids', () => {
+		const summary = liftVoterSummary(consensus({ pulled: [3], equivocators: [1], contradictions: [2] }))
+		expect(summary.pulled).toEqual([3])
+		expect(summary.equivocators).toEqual([1])
+		expect(summary.contradictions).toEqual([2])
+	})
+
+	it('is all-empty for a lift with no voters or markers', () => {
+		expect(liftVoterSummary(consensus({}))).toEqual({
+			participants: [],
+			refereeOnlyCount: 0,
+			pulled: [],
+			equivocators: [],
+			contradictions: [],
+		})
 	})
 })
 

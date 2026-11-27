@@ -146,6 +146,10 @@ describe('createTimeline — consensus settlement', () => {
 			transactionCode: 'TX1',
 			edges: [{ tally: 0, phase: 'promised' }],
 			nodes: [{ node: 0, phase: 'promised' }],
+			voters: [],
+			pulled: [],
+			equivocators: [],
+			contradictions: [],
 			decision: undefined,
 			settledTime: undefined,
 			unresolved: [],
@@ -234,6 +238,83 @@ describe('createTimeline — consensus settlement', () => {
 		expect(c?.unresolved).toEqual(['mX'])
 		expect(c?.edges).toEqual([]) // the sender did not resolve, so no edge could be placed
 		expect(c?.nodes).toEqual([])
+	})
+
+	it('marks a member that recovered via a successful pull (ok:true), ignoring its failed pulls', () => {
+		// m2 is cut off: it pulls from m0 (served, ok:true) and m1 (served nothing, ok:false). It recovered.
+		const pullEvents: TraceEvent[] = [
+			{ time: 40, nodeId: 'm0', sessionCode: 'S1', type: 'settled', transactionCode: 'TX1', decision: 'commit' },
+			{ time: 50, nodeId: 'm2', sessionCode: 'S1', type: 'record-pulled', transactionCode: 'TX1', from: 'm1', ok: false },
+			{ time: 51, nodeId: 'm2', sessionCode: 'S1', type: 'record-pulled', transactionCode: 'TX1', from: 'm0', ok: true },
+		]
+		const c = consensusTimeline(pullEvents).deriveActiveSet(100).consensus
+		expect(c?.pulled).toEqual([2])
+		expect(c?.unresolved).toEqual([]) // the puller is a route member — no sentinel pollution
+	})
+
+	it('does not mark a member whose pulls all failed (never recovered)', () => {
+		const failedPulls: TraceEvent[] = [
+			{ time: 50, nodeId: 'm2', sessionCode: 'S1', type: 'record-pulled', transactionCode: 'TX1', from: 'm0', ok: false },
+			{ time: 51, nodeId: 'm2', sessionCode: 'S1', type: 'record-pulled', transactionCode: 'TX1', from: 'm1', ok: false },
+		]
+		expect(consensusTimeline(failedPulls).deriveActiveSet(100).consensus?.pulled).toEqual([])
+	})
+
+	it('records an equivocating signer from equivocation-proof-kept (the signer, not the keeper)', () => {
+		const equivEvents: TraceEvent[] = [
+			{ time: 30, nodeId: 'm0', sessionCode: 'S1', type: 'equivocation-proof-kept', transactionCode: 'TX1', signer: 'm1' },
+		]
+		const c = consensusTimeline(equivEvents).deriveActiveSet(100).consensus
+		expect(c?.equivocators).toEqual([1])
+		expect(c?.contradictions).toEqual([])
+		expect(c?.unresolved).toEqual([])
+	})
+
+	it('records a contradiction-detecting node from contradiction-detected', () => {
+		const contraEvents: TraceEvent[] = [
+			{ time: 30, nodeId: 'm1', sessionCode: 'S1', type: 'contradiction-detected', transactionCode: 'TX1', ourOutcome: 'commit', peerOutcome: 'void' },
+		]
+		const c = consensusTimeline(contraEvents).deriveActiveSet(100).consensus
+		expect(c?.contradictions).toEqual([1])
+		expect(c?.equivocators).toEqual([])
+		expect(c?.unresolved).toEqual([])
+	})
+
+	it('classifies an on-route voter as a participant (resolves to its route node)', () => {
+		const onRoute: TraceEvent[] = [
+			{ time: 20, nodeId: 'm2', sessionCode: 'S1', type: 'voter-vote', transactionCode: 'TX1', decision: 'C' },
+		]
+		const c = consensusTimeline(onRoute).deriveActiveSet(100).consensus
+		expect(c?.voters).toEqual([{ key: 'm2', node: 2, role: 'participant', vote: 'C' }])
+		// A participant voter is also drawn as a route node (voted phase + vote).
+		expect(c?.nodes).toEqual([{ node: 2, phase: 'voted', vote: 'C' }])
+		expect(c?.unresolved).toEqual([])
+	})
+
+	it('classifies an off-route referee voter as a referee, keeping it off the graph and out of unresolved', () => {
+		const offRoute: TraceEvent[] = [
+			{ time: 20, nodeId: 'mRef', sessionCode: 'S1', type: 'voter-vote', transactionCode: 'TX1', decision: 'NC' },
+		]
+		const c = consensusTimeline(offRoute).deriveActiveSet(100).consensus
+		expect(c?.voters).toEqual([{ key: 'mRef', role: 'referee', vote: 'NC' }])
+		// An off-route referee has no entity id — it never becomes a graph node, and it is NOT a malformed key.
+		expect(c?.nodes).toEqual([])
+		expect(c?.unresolved).toEqual([])
+	})
+
+	it('orders voters participants-first (by id) then referees (by key), deduping a re-vote', () => {
+		const mixed: TraceEvent[] = [
+			{ time: 18, nodeId: 'mRef', sessionCode: 'S1', type: 'voter-vote', transactionCode: 'TX1', decision: 'C' },
+			{ time: 20, nodeId: 'm2', sessionCode: 'S1', type: 'voter-vote', transactionCode: 'TX1', decision: 'C' },
+			{ time: 22, nodeId: 'm1', sessionCode: 'S1', type: 'voter-vote', transactionCode: 'TX1', decision: 'NC' },
+			{ time: 24, nodeId: 'mRef', sessionCode: 'S1', type: 'voter-vote', transactionCode: 'TX1', decision: 'NC' }, // re-vote: latest wins
+		]
+		const c = consensusTimeline(mixed).deriveActiveSet(100).consensus
+		expect(c?.voters).toEqual([
+			{ key: 'm1', node: 1, role: 'participant', vote: 'NC' },
+			{ key: 'm2', node: 2, role: 'participant', vote: 'C' },
+			{ key: 'mRef', role: 'referee', vote: 'NC' },
+		])
 	})
 })
 

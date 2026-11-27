@@ -25,10 +25,13 @@
  *   - **Consensus** — when {@link PaintInput.consensus} is set (a settling lift's state at `currentTime`), the
  *     sign-and-settle phase is layered **over** the spread marks: promised hops take {@link Palette.promised},
  *     a committed route turns solid {@link Palette.committed}, and a voided route's held hops flash
- *     {@link Palette.voidFlash} for {@link VOID_FLASH_MS} then clear back to their resting/discovery style. It
- *     is composed last (consensus is later in event time than discovery, so it wins past settlement) and is
- *     **suppressed in isolate mode** (isolate stays the green route selection). See the design doc's *Consensus
- *     phase*.
+ *     {@link Palette.voidFlash} for {@link VOID_FLASH_MS} then clear back to their resting/discovery style. Over
+ *     the settled nodes come the voter-model accents — {@link Palette.pulled} (a member recovered by a pull),
+ *     {@link Palette.equivocator} (a both-faces signer), {@link Palette.contradiction} (an outcome-mismatch
+ *     detector) — recolouring the node while keeping its settled size. Off-route *referee* voters have no entity
+ *     id and are never drawn here (side panel counts them). The whole layer is composed last (consensus is later
+ *     in event time than discovery, so it wins past settlement) and is **suppressed in isolate mode** (isolate
+ *     stays the green route selection). See the design doc's *Consensus phase*.
  *
  * This module is sigma-free on purpose: it imports only the key-mapping helpers (`edgeKeyForTally`,
  * `entityName`) that are the one documented place the tally-index↔edge-key and id↔node-key conventions live.
@@ -160,6 +163,25 @@ function applyConsensus(overlay: ReplayOverlay, consensus: ConsensusState, curre
 			overlay.nodes.set(entityName(node.node), style)
 		}
 	}
+	// Voter-model node accents, layered LAST over the settled node styles (recolour only — any settled size boost
+	// underneath is kept). Off-route referee voters carry no entity id, so they are never keyed here (side-panel
+	// only). Applied pulled → equivocator → contradiction so a "misbehaving" mark wins over the recovery mark on
+	// the (rare) node that is both.
+	for (const id of consensus.pulled) {
+		markNode(overlay, id, palette.pulled)
+	}
+	for (const id of consensus.equivocators) {
+		markNode(overlay, id, palette.equivocator)
+	}
+	for (const id of consensus.contradictions) {
+		markNode(overlay, id, palette.contradiction)
+	}
+}
+
+/** Recolour a node's overlay style to `color`, preserving any size the consensus layer already set under it. */
+function markNode(overlay: ReplayOverlay, id: number, color: string): void {
+	const key = entityName(id)
+	overlay.nodes.set(key, { ...overlay.nodes.get(key), color })
 }
 
 /**

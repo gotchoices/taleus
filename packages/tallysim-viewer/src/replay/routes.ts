@@ -21,7 +21,7 @@
 
 import type { TraceLiftEntry } from 'tallysim'
 import type { Deanonymiser } from '../core/deanonymise.js'
-import type { ConsensusDecision } from '../core/timeline.js'
+import type { ConsensusDecision, ConsensusState } from '../core/timeline.js'
 import type { IsolatedRoute } from './paint.js'
 
 /**
@@ -137,6 +137,52 @@ export function liftOutcome(decision: ConsensusDecision | undefined): LiftOutcom
 		return 'voided'
 	}
 	return 'stalled'
+}
+
+/**
+ * One participant voter the side panel draws: its route node id and the vote it cast (if any). A participant is
+ * a voter whose member key resolved to a route entity (so it is also drawn on the graph).
+ */
+export interface ParticipantVoter {
+	node: number
+	vote?: 'C' | 'NC'
+}
+
+/**
+ * The voter-model summary the side panel renders for a settled lift, distilled from its {@link ConsensusState}:
+ *   - `participants` — voters that sit on the route (drawn as graph nodes), id + vote;
+ *   - `refereeOnlyCount` — how many voters are **off-route referees** the trace format cannot place (counted,
+ *     never drawn — so "a stacked voter set looks stacked"; see the design doc's format gap);
+ *   - `pulled` — members that recovered via a successful pull;
+ *   - `equivocators` — members caught signing both faces;
+ *   - `contradictions` — members that detected an outcome mismatch.
+ */
+export interface LiftVoterSummary {
+	participants: ParticipantVoter[]
+	refereeOnlyCount: number
+	pulled: readonly number[]
+	equivocators: readonly number[]
+	contradictions: readonly number[]
+}
+
+/** Distil a lift's {@link ConsensusState} into the {@link LiftVoterSummary} the side panel renders. */
+export function liftVoterSummary(consensus: ConsensusState): LiftVoterSummary {
+	const participants: ParticipantVoter[] = []
+	let refereeOnlyCount = 0
+	for (const voter of consensus.voters) {
+		if (voter.role === 'participant' && voter.node !== undefined) {
+			participants.push(voter.vote === undefined ? { node: voter.node } : { node: voter.node, vote: voter.vote })
+		} else {
+			refereeOnlyCount += 1
+		}
+	}
+	return {
+		participants,
+		refereeOnlyCount,
+		pulled: consensus.pulled,
+		equivocators: consensus.equivocators,
+		contradictions: consensus.contradictions,
+	}
 }
 
 /** The isolate view for a settled lift's route — its exact nodes + tallies, from the header (no decode). */

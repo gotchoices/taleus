@@ -37,6 +37,13 @@
  *     roundScale, violet unlimited, rose pruned) and from each other; its one colour-blind-risky pair —
  *     committed (green) vs voidFlash (red) — never co-occurs (commit XOR void) and is backed by the
  *     found-routes outcome **badge** text, so colour is never the sole channel.
+ *   - **pulled / equivocator / contradiction** are the voter-model **node** accents, layered over a member's
+ *     settled style: indigo **pulled** (a member that recovered by pulling the outcome from a reachable peer),
+ *     magenta **equivocator** (a signer that emitted both faces), purple **contradiction** (a member whose
+ *     outcome disagreed with a peer's). Each sits in a hue family no *node* uses elsewhere, and — like the
+ *     consensus triad — each is backed by the side panel's per-member text, so colour is never the sole channel
+ *     even where two of them co-occur. (Off-route *referee* voters have no node; they are counted in the panel,
+ *     not drawn — a trace-format gap, see the design doc.)
  *
  * Persistence: the chosen theme is stored in `localStorage` and defaults to the OS `prefers-color-scheme`.
  */
@@ -90,6 +97,16 @@ export interface Palette {
 	/** The brief flash a voided lift's held hops take as they clear, and a no-commit vote's node: a crimson red. */
 	voidFlash: string
 	/**
+	 * A route member that recovered via a **pull** (the push could not reach it, so it fetched the outcome from a
+	 * reachable peer): an indigo-blue accent, layered over its settled node. Distinct from the capacity-blue edges
+	 * (this marks nodes), the teal promise and the green commit.
+	 */
+	pulled: string
+	/** A member caught **equivocating** (signed both faces): a vivid magenta node accent, distinct from the muted-rose pruned fade. */
+	equivocator: string
+	/** A member that detected a **contradiction** (its outcome disagreed with a peer's): a purple node accent. */
+	contradiction: string
+	/**
 	 * The sweep charts' categorical series colours — one per plotted line. The data-viz reference's eight-hue
 	 * categorical set in its validated order (the ordering is the colour-blind-safety mechanism, not cosmetic);
 	 * each theme has its own steps for its surface. More than eight series cycle the set (a dev tool; a line
@@ -123,6 +140,11 @@ export const lightPalette: Palette = {
 	promised: '#0e9fb8',
 	committed: '#0a8f3c',
 	voidFlash: '#d81e3f',
+	// Voter-model node accents (light), each in a hue family not used for a node elsewhere, and backed by the
+	// side-panel text so colour is never the sole channel: indigo recovery, magenta equivocation, purple conflict.
+	pulled: '#3457d5',
+	equivocator: '#c81d97',
+	contradiction: '#7a3bd4',
 	// Categorical slots 1–8 (blue, orange, aqua, yellow, magenta, green, violet, red), light column.
 	seriesScale: ['#257de0', '#f47230', '#00b894', '#f2a600', '#ee7fac', '#008a17', '#6a4ce2', '#ec4647'],
 }
@@ -151,6 +173,10 @@ export const darkPalette: Palette = {
 	promised: '#34c0d6',
 	committed: '#2bb14e',
 	voidFlash: '#f0506a',
+	// Voter-model node accents (dark): brighter steps of the same three hues for the #191919 surface.
+	pulled: '#5c7cfa',
+	equivocator: '#f05cc4',
+	contradiction: '#a579f0',
 	// The same eight hues stepped for the dark surface (data-viz reference's dark column).
 	seriesScale: ['#338ced', '#e76624', '#00a888', '#d28e05', '#e24d8b', '#0aac23', '#9887ef', '#eb6263'],
 }
