@@ -926,6 +926,40 @@ round-trips through a trace header).
   dimension then appends the `creditHeldMsPerLift` distribution and the `permanentlyPendingCount` /
   `permanentlyPendingFraction` scalars as the final columns (see § *Consensus metrics*).
 
+### Hostile-actor scenarios
+
+Beyond the failure dials above (which void or strand a lift through *missing* cooperation), a separate set of
+scenarios proves the protocol's own defences against *active-emission* attacks — a peer that emits crafted,
+malicious records. They are **hand-driven** rather than swept: feeding divergent faces to different parts of the
+network requires dropping a link mid-drive, which the atomic `start` + single `runUntilIdle` of a normal lift
+cannot express. The sim holds every node's private key deterministically (`sim/identity.ts`), so
+`sim/hostile-records.ts` mints the malicious records (`signAs` a genuine face, `forgeFace` a face claiming a
+victim but signed by an attacker, `junkCommits` a distinct-garbage flood), and `sim/hostile-scenarios.test.ts`
+pushes them at a real reconstructed route (or a line split through the live-conditions seam). Five invariants:
+
+- **Forgery.** A commit or promise forged in another member's name fails verification, is rejected `forged`,
+  and never counts; the genuine outcome is unmoved. (A forged *commit* is dropped whether or not the victim has
+  a genuine commit, because verification runs before the dedupe check; a forged *promise* reads `forged` only
+  when the victim has no prior promise — otherwise the dedupe fires first and reads `changed`.)
+- **Junk-commit flood.** A voter's commit pool caps unverifiable commits at `MAX_PENDING_COMMITS_PER_VOTER`
+  (4) per signer; the overflow drops `pool-full`, and the voter's genuine vote, delivered after the promise
+  phase completes, still counts and the lift commits.
+- **Replay.** Re-pushing an already-settled record is deduped silently — the outcome, the releases (exactly
+  one per member) and the moved balances are all unchanged.
+- **Equivocating voter, honest majority.** One of three voters signs both faces; every honest member still
+  settles the same way (the majority's), the equivocator is listed by `equivocators()` with both faces retained
+  as proof, and no contradiction is flagged.
+- **Equivocating voter *majority* — the documented boundary.** The single attack the protocol cannot mask: a
+  *majority* of the voter set (two of three) equivocates, so two honest members genuinely settle opposite ways.
+  The protocol does not hide it — it **detects** it (`contradicts()` is true at the boundary nodes, with a
+  `contradiction-detected` trace event). This is the boundary the parent plan names: zero inconsistent
+  settlements *unless a voter majority equivocates*, matching `tallynet`'s own `detectContradiction` limit.
+
+The equivocation scenarios inject the equivocator's two faces as crafted records (the sim god-mints both
+genuine faces) rather than driving a node that natively double-signs, and after healing the split they cross
+the boundary with an explicit `serveRecord` → `update` (a dropped push is never re-queued, so a settled node
+will not re-push across a restored link on its own).
+
 ### Consensus metrics
 
 `sim/consensus-metrics.ts` is the consensus tier's measurement layer — **recorded lift in, metrics out** —
