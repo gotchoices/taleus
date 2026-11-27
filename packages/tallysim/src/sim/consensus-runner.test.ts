@@ -212,9 +212,10 @@ describe('runConsensusSweep — circular route (no completion cliff around a non
 
 describe('runConsensusSweep — stacked voter sets are refused at discovery', () => {
 	it('every line route is stapled with obscure referees, dropped by the scorer ⇒ refusals, no lifts', async () => {
-		// `stackedVoters: 2` staples two obscure (non-well-known) referees onto every plan an even-id node folds
-		// into; every line route spans an even node, so every route is stacked and the counting scorer drops it
-		// (returns -Infinity, which the originator filters out) — leaving no plan to lift. Each drop is counted.
+		// `stackedVoters: 2` staples two obscure (non-well-known) referees onto every plan EVERY node folds into
+		// (the originator always processes its own plan, so even a single-hop route is stapled); every route is
+		// thus stacked and the counting scorer drops it (returns -Infinity, which the originator filters out) —
+		// leaving no plan to lift. Each drop is counted.
 		const base: SimScenario = {
 			network: { materialized: line(5) },
 			workload: { kind: 'payment', queries: 12, amount: { dist: 'constant', params: { value: 5 } }, depth: 5, seed: 200 },

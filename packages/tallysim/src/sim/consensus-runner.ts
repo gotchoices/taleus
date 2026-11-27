@@ -246,9 +246,10 @@ interface ConsensusWiring {
  *
  * - **`voterNomination: 'well-known'`** — derive the well-known (high-degree) set, nominate the one hub as an
  *   off-route `[V]` referee (`nomineesFor`), and score plans voter-aware (`scorePlan`).
- * - **`stackedVoters > 0`** — staple that many obscure referees onto every plan an even-id node folds into
- *   (`negotiatePlanFor`) and **override** the scorer with one that refuses (drops, `-Infinity`) any stacked
- *   plan, counting each refusal into `planRefusals`.
+ * - **`stackedVoters > 0`** — staple that many obscure referees onto every plan **every** node folds into
+ *   (`negotiatePlanFor`; see {@link stackingNegotiateFor} for why every node, not a subset) and **override**
+ *   the scorer with one that refuses (drops, `-Infinity`) any stacked plan, counting each refusal into
+ *   `planRefusals`.
  *
  * `'self'` nomination needs no wiring — the default `voters: [route[0]]` already makes the originator the
  * sole `[P, V]` voter. A run with none of these knobs returns exactly the base config (no new keys), so the
