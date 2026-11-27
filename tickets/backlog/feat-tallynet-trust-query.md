@@ -1,4 +1,3 @@
-----
 description: Use the same network search to answer "how closely am I connected to this person, and how much do the people between us trust each other?" — for example, before getting into a ride-share driver's car — without moving any value.
 prereq: tallynet-discovery
 files: packages/tallynet/docs/design.md, packages/tallynet/src/discovery/

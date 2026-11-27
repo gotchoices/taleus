@@ -1,52 +1,68 @@
 # TallyNet status and sequence
 
-Where TallyNet and its simulator stand, and the order the remaining work follows. Design lives in [design.md](design.md); the work itself lives in `tickets/` (slugs below). This file records the **sequence** and why.
+Where TallyNet and its simulator stand, as a checklist in the order the work follows. Design lives in [design.md](design.md); the work itself lives in `tickets/` (slugs below, without sequence prefixes). Tick items as they land; this file records the **sequence** and why.
 
 ## Strategy: protocol first, bind once
 
 TallyNet is developed, tested and measured on its own, with `tallysim` and `tallysim-viewer`, before `taleus-core` changes to use it. Reasons:
 
-- The protocol is still moving (voter model, record availability, timeouts, hostile peers). Iterating inside one package is cheap; every change after binding also ripples into `taleus-core`'s adapters and schema.
+- The protocol is still moving (voter model, timeouts, hostile peers). Iterating inside one package is cheap; every change after binding also ripples into `taleus-core`'s adapters and schema.
 - The voter model decides what each tally's schema must verify. Binding first would build in the legacy single-referee shape only to replace it.
 - Simulation supplies the defaults (depth, time budget, voter policy, timeouts) from measurement.
+- **Every node decides alone.** The library is per-node code (its own store, keys, clock, hooks and settings); no rule is global (design.md § Lift design principles, principle 0). The simulator must run independent nodes the same way: it may set up the world (give each node its tallies, trusted voters, settings) and watch it, but every transition at runtime is a node acting on what it holds.
 
-`taleus-core` is bound once, against the settled protocol, with voter sets from the start. The cost of waiting: end-to-end lifts in the apps stay mocked until then. The risk: mismatches that only show at integration. Keep [design.md](design.md) § The seam taleus-core already defines current, and treat "what a tally must verify" (from the voter model) as the binding contract.
+`taleus-core` is bound once, against the settled protocol, with voter sets from the start. The cost of waiting: end-to-end lifts in the apps stay mocked until then. Treat "what a tally must verify" (design.md § Lift proposal and settlement) as the binding contract.
 
-## Built
+## Checklist
 
-- **Shared pieces**: crypto ports, self-expiring session codes, nonces, canonical digest (DAG-CBOR), step sequencing, rule engine; `Clock` and `TraceSink` ports; `tallynet/testing` (virtual clock, in-memory network, seeded random).
-- **Discovery**: unidirectional search, one round per level (depth limit = hops), durable/in-flight state split, hop-context hooks for multiple currencies (default single-currency behaviour).
-- **Consensus**: self-describing record merged by union, promise then vote, strict majority of the voter set both ways, every signature verified, unverified votes held in a capped side pool so they can't block real ones.
-- **tallysim**: seeded network generators, whole-graph oracle, sweep runner and CLI, route-existence experiment, the real discovery protocol on simulated time with replayable traces and found-vs-oracle metrics, discovery experiment; consensus in the simulator (in progress).
-- **tallysim-viewer**: graph view, trace replay, live runs in the page, sweep charts; consensus animation (in progress).
+### 1. Protocol core
+- [x] Shared pieces: crypto ports, session codes, nonces, canonical digest, step sequencing, rule engine; `Clock` and `TraceSink` ports; `tallynet/testing` (`tallynet-scaffold`, `tallynet-discovery-ports`)
+- [x] Discovery: one round per level, depth = hops, hooks for currencies (`tallynet-discovery`)
+- [x] Consensus: union merge, promise then vote, every signature verified, forged-vote side pool (`tallynet-consensus`, `debt-tallynet-forged-commit-shadows-vote`)
+- [x] Regression check against ChipNet: no correctness regressions; push-echo fixed (`tallynet-chipnet-regression`, `bug-tallynet-push-echo-suppression`)
+- [x] Voter model: terms (participant / voter / referee), consensus method and lift contract as proposal parameters, acceptance and plan-scoring hooks, the originator's plan→record minting, record pull, equivocation proof (`tallynet-terms-and-proposal-params`, `tallynet-lift-policy-hooks`, `tallynet-originator-proceed`, `tallynet-record-availability`)
+- [x] Timeouts: deadline from the transaction code, voters void at the deadline, recovery loop (`tallynet-deadline-timeout-votes`, `tallynet-stalled-recovery`)
+- [ ] Void when the promise set never completes: at the deadline a voter that hasn't committed votes void even without every promise, so a lift with a dead participant closes (`tallynet-void-incomplete-promises`)
+- [ ] Per-node settings for the remaining hard-coded limits (pending-vote cap, proof cap, TTL ceiling) (in `tallysim-independent-nodes`)
 
-## ChipNet regression check (done 2026-11-25)
+### 2. Simulator (`tallysim`)
+- [x] Seeded network generators, whole-graph oracle, sweep runner and CLI, route-existence experiment
+- [x] Discovery on simulated time, traces, found-vs-oracle metrics and experiment
+- [x] Consensus on simulated time: refusers, dropped links, commit-vs-found experiment
+- [x] Voter-model scenarios (non-relayers, contact points, circular stand-in); timeout scenarios (slow voter, abandonment, split and rejoin)
+- [ ] **Independent nodes**: persistent nodes; the originator picks the plan and mints the record itself; voters come from nominations made in discovery; each node has its own settings, random stream and policy, and books its own tallies from its own outcome; the manager only sets up, injects faults and observes (`tallysim-independent-nodes`; absorbs `debt-voter-nomination-on-path-composition`)
+- [ ] Hostile actors: forgery and equivocation done (`tallysim-hostile-consensus-scenarios`); several voters and "no" votes, the experiment comparing consensus methods, viewer markers (`tallysim-multivoter-and-vote-no`, `tallysim-hostile-experiment-and-findings`, `tallysim-viewer-hostile-markers`)
+- [ ] Trading model: balances that build up and drain over time (brainstorm first) (`feat-tallysim-trading-model`)
+- [ ] Multiple currencies (`feat-tallysim-multi-denomination`)
+- [ ] Real clearing discovery instead of the circular stand-in (`feat-tallysim-clearing-discovery`)
 
-The feature-by-feature check that the rewrite kept everything ChipNet got right is in [chipnet-review.md § Regression check](chipnet-review.md#regression-check-tallynet-vs-chipnet-feature-by-feature). Outcome: **no correctness regression** — discovery and consensus are a faithful superset, improved on every known-defect axis. It turned up:
-- **One minor silent regression** — ChipNet saved an inbound peer record before processing, suppressing an echo of an unchanged record back to its sender; TallyNet lost that. Ticket `bug-tallynet-push-echo-suppression` (fix/).
-- **Designed-but-unbuilt features no ticket owned** — target-signature verification + "whispering" identity checks (`feat-tallynet-identity-verification`), and discovery path/address caching (`feat-tallynet-discovery-caching`), both new in backlog. Everything else ChipNet only designed is already owned by a step above (voter model, propagation timeouts, hostile actors, query economics, bidirectional, adaptive budget).
-- **Test-coverage gaps** — no 10k-node discovery run and no mixed-intent (`C`) route test: `debt-tallynet-discovery-scale-intent-tests` (backlog).
-- **Design-question inputs** for the next step (plan→topology voter-set assembly and its end-to-end test; record availability around a non-cooperating member; equivocation "proof kept" is still aspirational) were recorded in `tallynet-voter-model` and are now resolved in design.md § Lift proposal and settlement: plan→topology minting + its end-to-end test is `tallynet-originator-proceed`; record availability (pull + contact points) and equivocation proof are `tallynet-record-availability`.
+### 3. Viewer (`tallysim-viewer`)
+- [x] Graph view, trace replay, live runs, sweep charts
+- [x] Consensus animation, camera controls, voter-set and record-flow view
+- [ ] UX pass: a spec (run with Fable), then implementation (`feat-tallysim-viewer-ux-spec`, `feat-tallysim-viewer-ux-implement`)
+- [ ] Visual check by the developer, click-level (`debt-viewer-consensus-visual-qa`)
+- [ ] Live-run settlement (`feat-viewer-live-consensus`); found-route paths in traces (`feat-trace-plan-found-path`)
+- [ ] Large graphs: 3D view, fisheye lens (`feat-tallysim-viewer-3d`, `feat-tallysim-viewer-fisheye-lens`)
 
-## Sequence
+### 4. Policy (brainstorm with the developer)
+- [ ] Reputation, evidence and expelling bad peers, fed by the hostile-actor results (`feat-tallynet-hostile-peers`)
+- [ ] Healing inconsistent lifts (`feat-lift-healing`)
 
-| # | Step | Ticket(s) |
-|---|---|---|
-| 1 | Finish consensus in the simulator and viewer | `tallysim-consensus-*`, `tallysim-viewer-consensus` |
-| 2 | Make the simulator's virtual clock drain robustly | `debt-tallynet-virtual-clock-drain` |
-| 3 | Regression check against ChipNet, feature by feature | `tallynet-chipnet-regression` |
-| 4 | Voter model, proposal parameters, record availability (principles 0–4 in design.md § Lift design principles; decisions in § Lift proposal and settlement) | `tallynet-terms-and-proposal-params` → `tallynet-lift-policy-hooks` → `tallynet-originator-proceed` → `tallynet-record-availability`; sim `tallysim-voter-model` → `tallysim-viewer-voter-model` |
-| 5 | Liveness: **void-on-timeout built** (an un-voted voter is driven to `NC` at the transaction code's deadline — `tallynet-deadline-timeout-votes`); **pending** periodic re-push/pull stalled-lift recovery (`tallynet-stalled-recovery`) and simulator timeout scenarios (`tallysim-timeout-scenarios`) | `tallynet-deadline-timeout-votes` (done) → `tallynet-stalled-recovery` → `tallysim-timeout-scenarios` |
-| 6 | Hostile actors in the simulator | `tallysim-hostile-actors` |
-| 7 | Reputation, evidence and expulsion policy (brainstorm first) | `feat-tallynet-hostile-peers` |
-| 8 | Trading model: balances that build up and drain over time (brainstorm first) | `feat-tallysim-trading-model` |
-| 9 | Multiple currencies in the simulator | `feat-tallysim-multi-denomination` |
-| 10 | Bind `taleus-core`, voter sets from the start; rename ChipNet → TallyNet | `feat-tallynet-bind-taleus-core` |
-| 11 | Real multi-currency lifts through Taleus | `feat-tallynet-multi-denomination` |
-| 12 | Taleus-level simulation tier (real lift rules on in-process strands) | `feat-tallysim-taleus-tier` |
+### 5. Binding to Taleus
+- [ ] Bind `taleus-core`: voter sets from the start, the tally verification contract, lift contracts; rename ChipNet → TallyNet (`feat-tallynet-bind-taleus-core`)
+- [ ] When a tally may release a held pledge (`feat-lift-timeout-release`)
+- [ ] Real multi-currency lifts (`feat-tallynet-multi-denomination`)
+- [ ] Taleus-level simulation tier: real lift rules on in-process strands (`feat-tallysim-taleus-tier`)
 
-Steps 6–9 can overlap. Other deferred protocol features stay in backlog until a step needs them: `feat-tallysim-clearing-discovery`, `feat-tallynet-adaptive-budget`, `feat-tallynet-bidirectional-search`, `feat-tallynet-routing-hints`, `feat-tallynet-trust-query`, `feat-tallynet-lift-identity-options`, `debt-tallynet-query-economics`.
+### Deferred until a step needs them
+Protocol: `feat-tallynet-multi-path-lift`, `feat-tallynet-adaptive-budget`, `feat-tallynet-bidirectional-search`, `feat-tallynet-routing-hints`, `feat-tallynet-trust-query`, `feat-tallynet-lift-identity-options`, `feat-tallynet-identity-verification`, `feat-tallynet-discovery-caching`, `debt-tallynet-query-economics`.
+Simulator: `feat-tallysim-false-capacity-advertising`, `feat-tallysim-hostile-query-flooding`, `debt-tallysim-native-double-sign-resource`.
+Cleanups: `debt-tallynet-invalid-record-logging`, `debt-tallynet-macrotask-callback-drop`, `debt-tallynet-discovery-scale-intent-tests`, `debt-tallysim-sweep-clone-extraction`, `debt-tallysim-viewer-headless-webgl-smoke`.
+
+## Regression check against ChipNet
+
+Done (`tallynet-chipnet-regression`): no correctness regression; feature tables in [chipnet-review.md](chipnet-review.md) § Regression check.
 
 ## Research question
 
-How complex must a tally network become before lift payments become statistically likely? First answers (route existence, no trading yet) are in `packages/tallysim/docs/design.md` § First experiment. A fuller answer needs the trading model (step 8) and the hostile-actor results (step 6).
+How complex must a tally network become before lift payments become statistically likely? Results so far are in `packages/tallysim/docs/design.md`: § First experiment (route existence), § Found vs. oracle (discovery), § Commit vs. found (consensus: 10% refusers already cost a third of commits). A fuller answer needs independent nodes, the trading model and the hostile-actor results.

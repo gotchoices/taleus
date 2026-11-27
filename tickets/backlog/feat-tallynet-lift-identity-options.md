@@ -1,4 +1,3 @@
-----
 description: Let a party take part in lifts without being recognisable to anyone on the route except its direct trading partners, by using a one-time identity per lift and choosing whether to publish its network address.
 prereq: tallynet-consensus
 files: packages/tallynet/docs/design.md, packages/tallynet/src/consensus/, packages/taleus-core/src/lift/, docs/architecture.md

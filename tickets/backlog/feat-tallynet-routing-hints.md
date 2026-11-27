@@ -1,4 +1,3 @@
-----
 description: Let a payee help payers find it by naming a few parties who know it ("reachable through these people"), so searches can aim at, or start from, those parties instead of hunting blindly through the network.
 prereq: tallynet-discovery
 files: packages/tallynet/docs/design.md, packages/tallynet/src/discovery/, tickets/backlog/feat-tallynet-bidirectional-search.md
