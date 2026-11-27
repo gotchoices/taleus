@@ -1289,6 +1289,64 @@ describe('consensus end to end — settling by deadline', () => {
 	})
 })
 
+describe('consensus end to end — void on an incomplete promise set', () => {
+	it('a voter whose downstream participant never promises votes NC at its deadline and voids the reachable arm', async () => {
+		// A—B—C, route A→B→C, with the B—C link DROPPED so C never receives the record and never promises:
+		// the promise phase can NEVER complete. B is the sole voter. At its own deadline (the recovery one-shot
+		// at expiry+skew) B — having already promised, so the participant branch is satisfied — casts a deadline
+		// `NC` on the INCOMPLETE set (the void-on-incomplete behaviour this ticket adds) and, as the sole voter,
+		// that strict void majority settles B as void. B pushes its void over the open ab link to A; A is a pure
+		// participant, so it never self-voids, but the void-majority check (which runs before the promise-phase
+		// gate) settles A void the instant B's verified NC arrives. C holds no record at all → pending forever.
+		const graph = makeGraph(['A', 'B', 'C'], [['ab', 'A', 'B'], ['bc', 'B', 'C']])
+		const members: LiftMemberSpec[] = [
+			{ name: 'A', roles: [PART] },
+			{ name: 'B', roles: [PART, VOTER] },
+			{ name: 'C', roles: [PART] },
+		]
+		const { net, doubles } = makeNet({ graph, conditions: { bc: { drop: true } }, recoveryGiveupMs: 60_000 })
+		const tx = await runLift(net, { members, route: ['A', 'B', 'C'], payload: PAYLOAD })
+
+		expect(await outcomes(net, ['A', 'B', 'C'], tx)).toEqual(['void', 'void', 'pending'])
+		expect(doubles.get('A')!.releaseSuccesses).toEqual([false]) // released once, as a void
+		expect(doubles.get('B')!.releaseSuccesses).toEqual([false]) // the voter voided on the incomplete set
+		expect(doubles.get('C')!.releaseSuccesses).toEqual([]) // C never held anything → nothing to release
+		expect(net.clock.pendingTimers).toBe(0) // A & B clear their loops on settle; C never armed one
+		expect(net.deliveryErrors).toEqual([])
+	})
+
+	it('a voter on a set that is merely slow (not dead) does NOT void prematurely — it waits and commits', async () => {
+		// The safety counterpart that guards the `anyCodeExpired` pre-gate on the voter-void branch. A—V—B, V the
+		// sole voter, with the V—B link SLOW (SLOW_MS = 50_000, well under the 600_000 code expiry) rather than
+		// dropped. At the mid-run snapshot (before B's completing promise returns) V holds an INCOMPLETE set but
+		// its code has NOT expired, so the voter-void branch must NOT fire — V stays `promising`, casts nothing,
+		// and has not voided. Once B's promise lands (still pre-expiry) the set completes and V votes C → commit
+		// everywhere. If the branch were gated wrong (voiding on incompleteness alone, ignoring expiry) V would
+		// have voided at the snapshot — which is exactly what the mid-run `.not.toContain(false)` catches.
+		const graph = makeGraph(['A', 'V', 'B'], [['av', 'A', 'V'], ['vb', 'V', 'B']])
+		const members: LiftMemberSpec[] = [
+			{ name: 'A', roles: [PART] },
+			{ name: 'V', roles: [PART, VOTER] },
+			{ name: 'B', roles: [PART] },
+		]
+		const { net, doubles } = makeNet({ graph, conditions: { vb: { latencyMs: SLOW_MS } } })
+		const { record, transactionCode: tx } = net.buildLift({ members, route: ['A', 'V', 'B'], payload: PAYLOAD })
+
+		await net.consensusNode('A').start(record)
+		await net.clock.advance(SLOW_MS / 5) // before B's completing promise returns to V — the set is still incomplete
+		expect(await outcomes(net, ['A', 'V', 'B'], tx)).toEqual(['pending', 'pending', 'pending'])
+		expect(doubles.get('V')!.releaseSuccesses).not.toContain(false) // V did NOT prematurely void the incomplete set
+
+		await net.clock.runUntilIdle() // B's promise lands pre-expiry; the set completes and V votes C
+		expect(await outcomes(net, ['A', 'V', 'B'], tx)).toEqual(['commit', 'commit', 'commit'])
+		for (const name of ['A', 'V', 'B']) {
+			expect(doubles.get(name)!.releaseSuccesses).toEqual([true])
+		}
+		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+})
+
 describe('consensus end to end — recovery loop heals a network split on rejoin', () => {
 	it('two voter islands split by a dropped link stay pending, then both commit once one cross-link reopens', async () => {
 		// P0 (a [P]-only minter) links to both voters A and B (p0a, p0b, always open); the two voters also
