@@ -23,11 +23,15 @@
  * - **`pending` is a real outcome.** A stalled lift (a dropped push, or an even voter-set tie; v1 has no
  *   timeout) settles nowhere and is surfaced as `'pending'`, not thrown. A clean run leaves
  *   `net.deliveryErrors === []` even when a participant refuses (the engine catches it and signs `NP`).
- * - **Pull recovery.** A member an interior non-relayer cut off from the commit push still holds the record
- *   (it promised) but lacks the commit evidence. After the initial settle, {@link recoverStrandedByPull}
- *   calls `fetchOutcome` on each still-pending cooperating member so it pulls the evidence from a reachable
- *   contact point (`contactPoints`) or link-neighbour — the whole point of record availability. v1 has no
- *   propagation-timeout loop, so the simulator triggers these pulls itself.
+ * - **Self-recovery (no manual pull).** The protocol's own deadline + recovery timers fire inside the single
+ *   `net.clock.runUntilIdle()`: `VirtualClock.runUntilIdle` fires every live timer until the heap empties, so
+ *   the deadline one-shot and the periodic recovery-loop ticks run there. A member an interior non-relayer cut
+ *   off from the commit push still holds the record (it promised) but lacks the commit evidence, and its
+ *   recovery loop pulls that evidence from a reachable contact point (`contactPoints`) or link-neighbour; a
+ *   silent or split lift voids by its own deadline. So the simulator drives no pull itself —
+ *   `tallynet-stalled-recovery` moved recovery into the protocol. {@link LiftResult.pullCalls} /
+ *   {@link LiftResult.recovered} are therefore **deprecated**, hard-coded to `0` here and re-homed onto the
+ *   protocol's own trace events in `tallysim-timeout-harness-metrics`.
  */
 
 import { MemberTypes, type ConsensusMethod, type MemberType, type TrxRecord } from 'tallynet'
@@ -54,9 +58,9 @@ export interface LiftResult {
 	amount: number
 	/** `commit` moved balances; `void` and `pending` left them unchanged. */
 	outcome: 'commit' | 'void' | 'pending'
-	/** How many `fetchOutcome` pulls the recovery pass issued (0 when nobody was stranded by the push). */
+	/** Deprecated; re-homed onto trace events in `tallysim-timeout-harness-metrics` — returns 0 here. */
 	pullCalls: number
-	/** How many cooperating members the pull pass moved off `pending` (stranded-then-settled count). */
+	/** Deprecated; re-homed onto trace events in `tallysim-timeout-harness-metrics` — returns 0 here. */
 	recovered: number
 	/**
 	 * Distinct route entities **not** in `options.nonCooperating` — the members that are allowed to reach
@@ -82,8 +86,8 @@ export interface RunLiftOptions {
 	contactPoints?: boolean
 	/**
 	 * Entity ids that never relay or serve the commit phase (the network's `refuseRelayFor` /
-	 * `silentAfterPromiseFor` nodes). They are **excluded from the pull pass**: a non-relayer serves no pull,
-	 * so it cannot recover that way and must not be counted as stranded. MUST match the network's injected set.
+	 * `silentAfterPromiseFor` nodes). They are **excluded from the completion count**: a non-relayer serves no
+	 * pull, so it can never recover and must not count as stranded. MUST match the network's injected set.
 	 */
 	nonCooperating?: number[]
 	/** The well-known entity set for the `voter-aware` policy (passed to {@link selectPlan}). Default: none. */
@@ -94,6 +98,13 @@ export interface RunLiftOptions {
 	 * A raised threshold (e.g. `2/3`) can leave a split voter set settling nowhere (`pending`).
 	 */
 	consensusMethod?: ConsensusMethod
+	/**
+	 * The lift code lifetime in ms → the deadline (the session + transaction code expiry minted by `buildLift`),
+	 * and so the point its recovery loop anchors on. Omitted ⇒ `buildLift`'s own `600_000` default, byte-identical
+	 * to not passing it. Must exceed the happy-path settle time but stay inside a stalled scenario's run budget,
+	 * so a genuinely-stuck lift reaches its deadline and abandons well before the test timeout.
+	 */
+	ttlMs?: number
 }
 
 /**
@@ -136,26 +147,29 @@ export async function runLiftForOutcome(
 		payload: { amount: String(q.amount) },
 		// Omitted ⇒ buildLift's DEFAULT_CONSENSUS_METHOD (1/2); a raised threshold can leave a split set pending.
 		method: options?.consensusMethod,
+		// Omitted ⇒ buildLift's 600_000 ms default; the spread keeps the no-ttl path byte-identical.
+		...(options?.ttlMs !== undefined ? { ttlMs: options.ttlMs } : {}),
 	})
 	sanitiseRecordIntents(record)
 
+	// The one drive to idle fires EVERY live timer — the protocol's own deadline one-shot and its periodic
+	// recovery-loop ticks included — so the protocol self-recovers here: a member an interior non-relayer cut
+	// off from the commit push pulls the evidence from a reachable contact point/link-neighbour on its recovery
+	// loop, and a silent or split lift voids by its own deadline. The simulator drives no pull of its own
+	// (recovery moved into the protocol by `tallynet-stalled-recovery`).
 	await net.consensusNode(entityName(route[0])).start(record)
 	await net.clock.runUntilIdle()
 
-	// A member cut off from the commit push by an interior non-relayer still HOLDS the record (it promised in
-	// phase 1) but lacks the commit evidence; the push will never reach it, so the simulator pulls on its
-	// behalf. Done AFTER the initial settle so only genuinely-stranded members are pulled.
-	const nonCooperating = options?.nonCooperating ?? []
-	const { pullCalls, recovered } = await recoverStrandedByPull(net, route, transactionCode, nonCooperating)
-
-	// Read the settlement off the originator AFTER the pull pass (a stranded originator can recover too), then
-	// move money on a commit — the money-move keys off the originator's own view, as the discovery-only path did.
+	// Read the settlement off the originator, then move money on a commit — the money-move keys off the
+	// originator's own view, as the discovery-only path did.
 	const settled = await net.consensusNode(entityName(route[0])).outcome(transactionCode)
 	if (settled === 'commit') {
 		settleRoute(network, route, tallyPath, q.amount)
 	}
-	// The principle-3 completion count, taken AFTER settle + recovery: of the cooperating members (those not
-	// cut out as non-relayers/silent), how many actually reached commit. The honest completion numerator.
+	// The principle-3 completion count: of the cooperating members (those not cut out as non-relayers/silent,
+	// which can never recover), how many actually reached commit — the honest completion numerator. The
+	// `nonCooperating` set is the network's injected non-relayer/silent set, excluded from the denominator.
+	const nonCooperating = options?.nonCooperating ?? []
 	const { members: cooperatingMembers, committed: cooperatingCommitted } = await countCommitted(net, route, transactionCode, nonCooperating)
 	return {
 		transactionCode,
@@ -164,8 +178,9 @@ export async function runLiftForOutcome(
 		tallyPath,
 		amount: q.amount,
 		outcome: settled,
-		pullCalls,
-		recovered,
+		// Deprecated; the protocol self-recovers, so no manual pass runs. Re-homed in tallysim-timeout-harness-metrics.
+		pullCalls: 0,
+		recovered: 0,
 		cooperatingMembers,
 		cooperatingCommitted,
 	}
@@ -174,8 +189,7 @@ export async function runLiftForOutcome(
 /**
  * The distinct route entities that are allowed to reach commit: each entity on `route` once (a circular
  * route's repeated origin deduped), minus the `nonCooperating` set (non-relayers / silent nodes, which can
- * never recover). The one place this member set is derived, so the pull pass and the completion count never
- * drift apart.
+ * never recover). The one place this member set is derived — the honest denominator of the completion count.
  */
 function cooperatingRoute(route: number[], nonCooperating: number[]): number[] {
 	const nonCoop = new Set(nonCooperating)
@@ -208,7 +222,7 @@ async function countCommitted(
  * additionally carries the voter role. Order follows first appearance on the route (the originator first),
  * which is deterministic. A circular route's repeated originator is emitted once. With `contactPoints`, the
  * originator and every voter also publish a `physical` dial address, so a member stranded by an interior
- * non-relayer can pull the settled record from one of them (see {@link recoverStrandedByPull}).
+ * non-relayer can pull the settled record from one of them on the protocol's recovery loop.
  */
 function liftMembers(route: number[], voters: Set<number>, contactPoints: boolean): LiftMemberSpec[] {
 	const members: LiftMemberSpec[] = []
@@ -222,62 +236,6 @@ function liftMembers(route: number[], voters: Set<number>, contactPoints: boolea
 		members.push({ name: entityName(id), roles: voters.has(id) ? [PART, VOTER] : [PART], ...(physical ? { physical: true } : {}) })
 	}
 	return members
-}
-
-/**
- * The pull-recovery pass: after the commit push has settled, any cooperating member still `pending` was cut
- * off from the push (an interior non-relayer dropped the forward), so pull the settled record on its behalf
- * (`fetchOutcome`) and drain the pushes that pull then schedules. v1 has no propagation-timeout loop, so the
- * simulator triggers the pull itself (deferred to `tallynet-propagation-timeouts`).
- *
- * `nonCooperating` entities (the network's non-relayers / silent nodes) are excluded: they serve no pull and
- * will never recover that way, so counting them as stranded would wrongly inflate the pending set. The pass
- * is finite and deterministic: each round pulls every currently-stuck cooperating member once (skipping any
- * that recovered mid-round via another member's push); it stops as soon as a round moves nobody, and in any
- * case after at most `members.length` rounds. Returns the pull count and how many members it recovered.
- */
-async function recoverStrandedByPull(
-	net: SimNetwork['net'],
-	route: number[],
-	transactionCode: string,
-	nonCooperating: number[],
-): Promise<{ pullCalls: number; recovered: number }> {
-	const members = [...new Set(route)]
-	const canPull = cooperatingRoute(route, nonCooperating)
-	const stillPending = async (): Promise<number[]> => {
-		const pending: number[] = []
-		for (const entity of canPull) {
-			if ((await net.consensusNode(entityName(entity)).outcome(transactionCode)) === 'pending') {
-				pending.push(entity)
-			}
-		}
-		return pending
-	}
-	const pendingBefore = (await stillPending()).length
-	let pullCalls = 0
-	for (let round = 0; round <= members.length; round++) {
-		const stuck = await stillPending()
-		if (stuck.length === 0) {
-			break
-		}
-		for (const entity of stuck) {
-			const node = net.consensusNode(entityName(entity))
-			if ((await node.outcome(transactionCode)) !== 'pending') {
-				continue // recovered mid-round via another member's push
-			}
-			pullCalls++
-			// NOTE: re-drives the clock to idle per stuck member, so a topology that strands many members
-			// (a large circular route) costs O(members²) clock drains. Fine for the small hand-built rings
-			// and short lines this tier runs; if circular sweeps grow large, batch one drain per round.
-			await node.fetchOutcome(transactionCode)
-			await net.clock.runUntilIdle()
-		}
-		if ((await stillPending()).length === stuck.length) {
-			break // no member advanced this round — no path to the evidence exists; stop
-		}
-	}
-	const recovered = pendingBefore - (await stillPending()).length
-	return { pullCalls, recovered }
 }
 
 /**

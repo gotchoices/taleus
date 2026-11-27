@@ -157,12 +157,14 @@ async function runConsensusQueries(
 	const consensus = wiring.config
 	const nonCooperating = [...compiled.nonRelayers, ...compiled.silent]
 	const consensusMethod = scenario.consensus?.consensusMethod
-	// Hoisted once: the per-lift options never change across queries (only the query does). `consensusMethod`
-	// and `wellKnown` are spread only when set, so a run without them passes exactly the pre-existing options.
+	const ttlMs = scenario.consensus?.ttlMs
+	// Hoisted once: the per-lift options never change across queries (only the query does). `consensusMethod`,
+	// `ttlMs` and `wellKnown` are spread only when set, so a run without them passes exactly the pre-existing options.
 	const liftOptions: RunLiftOptions = {
 		contactPoints: scenario.consensus?.contactPoints ?? false,
 		nonCooperating,
 		...(consensusMethod ? { consensusMethod } : {}),
+		...(ttlMs !== undefined ? { ttlMs } : {}),
 		...(wiring.wellKnown ? { wellKnown: wiring.wellKnown } : {}),
 	}
 
@@ -341,6 +343,10 @@ function consensusConfigFromCompiled(scenario: SimScenario, compiled: CompiledCo
 	}
 	if (compiled.silent.size > 0) {
 		config.silentAfterPromiseFor = (id) => compiled.silent.has(id)
+	}
+	// Per-scenario recovery give-up window; added only when set, so a run without it keeps the sim default.
+	if (scenario.consensus?.recoveryGiveupMs !== undefined) {
+		config.recoveryGiveupMs = scenario.consensus.recoveryGiveupMs
 	}
 	return config
 }

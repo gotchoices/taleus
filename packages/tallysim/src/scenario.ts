@@ -159,6 +159,18 @@ export interface ConsensusSpec {
 	 * Raising the threshold (e.g. `2/3`) makes a split voter set settle nowhere (`pending`) rather than commit.
 	 */
 	consensusMethod?: ConsensusMethod
+	/**
+	 * The lift code lifetime / deadline (ms) every lift in the run settles under; threads to
+	 * {@link RunLiftOptions.ttlMs} and so onto `buildLift`'s mint. Omitted ⇒ `buildLift`'s own 600_000 ms
+	 * default. Must exceed the happy-path settle time but stay inside the run's stall budget.
+	 */
+	ttlMs?: number
+	/**
+	 * Per-scenario override of the recovery-loop give-up window (ms): how long past the deadline a node's
+	 * recovery loop polls before abandoning. Threads onto {@link ConsensusConfig.recoveryGiveupMs}. Omitted ⇒
+	 * the sim's 60_000 ms default. (`recoveryBaseMs` / `recoveryMaxMs` are left to a later scenarios ticket.)
+	 */
+	recoveryGiveupMs?: number
 }
 
 /**

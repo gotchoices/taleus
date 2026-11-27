@@ -68,8 +68,8 @@ const SESSION_CODE_SEED = 1
  * virtual hour of exponential-backoff ticks — thousands of signature verifications across the voter set —
  * and blow the test timeout. A healable lift settles on its first post-deadline tick (well inside this
  * window), so the only lifts this shortens are the ones that must abandon anyway; the abandoned outcome
- * is unchanged (`pending`, resources held). NOTE(6.2→6.3): tallysim-timeout-scenarios makes this a
- * per-scenario knob when it builds explicit timeout/abandonment experiments.
+ * is unchanged (`pending`, resources held). This is the **default**; a run that studies abandonment timing
+ * overrides it per scenario via {@link ConsensusConfig.recoveryGiveupMs}.
  */
 const SIM_RECOVERY_GIVEUP_MS = 60_000
 
@@ -128,6 +128,13 @@ export interface ConsensusConfig {
 	 * minting). Omit ⇒ every node stays reachable.
 	 */
 	silentAfterPromiseFor?: (entityId: number) => boolean
+	/**
+	 * How long past a lift's deadline every node's recovery loop polls before abandoning (ms). Omit ⇒
+	 * {@link SIM_RECOVERY_GIVEUP_MS} (60_000) — see that constant for why the sim defaults far below TallyNet's
+	 * production hour: a genuinely-stuck sim lift must abandon quickly rather than poll a virtual hour of
+	 * backoff ticks. A scenario that studies abandonment timing overrides it per run.
+	 */
+	recoveryGiveupMs?: number
 }
 
 /** One payment query to run: pay `amount` from entity `from` to entity `to`, within `depth` hops. */
@@ -191,7 +198,7 @@ export function buildSimNetwork(
 		conditions: compiled.conditions,
 		trace,
 		options,
-		recoveryGiveupMs: SIM_RECOVERY_GIVEUP_MS,
+		recoveryGiveupMs: consensus?.recoveryGiveupMs ?? SIM_RECOVERY_GIVEUP_MS,
 		...consensusPorts(consensus),
 	})
 	return { net, entityName, entityId }

@@ -3,7 +3,7 @@ import type { LiftMemberSpec } from 'tallynet/testing'
 import { FORMAT_VERSION, type Network, type Tally, cloneNetwork, serialize } from '../model.js'
 import { runLiftForOutcome } from './consensus-harness.js'
 import { makeSimResources } from './consensus-resource.js'
-import { buildSimNetwork, runQuery, type QueryOutcome, type QuerySpec } from './harness.js'
+import { buildSimNetwork, runQuery, type QueryOutcome, type QuerySpec, type SimNetwork } from './harness.js'
 import { linkIdForTally } from './naming.js'
 
 const PART: MemberType = MemberTypes.participant
@@ -283,5 +283,79 @@ describe('runLiftForOutcome — discovery + consensus end to end', () => {
 			expect(netPosition(network, e)).toBe(0) // every node nets zero around the loop
 		}
 		expect(sim.net.deliveryErrors).toEqual([])
+	})
+})
+
+describe('runLiftForOutcome — protocol self-recovery and the ttl / give-up knobs', () => {
+	/** The settled outcome of `transactionCode` at entity `e`. */
+	function outcomeOf(sim: SimNetwork, e: number, transactionCode: string): Promise<'commit' | 'void' | 'pending'> {
+		return sim.net.consensusNode(String(e)).outcome(transactionCode)
+	}
+
+	it('stranded members self-heal via the protocol recovery loop (no simulator-driven pull)', async () => {
+		// 0—1—2—3—4, node 2 refuses to relay the commit phase, so the push reaches 0,1,2 but 3 and 4 are cut off.
+		// With the originator (sole voter) publishing a contact point, the protocol's OWN recovery loop heals 3
+		// and 4 inside the single runUntilIdle — each pulls node 0's committed record over its contact point around
+		// the refuser. The simulator drives no pull of its own now, so pullCalls/recovered are hard-coded 0.
+		const network = line(5)
+		const sim = buildSimNetwork(network, {}, 0, undefined, undefined, { identitySeed: 7, refuseRelayFor: (id) => id === 2 })
+		const q: QuerySpec = { from: 0, to: 4, amount: 5, depth: 5 }
+		const outcome = await runQuery(sim, q)
+		expect(outcome.found).toBe(true)
+
+		const result = await runLiftForOutcome(sim, network, outcome, q, { contactPoints: true, nonCooperating: [2] })
+		expect(result?.outcome).toBe('commit')
+		expect(result?.pullCalls).toBe(0) // the manual pull pass is gone
+		expect(result?.recovered).toBe(0)
+		for (const e of [0, 1, 2, 3, 4]) {
+			expect(await outcomeOf(sim, e, result!.transactionCode)).toBe('commit') // the loop healed 3 and 4
+		}
+		for (const t of network.tallies) {
+			expect(t.balance).toBe(-5) // money moved the full route
+		}
+		expect(sim.net.deliveryErrors).toEqual([])
+		expect(sim.net.clock.pendingTimers).toBe(0)
+	})
+
+	it('ttlMs threads to the mint: the final abandon clock shifts by exactly the ttl delta', async () => {
+		// Same chain and refuser but NO contact points, so nodes 3 and 4 have no path to the commit evidence and
+		// each runs its recovery loop to abandonment. The whole tick schedule is anchored at the transaction
+		// code's expiry = mintTime + ttlMs; with ideal conditions mintTime is identical across two runs (ttlMs does
+		// not touch discovery), so shifting ttlMs by Δ shifts the final clock.now() at idle by exactly Δ. The one
+		// latency-independent proof that ttlMs actually reached buildLift's mint.
+		async function finalClock(ttlMs: number): Promise<number> {
+			const network = line(5)
+			const sim = buildSimNetwork(network, {}, 0, undefined, undefined, { identitySeed: 7, refuseRelayFor: (id) => id === 2 })
+			const q: QuerySpec = { from: 0, to: 4, amount: 5, depth: 5 }
+			const outcome = await runQuery(sim, q)
+			const result = await runLiftForOutcome(sim, network, outcome, q, { contactPoints: false, nonCooperating: [2], ttlMs })
+			expect(result?.outcome).toBe('commit') // the originator (sole voter) commits; 3 and 4 abandon
+			return sim.net.clock.now()
+		}
+		expect((await finalClock(700_000)) - (await finalClock(100_000))).toBe(600_000)
+	})
+
+	it('recoveryGiveupMs threads to the loop: a larger give-up window runs strictly longer', async () => {
+		// Same stranded line(5), ttlMs left at its default; the give-up window is threaded through the
+		// ConsensusConfig. A larger window lets each stuck node's recovery loop run more backoff ticks before it
+		// abandons, so the final clock.now() is strictly larger. The originator commits and 3,4 stay pending in both.
+		async function finalClock(recoveryGiveupMs: number): Promise<number> {
+			const network = line(5)
+			const sim = buildSimNetwork(network, {}, 0, undefined, undefined, {
+				identitySeed: 7,
+				refuseRelayFor: (id) => id === 2,
+				recoveryGiveupMs,
+			})
+			const q: QuerySpec = { from: 0, to: 4, amount: 5, depth: 5 }
+			const outcome = await runQuery(sim, q)
+			const result = await runLiftForOutcome(sim, network, outcome, q, { contactPoints: false, nonCooperating: [2] })
+			expect(result?.outcome).toBe('commit')
+			expect(await outcomeOf(sim, 3, result!.transactionCode)).toBe('pending') // no path to the evidence
+			expect(await outcomeOf(sim, 4, result!.transactionCode)).toBe('pending')
+			return sim.net.clock.now()
+		}
+		const longGiveup = await finalClock(500_000)
+		const shortGiveup = await finalClock(50_000)
+		expect(longGiveup).toBeGreaterThan(shortGiveup) // more backoff ticks before abandonment
 	})
 })
