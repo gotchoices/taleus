@@ -329,6 +329,9 @@ export function summarizeConsensusMetrics(
 		voidReasons,
 		cooperatingMemberTotal,
 		cooperatingCommittedTotal,
+		// NOTE: a refuser-voided lift contributes 0/N here just like a stranded one, so if a sweep ever varies
+		// `refuserFraction` AND `nonRelayerFraction` together this number conflates "refused" with "stranded".
+		// Today only `nonRelayerFraction` is swept, so it reads cleanly; split it by void-reason if that changes.
 		cooperatingCompletion: cooperatingMemberTotal > 0 ? cooperatingCommittedTotal / cooperatingMemberTotal : 0,
 		pullMessagesPerLift: summarizeDistribution(pullMessages),
 		recoveredTotal,

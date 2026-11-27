@@ -374,7 +374,9 @@ wrappers that pin the oracle's canonical column order — so their byte output i
 distributions, then the six prune-reason tallies). `serialize-consensus-records.ts` adds the **consensus-sweep**
 counterpart (`consensusRecordToJsonLine`, `createConsensusCsvAccumulator`, …) the same way — reusing the generic
 machinery, supplying only its column order (`pCommitGivenFound` and the commit/void/pending counts, the
-`timeToSettleMs` / `messagesPerLift` distributions, then the four `voidReasons.<reason>` tallies).
+`timeToSettleMs` / `messagesPerLift` distributions, the four `voidReasons.<reason>` tallies, then the
+completion scalars `cooperatingMemberTotal` / `cooperatingCommittedTotal` / `cooperatingCompletion` /
+`recoveredTotal` and the `pullMessagesPerLift` distribution).
 
 The **CLIs** (`src/cli/`) are the **only Node-specific files** in the package — they do file I/O, so they live
 outside the neutral core, are excluded from the `no-node-globals` guard and the neutral `tsconfig.build.json`,
@@ -830,8 +832,12 @@ headline is **`pCommitGivenFound`** = `commitCount / liftCount` — P(commit | a
 attempted), the consensus complement of the discovery tier's `pFoundGivenExists`, and **0 (never NaN)** when no
 lift ran. Cost distributions reuse `summarizeDistribution` from `metrics.ts`; `timeToSettleMs` is distributed
 over the settled lifts only (a pending contributes no sample), `messagesPerLift` over all lifts; `voidReasons`
-sums each non-commit lift's reason. `queryCount` and the `StructuralMetrics` carry through from the runner
-unchanged.
+sums each non-commit lift's reason. It also sums the record-availability aggregates: `cooperatingCompletion`
+= `cooperatingCommittedTotal / cooperatingMemberTotal` (of the members allowed to reach commit — route
+entities minus the injected non-relayers/silent — the fraction that committed, **0 not NaN** when none),
+`pullMessagesPerLift` over all lifts, and `recoveredTotal` (members the pull pass moved off `pending`); see
+the voter-model subsection for what those knobs mean. `queryCount` and the `StructuralMetrics` carry through
+from the runner unchanged.
 
 ### The sequential consensus sweep runner
 
