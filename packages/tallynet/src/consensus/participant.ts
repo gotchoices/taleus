@@ -926,9 +926,18 @@ export class TrxParticipant<TTerms, TPayload> {
 		if (now >= expiry) {
 			return // deadline already passed; the expired path runs inline, so a timer adds nothing (6.2 owns retry)
 		}
-		const handle = this.clock.setTimer(() => {
+		const handle = this.clock.setTimer(async () => {
 			this.deadlineTimers.delete(transactionCode) // one-shot: spent the moment it fires
-			return this.onDeadline(transactionCode)
+			// A fire-and-forget callback has no caller to catch a rejection — `realClock` discards the
+			// returned promise (`void fn()`), so a throw from `onDeadline` (a store read, a verify, a
+			// resource hook, a re-thrown release) would surface as an unhandled rejection and be lost.
+			// Catch and log here, so the timer path obeys the same "never eat an exception unlogged" rule
+			// every other engine entry point does. Direct callers of `onDeadline` still see the throw.
+			try {
+				await this.onDeadline(transactionCode)
+			} catch (error) {
+				this.log('tallynet consensus: deadline tick threw on transaction %s: %o', transactionCode, error)
+			}
 		}, Math.max(0, expiry + this.skewGraceMs - now))
 		this.deadlineTimers.set(transactionCode, handle)
 	}
@@ -953,6 +962,12 @@ export class TrxParticipant<TTerms, TPayload> {
 	 * Independently callable so a unit test can drive the timeout against a seeded store.
 	 */
 	async onDeadline(transactionCode: string): Promise<void> {
+		// NOTE: shares the read-merge-save non-atomicity the engine.ts re-entrancy NOTE describes — the
+		// timer fires on its own schedule, so it can interleave with an in-flight `update` of the SAME
+		// transaction at an await boundary and clobber a concurrently-added signature. Harmless today (a
+		// lost vote is a liveness concern the re-push/pull recovery already heals, and onDeadline's own
+		// settling path is unreachable over the wire), but `tallynet-stalled-recovery` (6.2) adds the
+		// retry that could make it matter: serialize onDeadline against update per transaction there.
 		const record = await this.store.getRecord(transactionCode)
 		if (!record || !this.memberByKey(record.topology, this.self.key) || (await this.store.isReleased(transactionCode))) {
 			this.clearDeadline(transactionCode)

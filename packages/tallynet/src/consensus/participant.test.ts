@@ -276,6 +276,8 @@ interface HarnessOpts {
 	fetchRecord?: FetchRecordFunc<TTerms, TPayload>
 	nonceToLinkId?: Record<string, string>
 	selfKeyOverride?: string
+	minPromiseMarginMs?: number
+	skewGraceMs?: number
 }
 
 /** Build a participant plus recording sinks. Ports default to a memory store, a recording trace/log/updatePeer. */
@@ -307,6 +309,8 @@ function harness(opts: HarnessOpts): Harness {
 		random: harnessRandom,
 		trace: (event) => events.push(event),
 		log,
+		minPromiseMarginMs: opts.minPromiseMarginMs,
+		skewGraceMs: opts.skewGraceMs,
 	})
 	return { participant, store, clock, events, logs, pushes }
 }
@@ -1583,5 +1587,42 @@ describe('TrxParticipant — deadline timer', () => {
 		expect(resource.shouldPromiseCtxs).toEqual([]) // the pre-gate short-circuits before the terms gate
 		expect(resource.promiseCtxs).toEqual([]) // nothing was ever held
 		expect(await participant.outcome(record.transactionCode)).toBe('void') // the NP voids the lift
+	})
+
+	it('(h) a per-node skewGraceMs override sets the armed delay (config is threaded, not hard-coded)', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const members = [member(alice, [P]), member(bob, [P]), member(ref, [V])]
+		const record = makeRecord(members, { n1: link(alice, bob) })
+		const clock = makeClock(NOW)
+		const { participant } = harness({ self: alice, clock, skewGraceMs: 12_345 }) // not the SKEW_GRACE_MS default
+
+		await participant.update(record) // alice promises; phase incomplete → pending → a timer arms
+		expect(clock.liveTimers()).toBe(1)
+		expect(clock.armed[0].delayMs).toBe(LONG_TTL + 12_345) // the override, not LONG_TTL + SKEW_GRACE_MS
+	})
+
+	it('(i) a per-node minPromiseMarginMs override moves the pre-gate both ways', async () => {
+		const build = (marginMs: number, ttlMs: number) => {
+			const alice = makeParty()
+			const bob = makeParty()
+			const record = makeRecord([member(alice, [P]), member(bob, [P, V])], { n1: link(alice, bob) }, {
+				transactionCode: generate(ttlMs, { now: NOW }),
+			})
+			const resource = makeResource({ shouldPromise: true })
+			return { record, ...harness({ self: alice, resource: resource.resource, minPromiseMarginMs: marginMs }) }
+		}
+
+		// A small margin accepts a window the DEFAULT margin (test g) would refuse.
+		const accept = build(1_000, MIN_PROMISE_MARGIN_MS - 1_000)
+		await accept.participant.update(accept.record)
+		expect(eventsOfType(accept.events, 'promise-signed').map((e) => e.signatureType)).toEqual(['P'])
+
+		// A margin wider than a full window refuses even that full window.
+		const refuse = build(LONG_TTL + 1, LONG_TTL)
+		await refuse.participant.update(refuse.record)
+		expect(eventsOfType(refuse.events, 'promise-signed').map((e) => e.signatureType)).toEqual(['NP'])
+		expect(await refuse.participant.outcome(refuse.record.transactionCode)).toBe('void')
 	})
 })
