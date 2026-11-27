@@ -155,6 +155,10 @@ describe('runConsensusSweep — principle 3 completion curve (linear route)', ()
 		// regenerates and validates them.)
 		expect(records[0].metrics.recoveredTotal).toBe(0) // nonRelayerFraction 0 ⇒ clean commits, the loop never runs
 		expect(records[1].metrics.recoveredTotal).toBeGreaterThan(0) // the loop ran to heal the members node 3 strands
+		// End-to-end lock on creditHeldMs: a committing sweep settles and releases, so the per-lift credit-held
+		// span populates on the real trace. Guards against a future engine change that stops emitting
+		// `resources-released` silently zeroing the metric (the hand-trace unit tests alone cannot catch that).
+		expect(records[0].metrics.creditHeldMsPerLift.count).toBeGreaterThan(0)
 	})
 
 	it('without contact points, a straight line shows the completion cliff (the documented gap)', async () => {

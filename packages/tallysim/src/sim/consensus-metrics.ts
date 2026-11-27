@@ -150,7 +150,7 @@ export interface ConsensusRunMetrics {
 	cooperatingCompletion: number
 	/** Pulls-per-lift distribution over ALL lifts — the extra messages a pull costs (pulls buy completions). */
 	pullMessagesPerLift: DistributionSummary
-	/** Σ `recovered` over all lifts — stranded-then-settled members across the run. */
+	/** Σ `recovered` over all lifts — the settled lifts whose protocol recovery loop had to run. */
 	recoveredTotal: number
 	/**
 	 * How many plans the originator's voter-aware scorer **refused** (dropped as `-Infinity`) for carrying a
@@ -349,8 +349,8 @@ export function analyzeLift(events: readonly TraceEvent[], result: LiftResult): 
  * over all lifts. `queryCount` and `StructuralMetrics` carry through from the runner unchanged. The
  * principle-3 aggregates sum each lift's cooperating-member counts: `cooperatingCompletion` is
  * `cooperatingCommittedTotal / cooperatingMemberTotal` guarded to 0 when no cooperating members exist (never
- * NaN); `pullMessagesPerLift` distributes the pull cost over all lifts; `recoveredTotal` sums stranded-then-
- * settled members. `creditHeldMsPerLift` distributes the defined per-lift credit-held spans only (like
+ * NaN); `pullMessagesPerLift` distributes the pull cost over all lifts; `recoveredTotal` sums the per-lift
+ * `recovered` 0/1 flag — the settled lifts whose recovery loop ran. `creditHeldMsPerLift` distributes the defined per-lift credit-held spans only (like
  * `timeToSettleMs`); `permanentlyPendingCount` sums the never-released pending lifts and
  * `permanentlyPendingFraction` divides it by `liftCount`, guarded to 0 (never NaN) when there are no lifts.
  */
