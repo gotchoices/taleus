@@ -826,6 +826,20 @@ periodic recovery ticks that all fire inside the simulator's single drive-to-idl
   virtual hour of backoff ticks), leaving the lift `pending` with credit still held. This is the
   **permanently-pending** outcome the metrics below count. (`consensus-timeout.test.ts` § *a needed party that
   never returns abandons and stays pending*, mirroring tallynet `consensus.test.ts` ≈:400.)
+- **Network split, then rejoin.** Two cooperating voter islands cut apart by a dropped cross-link each see only
+  a minority of votes and stall `pending` while split; re-opening a *single* cross-island link lets a live
+  recovery tick pull the far island's vote across it, a majority forms, and both converge to `commit` ("any
+  single cross-island link restores the trend toward resolution" — ChipNet § Network splits). The simulator
+  imposes and then lifts the split by mutating the **live per-link condition map** `buildSimNetwork` returns on
+  its `SimNetwork` result (`conditions`, keyed by `linkIdForTally`): `InMemoryNetwork` holds that same object
+  and reads it on **every** delivery, so flipping a link's `drop` mid-drive takes effect on the next delivery
+  (set `conditions[id] = { drop: true }` to split, `delete conditions[id]` to heal). This is the one scenario
+  that cannot go through `runLiftForOutcome` — its `start` + single `runUntilIdle` is atomic and cannot flip a
+  link mid-drive, and the minter-plus-two-voter triangle is not a line/cycle route — so it is **hand-driven**
+  (`voter-harness.test.ts` § *a network split stays pending while cut off, then converges on rejoin*, mirroring
+  tallynet `consensus.test.ts` ≈:1278). The heal must land while each stalled voter still holds a live recovery
+  timer (`recoveryGiveupMs` is raised for the scenario): an abandoned loop re-arms only on a fresh inbound
+  delivery, and a dropped push queues no timer, so nothing would otherwise wake an abandoned voter.
 
 Where a pull has
 somewhere to reach — a published contact point, or a ring that delivers both ways — the lift completes for

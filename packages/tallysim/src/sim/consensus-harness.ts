@@ -267,8 +267,12 @@ function cborSafe(value: number): number {
  * accordingly. Asserts the payer is actually an endpoint of the tally and that the balance stays within
  * `[-foilCreditLimit, stockCreditLimit]` after each hop — a violation is a route-reconstruction or
  * direction bug (discovery already guaranteed enough capacity for a single lift over the found route).
+ *
+ * Exported so a **hand-driven** lift (one that cannot go through {@link runLiftForOutcome} — e.g. the
+ * network-split/rejoin scenario in `voter-harness.test.ts`, which flips a link mid-drive) can apply the same
+ * on-commit money-move once its route has fully converged, rather than copying the arithmetic.
  */
-function settleRoute(network: Network, route: number[], tallyPath: number[], amount: number): void {
+export function settleRoute(network: Network, route: number[], tallyPath: number[], amount: number): void {
 	for (let i = 0; i < tallyPath.length; i++) {
 		const payer = route[i]
 		const tally = network.tallies[tallyPath[i]]

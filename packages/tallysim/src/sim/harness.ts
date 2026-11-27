@@ -30,6 +30,7 @@ import {
 	VirtualClock,
 	SeededRandom,
 	type InMemoryNetworkConfig,
+	type LinkCondition,
 	type NetworkGraph,
 	type NetworkLink,
 	type RefereeNomination,
@@ -81,6 +82,16 @@ export interface SimNetwork {
 	entityName(id: number): string
 	/** Node name → entity id. */
 	entityId(name: string): number
+	/**
+	 * The **live** per-link condition map the wired `net` reads on every delivery (keyed by `linkIdForTally`;
+	 * see `sim/naming.ts`). This is the very object `InMemoryNetwork` holds, not a copy — `resolveCondition`
+	 * looks a link's condition up here per delivery, so **mutating it takes effect on the next delivery**. A
+	 * test uses it to impose or lift a split mid-drive: set `conditions[linkIdForTally(k)] = { drop: true }`
+	 * before driving to split off a link, then `delete conditions[linkIdForTally(k)]` (or set `.drop = false`)
+	 * and drive again to heal it. The common path never touches it — it is compiled once from the
+	 * {@link ConditionsSpec} and left alone.
+	 */
+	conditions: Record<string, LinkCondition>
 }
 
 /**
@@ -201,7 +212,9 @@ export function buildSimNetwork(
 		recoveryGiveupMs: consensus?.recoveryGiveupMs ?? SIM_RECOVERY_GIVEUP_MS,
 		...consensusPorts(consensus),
 	})
-	return { net, entityName, entityId }
+	// Return the SAME compiled conditions object the network reads per delivery, so a test can mutate it
+	// mid-drive to impose or heal a link split (see SimNetwork.conditions).
+	return { net, entityName, entityId, conditions: compiled.conditions }
 }
 
 /**

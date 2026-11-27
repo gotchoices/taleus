@@ -10,10 +10,11 @@
 
 import { MemberTypes, type ConsensusMethod, type DependentMember, type DiscoveryHooks, type MemberType, type Plan, type TraceEvent } from 'tallynet'
 import { FORMAT_VERSION, type Network, type Tally, cloneNetwork, serialize } from '../model.js'
-import { runLiftForOutcome } from './consensus-harness.js'
+import { runLiftForOutcome, settleRoute } from './consensus-harness.js'
 import { analyzeLift } from './consensus-metrics.js'
 import { makeSimResources, refuseStackedPlanHook, type StackedVoterPolicy } from './consensus-resource.js'
 import { buildSimNetwork, runQuery, type QuerySpec, type SimNetwork } from './harness.js'
+import { entityName, linkIdForTally } from './naming.js'
 import { voterAwareScorePlan } from './plan-select.js'
 import { buildCircularOutcome } from './route.js'
 import type { LiftTerms } from './terms.js'
@@ -144,6 +145,76 @@ describe('voter harness — record availability (principle 3: a pull routes arou
 			expect(netPosition(network, e)).toBe(0) // conservation around the loop
 		}
 		expect(sim.net.deliveryErrors).toEqual([])
+	})
+})
+
+describe('voter harness — a network split stays pending while cut off, then converges on rejoin', () => {
+	it('two voter islands split by a dropped link stall pending, then both commit once the cross-link reopens', async () => {
+		// Mirrors tallynet consensus.test :1278 ("recovery loop heals a network split on rejoin"), driven over a
+		// tallysim Network with the live-conditions seam instead of a raw graph. P0 (entity 0) is a [P]-only minter
+		// linked to voters A (1) and B (2) over T0 / T1 (always open); the voters also share a direct link, T2,
+		// which starts DROPPED. P0 refuses to relay the commit phase, so it carries the promise phase (all promise
+		// at t≈0) but forwards no vote. Each voter casts its commit at t≈0 yet sees only its own (1 of 2, no
+		// majority) → both stall `pending`; P0, which merges both commit pushes, reaches 2 of 2 and commits.
+		// Re-opening T2 lets a live recovery tick pull the far island's commit across the restored link → a
+		// majority forms and both voters converge. "Any single cross-island link restores the trend toward
+		// resolution" (ChipNet § Network splits), driven by the protocol's own recovery loop.
+		const edge = (stock: number, foil: number): Tally => ({ stock, foil, balance: 0, stockCreditLimit: 1000, foilCreditLimit: 1000 })
+		const [P0, A, B] = [0, 1, 2]
+		const network: Network = { entityCount: 3, tallies: [edge(P0, A), edge(P0, B), edge(A, B)], meta: META }
+		const abLink = linkIdForTally(2) // T2, the A—B link that splits then heals
+
+		// recoveryGiveupMs well above the drive budget on purpose: neither voter may abandon mid-split, so the heal
+		// lands while each still holds a LIVE recovery timer to pull across. (An abandoned loop re-arms only on a
+		// fresh inbound delivery, and a dropped push queues no timer — so nothing would ever wake an abandoned
+		// voter. This cannot go through runLiftForOutcome: its start+runUntilIdle is atomic and cannot flip T2
+		// open mid-drive, and the P0/A/B triangle is not a line/cycle route anyway.)
+		const sim = buildSimNetwork(network, {}, 0, undefined, undefined, {
+			identitySeed: IDENTITY_SEED,
+			refuseRelayFor: (id) => id === P0,
+			recoveryGiveupMs: 2_000_000,
+		})
+		sim.conditions[abLink] = { drop: true } // impose the split BEFORE driving — the net reads this live map per delivery
+
+		const amount = 5
+		const route = [P0, A] // the single money hop P0 → A
+		const tallyPath = [0] // T0 carries it
+		const { record, transactionCode } = sim.net.buildLift({
+			members: [
+				{ name: entityName(P0), roles: [PART] }, // the non-voting minter
+				{ name: entityName(A), roles: [PART, VOTER] },
+				{ name: entityName(B), roles: [PART, VOTER] },
+			],
+			route: route.map(entityName),
+			routeLinkIds: tallyPath.map(linkIdForTally),
+			extraLinks: [[entityName(P0), entityName(B)], [entityName(A), entityName(B)]], // T1 (P0—B), T2 (A—B)
+			payload: { amount: String(amount) },
+		})
+		// Finite credit limits ⇒ no Infinity in the link intents ⇒ no sanitiseRecordIntents needed (see its docstring).
+
+		await sim.net.consensusNode(entityName(P0)).start(record)
+		// Drive past the code deadline (600_000 default) into the recovery regime while still split: neither voter
+		// can reach the other (T2 dropped; P0 relays no commit), so both stay pending, backing off on their timers.
+		await sim.net.clock.advance(650_000)
+		expect(await Promise.all([P0, A, B].map((e) => outcomeOf(sim, e, transactionCode)))).toEqual(['commit', 'pending', 'pending'])
+		for (const t of network.tallies) {
+			expect(t.balance).toBe(0) // nothing settled while split — money has not moved
+		}
+
+		delete sim.conditions[abLink] // heal: restore the single cross-island link
+		await sim.net.clock.runUntilIdle() // the next live recovery tick pulls across it; the merged votes form a majority
+		expect(await Promise.all([P0, A, B].map((e) => outcomeOf(sim, e, transactionCode)))).toEqual(['commit', 'commit', 'commit'])
+
+		// Full convergence reached → apply the on-commit money-move once, exactly as runLiftForOutcome does on commit.
+		settleRoute(network, route, tallyPath, amount)
+		expect(network.tallies[0].balance).toBe(-amount) // T0 moved once (P0→A), not doubled
+		expect(netPosition(network, P0)).toBe(-amount)
+		expect(netPosition(network, A)).toBe(amount)
+		expect(netPosition(network, B)).toBe(0) // the off-route voter's position is untouched
+		expect(netPosition(network, P0) + netPosition(network, A) + netPosition(network, B)).toBe(0) // conserved across the route
+
+		expect(sim.net.deliveryErrors).toEqual([])
+		expect(sim.net.clock.pendingTimers).toBe(0) // both converged → every recovery loop cleared, no timer leaked
 	})
 })
 
