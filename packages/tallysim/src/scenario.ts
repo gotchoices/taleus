@@ -82,8 +82,9 @@ export const DEFAULT_CONSENSUS_IDENTITY_SEED = 1
  * both key off that. The refuser selection is drawn from the dedicated {@link SimScenario.consensusSeed}
  * stream so it never perturbs which network / queries / link-conditions a run gets.
  *
- * It is structurally assignable to {@link ConsensusConditionsSpec} (same `refuserFraction` field), so the
- * runner compiles refusers with `compileConsensusConditions(network, scenario.consensus, consensusSeed)`.
+ * It is structurally assignable to {@link ConsensusConditionsSpec} (it carries every fraction that spec
+ * names — `refuserFraction`, `nonRelayerFraction`, `silentAfterPromiseFraction`), so the runner compiles the
+ * failure sets with `compileConsensusConditions(network, scenario.consensus, consensusSeed)`.
  */
 export interface ConsensusSpec {
 	/**
@@ -91,6 +92,29 @@ export interface ConsensusSpec {
 	 * on a taken route signs `NP` (no-promise), so that lift voids (`refused-promise`). Omitted / 0 ⇒ none.
 	 */
 	refuserFraction?: number
+	/**
+	 * Fraction of entities made **non-relayers** — count-based, `round(fraction · entityCount)` selected,
+	 * drawn on the same dedicated consensus seed as {@link ConsensusSpec.refuserFraction} (after it, so the
+	 * refuser draw is unchanged). Distinct from a refuser: a non-relayer promises normally but then drops
+	 * every commit-phase record it would send or forward and serves no pulls, so a member it cuts off from the
+	 * commit push must recover by pulling from a reachable peer. This is the swept x-axis of the principle-3
+	 * completion curve. Omitted / 0 ⇒ none.
+	 */
+	nonRelayerFraction?: number
+	/**
+	 * Fraction of entities made **silent-after-promise** — count-based, `round(fraction · entityCount)`
+	 * selected, drawn on the dedicated consensus seed after the non-relayers. Such a node promises, then
+	 * neither sends nor receives any commit-phase record and serves no pulls (a node offline after minting).
+	 * A count-based fraction over all entities subsumes the "payee goes silent after mint" edge case — the
+	 * per-query payee is not a fixed set, so a fraction over every entity is the right model. Omitted / 0 ⇒ none.
+	 */
+	silentAfterPromiseFraction?: number
+	/**
+	 * Publish a `physical` contact point on the originator and every voter of each lift (a dial address every
+	 * record-holder can reach), so a member the commit push could not reach can still pull the settled record.
+	 * Threads to {@link RunLiftOptions.contactPoints}. Omitted ⇒ `false` (only link-neighbours are reachable).
+	 */
+	contactPoints?: boolean
 	/**
 	 * Seed for every node's deterministic ed25519 identity (the harness's signer/verifier layer). Omitted ⇒
 	 * {@link DEFAULT_CONSENSUS_IDENTITY_SEED}. Same seed ⇒ same keys across runs.

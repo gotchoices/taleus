@@ -177,21 +177,40 @@ export function compileConditions(network: Network, spec: ConditionsSpec, seed: 
 export interface ConsensusConditionsSpec {
 	/** Fraction of entities made refusers (a refuser on a taken route signs `NP` → that lift voids). Count-based. */
 	refuserFraction?: number
+	/**
+	 * Fraction of entities made non-relayers (promise, then drop every commit-phase record and serve no
+	 * pulls — a member they cut off recovers by pull). Count-based. Distinct from {@link refuserFraction}.
+	 */
+	nonRelayerFraction?: number
+	/**
+	 * Fraction of entities made silent-after-promise (promise, then neither send nor receive a commit-phase
+	 * record and serve no pulls — a node offline after minting). Count-based.
+	 */
+	silentAfterPromiseFraction?: number
 }
 
-/** The compiled consensus conditions: which entities refuse to promise. */
+/** The compiled consensus conditions: which entities refuse to promise, relay nothing, or go silent. */
 export interface CompiledConsensusConditions {
 	/** The entities made refusers (exactly `round(refuserFraction · entityCount)` of them). */
 	refusers: Set<number>
+	/** The entities made non-relayers (exactly `round(nonRelayerFraction · entityCount)` of them). */
+	nonRelayers: Set<number>
+	/** The entities made silent-after-promise (exactly `round(silentAfterPromiseFraction · entityCount)`). */
+	silent: Set<number>
 }
 
 /**
- * Select exactly `round(refuserFraction · network.entityCount)` refuser entity ids from a fresh
- * `SeededRandom(seed)` — the **dedicated** consensus stream, independent of the conditions/network/workload
- * streams. Reuses the same seeded partial-shuffle machinery {@link compileConditions} uses, so the two
- * selectors behave identically (same `round` rule, same determinism). `refuserFraction` 0 / undefined ⇒ an
- * empty set. The runner turns `refusers` into `{ shouldPromise: false }` resource specs (see
- * `sim/consensus-resource.ts`).
+ * Select the refuser / non-relayer / silent entity sets from a fresh `SeededRandom(seed)` — the
+ * **dedicated** consensus stream, independent of the conditions/network/workload streams. Each set is
+ * exactly `round(fraction · network.entityCount)` ids, drawn with the same seeded partial-shuffle machinery
+ * {@link compileConditions} uses (same `round` rule, same determinism). An omitted / 0 fraction consumes no
+ * rng and yields an empty set.
+ *
+ * Draw order (so a seed replays exactly): **refusers first**, then non-relayers, then silent — each over all
+ * entities from the one stream. Refusers are drawn first and unchanged, so a spec that sets only
+ * `refuserFraction` replays byte-identically to before the other two fractions existed. The runner turns
+ * `refusers` into `{ shouldPromise: false }` resource specs and `nonRelayers` / `silent` into the harness's
+ * `refuseRelayFor` / `silentAfterPromiseFor` ports (see `sim/consensus-runner.ts`).
  */
 export function compileConsensusConditions(
 	network: Network,
@@ -199,6 +218,9 @@ export function compileConsensusConditions(
 	seed: number,
 ): CompiledConsensusConditions {
 	const rng = new SeededRandom(seed)
-	const refusers = pickFraction(range(network.entityCount), spec.refuserFraction, rng)
-	return { refusers }
+	const entities = range(network.entityCount)
+	const refusers = pickFraction(entities, spec.refuserFraction, rng)
+	const nonRelayers = pickFraction(entities, spec.nonRelayerFraction, rng)
+	const silent = pickFraction(entities, spec.silentAfterPromiseFraction, rng)
+	return { refusers, nonRelayers, silent }
 }

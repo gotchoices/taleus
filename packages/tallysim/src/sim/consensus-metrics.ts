@@ -80,6 +80,14 @@ export interface ConsensusLiftMetrics {
 	messages: number
 	/** The void reason for a non-commit lift (`void` **or** `pending`); omitted for a `commit`. */
 	voidReason?: VoidReason
+	/** Distinct route members allowed to reach commit (non-relayers/silent excluded); from the {@link LiftResult}. */
+	cooperatingMembers: number
+	/** How many of those cooperating members reached `commit` after settle + recovery; from the {@link LiftResult}. */
+	cooperatingCommitted: number
+	/** How many `fetchOutcome` pulls the recovery pass issued for this lift (`result.pullCalls`). */
+	pullMessages: number
+	/** How many stranded members the pull pass moved off `pending` (`result.recovered`). */
+	recovered: number
 }
 
 /** A whole run's consensus metrics: the commit-vs-found rate plus cost distributions and void-reason totals. */
@@ -106,6 +114,19 @@ export interface ConsensusRunMetrics {
 	messagesPerLift: DistributionSummary
 	/** Void reasons summed over every non-commit lift, zero-initialised via {@link zeroVoidReasons}. */
 	voidReasons: Record<VoidReason, number>
+	/** Σ `cooperatingMembers` over all lifts — the denominator of {@link cooperatingCompletion}. */
+	cooperatingMemberTotal: number
+	/** Σ `cooperatingCommitted` over all lifts — the numerator of {@link cooperatingCompletion}. */
+	cooperatingCommittedTotal: number
+	/**
+	 * `cooperatingCommittedTotal / cooperatingMemberTotal`, or 0 when `cooperatingMemberTotal === 0` (never
+	 * NaN) — the principle-3 completion curve's y-axis, plotted against the swept `consensus.nonRelayerFraction`.
+	 */
+	cooperatingCompletion: number
+	/** Pulls-per-lift distribution over ALL lifts — the extra messages a pull costs (pulls buy completions). */
+	pullMessagesPerLift: DistributionSummary
+	/** Σ `recovered` over all lifts — stranded-then-settled members across the run. */
+	recoveredTotal: number
 }
 
 /** The {@link TraceEvent} variants that carry a `transactionCode` — i.e. the consensus events. */
@@ -214,7 +235,14 @@ export function analyzeLift(events: readonly TraceEvent[], result: LiftResult): 
 		}
 	}
 
-	const metrics: ConsensusLiftMetrics = { outcome: result.outcome, messages }
+	const metrics: ConsensusLiftMetrics = {
+		outcome: result.outcome,
+		messages,
+		cooperatingMembers: result.cooperatingMembers,
+		cooperatingCommitted: result.cooperatingCommitted,
+		pullMessages: result.pullCalls,
+		recovered: result.recovered,
+	}
 	const voidReason = deriveVoidReason(result.outcome, signals)
 	if (voidReason !== undefined) {
 		metrics.voidReason = voidReason
@@ -236,7 +264,11 @@ export function analyzeLift(events: readonly TraceEvent[], result: LiftResult): 
  * `summarizeDistribution` from `metrics.ts`; guards `pCommitGivenFound` against 0/0 (→ 0, never NaN); sums
  * each non-commit lift's `voidReason` into the tally (a commit adds nothing). `timeToSettleMs` is
  * distributed over the lifts whose `timeToSettleMs` is defined (the settled ones); `messagesPerLift` is
- * over all lifts. `queryCount` and `StructuralMetrics` carry through from the runner unchanged.
+ * over all lifts. `queryCount` and `StructuralMetrics` carry through from the runner unchanged. The
+ * principle-3 aggregates sum each lift's cooperating-member counts: `cooperatingCompletion` is
+ * `cooperatingCommittedTotal / cooperatingMemberTotal` guarded to 0 when no cooperating members exist (never
+ * NaN); `pullMessagesPerLift` distributes the pull cost over all lifts; `recoveredTotal` sums stranded-then-
+ * settled members.
  */
 export function summarizeConsensusMetrics(
 	lifts: readonly ConsensusLiftMetrics[],
@@ -246,8 +278,12 @@ export function summarizeConsensusMetrics(
 	let commitCount = 0
 	let voidCount = 0
 	let pendingCount = 0
+	let cooperatingMemberTotal = 0
+	let cooperatingCommittedTotal = 0
+	let recoveredTotal = 0
 	const settleTimes: number[] = []
 	const messages: number[] = []
+	const pullMessages: number[] = []
 	const voidReasons = zeroVoidReasons()
 
 	for (const lift of lifts) {
@@ -272,6 +308,10 @@ export function summarizeConsensusMetrics(
 			settleTimes.push(lift.timeToSettleMs)
 		}
 		messages.push(lift.messages)
+		pullMessages.push(lift.pullMessages)
+		cooperatingMemberTotal += lift.cooperatingMembers
+		cooperatingCommittedTotal += lift.cooperatingCommitted
+		recoveredTotal += lift.recovered
 	}
 
 	const liftCount = lifts.length
@@ -287,5 +327,10 @@ export function summarizeConsensusMetrics(
 		timeToSettleMs: summarizeDistribution(settleTimes),
 		messagesPerLift: summarizeDistribution(messages),
 		voidReasons,
+		cooperatingMemberTotal,
+		cooperatingCommittedTotal,
+		cooperatingCompletion: cooperatingMemberTotal > 0 ? cooperatingCommittedTotal / cooperatingMemberTotal : 0,
+		pullMessagesPerLift: summarizeDistribution(pullMessages),
+		recoveredTotal,
 	}
 }

@@ -12,8 +12,20 @@ import {
 const STRUCTURAL: StructuralMetrics = { meanDegree: 3, largestComponentFraction: 1 }
 
 /** A LiftResult with the given code and outcome; route/amount are irrelevant to these metrics. */
-function lift(transactionCode: string, outcome: LiftResult['outcome']): LiftResult {
-	return { transactionCode, sessionCode: 'S1', route: [0, 1, 0], tallyPath: [0, 1], amount: 10, outcome }
+function lift(transactionCode: string, outcome: LiftResult['outcome'], over: Partial<LiftResult> = {}): LiftResult {
+	return {
+		transactionCode,
+		sessionCode: 'S1',
+		route: [0, 1, 0],
+		tallyPath: [0, 1],
+		amount: 10,
+		outcome,
+		pullCalls: 0,
+		recovered: 0,
+		cooperatingMembers: 0,
+		cooperatingCommitted: 0,
+		...over,
+	}
 }
 
 describe('zeroVoidReasons / ALL_VOID_REASONS', () => {
@@ -121,7 +133,7 @@ describe('analyzeLift — a refuser AND a dropped edge counts once', () => {
 
 describe('summarizeConsensusMetrics — mixed lifts', () => {
 	function liftMetrics(over: Partial<ConsensusLiftMetrics>): ConsensusLiftMetrics {
-		return { outcome: 'commit', messages: 0, ...over }
+		return { outcome: 'commit', messages: 0, cooperatingMembers: 0, cooperatingCommitted: 0, pullMessages: 0, recovered: 0, ...over }
 	}
 
 	it('counts commit/void/pending, guards pCommitGivenFound, and sums void reasons', () => {
@@ -148,6 +160,27 @@ describe('summarizeConsensusMetrics — mixed lifts', () => {
 		expect(metrics.voidReasons.stalled).toBe(1)
 		expect(metrics.voidReasons['voted-no-commit']).toBe(0)
 		expect(metrics.voidReasons.expired).toBe(0)
+	})
+
+	it('aggregates cooperating completion, pull messages, and recovered across lifts (completion guarded 0/0 ⇒ 0)', () => {
+		const lifts: ConsensusLiftMetrics[] = [
+			// 4 cooperating members, all committed, no pulls.
+			liftMetrics({ outcome: 'commit', cooperatingMembers: 4, cooperatingCommitted: 4, pullMessages: 0, recovered: 0 }),
+			// 3 cooperating members, 2 of them recovered by pull, 1 stays stranded.
+			liftMetrics({ outcome: 'commit', cooperatingMembers: 3, cooperatingCommitted: 2, pullMessages: 5, recovered: 2 }),
+		]
+		const metrics = summarizeConsensusMetrics(lifts, STRUCTURAL, 2)
+		expect(metrics.cooperatingMemberTotal).toBe(7)
+		expect(metrics.cooperatingCommittedTotal).toBe(6)
+		expect(metrics.cooperatingCompletion).toBeCloseTo(6 / 7)
+		expect(metrics.recoveredTotal).toBe(2)
+		expect(metrics.pullMessagesPerLift.count).toBe(2) // one sample per lift
+		expect(metrics.pullMessagesPerLift.max).toBe(5)
+		// Zero cooperating members over the run ⇒ completion guarded to 0, never NaN.
+		const empty = summarizeConsensusMetrics([], STRUCTURAL, 0)
+		expect(empty.cooperatingCompletion).toBe(0)
+		expect(Number.isNaN(empty.cooperatingCompletion)).toBe(false)
+		expect(empty.pullMessagesPerLift.count).toBe(0)
 	})
 
 	it('an all-commit run gives pCommitGivenFound 1 and an all-zero void tally', () => {

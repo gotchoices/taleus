@@ -104,12 +104,78 @@ describe('runConsensusSweep — stalled (sleeping target)', () => {
 	})
 })
 
+describe('runConsensusSweep — principle 3 completion curve (linear route)', () => {
+	// The single non-relayer the 1/6 cell selects on `line(6)` is node 3 (interior): with refuserFraction
+	// unset the nonRelayer draw is the first to consume the stream, so it lands on the same node the refuser
+	// test's node-3 draw does (consensusSeed 0 + runSeed 1). Re-derived in-test so the pinned seed is visible.
+	const nonRelayerConsensus = (contactPoints: boolean): ConsensusSpec => ({ nonRelayerFraction: 1 / 6, contactPoints, identitySeed: 7 })
+
+	it('with contact points, cooperating completion holds at 1.0 while ≤ 1 node is a non-relayer', async () => {
+		const consensus = nonRelayerConsensus(true)
+		// workload.seed 1: its 12 queries straddle node 3 (so recovery is exercised) but never originate AT
+		// node 3 — a non-relayer that is itself the sole-voter originator serves no pull, so a lift it starts
+		// would strand its own members and is outside the principle-3 "pull routes around an interior node"
+		// claim. Pinned + re-derivable; see the determinism test for the knobs' byte-stability.
+		const base: SimScenario = {
+			network: { materialized: line(6) },
+			workload: { kind: 'payment', queries: 12, amount: { dist: 'constant', params: { value: 5 } }, depth: 6, seed: 1 },
+			consensus,
+			consensusSeed: 0,
+		}
+		const nonRelayers = compileConsensusConditions(line(6), consensus, (base.consensusSeed ?? 0) + 1).nonRelayers
+		expect([...nonRelayers]).toEqual([3]) // interior node, re-derived from the pinned seed
+
+		// Sweep the non-relayer fraction over {0, 1/6} — both cells select ≤ 1 non-relayer. With a published
+		// contact point, every member an interior non-relayer strands pulls the settled record from the
+		// originator's contact point and commits, so completion stays pinned at 1.0 across the curve.
+		const spec: SimSweepSpec = { base, vary: [{ path: 'consensus.nonRelayerFraction', values: [0, 1 / 6] }], seeds: [1] }
+		const records = await runConsensusSweepToArray(spec)
+		expect(records).toHaveLength(2)
+		for (const r of records) {
+			expect(r.metrics.cooperatingCompletion).toBe(1)
+		}
+		// The 1/6 cell actually exercised recovery (members were stranded then pulled back), not a no-op.
+		expect(records[1].metrics.recoveredTotal).toBeGreaterThan(0)
+	})
+
+	it('without contact points, a straight line shows the completion cliff (the documented gap)', async () => {
+		const consensus = nonRelayerConsensus(false)
+		const base: SimScenario = {
+			network: { materialized: line(6) },
+			workload: { kind: 'payment', queries: 12, amount: { dist: 'constant', params: { value: 5 } }, depth: 6, seed: 1 },
+			consensus,
+			consensusSeed: 0,
+		}
+		expect([...compileConsensusConditions(line(6), consensus, 1).nonRelayers]).toEqual([3])
+
+		const records = await runConsensusSweepToArray(specFor(base, 1))
+		const m = records[0].metrics
+		// The expected gap (not a failure): members beyond the interior non-relayer have no pull path to the
+		// evidence on a straight line, so they stay pending and completion falls below 1.0.
+		expect(m.cooperatingCompletion).toBeLessThan(1)
+		expect(m.cooperatingCompletion).toBeGreaterThan(0) // lifts not straddling node 3 still fully complete
+		expect(m.recoveredTotal).toBe(0) // no contact point ⇒ nothing recovers
+	})
+})
+
 describe('runConsensusSweep — determinism', () => {
 	it('replays byte-for-byte: two runs of the same spec yield identical records', async () => {
 		const base: SimScenario = {
 			network: { materialized: line(6) },
 			workload: { kind: 'payment', queries: 12, amount: { dist: 'constant', params: { value: 5 } }, depth: 6, seed: 200 },
 			consensus: { refuserFraction: 1 / 6, identitySeed: 7 },
+			consensusSeed: 0,
+		}
+		const a = await runConsensusSweepToArray(specFor(base, 1))
+		const b = await runConsensusSweepToArray(specFor(base, 1))
+		expect(a).toEqual(b)
+	})
+
+	it('replays byte-for-byte with the voter-model knobs set (contact points + non-relayer + silent)', async () => {
+		const base: SimScenario = {
+			network: { materialized: line(6) },
+			workload: { kind: 'payment', queries: 12, amount: { dist: 'constant', params: { value: 5 } }, depth: 6, seed: 200 },
+			consensus: { nonRelayerFraction: 1 / 6, silentAfterPromiseFraction: 1 / 6, contactPoints: true, identitySeed: 7 },
 			consensusSeed: 0,
 		}
 		const a = await runConsensusSweepToArray(specFor(base, 1))

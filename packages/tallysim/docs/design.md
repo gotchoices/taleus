@@ -712,7 +712,7 @@ bug in this tier, not an input to tolerate.
 `q.amount` and drives it:
 
 - **Members & voters.** Every distinct entity on the route is a participant (`['P']`); the voter set (default
-  `[route[0]]`, the originator) additionally gets `['R']`, so a default lift settles on the originator's own vote
+  `[route[0]]`, the originator) additionally gets `['V']`, so a default lift settles on the originator's own vote
   — the voter model, a voter set of one. A circular lift (`route[0] === route[last]`) lists
   the originator **once** in `members` though it sits on two links; `buildLift` resolves the route pairs anyway.
 - **Exact tally selection.** `routeLinkIds: tallyPath.map(linkIdForTally)` picks the *discovery-chosen* tally at

@@ -45,7 +45,7 @@ import {
 import { connectedComponents, meanDegree } from '../structure.js'
 import { cartesian, coordsOf, requireNonEmptyValues, setByPath, type VaryAssignment } from '../sweep-vary.js'
 import { materializeNetwork } from '../workload.js'
-import type { ConditionsSpec } from './conditions.js'
+import type { CompiledConsensusConditions, ConditionsSpec } from './conditions.js'
 import { compileConsensusConditions } from './conditions.js'
 import { runLiftForOutcome } from './consensus-harness.js'
 import { analyzeLift, summarizeConsensusMetrics, type ConsensusLiftMetrics, type ConsensusRunMetrics } from './consensus-metrics.js'
@@ -123,10 +123,15 @@ async function runConsensusQueries(
 ): Promise<ConsensusLiftMetrics[]> {
 	const conditions = scenario.conditions ?? {}
 	const conditionsSeed = (scenario.conditionsSeed ?? 0) + runSeed
-	// The identity + refuser port the whole run shares. Built ONCE: the port's handles accumulate observations
-	// across lifts, but its shouldPromise gate is stateless/deterministic, so reuse is fine (and keeps the
-	// refuser set stable across the per-query rebuilds).
-	const consensus = consensusConfigFor(scenario, network, runSeed)
+	// Compile the failure sets ONCE per run on the dedicated consensus seed, then build BOTH the shared
+	// network config (refuser/non-relayer/silent ports) and the per-lift `nonCooperating` exclusion from the
+	// SAME compiled selection — so the network injection and the pull-pass exclusion cannot diverge. The
+	// config is reused across the per-query rebuilds (its gates are stateless/deterministic), keeping the
+	// failure sets stable.
+	const compiled = compileConsensusConditions(network, scenario.consensus ?? {}, (scenario.consensusSeed ?? 0) + runSeed)
+	const consensus = consensusConfigFromCompiled(scenario, compiled, runSeed)
+	const nonCooperating = [...compiled.nonRelayers, ...compiled.silent]
+	const contactPoints = scenario.consensus?.contactPoints ?? false
 
 	const liftMetrics: ConsensusLiftMetrics[] = []
 	// NOTE: rebuild-per-query pays keygen per query; fine for the small grids this tier runs (~50 queries).
@@ -138,7 +143,8 @@ async function runConsensusQueries(
 		}
 		const sim = buildSimNetwork(network, conditions, conditionsSeed, sink, scenario.budget, consensus)
 		const outcome = await runQuery(sim, query)
-		const result = await runLiftForOutcome(sim, network, outcome, query) // mutates network.balance on commit
+		// mutates network.balance on commit; contactPoints + nonCooperating turn on record-availability recovery
+		const result = await runLiftForOutcome(sim, network, outcome, query, { contactPoints, nonCooperating })
 		if (result) {
 			liftMetrics.push(analyzeLift(events, result))
 		}
@@ -154,12 +160,30 @@ async function runConsensusQueries(
  * identities + refusers for a given `(scenario, runSeed)`.
  */
 export function consensusConfigFor(scenario: SimScenario, network: Network, runSeed: number): ConsensusConfig {
-	const consensus = scenario.consensus ?? {}
 	const refuserSeed = (scenario.consensusSeed ?? 0) + runSeed
-	const identitySeed = (consensus.identitySeed ?? DEFAULT_CONSENSUS_IDENTITY_SEED) + runSeed
-	const refusers = compileConsensusConditions(network, consensus, refuserSeed).refusers
-	const { resourceFor } = makeSimResources(refuserSpecs(refusers))
-	return { identitySeed, resourceFor }
+	const compiled = compileConsensusConditions(network, scenario.consensus ?? {}, refuserSeed)
+	return consensusConfigFromCompiled(scenario, compiled, runSeed)
+}
+
+/**
+ * Build the {@link ConsensusConfig} from an already-compiled failure selection: refusers become
+ * `{ shouldPromise: false }` resource specs, and the non-relayer / silent sets become the harness's
+ * `refuseRelayFor` / `silentAfterPromiseFor` ports. The two failure ports are added **only when their set is
+ * non-empty**, so a run with no non-relayers/silent nodes passes exactly `{ identitySeed, resourceFor }` as
+ * before — the existing refuser/stalled/all-cooperative runs stay byte-identical. Shared by the sweep runner
+ * (which also derives `nonCooperating` from the same `compiled`) and {@link consensusConfigFor}.
+ */
+function consensusConfigFromCompiled(scenario: SimScenario, compiled: CompiledConsensusConditions, runSeed: number): ConsensusConfig {
+	const identitySeed = (scenario.consensus?.identitySeed ?? DEFAULT_CONSENSUS_IDENTITY_SEED) + runSeed
+	const { resourceFor } = makeSimResources(refuserSpecs(compiled.refusers))
+	const config: ConsensusConfig = { identitySeed, resourceFor }
+	if (compiled.nonRelayers.size > 0) {
+		config.refuseRelayFor = (id) => compiled.nonRelayers.has(id)
+	}
+	if (compiled.silent.size > 0) {
+		config.silentAfterPromiseFor = (id) => compiled.silent.has(id)
+	}
+	return config
 }
 
 /** Turn a refuser id set into `{ shouldPromise: false }` specs for {@link makeSimResources}. */

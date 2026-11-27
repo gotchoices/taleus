@@ -11,7 +11,7 @@
 import { MemberTypes, type DependentMember, type DiscoveryHooks, type MemberType, type Plan } from 'tallynet'
 import { FORMAT_VERSION, type Network, type Tally, cloneNetwork, serialize } from '../model.js'
 import { runLiftForOutcome } from './consensus-harness.js'
-import { refuseStackedPlanHook, type StackedVoterPolicy } from './consensus-resource.js'
+import { makeSimResources, refuseStackedPlanHook, type StackedVoterPolicy } from './consensus-resource.js'
 import { buildSimNetwork, runQuery, type QuerySpec, type SimNetwork } from './harness.js'
 import { voterAwareScorePlan } from './plan-select.js'
 import { buildCircularOutcome } from './route.js'
@@ -142,6 +142,25 @@ describe('voter harness — record availability (principle 3: a pull routes arou
 			expect(netPosition(network, e)).toBe(0) // conservation around the loop
 		}
 		expect(sim.net.deliveryErrors).toEqual([])
+	})
+})
+
+describe('voter harness — a voter-set tie settles nowhere (a clean third outcome, not a hang)', () => {
+	it('a 2-voter set split one commit / one NC reaches neither majority ⇒ pending', async () => {
+		// line(3): 0—1—2, both 0 and 1 are voters. Node 1 declines its commit vote (signs NC); node 0 votes
+		// commit. With a 2-voter set the strict-majority floor is count·2 > W=2 ⇒ count ≥ 2, so one commit +
+		// one NC reaches neither the commit nor the void side — the lift settles nowhere and is `pending`.
+		const network = line(3)
+		const { resourceFor } = makeSimResources({ 1: { shouldCommit: false } })
+		const sim = buildSimNetwork(network, {}, 0, undefined, undefined, { identitySeed: IDENTITY_SEED, resourceFor })
+		const q: QuerySpec = { from: 0, to: 2, amount: 5, depth: 3 }
+		const outcome = await runQuery(sim, q)
+
+		const result = await runLiftForOutcome(sim, network, outcome, q, { voters: [0, 1] })
+		expect(result?.outcome).toBe('pending') // not a throw, not a hang — the tie is a real third outcome
+		expect(network.tallies[0].balance).toBe(0) // nothing settled ⇒ no money moved
+		expect(sim.net.deliveryErrors).toEqual([])
+		expect(sim.net.clock.pendingTimers).toBe(0)
 	})
 })
 

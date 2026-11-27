@@ -58,6 +58,14 @@ export interface LiftResult {
 	pullCalls: number
 	/** How many cooperating members the pull pass moved off `pending` (stranded-then-settled count). */
 	recovered: number
+	/**
+	 * Distinct route entities **not** in `options.nonCooperating` — the members that are allowed to reach
+	 * commit. A non-relayer/silent node is excluded (it can never recover), so this is the honest denominator
+	 * of the completion fraction, exactly as the pull pass excludes them.
+	 */
+	cooperatingMembers: number
+	/** How many {@link LiftResult.cooperatingMembers} have `commit` outcome after settlement + recovery. */
+	cooperatingCommitted: number
 }
 
 /** Tuning for {@link runLiftForOutcome}: plan policy, voter set, contact points, and the non-cooperating set. */
@@ -129,7 +137,8 @@ export async function runLiftForOutcome(
 	// A member cut off from the commit push by an interior non-relayer still HOLDS the record (it promised in
 	// phase 1) but lacks the commit evidence; the push will never reach it, so the simulator pulls on its
 	// behalf. Done AFTER the initial settle so only genuinely-stranded members are pulled.
-	const { pullCalls, recovered } = await recoverStrandedByPull(net, route, transactionCode, options?.nonCooperating ?? [])
+	const nonCooperating = options?.nonCooperating ?? []
+	const { pullCalls, recovered } = await recoverStrandedByPull(net, route, transactionCode, nonCooperating)
 
 	// Read the settlement off the originator AFTER the pull pass (a stranded originator can recover too), then
 	// move money on a commit — the money-move keys off the originator's own view, as the discovery-only path did.
@@ -137,7 +146,53 @@ export async function runLiftForOutcome(
 	if (settled === 'commit') {
 		settleRoute(network, route, tallyPath, q.amount)
 	}
-	return { transactionCode, sessionCode: outcome.sessionCode, route, tallyPath, amount: q.amount, outcome: settled, pullCalls, recovered }
+	// The principle-3 completion count, taken AFTER settle + recovery: of the cooperating members (those not
+	// cut out as non-relayers/silent), how many actually reached commit. The honest completion numerator.
+	const { members: cooperatingMembers, committed: cooperatingCommitted } = await countCommitted(net, route, transactionCode, nonCooperating)
+	return {
+		transactionCode,
+		sessionCode: outcome.sessionCode,
+		route,
+		tallyPath,
+		amount: q.amount,
+		outcome: settled,
+		pullCalls,
+		recovered,
+		cooperatingMembers,
+		cooperatingCommitted,
+	}
+}
+
+/**
+ * The distinct route entities that are allowed to reach commit: each entity on `route` once (a circular
+ * route's repeated origin deduped), minus the `nonCooperating` set (non-relayers / silent nodes, which can
+ * never recover). The one place this member set is derived, so the pull pass and the completion count never
+ * drift apart.
+ */
+function cooperatingRoute(route: number[], nonCooperating: number[]): number[] {
+	const nonCoop = new Set(nonCooperating)
+	return [...new Set(route)].filter((entity) => !nonCoop.has(entity))
+}
+
+/**
+ * Count the cooperating members (see {@link cooperatingRoute}) and how many of them read `commit` for
+ * `transactionCode`. Used once at the end of a lift to fill {@link LiftResult.cooperatingMembers} /
+ * {@link LiftResult.cooperatingCommitted} — the numerator and denominator of the completion fraction.
+ */
+async function countCommitted(
+	net: SimNetwork['net'],
+	route: number[],
+	transactionCode: string,
+	nonCooperating: number[],
+): Promise<{ members: number; committed: number }> {
+	const members = cooperatingRoute(route, nonCooperating)
+	let committed = 0
+	for (const entity of members) {
+		if ((await net.consensusNode(entityName(entity)).outcome(transactionCode)) === 'commit') {
+			committed++
+		}
+	}
+	return { members: members.length, committed }
 }
 
 /**
@@ -180,8 +235,7 @@ async function recoverStrandedByPull(
 	nonCooperating: number[],
 ): Promise<{ pullCalls: number; recovered: number }> {
 	const members = [...new Set(route)]
-	const nonCoop = new Set(nonCooperating)
-	const canPull = members.filter((entity) => !nonCoop.has(entity))
+	const canPull = cooperatingRoute(route, nonCooperating)
 	const stillPending = async (): Promise<number[]> => {
 		const pending: number[] = []
 		for (const entity of canPull) {
@@ -204,6 +258,9 @@ async function recoverStrandedByPull(
 				continue // recovered mid-round via another member's push
 			}
 			pullCalls++
+			// NOTE: re-drives the clock to idle per stuck member, so a topology that strands many members
+			// (a large circular route) costs O(members²) clock drains. Fine for the small hand-built rings
+			// and short lines this tier runs; if circular sweeps grow large, batch one drain per round.
 			await node.fetchOutcome(transactionCode)
 			await net.clock.runUntilIdle()
 		}

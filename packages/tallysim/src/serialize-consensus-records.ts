@@ -33,6 +33,11 @@ const CONSENSUS_METRIC_COLUMNS: readonly string[] = [
 	'voidReasons.voted-no-commit',
 	'voidReasons.stalled',
 	'voidReasons.expired',
+	'cooperatingMemberTotal',
+	'cooperatingCommittedTotal',
+	'cooperatingCompletion',
+	'recoveredTotal',
+	...distributionColumns('pullMessagesPerLift'),
 ]
 
 /** One {@link ConsensusRunRecord} as a single JSON line (no trailing newline). */
