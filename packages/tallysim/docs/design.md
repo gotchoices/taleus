@@ -736,11 +736,12 @@ bug in this tier, not an input to tolerate.
 - **Outcome.** `consensusNode(originator).start(record)` then `clock.runUntilIdle()` — the single drive fires
   the protocol's own deadline one-shot and periodic recovery ticks, so a stalled lift resolves *itself* inside
   it (no simulator-driven pull). The result is read from `outcome(txCode)` as `'commit' | 'void' | 'pending'`.
-  `pending` is the **permanently-stuck** third outcome: a needed party never returned, so the promise phase
-  never completed, no vote was cast, and the recovery loop abandoned past its give-up ceiling — the lift
-  settled nowhere, surfaced not thrown, with credit still held. (A late-but-*completing* lift is **not**
-  `pending`: it self-voids by its own deadline — the completed promise set reaches the voter post-expiry, so
-  `castCommit` votes `NC` — and reads `void`. A split voter set that clears no threshold is also `pending`.) A
+  `pending` is now the **dead-voter** third outcome: a voter majority never heard the record (the needed voter
+  cut off or asleep), so no reachable voter ever voted and the recovery loop abandoned past its give-up ceiling
+  — the lift settled nowhere, surfaced not thrown, with credit still held. (An incomplete promise set whose
+  voter IS reachable is **not** `pending`: that voter votes `NC` at its own deadline on the incomplete set and
+  reads `void` — the same self-void a late-but-*completing* lift reaches once its completed set reaches the
+  voter post-expiry. A split voter set that clears no threshold is also `pending`.) A
   clean run leaves `net.deliveryErrors === []` even when a participant refuses (the engine catches it and signs
   `NP`) or a needed push is dropped.
 
@@ -820,12 +821,20 @@ periodic recovery ticks that all fire inside the simulator's single drive-to-idl
 - **Recovery-loop healing.** A member an interior non-relayer cut off from the commit push pulls the settled
   evidence *itself* from a reachable contact point or link-neighbour (see the § *Voter model*
   record-availability curve below) and commits — a stranded member recovers rather than staying dead.
-- **Abandonment (permanently pending).** A lift whose needed party never returns — the promise phase never
-  completes, so no vote is ever cast — has its recovery loop back off and **abandon** past the give-up ceiling
+- **Abandonment (permanently pending — the dead-voter case).** A lift whose sole/needed **voter** is cut off —
+  it never hears the record and never votes, and the one reachable member is a pure participant that never
+  self-voids — has its recovery loop back off and **abandon** past the give-up ceiling
   (`consensus.recoveryGiveupMs`, kept small in the sim so a stuck lift abandons fast rather than polling a
   virtual hour of backoff ticks), leaving the lift `pending` with credit still held. This is the
-  **permanently-pending** outcome the metrics below count. (`consensus-timeout.test.ts` § *a needed party that
-  never returns abandons and stays pending*, mirroring tallynet `consensus.test.ts` ≈:400.)
+  **permanently-pending** outcome the metrics below count, and it is now the *only* way a lift stays pending: a
+  dead non-voter participant with reachable voters voids by the deadline instead (see *Incomplete-set deadline
+  void* below). (`consensus-timeout.test.ts` § *a lift whose sole voter is cut off abandons and stays pending*,
+  mirroring tallynet `consensus.test.ts` ≈:400.)
+- **Incomplete-set deadline void (self-resolution).** A lift whose promise set never completes — a non-voter
+  participant died before promising — but whose voter IS reachable self-voids: the reachable voter casts `NC` at
+  its own deadline on the incomplete set and the route reads `void`, so every promiser releases rather than
+  hanging. (`consensus-timeout.test.ts` § *an incomplete promise set with a reachable voter voids by deadline*;
+  the runner's § *deadline void (sleeping target, incomplete promise set)* shows the same end-to-end.)
 - **Network split, then rejoin.** Two cooperating voter islands cut apart by a dropped cross-link each see only
   a minority of votes and stall `pending` while split; re-opening a *single* cross-island link lets a live
   recovery tick pull the far island's vote across it, a majority forms, and both converge to `commit` ("any

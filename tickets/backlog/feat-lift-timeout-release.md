@@ -39,12 +39,14 @@ commit settles the others. Candidate directions to weigh (design work, not yet d
 Resolve which approach (or combination) actually preserves atomicity before writing any schema — a naive
 unilateral or even bilateral void can silently break it.
 
-## Invariants the schema release must honour (from `tallynet-propagation-timeouts`, planned 2026-11-26)
+## Invariants the schema release must honour (from the TallyNet timeout work, landed 2026-11-27)
 
-The TallyNet protocol work (`tallynet-deadline-timeout-votes` + `tallynet-stalled-recovery`) resolves every
-case it *can* resolve atomically in-protocol, and leaves only the genuinely-stuck case (a needed party
-permanently unreachable) for this schema-level escape. What that protocol work guarantees, and the hard
-constraint it hands you:
+The TallyNet protocol work (`tallynet-deadline-timeout-votes` + `tallynet-stalled-recovery` +
+`tallynet-void-incomplete-promises`) resolves every case it *can* resolve atomically in-protocol — including a
+promise set that **never completes** (a participant dies before promising): a reachable voter now votes `NC` at
+its deadline on the incomplete set and a void majority settles it. That leaves **only the dead-voter case** (a
+voter majority that never hears the record — no reachable voter, so no `NC` evidence can ever be produced) for
+this schema-level escape. What that protocol work guarantees, and the hard constraint it hands you:
 
 - **A protocol-produced void is always globally safe** — you never need to defend against it racing a commit.
   A void arises only as (a) a participant's no-promise (`NP`) *before* the promise phase completes, in which
@@ -58,16 +60,22 @@ constraint it hands you:
   commit majority signed *before* expiry can still settle the lift to **commit** after the deadline has
   passed. Therefore a post-expiry bilateral release can **not** be assumed final.
 
-- **Rule: treat a bilateral post-expiry release as a local capacity reclaim with a compensation obligation,
-  not as a protocol void.** A later genuine commit is authoritative; if one arrives after the parties released,
-  they must reconcile with a correcting/compensating lift (ChipNet § Lying referees remedy), never leave the
-  route half-settled. Do not let the release assert "this lift voided" in a way a late commit could contradict
-  into a split.
+- **With verified void evidence, release freely — no compensation duty.** If the releasing party holds a
+  verified voter-void (`NC`-majority) record, the lift has *already* voided in-protocol and that void is globally
+  safe (invariant 1): simply release the reserved capacity — no bilateral co-sign, no compensation obligation.
+  This is now the common path (a reachable voter produces `NC` even on an incomplete set), so the bilateral
+  machinery below is reserved for the one case that yields no such evidence: the **dead voter**.
 
-- **Only bilateral, only well past the deadline.** The release needs the *counterparty's* co-signature (never
-  unilateral) and must wait until the transaction code's embedded expiry plus a margin exceeding the maximum
-  plausible clock skew — so it can never fire while an honest node might still be legitimately casting or
-  propagating votes.
+- **Rule (dead-voter case only): treat a bilateral post-expiry release as a local capacity reclaim with a
+  compensation obligation, not as a protocol void.** When no `NC` evidence is obtainable (the dead-voter case), a
+  later genuine commit is still authoritative; if one arrives after the parties released, they must reconcile
+  with a correcting/compensating lift (ChipNet § Lying referees remedy), never leave the route half-settled. Do
+  not let the release assert "this lift voided" in a way a late commit could contradict into a split.
+
+- **Only bilateral, only well past the deadline (dead-voter case).** This release needs the *counterparty's*
+  co-signature (never unilateral) and must wait until the transaction code's embedded expiry plus a margin
+  exceeding the maximum plausible clock skew — so it can never fire while an honest node might still be
+  legitimately casting or propagating votes.
 
 ## Not urgent
 

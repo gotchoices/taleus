@@ -2,18 +2,22 @@
  * Behavioural tests for the sequential consensus sweep runner. Each case builds a {@link SimSweepSpec} over a
  * hand-built **materialised** line network (predictable routes), pins the seeds, and asserts on the single
  * run's `ConsensusRunMetrics`. The three failure outcomes — all-commit, one refuser voiding, a sleeping
- * target stalling — are each driven by a pinned seed whose outcome is verified (and re-derivable): the
- * selected refuser / sleeping node is computed from the same compiler the runner uses, so a reviewer can see
- * exactly which node the seed picks.
+ * target voiding by deadline — are each driven by a pinned seed whose outcome is verified (and re-derivable):
+ * the selected refuser / sleeping node is computed from the same compiler the runner uses, so a reviewer can
+ * see exactly which node the seed picks.
  *
  * ── The pinned seeds (how they were chosen) ─────────────────────────────────────────────────────────────
  * - one refuser: `line(6)`, `refuserFraction 1/6` ⇒ exactly one refuser; `consensusSeed 0` + run seed 1
  *   selects entity **3** (an interior node of the line), so every query straddling it voids with
  *   `refused-promise`. Verified in-test via `compileConsensusConditions`.
- * - stalled: `line(6)`, `sleepingFraction 1/6` ⇒ exactly one sleeping node; `conditionsSeed 0` +
+ * - deadline void: `line(6)`, `sleepingFraction 1/6` ⇒ exactly one sleeping node; `conditionsSeed 0` +
  *   `workload.seed 200` + run seed 1 yields ≥ 1 query that targets the sleeping, cut-off node — discoverable
- *   via its awake neighbour's peerMatch but un-pushable (both its links drop), so the lift stays `pending`
- *   (`stalled`). A sleeping node also cuts the line, so straddling queries just don't route (no lift).
+ *   via its awake neighbour's peerMatch but un-pushable (both its links drop), so its promise set never
+ *   completes. The originator is the default sole voter (`voters: [route[0]]`) and IS reachable, so it votes
+ *   `NC` at its own deadline on the incomplete set and the lift VOIDS (`voted-no-commit`), not `pending` — the
+ *   behaviour this ticket adds. (A lift stays pending only in the dead-voter case — a voter majority that never
+ *   hears the record — which a self-voting originator structurally cannot produce.) A sleeping node also cuts
+ *   the line, so straddling queries just don't route (no lift).
  */
 
 import { SeededRandom } from 'tallynet/testing'
@@ -95,8 +99,8 @@ describe('runConsensusSweep — one refuser', () => {
 	})
 })
 
-describe('runConsensusSweep — stalled (sleeping target)', () => {
-	it('a lift to a sleeping, cut-off target stays pending (stalled)', async () => {
+describe('runConsensusSweep — deadline void (sleeping target, incomplete promise set)', () => {
+	it('a lift to a sleeping, cut-off target voids by the reachable voter deadline (voted-no-commit)', async () => {
 		const base: SimScenario = {
 			network: { materialized: line(6) },
 			workload: { kind: 'payment', queries: 16, amount: { dist: 'constant', params: { value: 5 } }, depth: 6, seed: 200 },
@@ -106,10 +110,17 @@ describe('runConsensusSweep — stalled (sleeping target)', () => {
 		}
 		const records = await runConsensusSweepToArray(specFor(base, 1))
 		const m = records[0].metrics
-		expect(m.pendingCount).toBeGreaterThanOrEqual(1)
-		expect(m.voidReasons.stalled).toBeGreaterThanOrEqual(1)
-		// A pending contributes a message count but no settle-time sample, so the settle distribution covers
-		// only the settled (committed/voided) lifts.
+		// The sleeping node is discoverable (its awake neighbour peer-matches it) but un-pushable (both its links
+		// drop), so a lift targeting it never completes its promise set. The originator is the default sole voter
+		// (`voters: [route[0]]`) and IS reachable, so at its own deadline it votes `NC` on the incomplete set and
+		// the lift voids — the behaviour this ticket adds. No lift stays pending: the only pending case left is a
+		// dead voter (a voter majority that never hears the record), which the self-voting runner cannot produce.
+		expect(m.voidCount).toBeGreaterThanOrEqual(1)
+		expect(m.voidReasons['voted-no-commit']).toBeGreaterThanOrEqual(1)
+		expect(m.pendingCount).toBe(0) // a reachable voter never leaves an incomplete set pending
+		expect(m.voidReasons.stalled).toBe(0)
+		// A deadline void is a settled lift, so it contributes a settle-time sample: the settle distribution
+		// covers every settled (committed/voided) lift, and here there are no pending lifts to exclude.
 		expect(m.timeToSettleMs.count).toBe(m.commitCount + m.voidCount)
 		expect(m.commitCount + m.voidCount + m.pendingCount).toBe(m.liftCount)
 	})

@@ -1,23 +1,31 @@
 /**
- * Timeout + self-recovery scenarios at the simulator level: the three ways a stalled lift resolves itself
- * under the clock, each driven over a hand-built line `Network` and read through the 6.32 consensus metrics.
+ * Timeout + self-recovery scenarios at the simulator level: the ways a stalled lift resolves itself under the
+ * clock, each driven over a hand-built line `Network` and read through the 6.32 consensus metrics.
  *
  *   1. **A lift waiting on a slow voter voids by its own deadline.** A uniformly-slow network delays the
  *      completing promise past a short `ttlMs`, so the sole voter casts its vote post-expiry → `NC` → `void`.
  *   2. **A lift whose interior relayer drops the commit push recovers by the loop.** A non-relayer cut off
  *      the stranded members, who pull the settled record from the originator's contact point on the
  *      protocol's own recovery loop and commit — the simulator drives no pull.
- *   3. **A lift whose needed party never returns abandons and stays `pending`.** A dropped link to the only
- *      relayer means the promise phase never completes; the recovery loop backs off, abandons at its ceiling,
- *      and leaves the lift `pending` with credit held — the permanently-pending outcome.
+ *   3. **A lift whose sole voter is cut off abandons and stays `pending`.** A dropped link to the only voter
+ *      means that voter never hears the record and never votes, and the one reachable member is a pure
+ *      participant that never self-voids on an incomplete set; the recovery loop backs off, abandons at its
+ *      ceiling, and leaves the lift `pending` with credit held — the dead-voter case, the sole remaining
+ *      permanently-pending outcome.
+ *   4. **A lift whose promise set never completes but whose voter IS reachable voids by deadline.** A dropped
+ *      link to a non-voter participant means the set never completes, but the reachable sole voter votes `NC`
+ *      at its own deadline on that incomplete set — the behaviour this ticket adds — so the lift `void`s and
+ *      every promiser releases, rather than hanging forever. The mirror of scenario 3 (same network, same
+ *      dropped link; only which node is the voter differs).
  *
  * These mirror the tallynet-level proofs in `tallynet/src/testing/consensus.test.ts` (§ settling by deadline
- * ≈:1249, § a dropped push on the only path stalls ≈:400, § record availability). The one subtlety that
- * governs all three (see `participant.ts` `getRecordState`): a lift voids by deadline **only** if the promise
- * phase COMPLETES (arbitrarily late is fine) and the voter's completing vote lands post-expiry; if a needed
- * party never promises, the set never completes, no vote is ever cast, and recovery abandons → `pending`
- * (NOT `void`). That is exactly scenario 1 (promise completes, late vote) vs. scenario 3 (promise never
- * completes).
+ * ≈:1249, § void on an incomplete promise set, § a dropped push on the only path stalls ≈:400). The one
+ * subtlety that governs all four (see `participant.ts` `getRecordState`): a REACHABLE voter votes `NC` at its
+ * own deadline and voids — whether the promise set COMPLETED (scenario 1, a late completing vote) or never
+ * completed (scenario 4, an incomplete set). A lift stays `pending` only when the voter itself is unreachable:
+ * the sole voter is cut off, never hears the record, never votes, and the one reachable member is a pure
+ * participant that never self-voids (scenario 3, the dead-voter case). So the pending-vs-void split is now
+ * "is a voter reachable?", not "did the promise phase complete?".
  *
  * ── Why the deadline-void scenario uses two sims over one network ──────────────────────────────────────
  * A tallysim `ConditionsSpec` latency hits BOTH discovery and the lift (one compiled per-link conditions map
@@ -149,9 +157,11 @@ async function runDroppedPushRecovers(): Promise<DrivenLift> {
 }
 
 /**
- * Drive the permanently-stuck scenario: discover 0→1 on a fast sim, then run the lift on a slow sim whose
- * only link DROPS, so the push to the payee never arrives, the promise phase never completes, and the
- * recovery loop abandons at its (small) ceiling → `pending`, credit held.
+ * Drive the dead-voter scenario: discover 0→1 on a fast sim, then run the lift on a slow sim whose only link
+ * DROPS, with node **1** (the payee) as the sole voter. The push to node 1 never arrives, so the sole voter
+ * never hears the record and never votes; node 0 (the originator) is a pure participant that never self-voids
+ * on an incomplete set; the recovery loop abandons at its (small) ceiling → `pending`, credit held. This is
+ * the sole remaining permanently-stuck case: a voter majority that never hears the record.
  */
 async function runPermanentlyStuck(): Promise<DrivenLift> {
 	const network = cloneNetwork(line(2))
@@ -166,7 +176,34 @@ async function runPermanentlyStuck(): Promise<DrivenLift> {
 		identitySeed: IDENTITY_SEED,
 		recoveryGiveupMs: STUCK_RECOVERY_GIVEUP_MS,
 	})
-	const result = await runLiftForOutcome(dropped, network, outcome, q, { voters: [0] })
+	// voters:[1] — the sole voter is node 1, the party the dropped link cuts off, so no reachable voter can
+	// void the incomplete set. (voters:[0] would make the reachable originator vote NC at its deadline → void;
+	// that is the mirror scenario `runIncompleteSetVoids`.)
+	const result = await runLiftForOutcome(dropped, network, outcome, q, { voters: [1] })
+	return { network, sim: dropped, events, result: result!, metrics: analyzeLift(events, result!) }
+}
+
+/**
+ * Drive the incomplete-set-voids scenario — the mirror of {@link runPermanentlyStuck}: the same `line(2)`
+ * whose only link DROPS, but with node **0** (the reachable originator) as the sole voter and a large recovery
+ * ceiling so the loop ticks to the deadline rather than abandoning early. Node 1 never promises (the push is
+ * dropped), so the promise set never completes; node 0, a reachable voter, votes `NC` at its own deadline on
+ * that incomplete set and voids the lift — the behaviour this ticket adds. Credit is held then released as a
+ * void, so the lift is NOT permanently pending.
+ */
+async function runIncompleteSetVoids(): Promise<DrivenLift> {
+	const network = cloneNetwork(line(2))
+	const q: QuerySpec = { from: 0, to: 1, amount: 5, depth: 2 }
+	const fast = buildSimNetwork(network, {}, 0, undefined, undefined, { identitySeed: IDENTITY_SEED })
+	const outcome = await runQuery(fast, q)
+	const events: TraceEvent[] = []
+	// The reachable voter (node 0) reaches its deadline and votes NC, so a large recovery ceiling (the loop
+	// ticks to the deadline, never abandoning early) is what separates this from the dead-voter scenario above.
+	const dropped = buildSimNetwork(network, { dropFraction: 1 }, 0, (e) => events.push(e), undefined, {
+		identitySeed: IDENTITY_SEED,
+		recoveryGiveupMs: DEADLINE_RECOVERY_GIVEUP_MS,
+	})
+	const result = await runLiftForOutcome(dropped, network, outcome, q, { voters: [0], ttlMs: DEADLINE_TTL_MS })
 	return { network, sim: dropped, events, result: result!, metrics: analyzeLift(events, result!) }
 }
 
@@ -204,8 +241,8 @@ describe('consensus timeout — a dropped commit-push recovers by the protocol r
 	})
 })
 
-describe('consensus timeout — a needed party that never returns abandons and stays pending', () => {
-	it('the promise phase never completes, the recovery loop abandons, and the lift is permanently pending', async () => {
+describe('consensus timeout — a lift whose sole voter is cut off abandons and stays pending', () => {
+	it('the sole voter never hears the record, no reachable voter votes, the recovery loop abandons, and the lift is permanently pending', async () => {
 		const { network, sim, events, result, metrics } = await runPermanentlyStuck()
 		expect(result.outcome).toBe('pending') // no decision ever reached — settled nowhere, surfaced not thrown
 		expect(metrics.voidReason).toBe('stalled') // a pending is always `stalled`, whatever stray events fired
@@ -214,6 +251,22 @@ describe('consensus timeout — a needed party that never returns abandons and s
 		expect(network.tallies[0].balance).toBe(0) // nothing settled ⇒ no money moved
 		expect(sim.net.deliveryErrors).toEqual([]) // a dropped push is not a delivery error
 		expect(sim.net.clock.pendingTimers).toBe(0) // the abandoned loop drained the heap
+	})
+})
+
+describe('consensus timeout — an incomplete promise set with a reachable voter voids by deadline', () => {
+	it('a participant never promises but the reachable sole voter votes NC at its deadline, so the lift voids (no money moves)', async () => {
+		const { network, sim, events, result, metrics } = await runIncompleteSetVoids()
+		expect(result.outcome).toBe('void') // the reachable voter voided the incomplete set by its own deadline
+		expect(metrics.voidReason).toBe('voted-no-commit') // a deadline void surfaces as a voter-vote NC, never `expired`
+		expect(metrics.permanentlyPending).toBe(false) // it settled (as a void) and released — credit is NOT tied up
+		expect(metrics.creditHeldMs).toBeGreaterThan(0) // promised `P` then released on the void ⇒ a defined held span
+		expect(events.some((e) => e.type === 'recovery-abandoned')).toBe(false) // it voided before the loop could give up
+		for (const t of network.tallies) {
+			expect(t.balance).toBe(0) // nothing committed ⇒ no balance moved
+		}
+		expect(sim.net.deliveryErrors).toEqual([]) // a dropped push is not a delivery error
+		expect(sim.net.clock.pendingTimers).toBe(0) // the void clears the recovery loop; the heap drains
 	})
 })
 
@@ -259,6 +312,14 @@ describe('consensus timeout — determinism over the deadline + recovery timers'
 	it('the permanently-stuck scenario replays identical result and metrics (abandonment is deterministic)', async () => {
 		const a = await runPermanentlyStuck()
 		const b = await runPermanentlyStuck()
+		expect(a.result).toEqual(b.result)
+		expect(a.metrics).toEqual(b.metrics)
+		expect(serialize(a.network)).toEqual(serialize(b.network))
+	})
+
+	it('the incomplete-set-void scenario replays identical result and metrics (the deadline vote is deterministic)', async () => {
+		const a = await runIncompleteSetVoids()
+		const b = await runIncompleteSetVoids()
 		expect(a.result).toEqual(b.result)
 		expect(a.metrics).toEqual(b.metrics)
 		expect(serialize(a.network)).toEqual(serialize(b.network))

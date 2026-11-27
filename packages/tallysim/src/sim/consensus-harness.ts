@@ -20,14 +20,16 @@
  *   same sanitised record, and nonces are keyed by `sessionCode`+`linkId` (independent of intent values), so
  *   this is safe and leaves settlement unaffected. Only this lift record is sanitised — never the shared
  *   discovery adjacency (that would break the pinned byte-identical discovery sweep).
- * - **`pending` is the permanently-stuck outcome.** A lift whose promise phase never completes — a needed
- *   party that never returns (a dropped push to the only relayer, a sleeping participant) — reaches no
- *   decision: its recovery loop backs off, abandons past its give-up ceiling, and the lift is surfaced as
- *   `'pending'` with credit still held, not thrown. This is distinct from a late-but-*completing* lift, which
- *   self-voids by its own deadline (the completed promise set reaches the voter post-expiry, so `castCommit`
- *   votes `NC`): that is a `'void'`, not a `'pending'`. A split voter set that clears no threshold is also
- *   `'pending'`. A clean run leaves `net.deliveryErrors === []` even when a participant refuses (the engine
- *   catches it and signs `NP`) or a needed push is dropped.
+ * - **`pending` is now only the dead-voter outcome.** A lift stays `'pending'` only when a voter majority never
+ *   hears the record: the sole/needed voter is cut off (a dropped push to it, a sleeping voter), so it never
+ *   votes, and the one reachable member is a pure participant that never self-voids on an incomplete set. Its
+ *   recovery loop backs off, abandons past its give-up ceiling, and the lift is surfaced as `'pending'` with
+ *   credit still held, not thrown. This is distinct from an incomplete set whose voter IS reachable: that voter
+ *   votes `NC` at its own deadline on the incomplete set (`castCommit`'s expired path), so the lift `'void'`s,
+ *   not pends — the same way a late-but-*completing* lift self-voids once its completed set reaches the voter
+ *   post-expiry. A split voter set that clears no threshold is also `'pending'`. A clean run leaves
+ *   `net.deliveryErrors === []` even when a participant refuses (the engine catches it and signs `NP`) or a
+ *   needed push is dropped.
  * - **Self-recovery (no manual pull).** The protocol's own deadline + recovery timers fire inside the single
  *   `net.clock.runUntilIdle()`: `VirtualClock.runUntilIdle` fires every live timer until the heap empties, so
  *   the deadline one-shot and the periodic recovery-loop ticks run there. A member an interior non-relayer cut
