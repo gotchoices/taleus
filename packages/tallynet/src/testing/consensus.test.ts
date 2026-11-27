@@ -1092,7 +1092,7 @@ describe('consensus end to end — record availability (a pull routes around a r
 			{ name: 'R', roles: [PART] },
 			{ name: 'F', roles: [PART] },
 		]
-		const { net, doubles } = makeNet({ graph, refuseRelay: (n) => n === 'R' })
+		const { net, doubles, traces } = makeNet({ graph, refuseRelay: (n) => n === 'R' })
 		const tx = await runLift(net, { members, route: ['O', 'V', 'R', 'F'], payload: PAYLOAD })
 
 		// The push settles everyone up to and including the refuser; F is stranded.
@@ -1104,6 +1104,20 @@ describe('consensus end to end — record availability (a pull routes around a r
 		await net.clock.runUntilIdle() // flush the pushes F's own settlement scheduled
 		expect(await net.consensusNode('F').outcome(tx)).toBe('commit')
 		expect(doubles.get('F')!.releaseSuccesses).toEqual([true]) // released exactly once, success
+
+		// The pull itself is traced: F asked every reachable peer (both contact points plus its sole link
+		// peer R) and recorded a per-peer `record-pulled` — ok:true from O and V (both already committed and
+		// willing to serve), ok:false from R (the refuser serves no pulls either).
+		const pulledByF = traces
+			.filter((event): event is Extract<TraceEvent, { type: 'record-pulled' }> => event.type === 'record-pulled' && event.nodeId === net.memberKey('F'))
+			.map((event) => [event.from, event.ok])
+		expect(new Map(pulledByF)).toEqual(
+			new Map([
+				[net.memberKey('O'), true],
+				[net.memberKey('V'), true],
+				[net.memberKey('R'), false],
+			]),
+		)
 
 		// A second pull after settlement is idempotent: no second release, no delivery error.
 		expect(await net.consensusNode('F').fetchOutcome(tx)).toBe('commit')

@@ -60,6 +60,7 @@ export type TraceEvent =
 	| (TraceBase & { type: 'round-budget-expired'; round: number })
 	| (TraceBase & { type: 'late-answer-folded';   nonce: string; round: number })
 	| (TraceBase & { type: 'record-pushed';        transactionCode: string; to: string; promiseCount: number; commitCount: number; ok: boolean })
+	| (TraceBase & { type: 'record-pulled';        transactionCode: string; from: string; ok: boolean })
 	| (TraceBase & { type: 'record-received';      transactionCode: string; from?: string; promiseCount: number; commitCount: number })
 	| (TraceBase & { type: 'promise-signed';       transactionCode: string; signatureType: 'P' | 'NP' })
 	| (TraceBase & { type: 'signature-rejected';   transactionCode: string; reason: SignatureRejectReason })

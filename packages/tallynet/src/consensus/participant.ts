@@ -248,6 +248,7 @@ export class TrxParticipant<TTerms, TPayload> {
 			if (reply) {
 				await this.update(reply, peer) // peer as fromAddress → primes the skip-test, no echo back
 			}
+			this.emitPulled(record, peer.key, reply !== undefined)
 		}
 		return this.outcome(transactionCode)
 	}
@@ -881,6 +882,10 @@ export class TrxParticipant<TTerms, TPayload> {
 			commitCount: record.commits.length,
 			ok,
 		})
+	}
+
+	private emitPulled(record: TrxRecord<TTerms, TPayload>, from: string, ok: boolean): void {
+		this.traceSink({ ...this.traceBase(record), type: 'record-pulled', transactionCode: record.transactionCode, from, ok })
 	}
 
 	/** Reachable peers: every member with a `physical` address, plus the far end of each of our links. */

@@ -1279,6 +1279,32 @@ describe('TrxParticipant — record availability (fetchOutcome pulls a settled r
 		expect(await participant.fetchOutcome('a-transaction-we-never-saw')).toBe('pending')
 		expect(pulls).toBe(0) // without the record we hold no topology, so we cannot even address a pull
 	})
+
+	it('traces a `record-pulled` event per reachable peer, ok:true for the one that served and ok:false for the one that did not', async () => {
+		const voter1 = makeParty()
+		const voter2 = makeParty()
+		const self = makeParty()
+		const members = [
+			member(voter1, [MemberTypes.participant, MemberTypes.voter], { physical: 'dial:voter1' }),
+			member(voter2, [MemberTypes.participant, MemberTypes.voter], { physical: 'dial:voter2' }),
+			member(self, [MemberTypes.participant]),
+		]
+		const record = makeRecord(members, { n1: link(voter1, self), n2: link(voter2, self) })
+		// voter1 serves its own (identical, already-stored) copy back; voter2 serves nothing.
+		const fetchRecord: FetchRecordFunc<TTerms, TPayload> = (_tx, from) => Promise.resolve(from.key === voter1.key ? record : undefined)
+		const { participant, events } = harness({ self, fetchRecord })
+
+		await participant.update(record)
+		await participant.fetchOutcome(record.transactionCode)
+
+		const pulled = eventsOfType(events, 'record-pulled')
+		expect(new Map(pulled.map((event) => [event.from, event.ok]))).toEqual(
+			new Map([
+				[voter1.key, true],
+				[voter2.key, false],
+			]),
+		)
+	})
 })
 
 describe('TrxParticipant — equivocation proof kept (both signed faces retained as evidence)', () => {
