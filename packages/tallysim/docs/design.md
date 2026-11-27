@@ -800,19 +800,21 @@ So a sleeping/dropped **target** yields a found-but-stalled lift on a single bui
 **relay** severs the route back in discovery (no route found, no lift at all). Either way the dark node costs
 a payment, but it reaches the metrics by a different path — a missing `found` versus a `pending`.
 
-**Pull recovery softens the stall, but a dark edge can still strand a line.** The v1 commit engine still has
-**no propagation timeout** — a node never *itself* re-sends or times out a lost push — but the simulator now
-drives a **pull pass** after the initial settle (see the § *Voter model* record-availability curve below): a
-member an interior non-relayer cut off from the commit push pulls the settled evidence from a reachable
-contact point or link-neighbour, so a stranded member can recover rather than staying dead. Where a pull has
+**Protocol self-recovery softens the stall, but a dark edge can still strand a line.** The commit engine now
+runs a **recovery loop** (landed in `tallynet-stalled-recovery`): each node arms a deadline one-shot and
+periodic recovery ticks that all fire inside the simulator's single drive-to-idle, so a member an interior
+non-relayer cut off from the commit push pulls the settled evidence *itself* from a reachable contact point or
+link-neighbour (see the § *Voter model* record-availability curve below) — the simulator drives no pull pass of
+its own, and a stranded member recovers rather than staying dead. Where a pull has
 somewhere to reach — a published contact point, or a ring that delivers both ways — the lift completes for
 every cooperating member. Where it does not — a straight line with no contact points, whose stranded members'
 only peers are the non-relayer and each other — the completion cliff remains: those members stay `pending`
 even though the originator committed and the money moved. A *dropped-link* stall (the sleeping/dropped-target
 asymmetry above) is harder still: with no settled record anywhere to pull, the lift settles nowhere
-(`pending`, reason `stalled`). The self-timing-out, re-routing behaviour that would close these gaps at the
-protocol level is **phase-2** work, tracked in `tallynet-propagation-timeouts`; until it lands, read a
-`pending` as "a needed message was lost and no pull could reach the evidence."
+(`pending`, reason `stalled`). The self-*re-routing* that would close these remaining gaps at the protocol
+level — choosing an alternate path to the evidence when the direct one is dark — is **phase-2** work, tracked
+in `tallynet-propagation-timeouts`; until it lands, read a `pending` as "a needed message was lost and no pull
+could reach the evidence."
 
 ### Voter model
 
@@ -853,9 +855,11 @@ round-trips through a trace header).
   record it would forward and serves no pulls — it does not void the lift, it *strands* the members behind it,
   which the completion curve measures. The two are injected on independent fractions.
 
-- **Explicit pull (no auto-timeout yet).** v1 has no propagation-timeout loop, so the **simulator itself**
-  triggers the recovery pulls after the initial settle; a real node timing out and pulling on its own is
-  deferred to `tallynet-propagation-timeouts`.
+- **Protocol-driven pull (recovery loop landed).** Recovery moved into the protocol in
+  `tallynet-stalled-recovery`: each node's deadline one-shot and periodic recovery ticks fire inside the
+  simulator's single drive-to-idle, so a stranded node pulls the settled record **itself** — the simulator
+  drives no pull pass. Self-*re-routing* around a dark edge (choosing an alternate path to the evidence) is
+  still deferred to `tallynet-propagation-timeouts`.
 
 - **Circular routes as the clearing-discovery stand-in (`routeShape: 'circular'`).** Real clearing discovery —
   a node *finding* a cycle back to itself over the decentralised protocol — is deferred

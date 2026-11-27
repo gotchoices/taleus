@@ -65,7 +65,7 @@ export interface LiftResult {
 	/**
 	 * Distinct route entities **not** in `options.nonCooperating` — the members that are allowed to reach
 	 * commit. A non-relayer/silent node is excluded (it can never recover), so this is the honest denominator
-	 * of the completion fraction, exactly as the pull pass excludes them.
+	 * of the completion fraction.
 	 */
 	cooperatingMembers: number
 	/** How many {@link LiftResult.cooperatingMembers} have `commit` outcome after settlement + recovery. */
