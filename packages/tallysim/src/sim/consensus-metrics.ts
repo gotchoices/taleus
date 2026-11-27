@@ -22,9 +22,11 @@
  * {@link analyzeLift} assigns at most one {@link VoidReason} per non-commit lift, driven first by the
  * settled outcome and only then by the events:
  *   - `commit`  ⇒ no reason (undefined).
- *   - `pending` ⇒ always `'stalled'`. Pending means no decision was reached — a dropped push on a needed
- *     edge, or an even voter-set tie (v1 has no timeout). We do **not** infer a different reason from
- *     stray `NP`/`NC` events that never carried the lift to a decision.
+ *   - `pending` ⇒ always `'stalled'`. Pending means no decision was reached — a needed party that never
+ *     returned (a dropped push on the only edge, a sleeping participant, so the promise phase never completed
+ *     and the recovery loop abandoned), or a split voter set that cleared no threshold. (A late-but-completing
+ *     lift is NOT pending: it self-voids by deadline — a `void`, classified `'voted-no-commit'` below.) We do
+ *     **not** infer a different reason from stray `NP`/`NC` events that never carried the lift to a decision.
  *   - `void`    ⇒ the first of: a `signature-rejected` with `reason === 'expired'` ⇒ `'expired'`; else any
  *     `promise-signed` `NP` (a refusal) ⇒ `'refused-promise'`; else any `voter-vote` `NC` (a no-commit
  *     vote) ⇒ `'voted-no-commit'`; else, defensively, `'voted-no-commit'` (a void always has one of these

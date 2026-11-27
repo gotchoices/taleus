@@ -733,10 +733,16 @@ bug in this tier, not an input to tolerate.
   `sessionCode`+`linkId` (independent of intent values), so this is safe and leaves settlement unaffected. Only
   *this* lift record is sanitised — never the shared discovery adjacency, whose terms are pinned byte-identical by
   the discovery sweep.
-- **Outcome.** `consensusNode(originator).start(record)` then `clock.runUntilIdle()`; the result is read from
-  `outcome(txCode)` as `'commit' | 'void' | 'pending'`. `pending` (a stalled lift — a dropped push or an even
-  voter-set tie; v1 has no timeout) is a **real third outcome**, surfaced, not thrown. A clean run leaves
-  `net.deliveryErrors === []` even when a participant refuses (the engine catches it and signs `NP`).
+- **Outcome.** `consensusNode(originator).start(record)` then `clock.runUntilIdle()` — the single drive fires
+  the protocol's own deadline one-shot and periodic recovery ticks, so a stalled lift resolves *itself* inside
+  it (no simulator-driven pull). The result is read from `outcome(txCode)` as `'commit' | 'void' | 'pending'`.
+  `pending` is the **permanently-stuck** third outcome: a needed party never returned, so the promise phase
+  never completed, no vote was cast, and the recovery loop abandoned past its give-up ceiling — the lift
+  settled nowhere, surfaced not thrown, with credit still held. (A late-but-*completing* lift is **not**
+  `pending`: it self-voids by its own deadline — the completed promise set reaches the voter post-expiry, so
+  `castCommit` votes `NC` — and reads `void`. A split voter set that clears no threshold is also `pending`.) A
+  clean run leaves `net.deliveryErrors === []` even when a participant refuses (the engine catches it and signs
+  `NP`) or a needed push is dropped.
 
 ### Moving money on commit
 
@@ -803,10 +809,25 @@ a payment, but it reaches the metrics by a different path — a missing `found` 
 
 **Protocol self-recovery softens the stall, but a dark edge can still strand a line.** The commit engine now
 runs a **recovery loop** (landed in `tallynet-stalled-recovery`): each node arms a deadline one-shot and
-periodic recovery ticks that all fire inside the simulator's single drive-to-idle, so a member an interior
-non-relayer cut off from the commit push pulls the settled evidence *itself* from a reachable contact point or
-link-neighbour (see the § *Voter model* record-availability curve below) — the simulator drives no pull pass of
-its own, and a stranded member recovers rather than staying dead. Where a pull has
+periodic recovery ticks that all fire inside the simulator's single drive-to-idle, so a stalled lift resolves
+*itself* under the clock in one of three ways, with **no simulator-driven pull**:
+
+- **Deadline void (self-resolution).** A lift that keeps waiting on a slow party — the completed promise set
+  reaches the voter only *after* the code expiry — self-voids by its own deadline: the voter casts `NC`
+  through `castCommit`'s expired path and the route reads `void`. The promise phase still *completes* (a late
+  promise is accepted); it is the completing *vote* that lands post-expiry. (`consensus-timeout.test.ts`
+  § *a lift waiting on a slow voter voids by its own deadline*, mirroring tallynet `consensus.test.ts` ≈:1249.)
+- **Recovery-loop healing.** A member an interior non-relayer cut off from the commit push pulls the settled
+  evidence *itself* from a reachable contact point or link-neighbour (see the § *Voter model*
+  record-availability curve below) and commits — a stranded member recovers rather than staying dead.
+- **Abandonment (permanently pending).** A lift whose needed party never returns — the promise phase never
+  completes, so no vote is ever cast — has its recovery loop back off and **abandon** past the give-up ceiling
+  (`consensus.recoveryGiveupMs`, kept small in the sim so a stuck lift abandons fast rather than polling a
+  virtual hour of backoff ticks), leaving the lift `pending` with credit still held. This is the
+  **permanently-pending** outcome the metrics below count. (`consensus-timeout.test.ts` § *a needed party that
+  never returns abandons and stays pending*, mirroring tallynet `consensus.test.ts` ≈:400.)
+
+Where a pull has
 somewhere to reach — a published contact point, or a ring that delivers both ways — the lift completes for
 every cooperating member. Where it does not — a straight line with no contact points, whose stranded members'
 only peers are the non-relayer and each other — the completion cliff remains: those members stay `pending`
