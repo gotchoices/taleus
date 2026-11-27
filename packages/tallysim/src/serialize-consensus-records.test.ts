@@ -33,6 +33,9 @@ const metrics: ConsensusRunMetrics = {
 	recoveredTotal: 3,
 	planRefusalCount: 4,
 	planRefusalShare: 4 / 10,
+	creditHeldMsPerLift: dist(6, 500),
+	permanentlyPendingCount: 1,
+	permanentlyPendingFraction: 1 / 8,
 }
 
 const record: ConsensusRunRecord = {
@@ -133,6 +136,23 @@ describe('CSV summary', () => {
 		expect(rows[0]['pullMessagesPerLift.mean']).toBe('2')
 		expect(rows[0]['planRefusalCount']).toBe('4')
 		expect(rows[0]['planRefusalShare']).toBe(String(4 / 10))
+	})
+
+	it('appends the credit-held distribution and permanently-pending columns after planRefusalShare', () => {
+		const { header, rows } = parseCsv(consensusRecordsToCsv([record]))
+		for (const suffix of ['count', 'mean', 'min', 'max', 'p50', 'p90', 'p99']) {
+			expect(header).toContain(`creditHeldMsPerLift.${suffix}`)
+		}
+		for (const column of ['permanentlyPendingCount', 'permanentlyPendingFraction']) {
+			expect(header).toContain(column)
+		}
+		// The three new fields come last, after the plan-refusal scalars, in appended order.
+		expect(header.indexOf('planRefusalShare')).toBeLessThan(header.indexOf('creditHeldMsPerLift.count'))
+		expect(header.indexOf('creditHeldMsPerLift.p99')).toBeLessThan(header.indexOf('permanentlyPendingCount'))
+		expect(header.indexOf('permanentlyPendingCount')).toBeLessThan(header.indexOf('permanentlyPendingFraction'))
+		expect(rows[0]['creditHeldMsPerLift.mean']).toBe('500')
+		expect(rows[0]['permanentlyPendingCount']).toBe('1')
+		expect(rows[0]['permanentlyPendingFraction']).toBe(String(1 / 8))
 	})
 
 	it('expands the nested voidReasons tally into voidReasons.<reason> columns', () => {

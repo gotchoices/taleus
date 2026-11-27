@@ -146,11 +146,15 @@ describe('runConsensusSweep — principle 3 completion curve (linear route)', ()
 			expect(r.metrics.cooperatingCompletion).toBe(1)
 		}
 		// Completion holding at 1.0 WITH a non-relayer present is itself the proof recovery happened: without
-		// it the stranded members would never commit. NOTE(6.2→6.3): that recovery is now the protocol loop
-		// (tallynet-stalled-recovery) healing them during the settle, not the simulator's manual pull — which
-		// therefore recovers 0. tallysim-timeout-scenarios (6.3) removes the manual recoverStrandedByPull and
-		// re-homes this counter onto the loop's own recovery (its `recovery-tick` / `record-pulled` traces).
-		expect(records[1].metrics.recoveredTotal).toBe(0) // the manual pull is redundant now the loop self-heals
+		// it the stranded members would never commit. `recoveredTotal` now counts the settled lifts whose
+		// protocol recovery loop ran (a `record-pulled` / `recovery-tick` fired), re-homed from the deleted
+		// manual-pull counter onto the loop's own trace events (tallysim-timeout-harness-metrics). The
+		// no-non-relayer cell commits cleanly so the loop never runs (0); the 1/6 cell strands node 3's members,
+		// whose loop runs and heals them, so its total is positive — the honest count of lifts that needed
+		// recovery. (That value went stale in the committed experiment CSVs; tallysim-timeout-scenarios
+		// regenerates and validates them.)
+		expect(records[0].metrics.recoveredTotal).toBe(0) // nonRelayerFraction 0 ⇒ clean commits, the loop never runs
+		expect(records[1].metrics.recoveredTotal).toBeGreaterThan(0) // the loop ran to heal the members node 3 strands
 	})
 
 	it('without contact points, a straight line shows the completion cliff (the documented gap)', async () => {
@@ -166,10 +170,15 @@ describe('runConsensusSweep — principle 3 completion curve (linear route)', ()
 		const records = await runConsensusSweepToArray(specFor(base, 1))
 		const m = records[0].metrics
 		// The expected gap (not a failure): members beyond the interior non-relayer have no pull path to the
-		// evidence on a straight line, so they stay pending and completion falls below 1.0.
+		// evidence on a straight line, so they stay pending and completion falls below 1.0 — this is the real
+		// success differentiator between the two scenarios now.
 		expect(m.cooperatingCompletion).toBeLessThan(1)
 		expect(m.cooperatingCompletion).toBeGreaterThan(0) // lifts not straddling node 3 still fully complete
-		expect(m.recoveredTotal).toBe(0) // no contact point ⇒ nothing recovers
+		// `recoveredTotal` counts settled lifts whose recovery loop RAN, not lifts it healed: a straddling lift
+		// still fires the loop (its stranded members tick/pull), it just cannot reach the evidence with no
+		// contact point. So the total is positive here too — completion (above), not recoveredTotal, is what
+		// separates the healed case from this one.
+		expect(m.recoveredTotal).toBeGreaterThan(0) // the loop ran on the straddling lifts, though it could not heal them
 	})
 })
 

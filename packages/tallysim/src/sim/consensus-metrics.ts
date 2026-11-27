@@ -73,7 +73,8 @@ export interface ConsensusLiftMetrics {
 	outcome: 'commit' | 'void' | 'pending'
 	/**
 	 * Ms from the first `record-pushed` / `promise-signed` to the last consensus event for this lift.
-	 * Present only for a settled lift (`commit` | `void`); **omitted for `pending`** (nothing settled).
+	 * Present only for a settled lift (`commit` | `void`); **omitted for `pending`** (nothing settled). A
+	 * deadline-driven void is a `void`, so timeout-driven settlements contribute a span here too.
 	 */
 	timeToSettleMs?: number
 	/** Count of `record-pushed` events for this lift — the push is the consensus message. */
@@ -84,10 +85,31 @@ export interface ConsensusLiftMetrics {
 	cooperatingMembers: number
 	/** How many of those cooperating members reached `commit` after settle + recovery; from the {@link LiftResult}. */
 	cooperatingCommitted: number
-	/** How many `fetchOutcome` pulls the recovery pass issued for this lift (`result.pullCalls`). */
+	/**
+	 * Count of `record-pulled` trace events for this lift — the protocol's own recovery-loop pulls (the
+	 * simulator drives none). A happy-path lift that settled before its deadline emits none; a lift whose
+	 * member was stranded runs the loop and emits ≥1.
+	 */
 	pullMessages: number
-	/** How many stranded members the pull pass moved off `pending` (`result.recovered`). */
+	/**
+	 * `1` iff the lift **settled** (`commit` | `void`) **and** emitted ≥1 `record-pulled` **or** `recovery-tick`
+	 * event — i.e. the recovery loop had to run to carry a stranded member home — else `0`. A clean
+	 * happy-commit or refuser-void (nobody stranded) is `0`. May be non-zero in a drop-sweep where a drop
+	 * strands a member who then self-heals; that is the honest value.
+	 */
 	recovered: number
+	/**
+	 * Ms the lift held credit: the span from the **first** `promise-signed` carrying a `P` signature (a `P`
+	 * promise holds credit; an `NP` holds nothing) to the **last** `resources-released`, both for this lift.
+	 * Omitted when either endpoint is absent (no credit-holding promise, or no release seen).
+	 */
+	creditHeldMs?: number
+	/**
+	 * `true` iff the lift is `pending` **and** never emitted a `resources-released` event — credit was tied up
+	 * and never freed. Tied to "resources never released" (not merely "pending") so it stays correct if a
+	 * future path ever releases resources on abandon.
+	 */
+	permanentlyPending: boolean
 }
 
 /** A whole run's consensus metrics: the commit-vs-found rate plus cost distributions and void-reason totals. */
@@ -108,7 +130,10 @@ export interface ConsensusRunMetrics {
 	pendingCount: number
 	/** `commitCount / liftCount`, or 0 when `liftCount === 0` (never NaN) — P(commit | found). */
 	pCommitGivenFound: number
-	/** Time-to-settle distribution over the SETTLED lifts (`commit` | `void`); a pending contributes no sample. */
+	/**
+	 * Time-to-settle distribution over the SETTLED lifts (`commit` | `void`); a pending contributes no sample.
+	 * A deadline-driven void is a `void`, so timeout-driven settlements are included in this distribution.
+	 */
 	timeToSettleMs: DistributionSummary
 	/** Messages-per-lift distribution over ALL lifts. */
 	messagesPerLift: DistributionSummary
@@ -136,6 +161,16 @@ export interface ConsensusRunMetrics {
 	planRefusalCount: number
 	/** `planRefusalCount / queryCount`, or 0 when `queryCount === 0` (never NaN) — the refused-plan rate. */
 	planRefusalShare: number
+	/**
+	 * Credit-held-time distribution over the lifts whose {@link ConsensusLiftMetrics.creditHeldMs} is defined
+	 * (a first-`P`-promise through a last release); a lift that never held credit or never released contributes
+	 * no sample. Measures how long a lift ties credit up before it is freed.
+	 */
+	creditHeldMsPerLift: DistributionSummary
+	/** Σ `permanentlyPending` — lifts left `pending` with their resources never released (credit never freed). */
+	permanentlyPendingCount: number
+	/** `permanentlyPendingCount / liftCount`, or 0 when `liftCount === 0` (never NaN) — the never-resolved rate. */
+	permanentlyPendingFraction: number
 }
 
 /** The {@link TraceEvent} variants that carry a `transactionCode` — i.e. the consensus events. */
@@ -188,14 +223,22 @@ function deriveVoidReason(outcome: LiftResult['outcome'], signals: VoidSignals):
 /**
  * Analyse one lift from its consensus trace events and its settled {@link LiftResult}. Filters `events` by
  * `result.transactionCode` **internally**, so it works whether handed just this lift's events or a whole
- * concurrent batch's. `messages` is the `record-pushed` count; `timeToSettleMs` spans this lift's first
- * push/promise to its last consensus event (omitted for `pending`); `voidReason` follows the module
- * header's outcome-driven precedence.
+ * concurrent batch's. `messages` is the `record-pushed` count; `pullMessages` the `record-pulled` count;
+ * `timeToSettleMs` spans this lift's first push/promise to its last consensus event (omitted for `pending`);
+ * `recovered` is 1 iff the lift settled and its recovery loop ran (a `record-pulled` / `recovery-tick`);
+ * `creditHeldMs` spans the first credit-holding (`P`) promise to the last `resources-released`;
+ * `permanentlyPending` flags a pending lift whose resources were never released; `voidReason` follows the
+ * module header's outcome-driven precedence. Pure and O(events) — one pass, no allocation per event.
  */
 export function analyzeLift(events: readonly TraceEvent[], result: LiftResult): ConsensusLiftMetrics {
 	let messages = 0
+	let pullMessages = 0
+	let sawRecoveryActivity = false // a record-pulled or recovery-tick fired ⇒ the recovery loop ran
 	let maxTime: number | undefined
 	let minStartTime: number | undefined // over record-pushed | promise-signed events only
+	let firstCreditPromise: number | undefined // earliest promise-signed 'P' (a P promise holds credit)
+	let lastRelease: number | undefined // latest resources-released
+	let sawRelease = false
 	const signals: VoidSignals = { sawExpired: false, sawNoPromise: false, sawNoCommit: false }
 
 	// NOTE: scans the whole `events` array per lift; the runner normally hands just this lift's events, but a
@@ -216,12 +259,27 @@ export function analyzeLift(events: readonly TraceEvent[], result: LiftResult): 
 				}
 				break
 			}
+			case 'record-pulled': {
+				pullMessages++
+				sawRecoveryActivity = true
+				break
+			}
+			case 'recovery-tick': {
+				// Emitted only on the force-repush path of a non-settling tick, so it is not always present on a
+				// recovered lift — hence `recovered` also keys on `record-pulled`. Its presence alone still marks
+				// recovery-loop activity.
+				sawRecoveryActivity = true
+				break
+			}
 			case 'promise-signed': {
 				if (minStartTime === undefined || event.time < minStartTime) {
 					minStartTime = event.time
 				}
 				if (event.signatureType === 'NP') {
 					signals.sawNoPromise = true
+				} else if (firstCreditPromise === undefined || event.time < firstCreditPromise) {
+					// signatureType === 'P' — a credit-holding promise; track its earliest time for creditHeldMs.
+					firstCreditPromise = event.time
 				}
 				break
 			}
@@ -237,20 +295,29 @@ export function analyzeLift(events: readonly TraceEvent[], result: LiftResult): 
 				}
 				break
 			}
+			case 'resources-released': {
+				sawRelease = true
+				if (lastRelease === undefined || event.time > lastRelease) {
+					lastRelease = event.time
+				}
+				break
+			}
 			default: {
-				// record-received / settled / resources-released contribute only to maxTime, counted above.
+				// record-received / settled / deadline-reached / … contribute only to maxTime, counted above.
 				break
 			}
 		}
 	}
 
+	const settled = result.outcome === 'commit' || result.outcome === 'void'
 	const metrics: ConsensusLiftMetrics = {
 		outcome: result.outcome,
 		messages,
 		cooperatingMembers: result.cooperatingMembers,
 		cooperatingCommitted: result.cooperatingCommitted,
-		pullMessages: result.pullCalls,
-		recovered: result.recovered,
+		pullMessages,
+		recovered: settled && sawRecoveryActivity ? 1 : 0,
+		permanentlyPending: result.outcome === 'pending' && !sawRelease,
 	}
 	const voidReason = deriveVoidReason(result.outcome, signals)
 	if (voidReason !== undefined) {
@@ -265,6 +332,12 @@ export function analyzeLift(events: readonly TraceEvent[], result: LiftResult): 
 	if (result.outcome !== 'pending' && minStartTime !== undefined && maxTime !== undefined) {
 		metrics.timeToSettleMs = maxTime - minStartTime
 	}
+	// Credit-held span: the first credit-holding (`P`) promise to the last release. Both endpoints must be
+	// present. The `lastRelease >= firstCreditPromise` guard documents intent — releases follow promises, so it
+	// holds — and defends the metric against an out-of-order trace rather than emitting a negative span.
+	if (firstCreditPromise !== undefined && lastRelease !== undefined && lastRelease >= firstCreditPromise) {
+		metrics.creditHeldMs = lastRelease - firstCreditPromise
+	}
 	return metrics
 }
 
@@ -277,7 +350,9 @@ export function analyzeLift(events: readonly TraceEvent[], result: LiftResult): 
  * principle-3 aggregates sum each lift's cooperating-member counts: `cooperatingCompletion` is
  * `cooperatingCommittedTotal / cooperatingMemberTotal` guarded to 0 when no cooperating members exist (never
  * NaN); `pullMessagesPerLift` distributes the pull cost over all lifts; `recoveredTotal` sums stranded-then-
- * settled members.
+ * settled members. `creditHeldMsPerLift` distributes the defined per-lift credit-held spans only (like
+ * `timeToSettleMs`); `permanentlyPendingCount` sums the never-released pending lifts and
+ * `permanentlyPendingFraction` divides it by `liftCount`, guarded to 0 (never NaN) when there are no lifts.
  */
 export function summarizeConsensusMetrics(
 	lifts: readonly ConsensusLiftMetrics[],
@@ -291,9 +366,11 @@ export function summarizeConsensusMetrics(
 	let cooperatingMemberTotal = 0
 	let cooperatingCommittedTotal = 0
 	let recoveredTotal = 0
+	let permanentlyPendingCount = 0
 	const settleTimes: number[] = []
 	const messages: number[] = []
 	const pullMessages: number[] = []
+	const creditHeldTimes: number[] = []
 	const voidReasons = zeroVoidReasons()
 
 	for (const lift of lifts) {
@@ -316,6 +393,12 @@ export function summarizeConsensusMetrics(
 		}
 		if (lift.timeToSettleMs !== undefined) {
 			settleTimes.push(lift.timeToSettleMs)
+		}
+		if (lift.creditHeldMs !== undefined) {
+			creditHeldTimes.push(lift.creditHeldMs)
+		}
+		if (lift.permanentlyPending) {
+			permanentlyPendingCount++
 		}
 		messages.push(lift.messages)
 		pullMessages.push(lift.pullMessages)
@@ -347,5 +430,8 @@ export function summarizeConsensusMetrics(
 		recoveredTotal,
 		planRefusalCount,
 		planRefusalShare: queryCount > 0 ? planRefusalCount / queryCount : 0,
+		creditHeldMsPerLift: summarizeDistribution(creditHeldTimes),
+		permanentlyPendingCount,
+		permanentlyPendingFraction: liftCount > 0 ? permanentlyPendingCount / liftCount : 0,
 	}
 }

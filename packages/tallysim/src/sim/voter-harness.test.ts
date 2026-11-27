@@ -89,13 +89,11 @@ describe('voter harness — record availability (principle 3: a pull routes arou
 
 		const result = await runLiftForOutcome(sim, network, outcome, q, { contactPoints: true, nonCooperating: [2] })
 		expect(result?.outcome).toBe('commit')
-		// NOTE(6.2→6.3): the protocol recovery loop (tallynet-stalled-recovery) now heals nodes 3 and 4
-		// automatically during the settle — each pulls node 0's committed record over its contact point around
-		// the refuser — so the simulator's manual `recoverStrandedByPull` finds nothing left and recovers 0. The
-		// guarantee under test (every cut-off member still commits) is asserted per-member below and is unchanged.
-		// tallysim-timeout-scenarios (6.3) removes the now-redundant manual pull and re-homes these counters.
-		expect(result?.recovered).toBe(0) // the loop beat the manual pull to it (was 2 before the loop existed)
-		expect(result?.pullCalls).toBe(0) // nobody was still pending by the time the manual pass ran
+		// NOTE: the protocol recovery loop (tallynet-stalled-recovery) heals nodes 3 and 4 automatically during
+		// the settle — each pulls node 0's committed record over its contact point around the refuser. The
+		// guarantee under test (every cut-off member still commits) is asserted per-member below. The recovery
+		// counters a manual pull once returned are gone from LiftResult; consensus-metrics.ts now derives them
+		// from the protocol's own trace events (tallysim-timeout-harness-metrics).
 		for (const e of [0, 1, 2, 3, 4]) {
 			expect(await outcomeOf(sim, e, result!.transactionCode)).toBe('commit')
 		}
@@ -118,7 +116,6 @@ describe('voter harness — record availability (principle 3: a pull routes arou
 
 		const result = await runLiftForOutcome(sim, network, outcome, q, { contactPoints: false, nonCooperating: [2] })
 		expect(result?.outcome).toBe('commit')
-		expect(result?.recovered).toBe(0) // no path to the evidence for 3 or 4
 		expect(await outcomeOf(sim, 3, result!.transactionCode)).toBe('pending')
 		expect(await outcomeOf(sim, 4, result!.transactionCode)).toBe('pending')
 		expect(network.tallies[0].balance).toBe(-5) // money still moved on the originator's commit
@@ -141,7 +138,6 @@ describe('voter harness — record availability (principle 3: a pull routes arou
 		const result = await runLiftForOutcome(sim, network, outcome!, q, { contactPoints: false, nonCooperating: [1] })
 		expect(result?.outcome).toBe('commit')
 		expect(result?.route).toEqual([0, 1, 2, 0]) // the closed loop the circular finder built
-		expect(result?.recovered).toBe(0) // the ring delivered directly — nobody stranded
 		expect(await outcomeOf(sim, 0, result!.transactionCode)).toBe('commit')
 		expect(await outcomeOf(sim, 2, result!.transactionCode)).toBe('commit')
 		for (const e of [0, 1, 2]) {
@@ -293,7 +289,7 @@ describe('voter harness — determinism', () => {
 		}
 		const a = await pass()
 		const b = await pass()
-		expect(a.result).toEqual(b.result) // identical LiftResult, including pullCalls and recovered
+		expect(a.result).toEqual(b.result) // identical LiftResult
 		expect(a.serialized).toEqual(b.serialized)
 	})
 })

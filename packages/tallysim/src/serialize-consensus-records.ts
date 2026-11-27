@@ -40,6 +40,9 @@ const CONSENSUS_METRIC_COLUMNS: readonly string[] = [
 	...distributionColumns('pullMessagesPerLift'),
 	'planRefusalCount',
 	'planRefusalShare',
+	...distributionColumns('creditHeldMsPerLift'),
+	'permanentlyPendingCount',
+	'permanentlyPendingFraction',
 ]
 
 /** One {@link ConsensusRunRecord} as a single JSON line (no trailing newline). */

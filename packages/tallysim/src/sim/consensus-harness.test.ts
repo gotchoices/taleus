@@ -296,7 +296,8 @@ describe('runLiftForOutcome — protocol self-recovery and the ttl / give-up kno
 		// 0—1—2—3—4, node 2 refuses to relay the commit phase, so the push reaches 0,1,2 but 3 and 4 are cut off.
 		// With the originator (sole voter) publishing a contact point, the protocol's OWN recovery loop heals 3
 		// and 4 inside the single runUntilIdle — each pulls node 0's committed record over its contact point around
-		// the refuser. The simulator drives no pull of its own now, so pullCalls/recovered are hard-coded 0.
+		// the refuser. The simulator drives no pull of its own; the guarantee under test is the per-member commit
+		// below (the recovery counters moved onto the trace events, read by consensus-metrics.ts).
 		const network = line(5)
 		const sim = buildSimNetwork(network, {}, 0, undefined, undefined, { identitySeed: 7, refuseRelayFor: (id) => id === 2 })
 		const q: QuerySpec = { from: 0, to: 4, amount: 5, depth: 5 }
@@ -305,8 +306,6 @@ describe('runLiftForOutcome — protocol self-recovery and the ttl / give-up kno
 
 		const result = await runLiftForOutcome(sim, network, outcome, q, { contactPoints: true, nonCooperating: [2] })
 		expect(result?.outcome).toBe('commit')
-		expect(result?.pullCalls).toBe(0) // the manual pull pass is gone
-		expect(result?.recovered).toBe(0)
 		for (const e of [0, 1, 2, 3, 4]) {
 			expect(await outcomeOf(sim, e, result!.transactionCode)).toBe('commit') // the loop healed 3 and 4
 		}

@@ -29,9 +29,9 @@
  *   off from the commit push still holds the record (it promised) but lacks the commit evidence, and its
  *   recovery loop pulls that evidence from a reachable contact point (`contactPoints`) or link-neighbour; a
  *   silent or split lift voids by its own deadline. So the simulator drives no pull itself —
- *   `tallynet-stalled-recovery` moved recovery into the protocol. {@link LiftResult.pullCalls} /
- *   {@link LiftResult.recovered} are therefore **deprecated**, hard-coded to `0` here and re-homed onto the
- *   protocol's own trace events in `tallysim-timeout-harness-metrics`.
+ *   `tallynet-stalled-recovery` moved recovery into the protocol. The recovery counters a manual pass once
+ *   returned are therefore gone from {@link LiftResult}; `consensus-metrics.ts` now derives them from the
+ *   protocol's own `record-pulled` / `recovery-tick` trace events instead.
  */
 
 import { MemberTypes, type ConsensusMethod, type MemberType, type TrxRecord } from 'tallynet'
@@ -58,10 +58,6 @@ export interface LiftResult {
 	amount: number
 	/** `commit` moved balances; `void` and `pending` left them unchanged. */
 	outcome: 'commit' | 'void' | 'pending'
-	/** Deprecated; re-homed onto trace events in `tallysim-timeout-harness-metrics` — returns 0 here. */
-	pullCalls: number
-	/** Deprecated; re-homed onto trace events in `tallysim-timeout-harness-metrics` — returns 0 here. */
-	recovered: number
 	/**
 	 * Distinct route entities **not** in `options.nonCooperating` — the members that are allowed to reach
 	 * commit. A non-relayer/silent node is excluded (it can never recover), so this is the honest denominator
@@ -178,9 +174,6 @@ export async function runLiftForOutcome(
 		tallyPath,
 		amount: q.amount,
 		outcome: settled,
-		// Deprecated; the protocol self-recovers, so no manual pass runs. Re-homed in tallysim-timeout-harness-metrics.
-		pullCalls: 0,
-		recovered: 0,
 		cooperatingMembers,
 		cooperatingCommitted,
 	}

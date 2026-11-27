@@ -376,7 +376,8 @@ counterpart (`consensusRecordToJsonLine`, `createConsensusCsvAccumulator`, …) 
 machinery, supplying only its column order (`pCommitGivenFound` and the commit/void/pending counts, the
 `timeToSettleMs` / `messagesPerLift` distributions, the four `voidReasons.<reason>` tallies, then the
 completion scalars `cooperatingMemberTotal` / `cooperatingCommittedTotal` / `cooperatingCompletion` /
-`recoveredTotal` and the `pullMessagesPerLift` distribution).
+`recoveredTotal`, the `pullMessagesPerLift` distribution, the plan-refusal scalars, and finally the
+`creditHeldMsPerLift` distribution and the `permanentlyPendingCount` / `permanentlyPendingFraction` scalars).
 
 The **CLIs** (`src/cli/`) are the **only Node-specific files** in the package — they do file I/O, so they live
 outside the neutral core, are excluded from the `no-node-globals` guard and the neutral `tsconfig.build.json`,
@@ -885,9 +886,10 @@ round-trips through a trace header).
   the winning side must clear both the strict-majority floor *and* the raised fraction of total vote weight.
 
 - **New metrics / CSV columns.** The stacked-voter dimension adds `planRefusalCount` and `planRefusalShare`
-  (`= planRefusalCount / queryCount`, 0 when no queries) to `ConsensusRunMetrics`, emitted as the last two CSV
-  columns (after `pullMessagesPerLift.*`). They count **discovery-time** plan refusals, distinct from voided
-  lifts.
+  (`= planRefusalCount / queryCount`, 0 when no queries) to `ConsensusRunMetrics`, emitted as CSV columns after
+  `pullMessagesPerLift.*`. They count **discovery-time** plan refusals, distinct from voided lifts. The timeout
+  dimension then appends the `creditHeldMsPerLift` distribution and the `permanentlyPendingCount` /
+  `permanentlyPendingFraction` scalars as the final columns (see § *Consensus metrics*).
 
 ### Consensus metrics
 
@@ -901,13 +903,22 @@ routes it found and took, **did the lift commit, how fast, how many messages, an
 `result.transactionCode` internally — every consensus event carries a `transactionCode` and no discovery event
 does, so this cleanly drops discovery noise *and* every other lift's events in a concurrent batch. From this
 lift's events it derives: `messages` = count of `record-pushed` (the push is the consensus message);
-`timeToSettleMs` = last consensus-event time − first `record-pushed`/`promise-signed` time, **omitted for a
-`pending`** (nothing settled); and `voidReason`, by an **outcome-driven precedence** — `commit` ⇒ none;
-`pending` ⇒ always `'stalled'` (a stray `NP`/`NC` that never reached a decision does not override it); `void`
-⇒ the first of `expired` (a `signature-rejected`), `'refused-promise'` (a `promise-signed` `NP`), or
-`'voted-no-commit'` (a `voter-vote` `NC`). (`zeroVoidReasons()` is the compile-checked source of truth for
-the reason set; `ALL_VOID_REASONS` derives from it, so the two cannot drift — the same `pruneReasons` pattern
-the discovery tier's § *Protocol metrics* uses for its reason set.)
+`pullMessages` = count of `record-pulled` (the protocol's **own** recovery-loop pulls — the simulator drives
+none); `timeToSettleMs` = last consensus-event time − first `record-pushed`/`promise-signed` time, **omitted
+for a `pending`** (nothing settled, so a deadline-driven void — itself a `void` — still contributes a span);
+`recovered` = `1` iff the lift **settled** and its recovery loop ran (a `record-pulled` *or* `recovery-tick`
+fired), else `0` — a clean happy-commit or refuser-void is `0`, so this counts the settled lifts that *needed*
+recovery, which is non-zero in a drop sweep that strands a self-healing member; `creditHeldMs` = last
+`resources-released` time − first credit-holding (`P`) `promise-signed` time (an `NP` holds nothing),
+**omitted** when either endpoint is absent; `permanentlyPending` = the lift is `pending` **and** never released
+its resources (credit tied up and never freed); and `voidReason`, by an **outcome-driven precedence** —
+`commit` ⇒ none; `pending` ⇒ always `'stalled'` (a stray `NP`/`NC` that never reached a decision does not
+override it); `void` ⇒ the first of `expired` (a `signature-rejected`), `'refused-promise'` (a `promise-signed`
+`NP`), or `'voted-no-commit'` (a `voter-vote` `NC`). A deadline-driven timeout void emits no `expired`
+signature-rejection — the engine surfaces it as a `voter-vote` `NC` — so it classifies as `'voted-no-commit'`.
+(`zeroVoidReasons()` is the compile-checked source of truth for the reason set; `ALL_VOID_REASONS` derives from
+it, so the two cannot drift — the same `pruneReasons` pattern the discovery tier's § *Protocol metrics* uses
+for its reason set.)
 
 `summarizeConsensusMetrics(lifts, structural, queryCount)` aggregates a run into `ConsensusRunMetrics`. The
 headline is **`pCommitGivenFound`** = `commitCount / liftCount` — P(commit | a route was found and a lift
@@ -917,9 +928,12 @@ over the settled lifts only (a pending contributes no sample), `messagesPerLift`
 sums each non-commit lift's reason. It also sums the record-availability aggregates: `cooperatingCompletion`
 = `cooperatingCommittedTotal / cooperatingMemberTotal` (of the members allowed to reach commit — route
 entities minus the injected non-relayers/silent — the fraction that committed, **0 not NaN** when none),
-`pullMessagesPerLift` over all lifts, and `recoveredTotal` (members the pull pass moved off `pending`); see
-the voter-model subsection for what those knobs mean. `queryCount` and the `StructuralMetrics` carry through
-from the runner unchanged.
+`pullMessagesPerLift` over all lifts, and `recoveredTotal` = Σ `recovered` (the settled lifts whose recovery
+loop ran); see the voter-model subsection for what those knobs mean. The timeout measurements add
+`creditHeldMsPerLift` (distributed over the lifts whose `creditHeldMs` is defined, like `timeToSettleMs`) and
+`permanentlyPendingCount` with `permanentlyPendingFraction` = `permanentlyPendingCount / liftCount` (**0 not
+NaN** when no lift ran) — how often a lift ties credit up and never resolves. `queryCount` and the
+`StructuralMetrics` carry through from the runner unchanged.
 
 ### The sequential consensus sweep runner
 
