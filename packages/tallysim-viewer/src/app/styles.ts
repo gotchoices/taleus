@@ -480,4 +480,31 @@ html, body, #app {
 	font-size: 0.8rem;
 	line-height: 1.4;
 }
+
+/* The voter-model breakdown below a settled lift's route: a reset list of participant voters plus one text line
+   per member set. Text is the non-colour channel for a member's state, so it reads like the panel's other notes. */
+.tsv-replay-voters {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	margin-top: 0.25rem;
+}
+
+.tsv-replay-voter-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	color: var(--tsv-text-secondary);
+	font-size: 0.8rem;
+	line-height: 1.4;
+}
+
+.tsv-replay-voter-line {
+	color: var(--tsv-text-secondary);
+	font-size: 0.8rem;
+	line-height: 1.4;
+}
 `
