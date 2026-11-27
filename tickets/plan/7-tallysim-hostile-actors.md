@@ -1,5 +1,5 @@
 description: Add misbehaving nodes to the network simulator (ones that stall, drop or delay messages, flood, forge, or vote both ways) and measure how much each kind hurts lifts and how well the protocol's defences hold, to ground later decisions about reputation and expelling bad peers.
-prereq: tallynet-propagation-timeouts
+prereq: tallysim-timeout-scenarios
 files: packages/tallysim/, packages/tallysim/docs/design.md, packages/tallysim-viewer/, packages/tallynet/docs/design.md, tickets/backlog/feat-tallynet-hostile-peers.md
 difficulty: medium
 ----

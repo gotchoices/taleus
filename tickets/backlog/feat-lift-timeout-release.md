@@ -39,6 +39,36 @@ commit settles the others. Candidate directions to weigh (design work, not yet d
 Resolve which approach (or combination) actually preserves atomicity before writing any schema — a naive
 unilateral or even bilateral void can silently break it.
 
+## Invariants the schema release must honour (from `tallynet-propagation-timeouts`, planned 2026-11-26)
+
+The TallyNet protocol work (`tallynet-deadline-timeout-votes` + `tallynet-stalled-recovery`) resolves every
+case it *can* resolve atomically in-protocol, and leaves only the genuinely-stuck case (a needed party
+permanently unreachable) for this schema-level escape. What that protocol work guarantees, and the hard
+constraint it hands you:
+
+- **A protocol-produced void is always globally safe** — you never need to defend against it racing a commit.
+  A void arises only as (a) a participant's no-promise (`NP`) *before* the promise phase completes, in which
+  case no valid commit can exist (a commit's signature binds the *complete* promise set, which the `NP`-signer
+  never completed), or (b) a voter-majority no-commit (`NC`) *after* completion, which the strict-majority
+  floor makes mutually exclusive with a commit majority.
+
+- **The danger is your out-of-band bilateral release, not the protocol.** The sharp fact: **transaction-code
+  expiry does NOT invalidate an already-cast commit signature.** TallyNet verifies a commit against its
+  cryptographic preimage, not against the clock; expiry only stops a node *casting new* votes. So a valid
+  commit majority signed *before* expiry can still settle the lift to **commit** after the deadline has
+  passed. Therefore a post-expiry bilateral release can **not** be assumed final.
+
+- **Rule: treat a bilateral post-expiry release as a local capacity reclaim with a compensation obligation,
+  not as a protocol void.** A later genuine commit is authoritative; if one arrives after the parties released,
+  they must reconcile with a correcting/compensating lift (ChipNet § Lying referees remedy), never leave the
+  route half-settled. Do not let the release assert "this lift voided" in a way a late commit could contradict
+  into a split.
+
+- **Only bilateral, only well past the deadline.** The release needs the *counterparty's* co-signature (never
+  unilateral) and must wait until the transaction code's embedded expiry plus a margin exceeding the maximum
+  plausible clock skew — so it can never fire while an honest node might still be legitimately casting or
+  propagating votes.
+
 ## Not urgent
 
 Nothing in the initial lift-chit schema is incorrect without this — a well-chosen, reachable referee never

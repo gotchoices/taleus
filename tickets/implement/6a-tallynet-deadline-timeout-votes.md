@@ -1,0 +1,202 @@
+description: Give a lift a clock, so one that promised fully but then stalled waiting on its overseers reaches a decision by itself instead of leaving everyone's reserved credit tied up forever.
+prereq: tallynet-record-availability
+files: packages/tallynet/src/consensus/participant.ts, packages/tallynet/src/consensus/engine.ts, packages/tallynet/src/consensus/participant.test.ts, packages/tallynet/src/testing/consensus.test.ts, packages/tallynet/src/trace.ts, packages/tallynet/src/discovery/types.ts, packages/tallynet/src/consensus/mint.ts, packages/tallynet/docs/design.md, packages/tallynet/docs/STATUS.md
+difficulty: hard
+----
+
+The first of the propagation-timeout work (split from the plan ticket `tallynet-propagation-timeouts`).
+Sibling tickets: `tallynet-stalled-recovery` (seq 6b, `prereq`s this) adds the periodic re-push/pull loop;
+`tallysim-timeout-scenarios` (seq 6c) drives and measures both in the simulator.
+
+Today TallyNet consensus has **no timer**. The state machine (`participant.ts`) advances only when a record
+is delivered (a push or a pull reply). A fully-promised lift whose voters never finish voting — a voter that
+stays silent, an even-split tie, a dropped commit push — sits in the `propagating` state forever, with every
+participant's promised credit held. This ticket gives the lift a deadline and the one in-protocol action a
+stalled lift can safely take on its own: **drive un-voted voters to vote void (`NC`) at the deadline**, so a
+voter majority (commit *or* void) is always eventually reached and resources release.
+
+Read first, in this package:
+- `docs/design.md` § Lift design principles (principle 3, "Promised means resolvable"), § Lift proposal and
+  settlement (the deadline bullet, "leave the seam"), § Protocol design (Consensus) — the `NOTE` at the
+  `propagating` branch of `getRecordState` names this exact injection point.
+- `src/consensus/participant.ts` — `getRecordState`, `advanceState`, `castCommit` (already votes `NC` when
+  `anyCodeExpired`), `castPromise`/`promiseDecision` (already signs `NP` when expired), `abort`.
+- `src/consensus/digest.ts` — a `C`/`NC` preimage **binds the complete promise set** (`pr`). This is the
+  fact that shapes the whole design (below).
+- `src/session-code.ts` — `expiresAt` / `isExpired`; the deadline already lives inside the transaction code.
+- `src/clock.ts` — the injected `Clock` (`now`/`setTimer`/`clearTimer`); consensus does not use it for timers
+  yet. The simulator's virtual clock drives `setTimer` deterministically.
+
+## The decisions this ticket builds (resolved in planning — write them into design.md)
+
+**1. The deadline is the transaction code's embedded expiry — a single lift-wide instant. No new field.**
+`transactionCode` already encodes a big-endian ms expiry (`session-code.ts`), already immutable, already
+bound into every edge nonce and every signature preimage. Adding a separate `deadline` record field would
+duplicate the source of truth and invite a mismatch. It becomes an **explicit proposal parameter** two ways,
+no redundant storage:
+- The originator *chooses* it: carry an optional `ttlMs?: number` on `UniQuery` (discovery) so every node
+  sees the intended lift window during the search, and have `proceed` mint the transaction code from
+  `args.ttlMs ?? args.query.ttlMs ?? DEFAULT_TTL`. A node may refuse a search whose window it judges too
+  short for its role through the existing `acceptsQuery` hook (it already receives the whole `query`; reading
+  `query.ttlMs` is host policy — **no protocol change, default accept**).
+- A node *judges* it before promising: `expiresAt(transactionCode)` is already on the `ResourceContext`
+  (`resource.ts`). Add a protocol-level pre-gate in `promiseDecision` — refuse (sign `NP`) when
+  `expiresAt(transactionCode) - now < MIN_PROMISE_MARGIN_MS` ("not enough time left to execute"). This is
+  protocol-enforced, not host policy, because the design makes the deadline one of the three things protocol
+  code enforces (verified signatures, the consensus method, the deadline).
+
+**2. One deadline, not per-phase.** Which action a node takes at the deadline is **structural, not
+temporal** — it is decided by what the node has already signed, so one instant suffices:
+- an un-voted **voter** in the commit phase (promise phase complete) → votes `NC`;
+- an un-promised **participant** → signs `NP` (but see decision 4 — this rarely fires in practice).
+
+Tradeoff to document: a slow promise phase eats into the voters' commit window. The originator sizes `ttlMs`
+to cover both phases; a node that finds too little time left refuses to promise (the pre-gate above). Genuine
+per-phase deadlines are a possible future refinement — record as a one-line backlog note, not built here.
+
+**3. Void-on-timeout is a *voter* `NC`, commit-phase only.** A `C`/`NC` preimage binds the complete promise
+set (`digest.ts`, `pr`). An `NC` cast over an *incomplete* promise set binds a different preimage than one
+cast over the complete set, so pre-completion void votes would not aggregate. Therefore the deadline's
+void-on-timeout action is **only** available once `promisePhaseComplete(record)` — exactly where `castCommit`
+already binds the full set and `countVerifiedCommits` can count it. Pre-completion void is instead an `NP`
+(binds only the core, aggregates trivially; **any** `NP` ⇒ `rejected` everywhere).
+
+**4. In TallyNet's immediate-promise model, the pre-promise-void *timer* is a no-op — do not build one.**
+A TallyNet participant promises synchronously on first sight (`advanceState` loops `ourPromiseNeeded` →
+`castPromise` in the same `update`); it never lingers un-promised across time. So a participant that would
+`NP` at the deadline has already either signed `P` (and cannot `NP` — equivocation guard), signed `NP`
+synchronously (a refusing `shouldPromise`), or never received the record at all (no record ⇒ no timer ⇒
+nothing to fire). The originator's pre-promise void is `abort` (already built). **Conclusion: the deadline
+timer's one genuinely-new action is voter void-on-timeout (decision 3).** Do not add a PPV timer that can
+never fire; do keep the `anyCodeExpired` → `NP` path (it still fires when an *expired* record is first seen,
+e.g. a node waking from sleep past the deadline — covered by re-running `advanceState`, below).
+
+**5. No unilateral void from silence.** A node concludes `void` only on evidence it can show every peer: an
+`NP` (pre-completion) or an `NC` majority (post-completion). Timing out while *waiting* never by itself lets a
+node declare void — it stays `pending`. This keeps every void globally atomic: an `NP` means no valid commit
+can exist (a commit binds the complete promise set the `NP`-signer never completed), and an `NC` majority is
+mutually exclusive with a `C` majority (the strict-majority floor). The deadline timer therefore never forces
+a node to *settle* on its own; it only makes an un-voted **voter** cast its `NC`, which then aggregates by the
+normal majority rule.
+
+**6. Clock skew: trust only your own clock (v1).** A node arms its deadline timer from `expiresAt` versus its
+own `clock.now()`, fired at `expiresAt + SKEW_GRACE_MS` so a modestly-fast clock does not prematurely void a
+lift that still had time. Gross skew is a **liveness/fairness** risk only — a premature `NC` can tip a
+would-be commit to a void, but the void is still atomic (every node converges on it), never a split. The
+ChipNet rule "reject a peer's `NC` dated before the deadline" is **not implementable** without signed
+timestamps and is deferred — note it, build nothing. This mirrors the existing time-budget philosophy
+("nothing trusts peer-reported timing", design.md § Time budget).
+
+**7. Ring/star convergence is NOT adopted.** The plan ticket asked to decide. Decision: no. Push-to-all-
+reachable (both directions) + contact points + the pull (`fetchOutcome`) already give every cooperating
+member the outcome (principle 3, proven in the record-availability tests); the stalled-recovery loop (6b)
+subsumes ChipNet's "bounce back / route around / try the next ring node". A convergence node was a ChipNet
+performance-and-ring-timeout coupling TallyNet does not use. Record this decision in design.md so it is not
+re-litigated.
+
+## The mechanism (what to build)
+
+**A per-transaction timer registry on `TrxParticipant`.** Consensus holds no timers today; add a small
+in-memory `Map<transactionCode, TimerHandle>` plus `arm`/`clear` helpers over the injected `Clock`. Design it
+loop-ready: a single `scheduleDeadlineTick(record)` that 6b will reuse for its periodic re-arm (name the seam
+in a comment so 6b slots in without rewriting). Timers are in-memory only — see the restart note below.
+
+**Arm on adopting a non-terminal record.** At the end of `update` (after push), if we are a member and the
+record is **not** terminal (`outcome` is `pending`) and not already released, arm (or leave armed) a one-shot
+timer for `max(0, expiresAt(transactionCode) + SKEW_GRACE_MS - clock.now())` ms. If the record is already
+terminal, clear any timer. Idempotent: re-arming for a code that already has a live timer leaves the existing
+one (do not stack timers per delivery).
+
+**The tick.** On fire, call a new `onDeadline(transactionCode)`: reload the stored record; if released or no
+longer a member, clear and return; otherwise run the same advance loop `update` runs
+(`while (await advanceState(record)) {}`) and then `push(record)`. Because the code is now expired,
+`advanceState`'s existing paths do the work: an un-voted voter hits `ourCommitNeeded` → `castCommit` →
+`anyCodeExpired` → `NC`; an un-promised-but-holding-the-record participant (the wake-from-sleep case) hits
+`ourPromiseNeeded` → `castPromise` → `NP`. A node with nothing to do (promised participant waiting, or a voter
+that already voted) signs nothing and stays `pending` — correct. The one-shot timer does **not** re-arm here;
+periodic retry is 6b's job. Clear the registry entry on a terminal outcome.
+
+**Deadline-aware classification.** `getRecordState`'s commit-phase branch currently returns `propagating`
+when a voter has voted and is waiting, or `ourCommitNeeded` when it has not. That is already correct — the tick
+simply re-invokes it after expiry so `ourCommitNeeded` resolves to an `NC`. Confirm no change is needed beyond
+re-running the loop; update the `NOTE` at that branch to point at the now-built mechanism.
+
+**Trace.** Add a `deadline-reached` trace event (`transactionCode`, and whether we acted) so the simulator and
+viewer can show the timeout firing; `voter-vote`/`promise-signed` already carry the resulting `NC`/`NP` face,
+so no new field is needed for the vote itself.
+
+**Restart note (seam, not built).** The timer map is in-memory; a restart loses armed timers, as discovery
+loses in-flight requests. A host re-arms by calling `update` (or a thin `resumeTimers()` sweep) over its
+non-terminal stored records on startup. Document it; the in-memory harness and simulator never restart
+mid-lift, so no code is needed here beyond the note.
+
+## Edge cases & interactions
+
+- **Voter already voted `C`, deadline passes.** `weHaveSigned(record.commits)` is true → `getRecordState`
+  returns `propagating`, not `ourCommitNeeded` → no `NC`. Must NOT equivocate. Assert.
+- **Promise phase incomplete at the deadline, we hold `P`.** State is `promising`; the tick signs nothing (we
+  cannot `NP` over our own `P`, and no voter may `NC` pre-completion). We stay `pending` and rely on 6b's
+  recovery. Assert the tick is a safe no-op here and does not throw.
+- **Even-split tie (2 voters, 1 C / 1 NC) reached before the deadline.** Already `propagating` with both
+  voters having voted. The deadline fires, both `weHaveSigned`, no new vote → stays `pending`. A genuine tie
+  does **not** resolve in-band in v1 (no third voter to break it); document that a tie needs either a 3rd
+  voter or the recovery loop surfacing a vote the node had not yet seen. This is the honest limit of a
+  2-voter set with a 1/2 threshold.
+- **`NC` majority vs a late `C` that arrives after settlement.** Once an `NC` majority settles `rejected`,
+  `releaseOnce(false)` runs and the release flag latches; a later `C` is merged but cannot flip a released
+  transaction (idempotent release). Mutual exclusivity (strict-majority floor) guarantees the late `C` can
+  never itself have reached a `C` majority. Assert commit/void stay mutually exclusive across the timeout.
+- **Threshold above 1/2 (the no-settle band).** With `thresholdNum/thresholdDen > 1/2`, a strict majority
+  that does not reach the threshold is neither commit nor void; at the deadline un-voted voters vote `NC`,
+  pushing toward the void side. If even full `NC` participation cannot reach the threshold on *either* side
+  (e.g. a pathological method), the lift stays `pending` — document that the originator owns choosing a
+  reachable method. Test a `2/3`-on-3 lift where one voter is silent: the deadline drives the 3rd... (there is
+  no 3rd; with 3 voters and 1 silent, 2 vote — pick the case that actually settles and the case that cannot,
+  and assert each).
+- **Expired transaction code at *first sight* (wake-from-sleep / a very late push).** `validateAndMerge`'s
+  new-record rules reject an already-expired `transactionCode` (`isValid` fails) — so a brand-new record that
+  is already expired is refused at validation, not adopted, and no timer is armed. A record we **already
+  hold** that expires while we hold it is the timer's job. Keep these two paths distinct and test both.
+- **`SKEW_GRACE_MS` vs `MIN_PROMISE_MARGIN_MS`.** The promise pre-gate refuses when too little time remains;
+  the void timer fires a grace past expiry. Choose constants so a node that *did* promise still has margin to
+  vote before its own void timer fires (`MIN_PROMISE_MARGIN_MS` comfortably larger than `SKEW_GRACE_MS`).
+  Document the relationship; make both exported constants.
+- **Timer cleared on terminal + on `abort`.** `abort`, `releaseOnce`, and a terminal `onDeadline` must all
+  clear the registry entry so a settled lift arms nothing. No leaked timers (the `no-node-globals` discipline
+  and the virtual clock both assume all timers go through `Clock` and are cleared).
+- **`proceed` honoring `query.ttlMs`.** A circular lift reuses the query's session code; confirm the
+  transaction-code TTL is independent of the session-code expiry and that `proceed` picks
+  `args.ttlMs ?? query.ttlMs ?? DEFAULT_TTL`. Guard against a `ttlMs` that would mint a code already beyond
+  the session-code `DEFAULT_MAX_TTL_MS` ceiling (refuse or clamp — pick and document).
+- **Determinism.** All timing through the injected `Clock`; no `Date.now`/`setTimeout`. `no-node-globals.test`
+  must stay green. Two runs under the same seed + virtual clock settle identically.
+
+## TODO
+
+- Add `ttlMs?: number` to `UniQuery` (`discovery/types.ts`); thread it through `proceed`
+  (`args.ttlMs ?? query.ttlMs ?? DEFAULT_TTL`) and confirm `mintRecord` needs no change (it folds topology,
+  not timing). Non-breaking (optional field).
+- Add `MIN_PROMISE_MARGIN_MS` and `SKEW_GRACE_MS` exported constants; add the "enough time left" pre-gate to
+  `promiseDecision` (refuse → `NP` when the window is too short), beside the existing `anyCodeExpired` check.
+- Add the per-transaction timer registry (`Map<string, TimerHandle>`) + `armDeadline`/`clearDeadline`/
+  `scheduleDeadlineTick` helpers over the injected `Clock`; make the arm point loop-ready for 6b (comment the
+  seam).
+- Arm at the end of `update` for a non-terminal record; clear on terminal / `abort` / `releaseOnce`.
+- Add `onDeadline(transactionCode)`: reload, no-op-and-clear if terminal/not-a-member, else run the advance
+  loop + `push`, then clear if now terminal. The expired-code paths already produce `NC`/`NP`.
+- Add the `deadline-reached` trace event to `trace.ts`; emit it from `onDeadline`.
+- Update the `NOTE` at the `propagating` branch of `getRecordState` to reference the built mechanism (no
+  behavioural change there).
+- Unit tests (`participant.test.ts`): deadline drives an un-voted voter to `NC`; a voted voter stays put; a
+  promised-and-waiting participant no-ops; the promise pre-gate refuses a too-short window; timers are cleared
+  on settle/abort and never leak; `onDeadline` on a terminal/released/unknown code is a safe no-op.
+- End-to-end tests (`testing/consensus.test.ts`): a lift with one silent voter in a multi-voter set reaches a
+  void (or commit) by the deadline and every node converges and releases; a dropped commit push that leaves a
+  lift `propagating` resolves once the deadline fires on the holders; confirm commit/void stay mutually
+  exclusive and atomic across the timeout; a 2-voter tie stays `pending` (documented limit).
+- Update `docs/design.md`: record decisions 1–7 in § Lift proposal and settlement / § Protocol design
+  (Consensus) (replace the "leave the seam" language), add the ring/star-not-adopted decision, and move
+  "pre-promise void on timeout; void-on-timeout" out of the § The commit attachment seam "Not in v1" list
+  into built state. Add the one-line per-phase-deadline future note. Update `docs/STATUS.md` (step 5 / the
+  built list).
+- Run `yarn workspace tallynet build && yarn workspace tallynet lint && yarn workspace tallynet test 2>&1 | tee /tmp/tallynet-6a.log` (streamed).
