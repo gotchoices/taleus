@@ -285,3 +285,24 @@ export function drawPaymentQueries(workload: WorkloadSpec, entityCount: number, 
 	}
 	return queries
 }
+
+/**
+ * Draw a workload's **circular** (clearing) queries: `workload.queries` draws of a single origin then an
+ * amount (origin-then-amount, mirroring {@link drawPaymentQueries}'s pair-then-amount draw order), each at
+ * `workload.depth`. Each returned {@link QuerySpec} has `from === to === origin` — the payment-pair draw
+ * cannot express a single origin (it re-draws until the pair is distinct), so a circular run needs this
+ * own draw. Empty for `entityCount < 2` (no cycle is possible). The **caller owns the rng seeding** — pass a
+ * {@link SeededRandom} seeded on the workload stream, exactly as the linear draw expects.
+ */
+export function drawCircularOrigins(workload: WorkloadSpec, entityCount: number, rng: SeededRandom): QuerySpec[] {
+	if (entityCount < 2) {
+		return []
+	}
+	const queries: QuerySpec[] = []
+	for (let i = 0; i < workload.queries; i++) {
+		const origin = rng.nextInt(entityCount)
+		const amount = drawAmount(workload.amount, rng)
+		queries.push({ from: origin, to: origin, amount, depth: workload.depth })
+	}
+	return queries
+}

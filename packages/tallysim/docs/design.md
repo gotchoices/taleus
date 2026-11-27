@@ -800,12 +800,90 @@ So a sleeping/dropped **target** yields a found-but-stalled lift on a single bui
 **relay** severs the route back in discovery (no route found, no lift at all). Either way the dark node costs
 a payment, but it reaches the metrics by a different path — a missing `found` versus a `pending`.
 
-**v1 has no recovery — a stalled push is a dead lift.** The v1 commit engine has **no propagation timeout**:
-a dropped push on a needed edge stalls the whole lift indefinitely (the `VirtualClock` simply runs out of
-timers and the outcome stays `pending`). The more forgiving behaviour — *a refuser or a dead edge takes only
-itself out of the running, and the lift re-routes, or a voter times the stall out and voids it cleanly* — is
-**phase-2** work, explicitly out of v1. Until it lands, read every `pending` as "a needed message was lost and
-nothing timed it out." That timeout/retry design is tracked in `tallynet-propagation-timeouts`.
+**Pull recovery softens the stall, but a dark edge can still strand a line.** The v1 commit engine still has
+**no propagation timeout** — a node never *itself* re-sends or times out a lost push — but the simulator now
+drives a **pull pass** after the initial settle (see the § *Voter model* record-availability curve below): a
+member an interior non-relayer cut off from the commit push pulls the settled evidence from a reachable
+contact point or link-neighbour, so a stranded member can recover rather than staying dead. Where a pull has
+somewhere to reach — a published contact point, or a ring that delivers both ways — the lift completes for
+every cooperating member. Where it does not — a straight line with no contact points, whose stranded members'
+only peers are the non-relayer and each other — the completion cliff remains: those members stay `pending`
+even though the originator committed and the money moved. A *dropped-link* stall (the sleeping/dropped-target
+asymmetry above) is harder still: with no settled record anywhere to pull, the lift settles nowhere
+(`pending`, reason `stalled`). The self-timing-out, re-routing behaviour that would close these gaps at the
+protocol level is **phase-2** work, tracked in `tallynet-propagation-timeouts`; until it lands, read a
+`pending` as "a needed message was lost and no pull could reach the evidence."
+
+### Voter model
+
+Beyond the two failure dials above, the consensus tier models **who votes on a lift and how a payer reacts to
+the voter set it is offered**. There are no global rules — every dimension is a per-lift proposal parameter a
+node accepts or refuses — and each dimension is a `ConsensusSpec` knob (all JSON-serialisable, so a scenario
+round-trips through a trace header).
+
+- **Voter nomination (`voterNomination`).** `self` (the implicit default) is a **voter set of one**: the
+  originator votes its own leg and no extra wiring is needed. `well-known` nominates the single most-recognised
+  off-route hub as a shared trusted voter the whole route folds in as a `[V]` referee. A **known limitation**:
+  the discovery layer folds a nominee as a *separate* voter-only member and only de-duplicates against members
+  already on the plan, so nominating a node that is **itself on the money path** does not upgrade it to
+  `[P, V]` — its referee vote is silently dropped (`well-known` picks a high-degree hub that is frequently
+  on-path). The clean fix — marking on-path participants `[P, V]` directly rather than routing on-path votes
+  through referee nomination — is `backlog/debt-voter-nomination-on-path-composition`; the model here works
+  **within that gap**, which is why it is exercised only with off-route hubs.
+
+- **Well-known is a graph property, not a flag (`wellKnownFraction`).** There is no "well-known" field in the
+  `Network` model and we do not add one — a flag would ripple through serialisation and perturb the pinned,
+  byte-identical discovery sweep. Instead the well-known set is **measured from the graph**: the top
+  `round(fraction · entityCount)` entities by degree (`wellKnownEntities`, ties → lower id), on the premise
+  that the highest-degree hubs are the nodes the rest of the network most recognises. This is the deliberate
+  departure from the original `5.5` sketch, which imagined an explicit marking; measuring from degree keeps
+  the model untouched and fully deterministic. The voter-aware plan scorer uses the same set to tell a trusted
+  voter from an obscure one.
+
+- **Contact points and the completion curve (principle 3).** A lift can publish a `physical` contact point on
+  its originator and voters (`consensus.contactPoints`); a member an interior non-relayer cut off from the
+  commit push then pulls the settled record from one of them. The **non-relayer** completion curve
+  (`consensus.nonRelayerFraction`, the swept x-axis; `cooperatingCompletion` the y-axis — see the sibling core
+  ticket's metric) measures how many of the members *allowed* to reach commit actually did. With contact
+  points, or on a ring that delivers both ways around an interior non-relayer, completion holds at 1.0; a
+  straight line with no contact point shows the cliff (its stranded members have no path to the evidence).
+
+- **Non-relayer vs refuser — two different failures.** A **refuser** signs `NP` on a route it sits on, so the
+  whole lift voids (`refused-promise`). A **non-relayer** promises normally but then drops every commit-phase
+  record it would forward and serves no pulls — it does not void the lift, it *strands* the members behind it,
+  which the completion curve measures. The two are injected on independent fractions.
+
+- **Explicit pull (no auto-timeout yet).** v1 has no propagation-timeout loop, so the **simulator itself**
+  triggers the recovery pulls after the initial settle; a real node timing out and pulling on its own is
+  deferred to `tallynet-propagation-timeouts`.
+
+- **Circular routes as the clearing-discovery stand-in (`routeShape: 'circular'`).** Real clearing discovery —
+  a node *finding* a cycle back to itself over the decentralised protocol — is deferred
+  (`feat-tallysim-clearing-discovery`). Until it lands, a circular run draws a single origin per query
+  (`drawCircularOrigins`), mints a real session code with a self-query, and builds the shortest simple cycle
+  through the origin **straight from the graph** the simulator already holds (`buildCircularOutcome`). This
+  exercises the circular consensus path — notably "a ring routes around a non-relayer with no contact points at
+  all" — without waiting on the discovery work.
+
+- **Stacked-voter refusal, measured at the discovery layer (`stackedVoters`).** A padding node can staple
+  obscure referees — voter-only members the payer does not recognise — onto a plan's voter set; a payer that
+  vets voter sets **refuses** such a padded quorum. This refusal is measured at the **discovery scorer**, not
+  the promise-time `acceptsProposal` gate, for a structural reason: in this tier the nominated/stapled referees
+  reach the *discovery* layer only — they are built from the route + voters and never land in the lift record's
+  members (the same composition gap the nomination limitation above names). So the promise-time gate would
+  never see them. Instead the originator's plan scorer drops any stacked plan (`-Infinity`, which the
+  originator's ranking filters out) and counts it into `planRefusalCount`. The voter-aware *reordering* of lean
+  vs. padded plans is a ranking, not a refusal, and is intentionally **not** counted.
+
+- **Consensus method / threshold override (`consensusMethod`).** Every lift settles under a `ConsensusMethod`
+  (vote weighting + win threshold), defaulting to `tallynet`'s plain strict-majority `1/2`. Raising it (e.g.
+  `2/3`) can leave a split voter set settling **nowhere** (`pending`) where a `1/2` lift would have committed —
+  the winning side must clear both the strict-majority floor *and* the raised fraction of total vote weight.
+
+- **New metrics / CSV columns.** The stacked-voter dimension adds `planRefusalCount` and `planRefusalShare`
+  (`= planRefusalCount / queryCount`, 0 when no queries) to `ConsensusRunMetrics`, emitted as the last two CSV
+  columns (after `pullMessagesPerLift.*`). They count **discovery-time** plan refusals, distinct from voided
+  lifts.
 
 ### Consensus metrics
 
@@ -970,6 +1048,10 @@ balance move against a throwaway `cloneNetwork` copy, leaving the recorded netwo
 initial graph — it deliberately does **not** model capacity depletion, unlike the consensus *metrics* sweep
 (§ Consensus simulation), which rebuilds per query and mutates one kept network. The two are each internally
 deterministic and need not agree, exactly as the discovery trace already seeds differently from the sweep.
+The trace CLI drives only the **linear** route shape — it always `drawPaymentQueries`; `routeShape: 'circular'`
+is a **sweep-only** feature this tier (the trace still threads the stacked/nomination/method wiring through
+`consensusConfigFor`, so a linear consensus trace replays its discovery identically). Driving circular route
+shape through the trace recorder is deferred alongside real clearing discovery (`feat-tallysim-clearing-discovery`).
 
 A **late answer** (`late-answer-folded`) appears in the stream at its own clock time with its round, so a
 reader sees it folded into a later round — not dropped, not duplicated. An **empty run** (a query that finds

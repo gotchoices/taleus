@@ -16,16 +16,27 @@
  *   (`stalled`). A sleeping node also cuts the line, so straddling queries just don't route (no lift).
  */
 
+import { SeededRandom } from 'tallynet/testing'
 import { FORMAT_VERSION, type Network, type Tally } from '../model.js'
 import type { ConsensusSpec, SimScenario, SimSweepSpec } from '../scenario.js'
 import { compileConsensusConditions } from './conditions.js'
 import { runConsensusSweepToArray } from './consensus-runner.js'
+import { drawCircularOrigins } from './harness.js'
 
 /** A line `0 - 1 - … - (n-1)`, one tally per consecutive pair, with finite symmetric credit limits. */
 function line(n: number, limit = 1000): Network {
 	const tallies: Tally[] = []
 	for (let i = 0; i + 1 < n; i++) {
 		tallies.push({ stock: i, foil: i + 1, balance: 0, stockCreditLimit: limit, foilCreditLimit: limit })
+	}
+	return { entityCount: n, tallies, meta: { generator: 'test', params: {}, seed: 0, formatVersion: FORMAT_VERSION } }
+}
+
+/** A ring `0 - 1 - … - (n-1) - 0`: tally `i` joins `i` to `(i + 1) mod n`, so every node has degree 2. */
+function ring(n: number, limit = 1000): Network {
+	const tallies: Tally[] = []
+	for (let i = 0; i < n; i++) {
+		tallies.push({ stock: i, foil: (i + 1) % n, balance: 0, stockCreditLimit: limit, foilCreditLimit: limit })
 	}
 	return { entityCount: n, tallies, meta: { generator: 'test', params: {}, seed: 0, formatVersion: FORMAT_VERSION } }
 }
@@ -158,6 +169,67 @@ describe('runConsensusSweep — principle 3 completion curve (linear route)', ()
 	})
 })
 
+describe('runConsensusSweep — circular route (no completion cliff around a non-relayer)', () => {
+	// A ring routes around an interior non-relayer by pushing BOTH ways from the origin, so completion holds at
+	// 1.0 even with NO contact points — the hard case a straight line cannot do (voter-harness.test § record
+	// availability). The seeds are tuned so the single non-relayer the 1/RING cell selects is NEVER a drawn
+	// origin: a non-relayer that is itself the sole-voter originator serves no pushes/pulls and would strand its
+	// own ring, which is outside the "a ring routes around an INTERIOR non-relayer" claim. The disjointness is
+	// re-derived in-test (below) so the pinned seed is visible, mirroring the linear curve's node-3 re-derivation.
+	const RING = 6
+	const RUN_SEED = 1
+
+	it('a ring commits every cooperating member with no contact points while ≤ 1 node is a non-relayer', async () => {
+		const consensus: ConsensusSpec = { routeShape: 'circular', nonRelayerFraction: 1 / RING, contactPoints: false, identitySeed: 7 }
+		const base: SimScenario = {
+			network: { materialized: ring(RING) },
+			// workload.seed 20: its 12 drawn origins are {1,2,4,5} — node 3 (the sole non-relayer the 1/RING cell
+			// selects at consensusSeed 0 + runSeed 1) is never an origin, so every lift strands it as an interior
+			// node the ring routes around. Pinned + re-derived below; adjust the seed if the compiler's pick moves.
+			workload: { kind: 'payment', queries: 12, amount: { dist: 'constant', params: { value: 5 } }, depth: RING, seed: 20 },
+			consensus,
+			consensusSeed: 0,
+		}
+		// Re-derive the pinned disjointness: the non-relayer the 1/RING cell selects must not be a drawn origin.
+		const nonRelayers = compileConsensusConditions(ring(RING), consensus, (base.consensusSeed ?? 0) + RUN_SEED).nonRelayers
+		const origins = new Set(drawCircularOrigins(base.workload, RING, new SeededRandom(base.workload.seed + RUN_SEED)).map((q) => q.from))
+		for (const nr of nonRelayers) {
+			expect(origins.has(nr)).toBe(false) // the non-relayer is never a sole-voter originator in this workload
+		}
+
+		// Sweep the non-relayer fraction over {0, 1/RING}: both cells keep completion at 1.0 — at 0 trivially, at
+		// 1/RING because the ring's two-way push reaches every cooperating member without crossing the non-relayer.
+		const spec: SimSweepSpec = { base, vary: [{ path: 'consensus.nonRelayerFraction', values: [0, 1 / RING] }], seeds: [RUN_SEED] }
+		const records = await runConsensusSweepToArray(spec)
+		expect(records).toHaveLength(2)
+		for (const r of records) {
+			expect(r.metrics.liftCount).toBeGreaterThanOrEqual(1) // circular origins all lie on the ring ⇒ real lifts
+			expect(r.metrics.cooperatingCompletion).toBe(1) // no cliff — the ring routed around the non-relayer
+		}
+		expect(records[1].metrics.recoveredTotal).toBe(0) // the two-way push delivered directly; nobody needed a pull
+	})
+})
+
+describe('runConsensusSweep — stacked voter sets are refused at discovery', () => {
+	it('every line route is stapled with obscure referees, dropped by the scorer ⇒ refusals, no lifts', async () => {
+		// `stackedVoters: 2` staples two obscure (non-well-known) referees onto every plan an even-id node folds
+		// into; every line route spans an even node, so every route is stacked and the counting scorer drops it
+		// (returns -Infinity, which the originator filters out) — leaving no plan to lift. Each drop is counted.
+		const base: SimScenario = {
+			network: { materialized: line(5) },
+			workload: { kind: 'payment', queries: 12, amount: { dist: 'constant', params: { value: 5 } }, depth: 5, seed: 200 },
+			consensus: { stackedVoters: 2, identitySeed: 7 },
+			consensusSeed: 0,
+		}
+		const records = await runConsensusSweepToArray(specFor(base, 1))
+		const m = records[0].metrics
+		expect(m.planRefusalCount).toBeGreaterThan(0) // the scorer dropped stacked plans
+		expect(m.planRefusalShare).toBeGreaterThan(0)
+		expect(m.liftCount).toBe(0) // every route's only plan was refused ⇒ no lift ever formed
+		expect(m.commitCount).toBe(0)
+	})
+})
+
 describe('runConsensusSweep — determinism', () => {
 	it('replays byte-for-byte: two runs of the same spec yield identical records', async () => {
 		const base: SimScenario = {
@@ -176,6 +248,28 @@ describe('runConsensusSweep — determinism', () => {
 			network: { materialized: line(6) },
 			workload: { kind: 'payment', queries: 12, amount: { dist: 'constant', params: { value: 5 } }, depth: 6, seed: 200 },
 			consensus: { nonRelayerFraction: 1 / 6, silentAfterPromiseFraction: 1 / 6, contactPoints: true, identitySeed: 7 },
+			consensusSeed: 0,
+		}
+		const a = await runConsensusSweepToArray(specFor(base, 1))
+		const b = await runConsensusSweepToArray(specFor(base, 1))
+		expect(a).toEqual(b)
+	})
+
+	it('replays byte-for-byte with circular route + well-known nomination + stacked voters + a raised threshold', async () => {
+		// Exercises every voter-model knob at once — including `cloneConsensus`'s deep-clone of `consensusMethod`
+		// and the circular dummy-discovery-to-self (whose empty plans make nomination/stacked no-ops here). The
+		// point is byte-stability of the whole wiring, not the behaviour of any one knob.
+		const base: SimScenario = {
+			network: { materialized: ring(6) },
+			workload: { kind: 'payment', queries: 12, amount: { dist: 'constant', params: { value: 5 } }, depth: 6, seed: 200 },
+			consensus: {
+				routeShape: 'circular',
+				voterNomination: 'well-known',
+				wellKnownFraction: 0.3,
+				stackedVoters: 2,
+				consensusMethod: { weighting: 'distinct-voter', thresholdNum: 2, thresholdDen: 3 },
+				identitySeed: 7,
+			},
 			consensusSeed: 0,
 		}
 		const a = await runConsensusSweepToArray(specFor(base, 1))

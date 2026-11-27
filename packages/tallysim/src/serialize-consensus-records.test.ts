@@ -31,6 +31,8 @@ const metrics: ConsensusRunMetrics = {
 	cooperatingCompletion: 18 / 20,
 	pullMessagesPerLift: dist(8, 2),
 	recoveredTotal: 3,
+	planRefusalCount: 4,
+	planRefusalShare: 4 / 10,
 }
 
 const record: ConsensusRunRecord = {
@@ -118,14 +120,19 @@ describe('CSV summary', () => {
 		for (const suffix of ['count', 'mean', 'min', 'max', 'p50', 'p90', 'p99']) {
 			expect(header).toContain(`pullMessagesPerLift.${suffix}`)
 		}
-		// Canonical order: the void-reason tally, then the completion scalars, then the pull distribution.
+		// Canonical order: the void-reason tally, then the completion scalars, the pull distribution, and finally
+		// the plan-refusal scalars (last of the metric columns).
 		expect(header.indexOf('voidReasons.expired')).toBeLessThan(header.indexOf('cooperatingMemberTotal'))
 		expect(header.indexOf('cooperatingMemberTotal')).toBeLessThan(header.indexOf('recoveredTotal'))
 		expect(header.indexOf('recoveredTotal')).toBeLessThan(header.indexOf('pullMessagesPerLift.count'))
+		expect(header.indexOf('pullMessagesPerLift.p99')).toBeLessThan(header.indexOf('planRefusalCount'))
+		expect(header.indexOf('planRefusalCount')).toBeLessThan(header.indexOf('planRefusalShare'))
 		expect(rows[0]['cooperatingMemberTotal']).toBe('20')
 		expect(rows[0]['cooperatingCompletion']).toBe(String(18 / 20))
 		expect(rows[0]['recoveredTotal']).toBe('3')
 		expect(rows[0]['pullMessagesPerLift.mean']).toBe('2')
+		expect(rows[0]['planRefusalCount']).toBe('4')
+		expect(rows[0]['planRefusalShare']).toBe(String(4 / 10))
 	})
 
 	it('expands the nested voidReasons tally into voidReasons.<reason> columns', () => {

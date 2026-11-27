@@ -12,6 +12,7 @@
  * The default is {@link noOpEconomyStep}. See `docs/design.md` § Runner / experiments.
  */
 
+import type { ConsensusMethod } from 'tallynet'
 import type { SeededRandom } from 'tallynet/testing'
 import type { CapacityDistribution } from './distributions.js'
 import type { Network } from './model.js'
@@ -77,6 +78,13 @@ export interface ScenarioSpec {
 export const DEFAULT_CONSENSUS_IDENTITY_SEED = 1
 
 /**
+ * How a run's lifts are routed. `linear` (the default) draws distinct `(from, to)` payment pairs and lifts
+ * the found line route; `circular` draws a single origin per query and lifts the shortest simple cycle back
+ * to it (the clearing-discovery stand-in — see `buildCircularOutcome`). JSON-serialisable.
+ */
+export type RouteShape = 'linear' | 'circular'
+
+/**
  * Consensus-phase failure injection + identity for a {@link SimScenario}. Its **presence** on a scenario is
  * the "run consensus" switch (omitted ⇒ discovery-only, consensus not driven); the runner and the trace
  * both key off that. The refuser selection is drawn from the dedicated {@link SimScenario.consensusSeed}
@@ -120,6 +128,37 @@ export interface ConsensusSpec {
 	 * {@link DEFAULT_CONSENSUS_IDENTITY_SEED}. Same seed ⇒ same keys across runs.
 	 */
 	identitySeed?: number
+	/**
+	 * How this run's lifts are routed (see {@link RouteShape}). `'linear'` (default) lifts distinct-pair line
+	 * routes; `'circular'` lifts the shortest simple cycle through a single drawn origin — the
+	 * clearing-discovery stand-in, exercising "a ring routes around a non-relayer". JSON-serialisable.
+	 */
+	routeShape?: RouteShape
+	/**
+	 * Who each participant nominates as a voter-set referee. `'self'` (the implicit default when omitted) is a
+	 * voter-set-of-one: the originator votes its own leg, needing no extra wiring. `'well-known'` nominates the
+	 * single most-recognised off-route hub (highest degree among the well-known set) as a shared trusted voter.
+	 * Omitted ⇒ `'self'` behaviour.
+	 */
+	voterNomination?: 'self' | 'well-known'
+	/**
+	 * Fraction of entities treated as **well-known** (highest-degree hubs; see `wellKnownEntities`), used by
+	 * `voterNomination: 'well-known'` and the voter-aware plan scorer. Well-known-ness is **measured from the
+	 * graph**, not a model flag, so this knob only sizes the top-degree set. Omitted ⇒ `0` (nobody well-known).
+	 */
+	wellKnownFraction?: number
+	/**
+	 * How many obscure referees a padding node staples onto every plan it folds into (the stacked-voter
+	 * attack model). `> 0` turns on a discovery-time scorer that **refuses** (drops) any plan carrying such a
+	 * stacked voter set, counting each refusal into `planRefusalCount`. Omitted / 0 ⇒ no padding, no refusals.
+	 */
+	stackedVoters?: number
+	/**
+	 * The consensus method (vote weighting + win threshold) every lift settles under. Omitted ⇒ `tallynet`'s
+	 * {@link ConsensusMethod} default (`distinct-voter` weighting at a plain strict-majority `1/2` threshold).
+	 * Raising the threshold (e.g. `2/3`) makes a split voter set settle nowhere (`pending`) rather than commit.
+	 */
+	consensusMethod?: ConsensusMethod
 }
 
 /**

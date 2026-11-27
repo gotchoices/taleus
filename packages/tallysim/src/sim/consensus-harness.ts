@@ -30,7 +30,7 @@
  *   propagation-timeout loop, so the simulator triggers these pulls itself.
  */
 
-import { MemberTypes, type MemberType, type TrxRecord } from 'tallynet'
+import { MemberTypes, type ConsensusMethod, type MemberType, type TrxRecord } from 'tallynet'
 import type { LiftMemberSpec } from 'tallynet/testing'
 import { applyLiftToBalance } from '../capacity.js'
 import type { Network } from '../model.js'
@@ -88,6 +88,12 @@ export interface RunLiftOptions {
 	nonCooperating?: number[]
 	/** The well-known entity set for the `voter-aware` policy (passed to {@link selectPlan}). Default: none. */
 	wellKnown?: Set<number>
+	/**
+	 * The {@link ConsensusMethod} this lift settles under, threaded onto `buildLift`. Omitted ⇒ `buildLift`'s
+	 * own default (`DEFAULT_CONSENSUS_METHOD`, a plain strict-majority `1/2`), byte-identical to not passing it.
+	 * A raised threshold (e.g. `2/3`) can leave a split voter set settling nowhere (`pending`).
+	 */
+	consensusMethod?: ConsensusMethod
 }
 
 /**
@@ -128,6 +134,8 @@ export async function runLiftForOutcome(
 		sessionCode: outcome.sessionCode,
 		// A STRING amount: DAG-CBOR rejects a bigint/number caveat on the payload; a string round-trips cleanly.
 		payload: { amount: String(q.amount) },
+		// Omitted ⇒ buildLift's DEFAULT_CONSENSUS_METHOD (1/2); a raised threshold can leave a split set pending.
+		method: options?.consensusMethod,
 	})
 	sanitiseRecordIntents(record)
 

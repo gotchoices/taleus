@@ -127,6 +127,15 @@ export interface ConsensusRunMetrics {
 	pullMessagesPerLift: DistributionSummary
 	/** Σ `recovered` over all lifts — stranded-then-settled members across the run. */
 	recoveredTotal: number
+	/**
+	 * How many plans the originator's voter-aware scorer **refused** (dropped as `-Infinity`) for carrying a
+	 * stacked voter set, summed over the run. This counts **discovery-time** refusals — plans dropped before a
+	 * lift ever formed — not voided lifts. The voter-aware *reordering* is a ranking, not a refusal, and is
+	 * intentionally not counted here. 0 unless `consensus.stackedVoters > 0`. See the voter-model subsection.
+	 */
+	planRefusalCount: number
+	/** `planRefusalCount / queryCount`, or 0 when `queryCount === 0` (never NaN) — the refused-plan rate. */
+	planRefusalShare: number
 }
 
 /** The {@link TraceEvent} variants that carry a `transactionCode` — i.e. the consensus events. */
@@ -274,6 +283,7 @@ export function summarizeConsensusMetrics(
 	lifts: readonly ConsensusLiftMetrics[],
 	structural: StructuralMetrics,
 	queryCount: number,
+	planRefusalCount = 0,
 ): ConsensusRunMetrics {
 	let commitCount = 0
 	let voidCount = 0
@@ -335,5 +345,7 @@ export function summarizeConsensusMetrics(
 		cooperatingCompletion: cooperatingMemberTotal > 0 ? cooperatingCommittedTotal / cooperatingMemberTotal : 0,
 		pullMessagesPerLift: summarizeDistribution(pullMessages),
 		recoveredTotal,
+		planRefusalCount,
+		planRefusalShare: queryCount > 0 ? planRefusalCount / queryCount : 0,
 	}
 }

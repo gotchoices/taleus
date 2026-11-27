@@ -8,9 +8,10 @@
  * wiring that turns them on inside a real discovery + consensus run.
  */
 
-import { MemberTypes, type DependentMember, type DiscoveryHooks, type MemberType, type Plan } from 'tallynet'
+import { MemberTypes, type ConsensusMethod, type DependentMember, type DiscoveryHooks, type MemberType, type Plan, type TraceEvent } from 'tallynet'
 import { FORMAT_VERSION, type Network, type Tally, cloneNetwork, serialize } from '../model.js'
 import { runLiftForOutcome } from './consensus-harness.js'
+import { analyzeLift } from './consensus-metrics.js'
 import { makeSimResources, refuseStackedPlanHook, type StackedVoterPolicy } from './consensus-resource.js'
 import { buildSimNetwork, runQuery, type QuerySpec, type SimNetwork } from './harness.js'
 import { voterAwareScorePlan } from './plan-select.js'
@@ -161,6 +162,37 @@ describe('voter harness — a voter-set tie settles nowhere (a clean third outco
 		expect(network.tallies[0].balance).toBe(0) // nothing settled ⇒ no money moved
 		expect(sim.net.deliveryErrors).toEqual([])
 		expect(sim.net.clock.pendingTimers).toBe(0)
+	})
+})
+
+describe('voter harness — a raised consensus threshold leaves a split voter set pending', () => {
+	it('an all-voter line commits at 1/2 but settles nowhere at 2/3 when two of five vote no-commit', async () => {
+		// line(5): 0—1—2—3—4, all five are voters (W = 5); nodes 3 and 4 decline their commit vote (sign NC), so
+		// the commit side holds 3 votes. At 1/2, 3·2 = 6 > 5 ⇒ commit. At 2/3 the strict-majority floor still
+		// holds (6 > 5) but the raised bar does not: 3·3 = 9 ≥ 2·5 = 10 is false, and the void side (2 votes)
+		// clears neither floor (2·2 = 4 > 5 is false) — so neither side settles and the lift is `pending`.
+		const q: QuerySpec = { from: 0, to: 4, amount: 5, depth: 5 }
+		const method = (thresholdNum: number, thresholdDen: number): ConsensusMethod => ({ weighting: 'distinct-voter', thresholdNum, thresholdDen })
+
+		async function run(consensusMethod: ConsensusMethod) {
+			const network = line(5)
+			const events: TraceEvent[] = []
+			const { resourceFor } = makeSimResources({ 3: { shouldCommit: false }, 4: { shouldCommit: false } })
+			const sim = buildSimNetwork(network, {}, 0, (e) => events.push(e), undefined, { identitySeed: IDENTITY_SEED, resourceFor })
+			const outcome = await runQuery(sim, q)
+			const result = await runLiftForOutcome(sim, network, outcome, q, { voters: [0, 1, 2, 3, 4], consensusMethod })
+			expect(result).toBeDefined()
+			return { result: result!, metrics: analyzeLift(events, result!) }
+		}
+
+		const half = await run(method(1, 2))
+		expect(half.result.outcome).toBe('commit')
+
+		const twoThirds = await run(method(2, 3))
+		expect(twoThirds.result.outcome).toBe('pending') // the stricter threshold strands a 3-vs-2 split
+		// The stricter run is no cheaper in consensus messages (it carries the same promise/vote traffic and
+		// reaches no earlier short-circuit): its push count is at least the committing run's.
+		expect(twoThirds.metrics.messages).toBeGreaterThanOrEqual(half.metrics.messages)
 	})
 })
 
