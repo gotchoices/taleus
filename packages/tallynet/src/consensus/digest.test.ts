@@ -126,12 +126,12 @@ describe('recordDigest — payload and topology are covered', () => {
 	})
 })
 
-describe('recordDigest — the promise set (commit preimage only)', () => {
+describe('recordDigest — the promise set (commit face `C` only)', () => {
 	const record = sampleRecord()
 	const p1 = promise('alice', 'sigA')
 	const p2 = promise('bob', 'sigB')
 
-	it('C/NC over a promise set is invariant to the order the promises are given in', () => {
+	it('C over a promise set is invariant to the order the promises are given in', () => {
 		const forward = recordDigest('C', record, [p1, p2])
 		const reversed = recordDigest('C', record, [p2, p1])
 		expect(toHex(forward)).toBe(toHex(reversed))
@@ -149,10 +149,23 @@ describe('recordDigest — the promise set (commit preimage only)', () => {
 		expect(toHex(recordDigest('C', record, [plain]))).toBe(toHex(recordDigest('C', record, [withAttachment])))
 	})
 
-	it('P/NP omit the promise set entirely — the promises argument is ignored', () => {
+	it('P/NP/NC omit the promise set entirely — the promises argument is ignored', () => {
+		// A void (`NC`) binds only the immutable core (never the promise set), exactly like a promise face.
+		// This is what lets a deadline `NC` be cast — and verified — on an INCOMPLETE promise set.
 		expect(toHex(recordDigest('P', record, [p1]))).toBe(toHex(recordDigest('P', record, [])))
 		expect(toHex(recordDigest('P', record, [p1]))).toBe(toHex(recordDigest('P', record)))
 		expect(toHex(recordDigest('NP', record, [p1, p2]))).toBe(toHex(recordDigest('NP', record)))
+		expect(toHex(recordDigest('NC', record, [p1, p2]))).toBe(toHex(recordDigest('NC', record)))
+	})
+
+	it('an NC over different promise sets is byte-identical (a void binds the core alone)', () => {
+		// The defining property: whatever (even incomplete) promise set is passed, an NC hashes the same — so
+		// one `NC` face verifies with or without a complete set. Contrast the `C` case above, which differs.
+		const withBoth = recordDigest('NC', record, [p1, p2])
+		const withOne = recordDigest('NC', record, [p1])
+		const withNone = recordDigest('NC', record, [])
+		expect(toHex(withBoth)).toBe(toHex(withOne))
+		expect(toHex(withBoth)).toBe(toHex(withNone))
 	})
 })
 

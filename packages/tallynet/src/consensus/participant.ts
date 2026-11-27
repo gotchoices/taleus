@@ -533,14 +533,17 @@ export class TrxParticipant<TTerms, TPayload> {
 	 * **only verified** signatures, so the `changed`/`equivocation` dedupe can never be triggered by — nor
 	 * a genuine vote shadowed by — an unverified one (the forged-commit-shadows-vote fix):
 	 *
-	 * - Promise phase **complete** → verify now and, on success, promote into the authoritative set with
-	 *   the dedupe/equivocation check ({@link promoteCommit}); a failure is `forged`.
-	 * - Promise phase **incomplete** → the commit cannot be verified yet. Hold it in the durable side pool
-	 *   ({@link poolCommit}), never in `merged.commits`. {@link drainPendingCommits} promotes or drops it
-	 *   once the promise set fills.
+	 * - A **void** (`NC`), OR a commit (`C`) once the promise phase is **complete** → verify now and, on
+	 *   success, promote into the authoritative set with the dedupe/equivocation check ({@link promoteCommit});
+	 *   a failure is `forged`. A void binds only the immutable core (never the promise set, see `digest.ts`),
+	 *   so it verifies the instant it arrives, with or without a complete set — it is never pooled.
+	 * - A commit (`C`) while the promise phase is **incomplete** → it cannot be verified yet (its preimage
+	 *   binds the still-filling promise set). Hold it in the durable side pool ({@link poolCommit}), never in
+	 *   `merged.commits`. {@link drainPendingCommits} promotes or drops it once the promise set fills. The pool
+	 *   therefore holds **only** `C` faces.
 	 */
 	private async mergeCommit(merged: TrxRecord<TTerms, TPayload>, signature: Signature, pending: Signature[]): Promise<void> {
-		if (this.promisePhaseComplete(merged)) {
+		if (signature.type === 'NC' || this.promisePhaseComplete(merged)) {
 			return this.promoteCommit(merged, signature)
 		}
 		this.poolCommit(merged, signature, pending)
@@ -658,28 +661,23 @@ export class TrxParticipant<TTerms, TPayload> {
 	 * § Protocol design (Consensus)).
 	 */
 	private async getRecordState(record: TrxRecord<TTerms, TPayload>): Promise<RecordState> {
-		// ── Promise phase ──
+		// ── Any refusal voids immediately (checked first, before any phase gate) ──
 		if (record.promises.some((signature) => signature.type === 'NP')) {
 			return 'rejected' // any refusal voids the lift — it can never form
 		}
-		if (!this.promisePhaseComplete(record)) {
-			if (this.weAre(MemberTypes.participant, record) && !this.weHaveSigned(record.promises)) {
-				return 'ourPromiseNeeded'
-			}
-			return 'promising' // waiting on other participants
-		}
 
-		// ── Commit phase (every participant has promised; the full promise set is present) ──
+		// ── Void settles regardless of promise-set completeness ──
+		// A void (`NC`) binds only the immutable core (see digest.ts), so it verifies standalone — a voter
+		// majority of `NC` proves the lift can never commit whether or not every participant promised. So
+		// this void check runs BEFORE the promise-phase gate: a lift whose promises never complete (a needed
+		// party died before promising) still closes once its voters vote `NC` at their deadlines.
 		const voters = this.membersWithRole(record.topology, MemberTypes.voter)
 		if (voters.length === 0) {
 			// Unreachable after validation (an empty voter set is rejected there); guarded so a stray
 			// record can never settle on a "majority of zero" (ChipNet's isConsensus(0,0), review :285-287).
-			this.log('tallynet consensus: empty voter set reached the commit phase on transaction %s (invalid)', record.transactionCode)
+			this.log('tallynet consensus: empty voter set on transaction %s (invalid)', record.transactionCode)
 			return 'propagating'
 		}
-
-		const commitCount = await this.countVerifiedCommits(record, 'C', voters)
-		const noCommitCount = await this.countVerifiedCommits(record, 'NC', voters)
 		// A side settles when it holds a strict majority AND reaches the method's threshold. The
 		// strict-majority floor (`count*2 > W`) keeps commit and void mutually exclusive for any
 		// threshold (two strict majorities over distinct voters would sum to more than W); the threshold
@@ -689,23 +687,47 @@ export class TrxParticipant<TTerms, TPayload> {
 		const totalWeight = voters.length // the only v1 weighting is distinct-voter: total weight = voter count
 		const { thresholdNum, thresholdDen } = record.method
 		const settles = (count: number): boolean => count * 2 > totalWeight && count * thresholdDen >= thresholdNum * totalWeight
+		const noCommitCount = await this.countVerifiedCommits(record, 'NC', voters)
+		if (settles(noCommitCount)) {
+			return 'rejected' // a strict void majority — settles even on an incomplete promise set
+		}
+
+		// ── Promise phase incomplete ──
+		if (!this.promisePhaseComplete(record)) {
+			// Participant-promise branch FIRST (order is load-bearing): a `P`+`V` member that never promised
+			// must sign its `NP` here before it can vote `NC` below, so its refusal voids the lift as an `NP`
+			// (any-refusal rule, applied the same by every node) rather than as a lone deadline void.
+			if (this.weAre(MemberTypes.participant, record) && !this.weHaveSigned(record.promises)) {
+				return 'ourPromiseNeeded'
+			}
+			// Then the voter-void branch: an un-voted voter whose code has EXPIRED votes `NC` at its deadline
+			// even on an incomplete promise set (castCommit's expired path casts `NC`). Raw expiry
+			// (anyCodeExpired), not expiry+skewGrace: the skew grace governs only when the recovery timer
+			// FIRES, never how a delivery past expiry classifies — matching the complete-set deadline-NC path.
+			if (this.weAre(MemberTypes.voter, record) && !this.weHaveSigned(record.commits) && this.anyCodeExpired(record)) {
+				return 'ourCommitNeeded'
+			}
+			// A pure participant (not a voter) never voids on its own on an incomplete set — it waits for and
+			// pulls the voters' decision. Pre-deadline, every member here is simply waiting on the promises.
+			return 'promising'
+		}
+
+		// ── Commit phase (every participant has promised; the full promise set is present) ──
+		const commitCount = await this.countVerifiedCommits(record, 'C', voters)
 		if (settles(commitCount)) {
 			return 'consensus'
-		}
-		if (settles(noCommitCount)) {
-			return 'rejected'
 		}
 		if (this.weAre(MemberTypes.voter, record) && !this.weHaveSigned(record.commits)) {
 			return 'ourCommitNeeded'
 		}
 		// NOTE: a stuck commit phase (a tie, or voters still to vote) stays `propagating` and does NOT
-		// settle from classification alone. The deadline timer ({@link updateDeadlineTimer} /
-		// {@link onDeadline}) re-runs the advance loop once the transaction code's own expiry passes
-		// (decision 1): an un-voted voter then votes `NC` (void-on-timeout, decision 3) through the
-		// expired-code path in {@link castCommit}, so a voter majority (commit OR void) is always eventually
-		// reached and every hold releases. A tie of voters that have ALL already voted still cannot settle
-		// (a documented limit); periodic re-push/pull recovery for a genuinely stalled transaction is
-		// `tallynet-stalled-recovery` (6.2). No behavioural change here — the tick just re-enters this loop.
+		// settle from classification alone. The recovery timer ({@link onRecoveryTick} / {@link onDeadline})
+		// re-runs the advance loop once the transaction code's own expiry passes (decision 1): an un-voted
+		// voter then votes `NC` (void-on-timeout, decision 3) through the expired-code path in
+		// {@link castCommit}, so a voter majority (commit OR void) is always eventually reached and every
+		// hold releases — on a complete set here, or on an incomplete set via the void branch above. A tie
+		// of voters that have ALL already voted still cannot settle (a documented limit); periodic
+		// re-push/pull recovery for a genuinely stalled transaction is the recovery loop (6.2).
 		return 'propagating'
 	}
 
@@ -718,10 +740,13 @@ export class TrxParticipant<TTerms, TPayload> {
 	}
 
 	/**
-	 * Count distinct voters whose `type` commit signature verifies against the record's (now complete)
-	 * promise set. The merge now admits only already-verified commits into `commits` (an unverified
-	 * out-of-order arrival waits in the side pool, never here), so this re-verification is **defensive** —
-	 * it cannot admit a forged vote; a signature that somehow fails to verify is simply not counted.
+	 * Count distinct voters whose `type` commit signature verifies. A commit (`C`) verifies against the
+	 * record's (now complete) promise set; a void (`NC`) binds only the immutable core (see digest.ts) and
+	 * so verifies independent of the promise set — which is why the void count is meaningful even before the
+	 * promise phase completes. The merge now admits only already-verified commits into `commits` (an
+	 * unverified out-of-order `C` waits in the side pool, never here; an `NC` promotes on arrival), so this
+	 * re-verification is **defensive** — it cannot admit a forged vote; a signature that somehow fails to
+	 * verify is simply not counted.
 	 */
 	private async countVerifiedCommits(
 		record: TrxRecord<TTerms, TPayload>,
@@ -730,7 +755,7 @@ export class TrxParticipant<TTerms, TPayload> {
 	): Promise<number> {
 		// NOTE: re-verifies every commit on each classification pass, and getRecordState runs in a loop.
 		// Fine at lift scale (a handful of voters); if voter sets ever grow large, cache verification
-		// per (record promise-set, signature).
+		// per (record promise-set, signature) for `C`, and per (record core, signature) for `NC`.
 		const voterKeys = new Set(voters.map((member) => member.address.key))
 		const counted = new Set<string>()
 		for (const signature of record.commits) {

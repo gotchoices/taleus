@@ -117,4 +117,4 @@ export type SignatureRejectReason =
 	| 'equivocation'  // the signer contributed both faces of a phase (P&NP, or C&NC)
 	| 'core-mismatch' // the record's immutable core differs from the stored copy
 	| 'expired'       // transaction or session code expired
-	| 'pool-full'     // the pending-commit side pool cap was reached for this signer (an unverifiable commit, dropped)
+	| 'pool-full'     // the pending-commit side pool cap was reached for this signer (an unverifiable `C`, dropped; only `C` is ever pooled — an `NC` verifies on arrival and never pools)

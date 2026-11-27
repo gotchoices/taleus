@@ -20,10 +20,11 @@ import { recordDigest } from './digest.js'
 import type { Signature, SignatureType, TrxRecord } from './types.js'
 
 /**
- * Produce a signature of `kind` over `record`, from `signer`'s key. The commit preimage binds the
- * record's current promise set (passed through to {@link recordDigest}); for a promise it is ignored.
- * The opaque `attachment` is the caller's to add afterward — it is never signed, so it is never set
- * here.
+ * Produce a signature of `kind` over `record`, from `signer`'s key. Only the **commit** face (`C`) binds
+ * the record's current promise set (passed through to {@link recordDigest}); a promise (`P`/`NP`) and a
+ * **void** (`NC`) ignore the passed promise set — a void binds the immutable core alone, so it verifies
+ * independent of the promise set (it may be cast on an incomplete set at the deadline). The opaque
+ * `attachment` is the caller's to add afterward — it is never signed, so it is never set here.
  */
 export async function signRecord<TTerms, TPayload>(
 	signer: Signer,
@@ -38,9 +39,11 @@ export async function signRecord<TTerms, TPayload>(
 
 /**
  * Check `signature` against `record`. Recomputes the preimage with the signature's **claimed** kind
- * (so a relabel fails) over the record's promise set, decodes the base64url key and value, and awaits
- * the verifier. Returns `false` — never throws — for a non-canonical base64url key/value or a verifier
- * rejection; `Verifier` already guarantees it never throws on malformed bytes.
+ * (so a relabel fails); for a `C` that preimage binds the record's promise set, while a `P`/`NP`/`NC`
+ * binds only the immutable core (so an `NC` verifies the same whether or not the promise set is
+ * complete). Decodes the base64url key and value, and awaits the verifier. Returns `false` — never
+ * throws — for a non-canonical base64url key/value or a verifier rejection; `Verifier` already
+ * guarantees it never throws on malformed bytes.
  */
 export async function verifySignature<TTerms, TPayload>(
 	verifier: Verifier,

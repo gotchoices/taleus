@@ -1002,10 +1002,10 @@ describe('TrxParticipant — commit-phase side pool (forged-commit-shadows-vote)
 		expect(await store.getPendingCommits(base.transactionCode)).toEqual([]) // pool drained empty
 	})
 
-	it('a garbage opposite-face (NC) commit pooled pre-promise does not collide with the genuine C', async () => {
-		// Under the old (dedupe-before-verify) code a garbage NC occupied the voter's slot first, so the
-		// genuine C collided as `equivocation` and was silenced. Pooled-until-verified, the garbage NC instead
-		// drains as `forged` and the genuine C stands.
+	it('a garbage opposite-face (NC) commit is rejected forged on arrival and never collides with the genuine C', async () => {
+		// A void (`NC`) binds only the immutable core (digest.ts), so it is verified the instant it arrives —
+		// never pooled. A forged NC therefore fails verification on arrival and is dropped `forged`; it never
+		// reaches the pool nor occupies the voter's slot, so the genuine C later stands.
 		const alice = makeParty()
 		const bob = makeParty()
 		const ref = makeParty()
@@ -1018,12 +1018,12 @@ describe('TrxParticipant — commit-phase side pool (forged-commit-shadows-vote)
 
 		const { participant, store, events } = harness({ self: makeParty() })
 		await participant.update({ ...base, promises: [], commits: [garbageNC] })
-		expect(await store.getPendingCommits(base.transactionCode)).toHaveLength(1)
+		expect(await store.getPendingCommits(base.transactionCode)).toEqual([]) // an NC verifies on arrival → never pooled
+		expect(rejectReasons(events)).toContain('forged') // the forged NC, dropped on arrival (not on drain)
 
 		const settled = await participant.update({ ...base, promises: [aliceP, bobP], commits: [genuineC] })
 		expect(settled.commits).toEqual([genuineC])
 		expect(await participant.outcome(base.transactionCode)).toBe('commit')
-		expect(rejectReasons(events)).toContain('forged')
 		expect(rejectReasons(events)).not.toContain('equivocation')
 	})
 
@@ -1050,9 +1050,12 @@ describe('TrxParticipant — commit-phase side pool (forged-commit-shadows-vote)
 		expect(await participant.outcome(base.transactionCode)).toBe('commit')
 	})
 
-	it('a genuine equivocation pooled pre-promise resolves to the earliest face on drain', async () => {
-		// Both faces verify, both arrive before the promise phase completes, both are pooled. On drain the
-		// insertion-order first face is promoted and the second is refused as `equivocation`.
+	it('a genuine equivocation pre-promise: the NC promotes on arrival and the drained C collides → void', async () => {
+		// An equivocating voter sends both faces before the promise phase completes. The `NC` binds only the
+		// core, so it is verified and promoted the instant it arrives (never pooled); the `C` cannot verify
+		// against the incomplete set yet, so it waits in the pool. The void face therefore wins the
+		// authoritative slot — a reversal of the old "earliest pooled face stands" behaviour — and on drain
+		// the genuine C collides as `equivocation`, both faces retained as proof, the outcome staying void.
 		const alice = makeParty()
 		const bob = makeParty()
 		const ref = makeParty()
@@ -1064,15 +1067,17 @@ describe('TrxParticipant — commit-phase side pool (forged-commit-shadows-vote)
 		const refVoid = await sign(ref, 'NC', complete)
 
 		const { participant, store, events } = harness({ self: makeParty() })
-		// Both genuine faces pooled pre-promise, commit first.
+		// Both genuine faces delivered pre-promise, commit first: only the C pools; the NC promotes at once.
 		await participant.update({ ...base, promises: [], commits: [refCommit, refVoid] })
-		expect(await store.getPendingCommits(base.transactionCode)).toHaveLength(2)
+		expect(await store.getPendingCommits(base.transactionCode)).toHaveLength(1) // only the C waits in the pool
+		expect(await participant.outcome(base.transactionCode)).toBe('void') // the promoted NC (sole voter) already voids
 
-		// Promises complete (the commit is NOT re-carried): the pool drains in insertion order.
+		// Promises complete (neither face re-carried): the pooled C drains, collides with the promoted NC.
 		const settled = await participant.update({ ...base, promises: [aliceP, bobP], commits: [] })
-		expect(settled.commits).toEqual([refCommit]) // the earliest face stands
+		expect(settled.commits.map((s) => s.type)).toEqual(['NC']) // the void face stands in the authoritative slot
 		expect(rejectReasons(events)).toContain('equivocation')
-		expect(await participant.outcome(base.transactionCode)).toBe('commit')
+		expect(await participant.equivocationProof(base.transactionCode, ref.key)).toHaveLength(2) // both faces kept as proof
+		expect(await participant.outcome(base.transactionCode)).toBe('void')
 	})
 })
 
@@ -1630,6 +1635,64 @@ describe('TrxParticipant — deadline timer', () => {
 		await refuse.participant.update(refuse.record)
 		expect(eventsOfType(refuse.events, 'promise-signed').map((e) => e.signatureType)).toEqual(['NP'])
 		expect(await refuse.participant.outcome(refuse.record.transactionCode)).toBe('void')
+	})
+})
+
+describe('TrxParticipant — deadline void on an INCOMPLETE promise set (promises never complete)', () => {
+	const P = MemberTypes.participant
+	const V = MemberTypes.voter
+
+	it('a sole voter whose promise set never completes votes NC at its deadline and voids', async () => {
+		// alice is P+V; bob (P) never promises, so the promise phase can never complete. At its deadline alice
+		// (having already promised, so the participant branch is satisfied) casts a deadline `NC` on the
+		// incomplete set — the new behaviour — and, as the sole voter, that void settles the lift.
+		const alice = makeParty()
+		const bob = makeParty()
+		const members = [member(alice, [P, V]), member(bob, [P])]
+		const base = makeRecord(members, { n1: link(alice, bob) })
+		const stored: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base)], commits: [] }
+		const store = new MemoryTrxStore<TTerms, TPayload>()
+		await store.saveRecord(stored)
+		const clock = makeClock(NOW)
+		const resource = makeResource()
+		const { participant, events } = harness({ self: alice, store, clock, resource: resource.resource })
+
+		clock.set(expiresAt(base.transactionCode) + 1) // past the deadline
+		await participant.onDeadline(base.transactionCode)
+
+		const settled = await store.getRecord(base.transactionCode)
+		expect(settled!.commits.map((s) => s.type)).toEqual(['NC']) // voided even though bob never promised
+		expect(settled!.commits[0].address).toBe(alice.key)
+		expect(settled!.promises.some((s) => s.type === 'NP')).toBe(false) // alice holds P; it voids as a voter NC, not an NP
+		expect(await participant.outcome(base.transactionCode)).toBe('void') // sole voter NC → strict void majority
+		expect(eventsOfType(events, 'deadline-reached').map((e) => e.acted)).toEqual([true])
+		expect(resource.releaseSuccesses).toEqual([false]) // released once, as a void
+	})
+
+	it('a P+V member that never promised signs NP at its deadline (promise branch wins over the voter-NC branch)', async () => {
+		// The ordering guard: alice is P+V and has signed NEITHER a promise nor a vote. The participant-promise
+		// branch must fire before the voter-NC branch, so alice signs `NP` (not a voter `NC`) — a cleaner void
+		// that every node applies via the any-refusal rule, rather than a lone deadline void.
+		const alice = makeParty()
+		const bob = makeParty()
+		const members = [member(alice, [P, V]), member(bob, [P])]
+		const base = makeRecord(members, { n1: link(alice, bob) })
+		const stored: TrxRecord<TTerms, TPayload> = { ...base, promises: [], commits: [] } // alice never promised
+		const store = new MemoryTrxStore<TTerms, TPayload>()
+		await store.saveRecord(stored)
+		const clock = makeClock(NOW)
+		const resource = makeResource()
+		const { participant } = harness({ self: alice, store, clock, resource: resource.resource })
+
+		clock.set(expiresAt(base.transactionCode) + 1)
+		await participant.onDeadline(base.transactionCode)
+
+		const settled = await store.getRecord(base.transactionCode)
+		expect(settled!.promises.map((s) => s.type)).toEqual(['NP']) // the participant branch wins → NP, not a voter NC
+		expect(settled!.promises[0].address).toBe(alice.key)
+		expect(settled!.commits).toEqual([]) // never reached the voter-NC branch
+		expect(await participant.outcome(base.transactionCode)).toBe('void') // any NP voids the lift
+		expect(resource.releaseSuccesses).toEqual([false])
 	})
 })
 

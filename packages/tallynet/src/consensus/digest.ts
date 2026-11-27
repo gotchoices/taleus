@@ -17,7 +17,7 @@
  *
  *     { k: kind, tx: transactionCode, sc: sessionCode, pl: payload, tp: topology, mt: method
  *       [, lc: liftContract ]              // present ONLY when the record carries a lift-contract CID
- *       [, pr: <canonical promise set> ]   // present ONLY for kind 'C' | 'NC'
+ *       [, pr: <canonical promise set> ]   // present ONLY for kind 'C' (the commit face)
  *     }
  *
  * Why each field is there:
@@ -27,12 +27,15 @@
  *   - **`tx` + `sc` bind the signature to this transaction.** A signature valid under one
  *     `(transactionCode, sessionCode)` with topology T fails under a different `(tx, sc)` with the
  *     same T — the replay defence.
- *   - **`pr` (commit/no-commit only)** is the promise set the vote is cast over, canonicalised: each
+ *   - **`pr` (the commit face `C` only)** is the promise set the vote is cast over, canonicalised: each
  *     promise is reduced to `{ type, address, value }` (its opaque `attachment` is dropped — promises
  *     never carry one anyway) and the list is **sorted by `address`, then `type`, then `value`**
  *     (bytewise on the base64url strings). Arrays are order-sensitive under DAG-CBOR, so this explicit
- *     sort is mandatory — insertion order must not change the bytes.
- *   - The `pr` key is **omitted entirely** for `P`/`NP` — not set to `undefined`, which DAG-CBOR
+ *     sort is mandatory — insertion order must not change the bytes. A `C` binds the promise set because
+ *     that set is the proof every participant promised; a void (`NC`) binds no such proof — the whole
+ *     point of a deadline void is that the promise set may be *incomplete* — so a void's preimage omits
+ *     `pr` entirely and so verifies the instant it arrives, independent of the promise set.
+ *   - The `pr` key is **omitted entirely** for `P`/`NP`/`NC` — not set to `undefined`, which DAG-CBOR
  *     rejects (follow the discovery store's "omit, don't undefine" discipline).
  *
  * **Payload must canonically encode.** `TPayload` is generic, but at this boundary it is handed to
@@ -40,12 +43,19 @@
  * function, `undefined`, …). A signing host must supply a `DigestValue`-compatible payload.
  *
  * **Why the commit preimage includes the promise set, and the convergence consequence** (carried into
- * the participant ticket as an edge case): binding a commit vote to the exact promise set keeps a
- * voter honest about which promises it saw. A node verifying a commit must therefore hold the same
- * promise set. The participant ticket only ever verifies commits once the full participant-promise set
- * is present — the promise phase completes before the commit phase opens — so verification is
- * deterministic. An early-arriving commit (out-of-order delivery) is retained by union but simply not
- * yet countable; it is **never** treated as forged merely because the promise set is still filling.
+ * the participant ticket as an edge case): binding a commit (`C`) vote to the exact promise set keeps a
+ * voter honest about which promises it saw. A node verifying a `C` must therefore hold the same promise
+ * set. The participant only ever verifies a `C` once the full participant-promise set is present — the
+ * promise phase completes before the commit phase opens — so verification is deterministic. An
+ * early-arriving `C` (out-of-order delivery) is retained in a side pool but simply not yet countable; it
+ * is **never** treated as forged merely because the promise set is still filling.
+ *
+ * **A void (`NC`) binds the core alone, so it verifies the instant it arrives.** A deadline void may be
+ * cast by a voter whose promise set never completed (a needed participant died before promising), so an
+ * `NC` cannot depend on the promise set. It omits `pr`, which means one `NC` face is byte-identical with
+ * or without a complete set — there is no separate "void-before-complete" face and no side pool for a
+ * void: an `NC` is always verifiable, so it is never pooled and never shadowed, and a forged `NC` fails
+ * verification on arrival and is dropped `forged`, exactly as a forged promise is.
  */
 
 import { digest, type DigestValue } from '../digest.js'
@@ -59,8 +69,9 @@ import type { Signature, SignatureType, TrxRecord } from './types.js'
  * @param record    the immutable, digest-covered core (`transactionCode`, `sessionCode`, `payload`,
  *                  `topology`, `method`, and the optional `liftContract`). Only these fields are read —
  *                  never `promises` (except via the explicit `promises` arg) nor `commits`.
- * @param promises  the promise set a commit is cast over. REQUIRED for `'C'`/`'NC'` (pass the record's
- *                  full promise set); ignored and omitted from the preimage for `'P'`/`'NP'`.
+ * @param promises  the promise set a commit (`'C'`) is cast over — pass the record's full promise set.
+ *                  Ignored and omitted from the preimage for `'P'`/`'NP'` (promise phase) and for `'NC'`
+ *                  (a void binds the core alone, so it verifies independent of the promise set).
  * @param hasher    sha256 port; defaults to `@noble/hashes`.
  */
 export function recordDigest<TTerms, TPayload>(
@@ -82,10 +93,13 @@ export function recordDigest<TTerms, TPayload>(
 	if (record.liftContract !== undefined) {
 		preimage.lc = record.liftContract
 	}
-	if (kind === 'C' || kind === 'NC') {
-		// NOTE: an absent promise set for a commit becomes the empty-set preimage, not a throw. Safe
-		// today — signRecord/verifySignature always pass record.promises (a required array field) — but
-		// a future direct caller that omits it for C/NC would silently sign over the empty set.
+	if (kind === 'C') {
+		// Only the commit face binds the promise set — it is the proof every participant promised. A void
+		// (`NC`) omits `pr`, so it verifies against the immutable core alone, independent of (and even
+		// before) the promise set completes. NOTE: an absent promise set for a `C` becomes the empty-set
+		// preimage, not a throw. Safe today — signRecord/verifySignature always pass record.promises (a
+		// required array field) — but a future direct caller that omits it for `C` would silently sign
+		// over the empty set.
 		preimage.pr = canonicalPromiseSet(promises ?? [])
 	}
 	return digest(preimage, hasher)
