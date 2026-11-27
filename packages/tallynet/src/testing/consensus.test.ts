@@ -661,7 +661,10 @@ describe('consensus end to end — a forged commit cannot shadow a genuine vote 
 		expect(net.deliveryErrors).toEqual([])
 	})
 
-	it('a garbage opposite-face NC injected before the promises does not collide with the genuine C', async () => {
+	it('a garbage opposite-face NC injected before the promises is rejected forged on arrival (never pooled)', async () => {
+		// A void (`NC`) binds only the immutable core (see digest.ts), so it is verified the instant it arrives —
+		// never pooled. A forged (corrupted) NC therefore fails verification on arrival and is dropped `forged`;
+		// it never reaches the side pool, so it can neither collide with nor shadow the genuine C that follows.
 		const { net, traces } = makeNet({ graph, seed })
 		const { record, transactionCode: tx } = net.buildLift({ members, route: ['A', 'B'], payload: PAYLOAD })
 		const complete = await completeOf(record)
@@ -669,6 +672,7 @@ describe('consensus end to end — a forged commit cannot shadow a genuine vote 
 		const garbageNC = corrupt(await signRecord(makeSigner(seed, 'R'), 'NC', complete))
 
 		await net.consensusNode('X').update({ ...record, promises: [], commits: [garbageNC] })
+		expect(await net.consensusStoreOf('X').getPendingCommits(tx)).toEqual([]) // the forged NC verified on arrival → never pooled
 		await net.consensusNode('X').update({ ...complete, commits: [genuineC] })
 		await net.clock.runUntilIdle()
 
@@ -699,20 +703,30 @@ describe('consensus end to end — a forged commit cannot shadow a genuine vote 
 		expect(net.deliveryErrors).toEqual([])
 	})
 
-	it('a genuine equivocation pooled before the promises resolves to the earliest face on drain', async () => {
+	it('a genuine equivocation pre-promise: the NC promotes on arrival and voids; the pooled C collides on drain', async () => {
+		// Both genuine faces arrive pre-promise, the `C` first in the array — but the two faces are judged
+		// differently. A `C` binds the (still-incomplete) promise set, so it cannot verify yet and waits in the
+		// pool; an `NC` binds only the immutable core (see digest.ts), so it promotes on arrival. R is the SOLE
+		// voter, so its promoted `NC` is a void majority the instant it lands — X reads `void` after delivery 1,
+		// with the promise phase still incomplete. On delivery 2 the promises complete and the pooled `C` drains,
+		// collides with the already-authoritative `NC` (equivocation, both faces kept as proof), and is dropped;
+		// the void (the earliest *authoritative* face) stands. This reverses the old "earliest pooled face wins".
 		const { net, traces } = makeNet({ graph, seed })
 		const { record, transactionCode: tx } = net.buildLift({ members, route: ['A', 'B'], payload: PAYLOAD })
 		const complete = await completeOf(record)
 		const refCommit = await signRecord(makeSigner(seed, 'R'), 'C', complete)
 		const refVoid = await signRecord(makeSigner(seed, 'R'), 'NC', complete)
 
-		// Both verifying faces pooled pre-promise, commit first; the promises then complete (commit not re-carried).
 		await net.consensusNode('X').update({ ...record, promises: [], commits: [refCommit, refVoid] })
+		expect(await net.consensusNode('X').outcome(tx)).toBe('void') // the promoted NC settles the sole-voter route at once
 		await net.consensusNode('X').update({ ...complete, commits: [] })
 		await net.clock.runUntilIdle()
 
-		expect(rejectReasons(traces)).toContain('equivocation') // the later (second) face is refused on drain
-		expect(await net.consensusNode('X').outcome(tx)).toBe('commit') // the earliest face (C) stands
+		expect(rejectReasons(traces)).toContain('equivocation') // the pooled C collides with the NC on drain
+		expect(await net.consensusNode('X').outcome(tx)).toBe('void') // the void (earliest authoritative face) stands
+		const stored = await net.consensusStoreOf('X').getRecord(tx)
+		expect(stored!.commits.map((signature) => signature.type)).toEqual(['NC']) // only the void holds the slot
+		expect(await net.consensusStoreOf('X').getProof(tx, net.memberKey('R'))).toHaveLength(2) // both faces kept as proof
 		expect(net.deliveryErrors).toEqual([])
 	})
 
