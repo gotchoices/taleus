@@ -112,6 +112,12 @@ export interface TrxParticipantConfig<TTerms, TPayload> {
 	 * {@link SKEW_GRACE_MS}. Keep comfortably < minPromiseMarginMs. Per-node (principle 0).
 	 */
 	skewGraceMs?: number
+	/** First recovery-loop backoff delay (ms) after the deadline. Default {@link RECOVERY_BASE_MS}. Per-node. */
+	recoveryBaseMs?: number
+	/** Ceiling the recovery-loop backoff doubles toward (ms). Default {@link RECOVERY_MAX_MS}. Per-node. */
+	recoveryMaxMs?: number
+	/** How long past the deadline the recovery loop polls before abandoning (ms). Default {@link RECOVERY_GIVEUP_MS}. Per-node. */
+	recoveryGiveupMs?: number
 }
 
 /** What {@link TrxParticipant.proceed} needs to start a discovered lift. */
@@ -158,8 +164,15 @@ export class TrxParticipant<TTerms, TPayload> {
 	private readonly newRecordRules: RuleSet<TrxRuleTest<TTerms, TPayload>>
 	private readonly minPromiseMarginMs: number
 	private readonly skewGraceMs: number
-	/** Per-transaction one-shot deadline timers. In-memory only (restart re-arm is a seam; see design.md). */
-	private readonly deadlineTimers = new Map<string, TimerHandle>()
+	private readonly recoveryBaseMs: number
+	private readonly recoveryMaxMs: number
+	private readonly recoveryGiveupMs: number
+	/** Per-transaction recovery timers (one live per tx). In-memory only (restart re-arm is a seam; see design.md). */
+	private readonly recoveryTimers = new Map<string, TimerHandle>()
+	/** Per-transaction current backoff delay (ms); reset to base on a tick that made progress, else doubles. */
+	private readonly recoveryBackoff = new Map<string, number>()
+	/** Per-transaction recovery-tick count (the `attempt` on each `recovery-tick` trace). */
+	private readonly recoveryAttempts = new Map<string, number>()
 
 	constructor(config: TrxParticipantConfig<TTerms, TPayload>) {
 		this.self = config.self
@@ -178,6 +191,9 @@ export class TrxParticipant<TTerms, TPayload> {
 		this.sessionCodes = config.sessionCodes ?? defaultSessionCodeValidators
 		this.minPromiseMarginMs = config.minPromiseMarginMs ?? MIN_PROMISE_MARGIN_MS
 		this.skewGraceMs = config.skewGraceMs ?? SKEW_GRACE_MS
+		this.recoveryBaseMs = config.recoveryBaseMs ?? RECOVERY_BASE_MS
+		this.recoveryMaxMs = config.recoveryMaxMs ?? RECOVERY_MAX_MS
+		this.recoveryGiveupMs = config.recoveryGiveupMs ?? RECOVERY_GIVEUP_MS
 		this.newRecordRules = this.buildNewRecordRules()
 
 		// A misconfigured signer (its key not matching our member key) would sign signatures no peer
@@ -193,6 +209,10 @@ export class TrxParticipant<TTerms, TPayload> {
 	 * peers. Returns the merged/advanced record.
 	 */
 	async update(record: TrxRecord<TTerms, TPayload>, fromAddress?: Address): Promise<TrxRecord<TTerms, TPayload>> {
+		// Snapshot our signature sets before the merge so the recovery timer can tell genuine new info from a
+		// plain re-delivery (one extra store read; `validateAndMerge` reads again — a minor dup, fine at lift scale).
+		const prior = await this.store.getRecord(record.transactionCode)
+		const priorKey = prior ? recordSignatureKey(prior) : ''
 		const merged = await this.validateAndMerge(record, fromAddress)
 		// If we are not a member, we are a pure relay: merge and push, but never promise/vote/release.
 		if (this.memberByKey(merged.topology, this.self.key)) {
@@ -202,7 +222,10 @@ export class TrxParticipant<TTerms, TPayload> {
 		// still classifies as "theirs" against our merged copy — surface a settled-outcome contradiction if any.
 		await this.detectContradiction(record, merged)
 		await this.push(merged)
-		await this.updateDeadlineTimer(merged)
+		// Progress = the merge and/or our own advance added a signature. Post-deadline the recovery timer only
+		// re-arms on progress (the storm guard); pre-deadline it always arms (6a's void-on-timeout tick).
+		const progressed = priorKey !== recordSignatureKey(merged)
+		await this.updateRecoveryTimer(merged, progressed)
 		return merged
 	}
 
@@ -245,8 +268,9 @@ export class TrxParticipant<TTerms, TPayload> {
 	 * Requester (the pull's asking end): pull the record for `transactionCode` from every reachable peer and
 	 * {@link update} each reply (an idempotent merge that cannot inject unverified state), then return our
 	 * resulting outcome. With no stored record we return `pending` and pull nothing — without the record we
-	 * hold no topology, so we cannot even address a pull; the timer-driven recovery loop that would catch a
-	 * never-seen record up is `tallynet-propagation-timeouts` (a seam, not built here). The reachable set is
+	 * hold no topology, so we cannot even address a pull; a never-seen record is caught up by its neighbour's
+	 * re-push, not by this pull (the timer-driven recovery loop that drives this pull is {@link onRecoveryTick}).
+	 * The reachable set is
 	 * read once from our own stored record; topology is immutable, so it is stable across the merges the pull
 	 * triggers. Each reply is merged with the peer as `fromAddress`, which primes the push skip-test so we do
 	 * not echo it straight back.
@@ -869,7 +893,7 @@ export class TrxParticipant<TTerms, TPayload> {
 		await this.store.saveRecord(record)
 	}
 
-	/* ── deadline timer ─────────────────────────────────────────────────────────────────── */
+	/* ── recovery timer (6a one-shot deadline + 6.2 periodic recovery loop) ─────────────── */
 
 	/** Run the state-advance loop; returns true if any step signed something (drove a vote/promise). */
 	private async runAdvanceLoop(record: TrxRecord<TTerms, TPayload>): Promise<boolean> {
@@ -881,11 +905,11 @@ export class TrxParticipant<TTerms, TPayload> {
 	}
 
 	/**
-	 * Arm or clear our deadline timer after adopting a record. Members only (a pure relay holds no
-	 * stake). A settled/released record clears any timer; a still-`pending` one arms (or keeps) a
-	 * one-shot timer at the transaction code's own expiry (decision 1) + our skew grace (decision 6).
+	 * Arm or clear our recovery timer after adopting a record. Members only (a pure relay holds no stake).
+	 * A settled/released record clears all recovery state; a still-`pending` one (re-)arms the timer via
+	 * {@link scheduleRecoveryTick}, which gates the post-deadline re-arm on `progressed` (the storm guard).
 	 */
-	private async updateDeadlineTimer(record: TrxRecord<TTerms, TPayload>): Promise<void> {
+	private async updateRecoveryTimer(record: TrxRecord<TTerms, TPayload>, progressed: boolean): Promise<void> {
 		if (!this.memberByKey(record.topology, this.self.key)) {
 			return
 		}
@@ -893,92 +917,173 @@ export class TrxParticipant<TTerms, TPayload> {
 		// scale; if voter sets grow, cache verification (see countVerifiedCommits NOTE).
 		const settled = (await this.recordOutcome(record)) !== 'pending'
 		if (settled || (await this.store.isReleased(record.transactionCode))) {
-			this.clearDeadline(record.transactionCode)
+			this.clearRecoveryState(record.transactionCode)
 			return
 		}
-		this.scheduleDeadlineTick(record)
+		this.scheduleRecoveryTick(record, progressed)
 	}
 
 	/**
-	 * Arm (or leave armed) the one-shot deadline timer for a non-terminal record. Idempotent: a code
-	 * that already has a live timer keeps it (never stack one per delivery). The deadline is the
-	 * transaction code's embedded expiry (decision 1) judged against OUR clock (decision 6); it fires a
-	 * `skewGraceMs` grace past expiry so a modestly-fast clock does not prematurely void.
+	 * Arm (or leave armed) the recovery timer for a non-terminal record. Idempotent: a code that already
+	 * has a live timer keeps it (never stack one per delivery).
 	 *
-	 * We do NOT arm once the code is already expired at `now`: the expired-code path (NC/NP) already
-	 * runs inline in `advanceState` during the very update that reaches here, so a zero-delay timer
-	 * would only re-run a no-op — and, worse, re-arm in a loop as onDeadline's push re-delivers (see
-	 * design.md). One-shot in 6.1; **SEAM for `tallynet-stalled-recovery` (6.2)**: the periodic
-	 * re-push/pull retry loop re-arms here on each fire.
+	 * **Pre-deadline** it arms the 6a one-shot at the transaction code's embedded expiry (decision 1)
+	 * judged against OUR clock (decision 6), a `skewGraceMs` grace past expiry so a modestly-fast clock
+	 * does not prematurely void. **Post-deadline** it (re-)arms the periodic recovery loop at the current
+	 * backoff delay — but **only when `progressed`**: a plain re-delivery (e.g. a peer's forced re-push of
+	 * a record we already hold) must not revive a loop that has backed off or abandoned, or two fully-
+	 * connected stuck nodes would re-arm each other forever (the timer storm). Genuine new info
+	 * (connectivity returned, fresh votes) is progress → the loop resumes, so abandonment is never final.
 	 */
-	private scheduleDeadlineTick(record: TrxRecord<TTerms, TPayload>): void {
+	private scheduleRecoveryTick(record: TrxRecord<TTerms, TPayload>, progressed: boolean): void {
 		const transactionCode = record.transactionCode
-		if (this.deadlineTimers.has(transactionCode)) {
+		if (this.recoveryTimers.has(transactionCode)) {
 			return
 		}
-		let expiry: number
-		try {
-			expiry = this.sessionCodes.expiresAt(transactionCode)
-		} catch {
+		const expiry = this.safeExpiry(transactionCode)
+		if (expiry === undefined) {
 			return // a malformed code cannot be scheduled against (validation should already have refused it)
 		}
 		const now = this.clock.now()
-		if (now >= expiry) {
-			return // deadline already passed; the expired path runs inline, so a timer adds nothing (6.2 owns retry)
-		}
-		const handle = this.clock.setTimer(async () => {
-			this.deadlineTimers.delete(transactionCode) // one-shot: spent the moment it fires
-			// A fire-and-forget callback has no caller to catch a rejection — `realClock` discards the
-			// returned promise (`void fn()`), so a throw from `onDeadline` (a store read, a verify, a
-			// resource hook, a re-thrown release) would surface as an unhandled rejection and be lost.
-			// Catch and log here, so the timer path obeys the same "never eat an exception unlogged" rule
-			// every other engine entry point does. Direct callers of `onDeadline` still see the throw.
-			try {
-				await this.onDeadline(transactionCode)
-			} catch (error) {
-				this.log('tallynet consensus: deadline tick threw on transaction %s: %o', transactionCode, error)
-			}
-		}, Math.max(0, expiry + this.skewGraceMs - now))
-		this.deadlineTimers.set(transactionCode, handle)
-	}
-
-	/** Cancel and forget the deadline timer for `transactionCode` (idempotent). */
-	private clearDeadline(transactionCode: string): void {
-		const handle = this.deadlineTimers.get(transactionCode)
-		if (handle === undefined) {
+		if (now < expiry) {
+			this.armRecoveryTimer(transactionCode, expiry + this.skewGraceMs - now)
 			return
 		}
-		this.deadlineTimers.delete(transactionCode)
-		this.clock.clearTimer(handle)
+		if (!progressed) {
+			return // post-deadline with no new info: do not revive a backing-off / abandoned loop (storm guard)
+		}
+		this.armRecoveryTimer(transactionCode, this.recoveryBackoff.get(transactionCode) ?? this.recoveryBaseMs)
 	}
 
 	/**
-	 * The deadline fired (or a test/host drove it): reload the stored record and, if we are still a
-	 * member of a non-terminal, unreleased lift, re-run the advance loop now the code has expired.
-	 * The expired-code paths already in `advanceState` do the work — an un-voted voter over a COMPLETE
-	 * promise set votes `NC` (void-on-timeout, decision 3); a holding-but-un-promised participant
-	 * signs `NP` (wake-from-sleep). A node with nothing to do signs nothing and stays `pending`
-	 * (decision 5: no unilateral void from silence). One-shot: does NOT re-arm (6.2 owns retry).
-	 * Independently callable so a unit test can drive the timeout against a seeded store.
+	 * Arm the recovery timer `delayMs` out. The fired callback deletes its own handle **first** (so a fire
+	 * is one-shot and the tick can re-arm cleanly), then runs {@link onRecoveryTick}. A fire-and-forget
+	 * callback has no caller to catch a rejection — `realClock` discards the returned promise — so a throw
+	 * is caught and logged here, the same "never eat an exception unlogged" rule every other engine entry
+	 * point obeys. Direct callers of `onRecoveryTick` / `onDeadline` still see the throw.
+	 */
+	private armRecoveryTimer(transactionCode: string, delayMs: number): void {
+		const handle = this.clock.setTimer(async () => {
+			this.recoveryTimers.delete(transactionCode)
+			try {
+				await this.onRecoveryTick(transactionCode)
+			} catch (error) {
+				this.log('tallynet consensus: recovery tick threw on transaction %s: %o', transactionCode, error)
+			}
+		}, Math.max(0, delayMs))
+		this.recoveryTimers.set(transactionCode, handle)
+	}
+
+	/** The transaction code's embedded expiry, or undefined if it is malformed (cannot be scheduled against). */
+	private safeExpiry(transactionCode: string): number | undefined {
+		try {
+			return this.sessionCodes.expiresAt(transactionCode)
+		} catch {
+			return undefined
+		}
+	}
+
+	/** Cancel and forget the recovery timer for `transactionCode` (idempotent); leaves backoff/attempt state. */
+	private clearRecoveryTimer(transactionCode: string): void {
+		const handle = this.recoveryTimers.get(transactionCode)
+		if (handle === undefined) {
+			return
+		}
+		this.recoveryTimers.delete(transactionCode)
+		this.clock.clearTimer(handle)
+	}
+
+	/** Clear the recovery timer **and** the per-transaction backoff/attempt state (on settle, abandon, non-member). */
+	private clearRecoveryState(transactionCode: string): void {
+		this.clearRecoveryTimer(transactionCode)
+		this.recoveryBackoff.delete(transactionCode)
+		this.recoveryAttempts.delete(transactionCode)
+	}
+
+	/**
+	 * The 6a one-shot deadline action, driven **directly** (a test or host calls it). The armed timer now
+	 * calls {@link onRecoveryTick} instead, which subsumes this; `onDeadline` is kept so a host can fire a
+	 * single deadline tick on demand. Reload the stored record and, if we are still a member of a
+	 * non-terminal, unreleased lift, re-run the advance loop now the code has expired: an un-voted voter
+	 * over a COMPLETE promise set votes `NC` (void-on-timeout, decision 3); a holding-but-un-promised
+	 * participant signs `NP` (wake-from-sleep). A node with nothing to do signs nothing and stays `pending`
+	 * (decision 5: no unilateral void from silence). One-shot: does NOT re-arm.
 	 */
 	async onDeadline(transactionCode: string): Promise<void> {
 		// NOTE: shares the read-merge-save non-atomicity the engine.ts re-entrancy NOTE describes — the
 		// timer fires on its own schedule, so it can interleave with an in-flight `update` of the SAME
-		// transaction at an await boundary and clobber a concurrently-added signature. Harmless today (a
-		// lost vote is a liveness concern the re-push/pull recovery already heals, and onDeadline's own
-		// settling path is unreachable over the wire), but `tallynet-stalled-recovery` (6.2) adds the
-		// retry that could make it matter: serialize onDeadline against update per transaction there.
+		// transaction at an await boundary. The in-memory harness serializes deliveries (one callback at a
+		// time off the VirtualClock) so it never trips in-repo; a real host serializes recovery ticks through
+		// the same per-transaction queue as `update` (see engine.ts and docs/design.md § recovery loop).
 		const record = await this.store.getRecord(transactionCode)
 		if (!record || !this.memberByKey(record.topology, this.self.key) || (await this.store.isReleased(transactionCode))) {
-			this.clearDeadline(transactionCode)
+			this.clearRecoveryTimer(transactionCode)
 			return
 		}
 		const acted = await this.runAdvanceLoop(record)
 		this.traceSink({ ...this.traceBase(record), type: 'deadline-reached', transactionCode, acted })
 		await this.push(record)
 		if ((await this.recordOutcome(record)) !== 'pending') {
-			this.clearDeadline(transactionCode) // a timeout NC may have settled us
+			this.clearRecoveryTimer(transactionCode) // a timeout NC may have settled us
 		}
+	}
+
+	/**
+	 * One periodic recovery tick (the armed timer fires this). A stalled, non-terminal lift re-contacts its
+	 * peers so a decision reached in one corner of the network eventually reaches every cooperating member:
+	 *
+	 *  1. reload; a terminal / released / non-member record clears all recovery state and stops;
+	 *  2. **pull** every reachable peer's merged copy ({@link fetchOutcome}, idempotent union — injects no
+	 *     unverified state); if the pull settled us, inform peers and stop;
+	 *  3. **advance** — the expired-code path casts our deadline `NC`/`NP`, so a node asleep through its
+	 *     deadline both votes AND recovers in this one tick; if that settled us, push and stop;
+	 *  4. past {@link recoveryGiveupMs} beyond expiry, **abandon** (emit `recovery-abandoned`, stop
+	 *     re-arming, leave the record `pending` — resources stay held, the genuinely-stuck case). The
+	 *     abandoning tick does NO force-push, so it revives nobody. Abandonment is not final: a later
+	 *     inbound delivery that merges new info re-arms the loop via {@link updateRecoveryTimer};
+	 *  5. else **force re-push** the current record (bypassing the skip-test — a silent peer's ack may have
+	 *     been to a stale copy, or it restarted), emit `recovery-tick`, and re-arm with exponential backoff:
+	 *     base on a tick that made progress, doubling toward {@link recoveryMaxMs} on a quiet one.
+	 *
+	 * Independently callable so a unit test can drive the loop against a seeded store.
+	 */
+	async onRecoveryTick(transactionCode: string): Promise<void> {
+		const record = await this.store.getRecord(transactionCode)
+		if (!record || !this.memberByKey(record.topology, this.self.key) || (await this.store.isReleased(transactionCode))) {
+			this.clearRecoveryState(transactionCode)
+			return
+		}
+		const beforeKey = recordSignatureKey(record)
+		await this.fetchOutcome(transactionCode) // PULL: merge each reachable peer's reply (may settle us)
+		const current = await this.store.getRecord(transactionCode)
+		if (!current || (await this.store.isReleased(transactionCode)) || (await this.recordOutcome(current)) !== 'pending') {
+			this.clearRecoveryState(transactionCode) // the pull settled us (or we were released mid-tick)
+			return
+		}
+		const acted = await this.runAdvanceLoop(current) // the expired-code path casts our deadline NC/NP
+		if ((await this.recordOutcome(current)) !== 'pending') {
+			await this.push(current) // settled this tick: inform peers (it changed, so a normal push suffices)
+			this.clearRecoveryState(transactionCode)
+			return
+		}
+		const changed = acted || beforeKey !== recordSignatureKey(current)
+		const attempt = (this.recoveryAttempts.get(transactionCode) ?? 0) + 1
+		this.recoveryAttempts.set(transactionCode, attempt)
+		const expiry = this.safeExpiry(transactionCode)
+		if (expiry !== undefined && this.clock.now() > expiry + this.recoveryGiveupMs) {
+			// GIVE UP: stop polling a permanently-stuck lift. No force-push here, so this revives no peer.
+			this.traceSink({ ...this.traceBase(current), type: 'recovery-abandoned', transactionCode })
+			this.clearRecoveryState(transactionCode)
+			return
+		}
+		await this.push(current, true) // FORCED re-push: re-send even to a peer whose last ack matched
+		this.traceSink({ ...this.traceBase(current), type: 'recovery-tick', transactionCode, attempt, changed })
+		// Re-arm exactly one timer: the pull's `update` may have armed a fresh one mid-tick (the fired handle
+		// was already deleted), so clear before arming. Backoff resets to base on progress, else doubles to the ceiling.
+		const next = changed ? this.recoveryBaseMs : Math.min((this.recoveryBackoff.get(transactionCode) ?? this.recoveryBaseMs) * 2, this.recoveryMaxMs)
+		this.recoveryBackoff.set(transactionCode, next)
+		this.clearRecoveryTimer(transactionCode)
+		this.armRecoveryTimer(transactionCode, next)
 	}
 
 	/* ── push ─────────────────────────────────────────────────────────────────────────── */
@@ -986,14 +1091,16 @@ export class TrxParticipant<TTerms, TPayload> {
 	/**
 	 * Push the current record to reachable peers: members with a dialable `physical` address, plus the
 	 * member at the other end of each of our links. A peer whose last-acked copy equals what we would
-	 * push is skipped. A failed push logs **once** and emits `record-pushed` `ok:false`; it is not
-	 * retried in-band (retry is the push-wake transport's concern).
+	 * push is skipped — **unless `force`**, the recovery path's forced re-send: a silent peer's earlier ack
+	 * may have been to a stale copy, or it may have restarted, so recovery re-sends even an unchanged record.
+	 * The happy-path callers pass no `force`, keeping the skip optimisation. A failed push logs **once** and
+	 * emits `record-pushed` `ok:false`; it is not retried in-band (retry is the push-wake transport's concern).
 	 */
-	private async push(record: TrxRecord<TTerms, TPayload>): Promise<void> {
+	private async push(record: TrxRecord<TTerms, TPayload>, force = false): Promise<void> {
 		for (const peer of this.reachablePeers(record)) {
 			const last = await this.store.getPeerRecord(record.transactionCode, peer.key)
-			if (last && sameSignatureSets(last, record)) {
-				continue // unchanged since our last push to this peer — suppress the re-push
+			if (!force && last && sameSignatureSets(last, record)) {
+				continue // unchanged since our last push to this peer — suppress the re-push (recovery forces a re-send)
 			}
 			// Snapshot per push: the live record keeps mutating across updates, and the store holds the
 			// peer copy by reference, so the skip test must compare against a frozen copy, not an alias.
@@ -1233,6 +1340,27 @@ export const SKEW_GRACE_MS = 5_000
  */
 export const MIN_PROMISE_MARGIN_MS = 30_000
 
+/**
+ * First recovery-loop backoff delay (ms) after the deadline: the gap before a stalled node's first retry
+ * once past expiry, and the delay a tick that made progress resets to. Short, so a lift the network is
+ * still carrying heals quickly. Per-node default (principle 0).
+ */
+export const RECOVERY_BASE_MS = 5_000
+
+/**
+ * Ceiling (ms) the recovery-loop backoff doubles toward on each quiet tick (5 min). A genuinely stuck lift
+ * backs off to this instead of hammering its peers. Per-node default.
+ */
+export const RECOVERY_MAX_MS = 300_000
+
+/**
+ * How long past the transaction code's expiry the recovery loop keeps polling before it abandons (1 hour).
+ * Past this a node stops re-arming and leaves the record `pending` (resources stay held — the genuinely-
+ * stuck case; the out-of-band release is `feat-lift-timeout-release`). Abandonment is not final: a later
+ * inbound delivery that merges new info re-arms the loop. Per-node default.
+ */
+export const RECOVERY_GIVEUP_MS = 3_600_000
+
 /** A shallow copy with copied signature arrays — enough to freeze a push snapshot (the core is immutable). */
 function snapshotRecord<TTerms, TPayload>(record: TrxRecord<TTerms, TPayload>): TrxRecord<TTerms, TPayload> {
 	return { ...record, promises: [...record.promises], commits: [...record.commits] }
@@ -1249,6 +1377,11 @@ function signatureSetKey(signatures: Signature[]): string {
 		.map((signature) => `${signature.type}|${signature.address}|${signature.value}`)
 		.sort()
 		.join('\n')
+}
+
+/** A set-identity string over a record's BOTH signature sets — the recovery loop's "did this tick add anything?" key. */
+function recordSignatureKey<TTerms, TPayload>(record: TrxRecord<TTerms, TPayload>): string {
+	return `${signatureSetKey(record.promises)}\u0000${signatureSetKey(record.commits)}`
 }
 
 /** Whether any member key appears more than once in the members array. */

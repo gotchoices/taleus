@@ -178,6 +178,8 @@ interface NetOpts {
 	refuseRelay?: (nodeId: string) => boolean
 	/** A member that goes silent (sends/receives/serves no commit phase) once it has promised. */
 	silentAfterPromise?: (nodeId: string) => boolean
+	/** How long past expiry the recovery loop polls before abandoning (ms). Small values keep a stall test fast. */
+	recoveryGiveupMs?: number
 }
 
 function makeNet(opts: NetOpts): {
@@ -199,6 +201,7 @@ function makeNet(opts: NetOpts): {
 		nomineesFor: opts.nomineesFor,
 		refuseRelay: opts.refuseRelay,
 		silentAfterPromise: opts.silentAfterPromise,
+		recoveryGiveupMs: opts.recoveryGiveupMs,
 		trace: (event) => traces.push(event),
 	})
 	return { net, traces, doubles }
@@ -407,18 +410,21 @@ describe('consensus end to end — dropped pushes', () => {
 			{ name: 'B', roles: [PART] },
 			{ name: 'T', roles: [PART, VOTER] },
 		]
-		const { net, doubles } = makeNet({ graph, conditions: { ab: { drop: true } } })
+		// A small give-up ceiling keeps the stall fast: A's recovery loop backs off and abandons within a few ticks.
+		const { net, doubles, traces } = makeNet({ graph, conditions: { ab: { drop: true } }, recoveryGiveupMs: 60_000 })
 		const tx = await runLift(net, { members, route: ['A', 'B', 'T'], payload: PAYLOAD })
 
 		expect(await outcomes(net, ['A', 'B', 'T'], tx)).toEqual(['pending', 'pending', 'pending'])
 		for (const name of ['A', 'B', 'T']) {
 			expect(doubles.get(name)!.releaseSuccesses).toEqual([]) // nothing settled → nothing released
 		}
-		// The holders' deadline timers fire once (one-shot) at ~expiry+grace and no-op — each holds an incomplete
-		// promise set, so none can void unilaterally — and the voter never received a record, so the heap drains
-		// to 0 and no node falsely settles.
+		// Only A holds a record (it promised); B and T never received one, so only A runs a recovery loop. Its
+		// pull and forced re-push both fall on the dropped ab link, so it makes no progress, backs off, and
+		// **abandons** at the give-up ceiling — leaving the record pending but the heap drained to 0. No node
+		// falsely settles; a cross-link that reopened would re-arm A via the next inbound delivery.
 		expect(net.clock.pendingTimers).toBe(0)
 		expect(net.deliveryErrors).toEqual([])
+		expect(traces.some((e) => e.type === 'recovery-abandoned')).toBe(true) // A gave up after the ceiling
 	})
 })
 
@@ -489,13 +495,16 @@ describe('consensus end to end — voter set sizes', () => {
 
 	it('a set of two that splits one commit / one void settles neither way (stall)', async () => {
 		const { nodes, members, graph } = voterSet(['R1', 'R2'])
-		const { net, doubles } = makeNet({ graph, resourceSpecs: { R2: { shouldCommit: false } } })
+		// Fully connected via contact points: every node's recovery loop re-pulls and force-re-pushes the same
+		// even-split record each tick, makes no progress (the storm guard stops those re-pushes re-arming anyone),
+		// backs off, and abandons at the ceiling. A small give-up keeps that finite and fast.
+		const { net, doubles } = makeNet({ graph, resourceSpecs: { R2: { shouldCommit: false } }, recoveryGiveupMs: 60_000 })
 		const tx = await runLift(net, { members, route: ['A', 'B'], payload: PAYLOAD })
 		expect(await outcomes(net, nodes, tx)).toEqual(nodes.map(() => 'pending')) // even split → no strict majority
 		for (const name of nodes) {
 			expect(doubles.get(name)!.releaseSuccesses).toEqual([]) // nothing settled in-band
 		}
-		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.clock.pendingTimers).toBe(0) // every node abandoned; the heap drained
 	})
 
 	it('a set of three commits on the two fast votes while the third voter is still asleep, then that one commits too', async () => {
@@ -1075,12 +1084,14 @@ describe('consensus end to end — determinism', () => {
 })
 
 describe('consensus end to end — record availability (a pull routes around a refuser)', () => {
-	it('a linear chain with contact points: an interior refuser cuts the far member off from the push, but a pull settles it', async () => {
+	it('a linear chain with contact points: an interior refuser cuts the far member off from the push, but the recovery loop pulls it around and settles it', async () => {
 		// O—V—R—F. V (the sole voter) and O publish contact points. R refuses to relay the commit phase, so
 		// the commit reaches O and V (directly) and R (delivered to it), but R forwards nothing onward — F,
-		// whose only neighbour is R and which has no contact point, is cut off from the push. F pulls O's
-		// settled record over O's contact point (no direct F—O edge, so no interior refuser in the way) and
-		// settles. This is the hard case principle 3 names: on a linear chain, nothing routes around a refuser.
+		// whose only neighbour is R and which has no contact point, is cut off from the PUSH. F stays pending
+		// after the push diffuses; then F's **recovery timer** fires at ~expiry+grace (still inside runLift's
+		// runUntilIdle) and pulls O's settled record over O's contact point (no direct F—O edge, so no interior
+		// refuser in the way) — settling F automatically, with NO manual fetchOutcome. This is the hard case
+		// principle 3 names: on a linear chain, only the timer-driven recovery loop routes a member around a refuser.
 		const graph = makeGraph(
 			['O', 'V', 'R', 'F'],
 			[
@@ -1098,19 +1109,14 @@ describe('consensus end to end — record availability (a pull routes around a r
 		const { net, doubles, traces } = makeNet({ graph, refuseRelay: (n) => n === 'R' })
 		const tx = await runLift(net, { members, route: ['O', 'V', 'R', 'F'], payload: PAYLOAD })
 
-		// The push settles everyone up to and including the refuser; F is stranded.
-		expect(await outcomes(net, ['O', 'V', 'R', 'F'], tx)).toEqual(['commit', 'commit', 'commit', 'pending'])
-		expect(doubles.get('F')!.releaseSuccesses).toEqual([]) // nothing reached F → nothing released
-
-		// F pulls and settles — synchronously (the pull resolves on a microtask), so fetchOutcome returns commit.
-		expect(await net.consensusNode('F').fetchOutcome(tx)).toBe('commit')
-		await net.clock.runUntilIdle() // flush the pushes F's own settlement scheduled
-		expect(await net.consensusNode('F').outcome(tx)).toBe('commit')
+		// With the recovery loop, F settles by itself: its timer fired during runLift, pulled O/V around R, and
+		// merged the commit. No manual fetchOutcome anywhere — the whole route commits, F releasing exactly once.
+		expect(await outcomes(net, ['O', 'V', 'R', 'F'], tx)).toEqual(['commit', 'commit', 'commit', 'commit'])
 		expect(doubles.get('F')!.releaseSuccesses).toEqual([true]) // released exactly once, success
 
-		// The pull itself is traced: F asked every reachable peer (both contact points plus its sole link
+		// F's recovery pull is traced: it asked every reachable peer (both contact points plus its sole link
 		// peer R) and recorded a per-peer `record-pulled` — ok:true from O and V (both already committed and
-		// willing to serve), ok:false from R (the refuser serves no pulls either).
+		// willing to serve), ok:false from R (the refuser serves no pulls either). This proves the LOOP ran.
 		const pulledByF = traces
 			.filter((event): event is Extract<TraceEvent, { type: 'record-pulled' }> => event.type === 'record-pulled' && event.nodeId === net.memberKey('F'))
 			.map((event) => [event.from, event.ok])
@@ -1122,11 +1128,7 @@ describe('consensus end to end — record availability (a pull routes around a r
 			]),
 		)
 
-		// A second pull after settlement is idempotent: no second release, no delivery error.
-		expect(await net.consensusNode('F').fetchOutcome(tx)).toBe('commit')
-		await net.clock.runUntilIdle()
-		expect(doubles.get('F')!.releaseSuccesses).toEqual([true])
-		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.clock.pendingTimers).toBe(0) // F settled → its loop cleared; no node left polling
 		expect(net.deliveryErrors).toEqual([])
 	})
 
@@ -1147,13 +1149,15 @@ describe('consensus end to end — record availability (a pull routes around a r
 			{ name: 'R', roles: [PART] },
 			{ name: 'F', roles: [PART] },
 		]
-		const { net, doubles } = makeNet({ graph, refuseRelay: (n) => n === 'R' })
+		// F runs a recovery loop (it cooperates), but its only reachable peer is the refuser R, which serves no
+		// pull — so F makes no progress and abandons at the give-up ceiling (kept small for speed).
+		const { net, doubles } = makeNet({ graph, refuseRelay: (n) => n === 'R', recoveryGiveupMs: 60_000 })
 		const tx = await runLift(net, { members, route: ['O', 'V', 'R', 'F'], payload: PAYLOAD })
 
 		expect(await outcomes(net, ['O', 'V', 'R', 'F'], tx)).toEqual(['commit', 'commit', 'commit', 'pending'])
 		expect(await net.consensusNode('F').fetchOutcome(tx)).toBe('pending') // R serves no pull; no other path exists
 		expect(doubles.get('F')!.releaseSuccesses).toEqual([])
-		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.clock.pendingTimers).toBe(0) // F abandoned; the heap drained
 		expect(net.deliveryErrors).toEqual([])
 	})
 
@@ -1245,14 +1249,14 @@ describe('consensus end to end — record availability (a pull routes around a r
 describe('consensus end to end — settling by deadline', () => {
 	it('a promise phase that only completes after the code expires voids the whole route by deadline', async () => {
 		// A—B carries a 400_000 ms latency; A—V (the sole voter) is instant. A promises at t=0 and reaches V at
-		// once, but B's promise does not arrive until t=400_000; B then completes the promise phase and its
-		// completed record returns to A at t=800_000 — past the 600_000 ms code expiry. A re-pushes the complete
-		// set to V, whose completing-promise update now lands post-expiry: castCommit's expired path votes NC,
-		// and as the sole voter that voids the whole route. (Each node's own deadline timer fires at ~605_000 and
-		// no-ops — it held an incomplete set then — so this exercises deadline-DRIVEN settlement; onDeadline's own
-		// voter-NC branch is unreachable via normal delivery and is covered only at the unit level, see
-		// participant.test.ts "deadline timer" (a). Keep the ab latency 400_000 exactly: 2×=800_000 > 600_000 so
-		// the completed set lands post-expiry, yet each single 400_000 hop leaves B's promise margin ≥ 30_000.)
+		// once, but B's promise does not arrive until t=400_000; B then completes the promise phase. By the 600_000
+		// ms code expiry the completed set has not yet returned to A over the slow ab link. The recovery loop
+		// closes the gap: A's recovery timer fires at ~605_000 and PULLS B's already-complete promise set (the
+		// harness pull ignores link latency, resolving immediately — so A need not wait for the 800_000 ms push),
+		// completes A's promise phase, and force-re-pushes the complete set to V. V's completing-promise update
+		// now lands post-expiry: castCommit's expired path votes NC, and as the sole voter that voids the whole
+		// route. So this exercises deadline-DRIVEN settlement reached by the recovery pull. Keep the ab latency
+		// 400_000: a single hop leaves B's promise margin ≥ 30_000, yet the push cannot return before expiry.
 		const graph = makeGraph(['A', 'B', 'V'], [['ab', 'A', 'B'], ['av', 'A', 'V']])
 		const members: LiftMemberSpec[] = [
 			{ name: 'A', roles: [PART] },
@@ -1266,7 +1270,52 @@ describe('consensus end to end — settling by deadline', () => {
 		for (const name of ['A', 'B', 'V']) {
 			expect(doubles.get(name)!.releaseSuccesses).toEqual([false]) // released once, as a void
 		}
-		expect(net.clock.pendingTimers).toBe(0) // one-shot deadlines fire and drain; no node re-arms past expiry
+		expect(net.clock.pendingTimers).toBe(0) // the route voids at the first recovery tick; every loop clears
+		expect(net.deliveryErrors).toEqual([])
+	})
+})
+
+describe('consensus end to end — recovery loop heals a network split on rejoin', () => {
+	it('two voter islands split by a dropped link stay pending, then both commit once one cross-link reopens', async () => {
+		// P0 (a [P]-only minter) links to both voters A and B (p0a, p0b, always open); the two voters also
+		// share a direct link ab, which starts DROPPED. P0 refuses to relay the commit phase, so it carries the
+		// promise phase (A:P, B:P, P0:P all complete at t≈0) but never forwards a vote. Each voter therefore
+		// casts its C at t≈0 (pre-deadline) yet sees only its own — 1 of 2, no majority — and both stall
+		// `pending`, each backing off on its recovery timer. P0, which merges both votes, is the one node that
+		// reaches 2 of 2 and commits. Flipping ab back open lets a live recovery tick pull the far island's C
+		// across the restored link: a majority forms and both voters converge and release. "Any single
+		// cross-island link restores the trend toward resolution" (ChipNet § Network splits), driven by the loop.
+		const graph = makeGraph(
+			['P0', 'A', 'B'],
+			[
+				['p0a', 'P0', 'A'],
+				['p0b', 'P0', 'B'],
+				['ab', 'A', 'B'],
+			],
+		)
+		const members: LiftMemberSpec[] = [
+			{ name: 'P0', roles: [PART] },
+			{ name: 'A', roles: [PART, VOTER] },
+			{ name: 'B', roles: [PART, VOTER] },
+		]
+		const conditions: Record<string, LinkCondition> = { ab: { drop: true } } // mutable: resolveCondition reads it per delivery
+		const { net, doubles } = makeNet({ graph, conditions, refuseRelay: (n) => n === 'P0' })
+		const { record, transactionCode: tx } = net.buildLift({ members, route: ['P0', 'A'], extraLinks: [['P0', 'B'], ['A', 'B']], payload: PAYLOAD })
+
+		await net.consensusNode('P0').start(record)
+		// Drive past the first recovery ticks (~expiry+grace) while the islands are still split. Neither voter
+		// can reach the other (ab dropped; P0 relays no commit), so both stay pending and keep backing off.
+		await net.clock.advance(650_000)
+		expect(await outcomes(net, ['P0', 'A', 'B'], tx)).toEqual(['commit', 'pending', 'pending'])
+
+		conditions.ab.drop = false // restore the single cross-island link
+		await net.clock.runUntilIdle() // the next live recovery tick pulls across it; the merged votes form a majority
+
+		expect(await outcomes(net, ['P0', 'A', 'B'], tx)).toEqual(['commit', 'commit', 'commit'])
+		for (const name of ['P0', 'A', 'B']) {
+			expect(doubles.get(name)!.releaseSuccesses).toEqual([true]) // each released once, success
+		}
+		expect(net.clock.pendingTimers).toBe(0) // both converged → every loop cleared
 		expect(net.deliveryErrors).toEqual([])
 	})
 })

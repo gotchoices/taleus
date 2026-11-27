@@ -60,6 +60,12 @@ export interface ConsensusNodeDeps<TTerms, TPayload> {
 	minPromiseMarginMs?: number
 	/** Grace (ms) past the transaction-code expiry before this node fires its void timer. Per-node; default applies when omitted. */
 	skewGraceMs?: number
+	/** First recovery-loop backoff delay (ms) after the deadline. Per-node; default applies when omitted. */
+	recoveryBaseMs?: number
+	/** Ceiling the recovery-loop backoff doubles toward (ms). Per-node; default applies when omitted. */
+	recoveryMaxMs?: number
+	/** How long past the deadline the recovery loop polls before abandoning (ms). Per-node; default applies when omitted. */
+	recoveryGiveupMs?: number
 }
 
 export class ConsensusNode<TTerms, TPayload> {
@@ -86,6 +92,9 @@ export class ConsensusNode<TTerms, TPayload> {
 			sessionCodes: deps.sessionCodes,
 			minPromiseMarginMs: deps.minPromiseMarginMs,
 			skewGraceMs: deps.skewGraceMs,
+			recoveryBaseMs: deps.recoveryBaseMs,
+			recoveryMaxMs: deps.recoveryMaxMs,
+			recoveryGiveupMs: deps.recoveryGiveupMs,
 		})
 	}
 
@@ -112,9 +121,14 @@ export class ConsensusNode<TTerms, TPayload> {
 		return this.participant.abort(transactionCode)
 	}
 
-	/** Drive the deadline tick for `transactionCode` (the timer fires this; exposed for host/tests). */
+	/** Drive the 6a one-shot deadline tick for `transactionCode` (exposed for host/tests; the loop uses {@link onRecoveryTick}). */
 	onDeadline(transactionCode: string): Promise<void> {
 		return this.participant.onDeadline(transactionCode)
+	}
+
+	/** Drive one periodic recovery tick for `transactionCode` (the armed recovery timer fires this; exposed for host/tests). */
+	onRecoveryTick(transactionCode: string): Promise<void> {
+		return this.participant.onRecoveryTick(transactionCode)
 	}
 
 	// NOTE: `update` is not re-entrancy-safe per node — it reads the stored record, merges, then saves

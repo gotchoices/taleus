@@ -145,8 +145,12 @@ describe('runConsensusSweep — principle 3 completion curve (linear route)', ()
 		for (const r of records) {
 			expect(r.metrics.cooperatingCompletion).toBe(1)
 		}
-		// The 1/6 cell actually exercised recovery (members were stranded then pulled back), not a no-op.
-		expect(records[1].metrics.recoveredTotal).toBeGreaterThan(0)
+		// Completion holding at 1.0 WITH a non-relayer present is itself the proof recovery happened: without
+		// it the stranded members would never commit. NOTE(6.2→6.3): that recovery is now the protocol loop
+		// (tallynet-stalled-recovery) healing them during the settle, not the simulator's manual pull — which
+		// therefore recovers 0. tallysim-timeout-scenarios (6.3) removes the manual recoverStrandedByPull and
+		// re-homes this counter onto the loop's own recovery (its `recovery-tick` / `record-pulled` traces).
+		expect(records[1].metrics.recoveredTotal).toBe(0) // the manual pull is redundant now the loop self-heals
 	})
 
 	it('without contact points, a straight line shows the completion cliff (the documented gap)', async () => {

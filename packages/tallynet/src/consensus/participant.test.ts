@@ -7,7 +7,7 @@ import type { TraceEvent } from '../trace.js'
 import { DEFAULT_CONSENSUS_METHOD, MemberTypes, type ConsensusMethod, type DependentMember, type MemberType } from '../discovery/types.js'
 import { signRecord } from './signature.js'
 import { MemoryTrxStore, type TrxStore } from './store.js'
-import { MAX_PENDING_COMMITS_PER_VOTER, MIN_PROMISE_MARGIN_MS, SKEW_GRACE_MS, TrxParticipant, type FetchRecordFunc, type Logger, type UpdatePeerFunc } from './participant.js'
+import { MAX_PENDING_COMMITS_PER_VOTER, MIN_PROMISE_MARGIN_MS, RECOVERY_BASE_MS, SKEW_GRACE_MS, TrxParticipant, type FetchRecordFunc, type Logger, type UpdatePeerFunc } from './participant.js'
 import type { ResourceContext, TrxParticipantResource } from './resource.js'
 import type { Signature, SignatureType, TrxLink, TrxRecord } from './types.js'
 
@@ -278,6 +278,9 @@ interface HarnessOpts {
 	selfKeyOverride?: string
 	minPromiseMarginMs?: number
 	skewGraceMs?: number
+	recoveryBaseMs?: number
+	recoveryMaxMs?: number
+	recoveryGiveupMs?: number
 }
 
 /** Build a participant plus recording sinks. Ports default to a memory store, a recording trace/log/updatePeer. */
@@ -311,6 +314,9 @@ function harness(opts: HarnessOpts): Harness {
 		log,
 		minPromiseMarginMs: opts.minPromiseMarginMs,
 		skewGraceMs: opts.skewGraceMs,
+		recoveryBaseMs: opts.recoveryBaseMs,
+		recoveryMaxMs: opts.recoveryMaxMs,
+		recoveryGiveupMs: opts.recoveryGiveupMs,
 	})
 	return { participant, store, clock, events, logs, pushes }
 }
@@ -1624,5 +1630,190 @@ describe('TrxParticipant — deadline timer', () => {
 		await refuse.participant.update(refuse.record)
 		expect(eventsOfType(refuse.events, 'promise-signed').map((e) => e.signatureType)).toEqual(['NP'])
 		expect(await refuse.participant.outcome(refuse.record.transactionCode)).toBe('void')
+	})
+})
+
+describe('TrxParticipant — recovery loop (periodic re-push/pull after the deadline)', () => {
+	const P = MemberTypes.participant
+	const V = MemberTypes.voter
+
+	/** The latest live (armed, not cleared) timer's delay, or undefined when none is armed. */
+	function liveDelay(clock: MutableClock): number | undefined {
+		const live = clock.armed.filter((timer) => !timer.cleared)
+		return live.length ? live[live.length - 1].delayMs : undefined
+	}
+
+	/**
+	 * A promised-but-waiting participant: alice (self) holds her `P`, bob (the other participant) has not
+	 * promised and ref (the sole voter) has not voted — so the record is non-terminal (`pending`) and
+	 * alice has nothing left to do, the clean "quiet tick" fixture. Alice's only reachable peer is bob (the
+	 * `n1` link), so a pull targets bob.
+	 */
+	async function pendingAlice(): Promise<{ alice: Party; bob: Party; ref: Party; base: TrxRecord<TTerms, TPayload>; store: MemoryTrxStore<TTerms, TPayload> }> {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const members = [member(alice, [P]), member(bob, [P]), member(ref, [V])]
+		const base = makeRecord(members, { n1: link(alice, bob) })
+		const stored: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base)], commits: [] }
+		const store = new MemoryTrxStore<TTerms, TPayload>()
+		await store.saveRecord(stored)
+		return { alice, bob, ref, base, store }
+	}
+
+	it('(j) a quiet recovery tick re-pushes, emits recovery-tick, and doubles the backoff', async () => {
+		const { alice, base, store } = await pendingAlice()
+		const clock = makeClock(NOW)
+		const { participant, events } = harness({ self: alice, store, clock })
+		clock.set(expiresAt(base.transactionCode) + 1) // past the deadline — the loop, not the 6a one-shot, now drives
+
+		await participant.onRecoveryTick(base.transactionCode)
+		expect(liveDelay(clock)).toBe(RECOVERY_BASE_MS * 2) // base 5000, doubled on a quiet tick → 10000
+		await participant.onRecoveryTick(base.transactionCode)
+		expect(liveDelay(clock)).toBe(RECOVERY_BASE_MS * 4) // doubled again → 20000
+		expect(eventsOfType(events, 'recovery-tick').map((e) => [e.attempt, e.changed])).toEqual([[1, false], [2, false]])
+		expect(clock.liveTimers()).toBe(1) // exactly one timer armed after each tick (the prior one cleared)
+		expect(await participant.outcome(base.transactionCode)).toBe('pending') // nothing settled; alice still waits on bob
+	})
+
+	it('(k) a tick that merges new info resets the backoff to base', async () => {
+		const { alice, bob, base, store } = await pendingAlice()
+		const box: { reply?: TrxRecord<TTerms, TPayload> } = {} // mutable holder so the pull can start empty, then deliver
+		const fetchRecord: FetchRecordFunc<TTerms, TPayload> = () => Promise.resolve(box.reply)
+		const clock = makeClock(NOW)
+		const { participant, events } = harness({ self: alice, store, clock, fetchRecord })
+		clock.set(expiresAt(base.transactionCode) + 1)
+
+		await participant.onRecoveryTick(base.transactionCode) // reply undefined → quiet: 5000 → 10000
+		await participant.onRecoveryTick(base.transactionCode) // quiet: 10000 → 20000
+		expect(liveDelay(clock)).toBe(RECOVERY_BASE_MS * 4)
+
+		// Connectivity delivers bob's promise on the next pull → the merge is progress → backoff resets to base.
+		box.reply = { ...base, promises: [await sign(alice, 'P', base), await sign(bob, 'P', base)], commits: [] }
+		await participant.onRecoveryTick(base.transactionCode)
+		expect(liveDelay(clock)).toBe(RECOVERY_BASE_MS)
+		const ticks = eventsOfType(events, 'recovery-tick')
+		expect(ticks[ticks.length - 1].changed).toBe(true)
+	})
+
+	it('(l) gives up past the ceiling: emits recovery-abandoned and does not re-arm', async () => {
+		const { alice, base, store } = await pendingAlice()
+		const clock = makeClock(NOW)
+		const { participant, events } = harness({ self: alice, store, clock, recoveryGiveupMs: 1_000 })
+		clock.set(expiresAt(base.transactionCode) + 2_000) // past expiry + giveup
+
+		await participant.onRecoveryTick(base.transactionCode)
+		expect(eventsOfType(events, 'recovery-abandoned').map((e) => e.transactionCode)).toEqual([base.transactionCode])
+		expect(eventsOfType(events, 'recovery-tick')).toEqual([]) // abandoned before the tick's force-push / emit
+		expect(clock.liveTimers()).toBe(0) // no re-arm — active polling stopped
+		expect(await participant.outcome(base.transactionCode)).toBe('pending') // resources stay held (the stuck case)
+	})
+
+	it('(m) a later inbound update after abandonment re-arms the loop (abandonment is not final)', async () => {
+		const { alice, bob, base, store } = await pendingAlice()
+		const clock = makeClock(NOW)
+		const { participant } = harness({ self: alice, store, clock, recoveryGiveupMs: 1_000 })
+		clock.set(expiresAt(base.transactionCode) + 2_000)
+		await participant.onRecoveryTick(base.transactionCode) // abandons
+		expect(clock.liveTimers()).toBe(0)
+
+		// Connectivity returns: a delivery carrying bob's promise merges new info post-deadline → re-arms at base.
+		const reply: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base), await sign(bob, 'P', base)], commits: [] }
+		await participant.update(reply, { key: bob.key })
+		expect(clock.liveTimers()).toBe(1)
+		expect(liveDelay(clock)).toBe(RECOVERY_BASE_MS) // backoff cleared on abandon → resumes at base
+	})
+
+	it('(n) onRecoveryTick is a safe no-op on an unknown, released, or non-member transaction', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const base = makeRecord([member(alice, [P]), member(bob, [P]), member(ref, [V])], { n1: link(alice, bob) })
+
+		const unknown = harness({ self: ref })
+		await expect(unknown.participant.onRecoveryTick('not-a-transaction')).resolves.toBeUndefined()
+		expect(eventsOfType(unknown.events, 'recovery-tick')).toEqual([])
+		expect(eventsOfType(unknown.events, 'recovery-abandoned')).toEqual([])
+
+		const releasedStore = new MemoryTrxStore<TTerms, TPayload>()
+		await releasedStore.saveRecord(base)
+		await releasedStore.setReleased(base.transactionCode)
+		const rel = harness({ self: ref, store: releasedStore })
+		await rel.participant.onRecoveryTick(base.transactionCode)
+		expect(eventsOfType(rel.events, 'recovery-tick')).toEqual([])
+		expect(rel.clock.liveTimers()).toBe(0)
+
+		const nonMemberStore = new MemoryTrxStore<TTerms, TPayload>()
+		await nonMemberStore.saveRecord(base)
+		const stranger = harness({ self: makeParty(), store: nonMemberStore })
+		await stranger.participant.onRecoveryTick(base.transactionCode)
+		expect(eventsOfType(stranger.events, 'recovery-tick')).toEqual([])
+	})
+
+	it('(o) recovery forces a re-push even when unchanged, while a happy-path re-push still skips', async () => {
+		const { alice, base, store } = await pendingAlice()
+		const clock = makeClock(NOW)
+		const stored: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base)], commits: [] }
+		const { participant, pushes } = harness({ self: alice, store, clock })
+
+		await participant.update(stored) // first push to bob records the peer copy
+		const afterFirst = pushes.length
+		expect(afterFirst).toBeGreaterThanOrEqual(1)
+
+		await participant.update(stored) // unchanged → the happy-path skip suppresses the re-push
+		expect(pushes.length).toBe(afterFirst)
+
+		clock.set(expiresAt(base.transactionCode) + 1)
+		await participant.onRecoveryTick(base.transactionCode) // recovery forces the re-send despite no change
+		expect(pushes.length).toBeGreaterThan(afterFirst)
+	})
+
+	it('(p) a plain re-delivery after the deadline does not arm a recovery timer (the storm guard)', async () => {
+		const { alice, base, store } = await pendingAlice()
+		const clock = makeClock(NOW)
+		const { participant } = harness({ self: alice, store, clock, recoveryGiveupMs: 1_000 })
+		clock.set(expiresAt(base.transactionCode) + 2_000)
+		await participant.onRecoveryTick(base.transactionCode) // abandons; no live timer
+		expect(clock.liveTimers()).toBe(0)
+
+		// Re-delivering the record we already hold merges nothing → must NOT revive the abandoned loop.
+		await participant.update({ ...base, promises: [await sign(alice, 'P', base)], commits: [] })
+		expect(clock.liveTimers()).toBe(0)
+	})
+
+	it('(q) the quiet-tick backoff caps at recoveryMaxMs', async () => {
+		const { alice, base, store } = await pendingAlice()
+		const clock = makeClock(NOW)
+		const { participant } = harness({ self: alice, store, clock, recoveryBaseMs: 100, recoveryMaxMs: 250 })
+		clock.set(expiresAt(base.transactionCode) + 1)
+		await participant.onRecoveryTick(base.transactionCode) // 100 → 200
+		expect(liveDelay(clock)).toBe(200)
+		await participant.onRecoveryTick(base.transactionCode) // 200 → min(400, 250) = 250
+		expect(liveDelay(clock)).toBe(250)
+		await participant.onRecoveryTick(base.transactionCode) // stays capped
+		expect(liveDelay(clock)).toBe(250)
+	})
+
+	it('(r) a recovery tick casts the deadline NC for an un-voted voter and settles (deadline folded into the tick)', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const members = [member(alice, [P]), member(bob, [P]), member(ref, [V])]
+		const base = makeRecord(members, { n1: link(alice, bob) })
+		// A complete promise phase, zero commits, seeded by hand (an un-voted sole voter past its deadline).
+		const stored: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base), await sign(bob, 'P', base)], commits: [] }
+		const store = new MemoryTrxStore<TTerms, TPayload>()
+		await store.saveRecord(stored)
+		const clock = makeClock(NOW)
+		const resource = makeResource()
+		const { participant } = harness({ self: ref, store, clock, resource: resource.resource })
+		clock.set(expiresAt(base.transactionCode) + 1)
+
+		await participant.onRecoveryTick(base.transactionCode)
+		const settled = await store.getRecord(base.transactionCode)
+		expect(settled!.commits.map((s) => s.type)).toEqual(['NC']) // the tick's advance loop cast the timeout NC
+		expect(await participant.outcome(base.transactionCode)).toBe('void') // sole voter NC → strict void majority
+		expect(resource.releaseSuccesses).toEqual([false]) // released once, as a void
+		expect(clock.liveTimers()).toBe(0) // settled → loop cleared, no re-arm
 	})
 })

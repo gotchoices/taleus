@@ -144,6 +144,12 @@ export interface InMemoryNetworkConfig<TTerms, TPayload> {
 	resourceFor?: (nodeId: string) => TrxParticipantResource<TTerms, TPayload>
 	/** Per-node consensus logger (refusals, rejections, push failures). Default: no-op. */
 	consensusLog?: (nodeId: string) => Logger
+	/** First recovery-loop backoff delay (ms) after the deadline, shared by every consensus node. Per-node default when omitted. */
+	recoveryBaseMs?: number
+	/** Ceiling the recovery-loop backoff doubles toward (ms), shared by every consensus node. Default when omitted. */
+	recoveryMaxMs?: number
+	/** How long past the deadline the recovery loop polls before abandoning (ms), shared by every node. Default when omitted. */
+	recoveryGiveupMs?: number
 	/**
 	 * A non-cooperating member that **refuses to relay the commit phase**: it still delivers and receives
 	 * promise-phase records (so its own promise propagates and the promise phase completes), but drops every
@@ -347,6 +353,9 @@ export class InMemoryNetwork<TTerms, TPayload> {
 			trace: config.trace,
 			log: config.consensusLog ? config.consensusLog(name) : undefined,
 			sessionCodes: config.sessionCodes,
+			recoveryBaseMs: config.recoveryBaseMs,
+			recoveryMaxMs: config.recoveryMaxMs,
+			recoveryGiveupMs: config.recoveryGiveupMs,
 		})
 	}
 
@@ -640,9 +649,17 @@ export class InMemoryNetwork<TTerms, TPayload> {
 	 * after promising, or sits behind a `drop` link on the direct puller↔target edge. A pull over a `physical`
 	 * contact point has no direct edge → `pushCondition` is `undefined` → the pull succeeds (how a cut-off
 	 * member reaches a voter/originator around an interior refuser).
+	 *
+	 * A non-cooperating **puller** (a refuser, or a node silent after promising) makes **no** pulls either —
+	 * its recovery loop is offline for the commit phase, so it neither serves nor fetches. This keeps the
+	 * refuser/silent model consistent now that every pending member polls on a timer (before 6.2 only a
+	 * cooperating stranded member ever called `fetchOutcome` by hand).
 	 */
 	private makeFetchRecord(pullerName: string): FetchRecordFunc<TTerms, TPayload> {
 		return async (transactionCode, from) => {
+			if (this.refuseRelay(pullerName) || this.silentAfterPromise(pullerName)) {
+				return undefined // a non-cooperating member runs no pulls (its recovery loop is offline for commits)
+			}
 			const targetName = this.nameByMemberKey.get(from.key)
 			if (!targetName || this.refuseRelay(targetName) || this.silentAfterPromise(targetName)) {
 				return undefined // a non-cooperating member serves no pulls
