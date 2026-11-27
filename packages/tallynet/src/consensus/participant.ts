@@ -1085,6 +1085,10 @@ export class TrxParticipant<TTerms, TPayload> {
 			this.clearRecoveryState(transactionCode) // the pull settled us (or we were released mid-tick)
 			return
 		}
+		// NOTE: load-bearing ordering — the advance loop (which casts the deadline `NC`, incl. on an incomplete
+		// set) MUST run before the abandon check below. If reordered, a reachable voter whose first post-expiry
+		// tick already sits past the give-up ceiling (a small `recoveryGiveupMs`) would abandon `pending` without
+		// ever voting, instead of voiding. Covered by consensus-timeout.test.ts § incomplete-set-voids.
 		const acted = await this.runAdvanceLoop(current) // the expired-code path casts our deadline NC/NP
 		if ((await this.recordOutcome(current)) !== 'pending') {
 			await this.push(current) // settled this tick: inform peers (it changed, so a normal push suffices)
