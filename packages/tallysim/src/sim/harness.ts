@@ -61,6 +61,18 @@ const LIFT_CODE = 'L'
  */
 const SESSION_CODE_SEED = 1
 
+/**
+ * How long past the transaction code's expiry a sim node polls on its recovery loop before abandoning (ms).
+ * Far smaller than TallyNet's 1-hour production default: the sim drives every lift to clock-idle, so a
+ * genuinely-stuck lift (an even split, or a threshold band no side clears) would otherwise poll through a
+ * virtual hour of exponential-backoff ticks — thousands of signature verifications across the voter set —
+ * and blow the test timeout. A healable lift settles on its first post-deadline tick (well inside this
+ * window), so the only lifts this shortens are the ones that must abandon anyway; the abandoned outcome
+ * is unchanged (`pending`, resources held). NOTE(6.2→6.3): tallysim-timeout-scenarios makes this a
+ * per-scenario knob when it builds explicit timeout/abandonment experiments.
+ */
+const SIM_RECOVERY_GIVEUP_MS = 60_000
+
 /** A built discovery network ready to run queries, plus the node↔entity bijection to map results back. */
 export interface SimNetwork {
 	/** The wired `tallynet` in-memory network. Drive `net.clock` to settle a `discover`. */
@@ -179,6 +191,7 @@ export function buildSimNetwork(
 		conditions: compiled.conditions,
 		trace,
 		options,
+		recoveryGiveupMs: SIM_RECOVERY_GIVEUP_MS,
 		...consensusPorts(consensus),
 	})
 	return { net, entityName, entityId }
