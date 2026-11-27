@@ -154,6 +154,11 @@ export interface UniQuery<TTerms> {
 	method: ConsensusMethod
 	/** Optional reference (a Stroc CID) to the lift's written contract. Omit when absent — never set `undefined`. */
 	liftContract?: string
+	/**
+	 * Optional lift-window hint (ms): the transaction-code lifetime the originator intends. A node may
+	 * refuse a too-short window via `acceptsQuery` (host policy). `proceed` mints the code from it.
+	 */
+	ttlMs?: number
 }
 
 /** A ticket a node returns while a search through it can still go deeper; feed it back to reenter. */

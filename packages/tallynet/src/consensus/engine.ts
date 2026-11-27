@@ -56,6 +56,10 @@ export interface ConsensusNodeDeps<TTerms, TPayload> {
 	log?: Logger
 	/** Session-code checks; default wraps `session-code.ts`. */
 	sessionCodes?: SessionCodeValidators
+	/** Minimum lift window (ms) this node needs before it will promise. Per-node (principle 0); default applies when omitted. */
+	minPromiseMarginMs?: number
+	/** Grace (ms) past the transaction-code expiry before this node fires its void timer. Per-node; default applies when omitted. */
+	skewGraceMs?: number
 }
 
 export class ConsensusNode<TTerms, TPayload> {
@@ -80,6 +84,8 @@ export class ConsensusNode<TTerms, TPayload> {
 			trace: deps.trace,
 			log: deps.log,
 			sessionCodes: deps.sessionCodes,
+			minPromiseMarginMs: deps.minPromiseMarginMs,
+			skewGraceMs: deps.skewGraceMs,
 		})
 	}
 
@@ -104,6 +110,11 @@ export class ConsensusNode<TTerms, TPayload> {
 	 */
 	abort(transactionCode: string): Promise<void> {
 		return this.participant.abort(transactionCode)
+	}
+
+	/** Drive the deadline tick for `transactionCode` (the timer fires this; exposed for host/tests). */
+	onDeadline(transactionCode: string): Promise<void> {
+		return this.participant.onDeadline(transactionCode)
 	}
 
 	// NOTE: `update` is not re-entrancy-safe per node — it reads the stored record, merges, then saves

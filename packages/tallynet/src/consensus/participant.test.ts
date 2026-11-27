@@ -2,12 +2,12 @@ import { ed25519 } from '@noble/curves/ed25519.js'
 import { base64urlToBytes, bytesToBase64url } from '../base64url.js'
 import type { Clock } from '../clock.js'
 import type { RandomSource, Signer, Verifier } from '../crypto.js'
-import { generate } from '../session-code.js'
+import { expiresAt, generate } from '../session-code.js'
 import type { TraceEvent } from '../trace.js'
 import { DEFAULT_CONSENSUS_METHOD, MemberTypes, type ConsensusMethod, type DependentMember, type MemberType } from '../discovery/types.js'
 import { signRecord } from './signature.js'
 import { MemoryTrxStore, type TrxStore } from './store.js'
-import { MAX_PENDING_COMMITS_PER_VOTER, TrxParticipant, type FetchRecordFunc, type Logger, type UpdatePeerFunc } from './participant.js'
+import { MAX_PENDING_COMMITS_PER_VOTER, MIN_PROMISE_MARGIN_MS, SKEW_GRACE_MS, TrxParticipant, type FetchRecordFunc, type Logger, type UpdatePeerFunc } from './participant.js'
 import type { ResourceContext, TrxParticipantResource } from './resource.js'
 import type { Signature, SignatureType, TrxLink, TrxRecord } from './types.js'
 
@@ -115,28 +115,59 @@ function corruptAt(signature: Signature, index: number): Signature {
 
 /* ── clock double ────────────────────────────────────────────────────────────────────── */
 
+interface ArmedTimer {
+	fn: () => void | Promise<void>
+	delayMs: number
+	cleared: boolean
+}
+
 interface MutableClock extends Clock {
 	set(now: number): void
+	/** Every timer ever armed, in arm order (cleared ones keep their slot, flagged `cleared`). */
+	armed: ArmedTimer[]
+	/** Count of live (armed, not cleared) timers. */
+	liveTimers(): number
+	/** Fire every live timer once, in arm order (a test sets `now` first; firing advances nothing). */
+	fireAll(): Promise<void>
 }
 
 /**
- * A clock whose `now` the test moves by hand. The consensus engine owns no timer, so `setTimer` /
- * `clearTimer` are wired to throw — any accidental timer use fails the test loudly.
+ * A clock whose `now` the test moves by hand. The deadline work arms real timers, so this double
+ * RECORDS each armed timer rather than throwing: a test sets `now`, then either drives
+ * `participant.onDeadline` directly or calls {@link MutableClock.fireAll}, and asserts arm/clear via
+ * {@link MutableClock.liveTimers}. (A surface-compatible superset of the old `now`/`set` clock, so the
+ * existing tests that only read those keep working — a non-terminal record simply arms a quiet timer.)
  */
 function makeClock(start = NOW): MutableClock {
 	let current = start
-	return {
+	const armed: ArmedTimer[] = []
+	const clock: MutableClock = {
 		now: () => current,
-		setTimer: () => {
-			throw new Error('consensus must not arm timers')
+		setTimer: (fn, ms) => {
+			const timer: ArmedTimer = { fn, delayMs: ms, cleared: false }
+			armed.push(timer)
+			return timer
 		},
-		clearTimer: () => {
-			throw new Error('consensus must not clear timers')
+		clearTimer: (handle) => {
+			const timer = handle as ArmedTimer | undefined
+			if (timer && armed.includes(timer)) {
+				timer.cleared = true
+			}
 		},
 		set: (next) => {
 			current = next
 		},
+		armed,
+		liveTimers: () => armed.filter((timer) => !timer.cleared).length,
+		fireAll: async () => {
+			for (const timer of armed) {
+				if (!timer.cleared) {
+					await timer.fn()
+				}
+			}
+		},
 	}
+	return clock
 }
 
 /* ── resource double ─────────────────────────────────────────────────────────────────── */
@@ -1400,5 +1431,157 @@ describe('TrxParticipant — settled-outcome contradiction (equivocating voters 
 		expect(resource.releaseSuccesses).toEqual([true]) // still exactly one release — settlement is untouched
 		expect([...(await participant.equivocators(base.transactionCode))].sort()).toEqual([r1.key, r2.key].sort())
 		expect(await participant.equivocationProof(base.transactionCode, r1.key)).toHaveLength(2) // C + NC
+	})
+})
+
+describe('TrxParticipant — deadline timer', () => {
+	const P = MemberTypes.participant
+	const V = MemberTypes.voter
+
+	it('(a) drives an un-voted voter to NC on the deadline (seeded complete-promise store)', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const members = [member(alice, [P]), member(bob, [P]), member(ref, [V])]
+		const base = makeRecord(members, { n1: link(alice, bob) })
+		// A complete promise phase with zero commits, SEEDED directly: calling update() would make ref vote C
+		// synchronously, so the un-voted-voter-at-deadline branch is only reachable by seeding the store by hand.
+		const stored: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base), await sign(bob, 'P', base)], commits: [] }
+		const store = new MemoryTrxStore<TTerms, TPayload>()
+		await store.saveRecord(stored)
+		const clock = makeClock(NOW)
+		const resource = makeResource()
+		const { participant, events } = harness({ self: ref, store, clock, resource: resource.resource })
+
+		clock.set(expiresAt(base.transactionCode) + 1) // past the deadline
+		await participant.onDeadline(base.transactionCode)
+
+		const settled = await store.getRecord(base.transactionCode)
+		expect(settled!.commits.map((s) => s.type)).toEqual(['NC']) // the un-voted voter voids on timeout
+		expect(settled!.commits[0].address).toBe(ref.key)
+		expect(await participant.outcome(base.transactionCode)).toBe('void') // sole voter NC → strict void majority
+		expect(eventsOfType(events, 'deadline-reached').map((e) => e.acted)).toEqual([true])
+		expect(resource.releaseSuccesses).toEqual([false]) // released once, as a void
+	})
+
+	it('(b) a voter that already voted C no-ops on the deadline (no equivocation)', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const r2 = makeParty()
+		const members = [member(alice, [P]), member(bob, [P]), member(ref, [V]), member(r2, [V])]
+		const base = makeRecord(members, { n1: link(alice, bob) })
+		const complete: TrxRecord<TTerms, TPayload> = { ...base, promises: [await sign(alice, 'P', base), await sign(bob, 'P', base)] }
+		const refC = await sign(ref, 'C', complete) // ref already voted C; r2 has not voted → 1 of 2, no majority yet
+		const stored: TrxRecord<TTerms, TPayload> = { ...complete, commits: [refC] }
+		const store = new MemoryTrxStore<TTerms, TPayload>()
+		await store.saveRecord(stored)
+		const clock = makeClock(NOW)
+		const resource = makeResource()
+		const { participant, events } = harness({ self: ref, store, clock, resource: resource.resource })
+
+		clock.set(expiresAt(base.transactionCode) + 1)
+		await participant.onDeadline(base.transactionCode)
+
+		const after = await store.getRecord(base.transactionCode)
+		expect(after!.commits.map((s) => s.type)).toEqual(['C']) // still just ref's C — no second (NC) face appended
+		expect(await participant.outcome(base.transactionCode)).toBe('pending') // propagating: 1 of 2
+		expect(eventsOfType(events, 'deadline-reached').map((e) => e.acted)).toEqual([false])
+		expect(resource.releaseSuccesses).toEqual([])
+	})
+
+	it('(c) a promised-and-waiting participant arms a timer, then no-ops when its deadline fires', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const members = [member(alice, [P]), member(bob, [P]), member(ref, [V])]
+		const record = makeRecord(members, { n1: link(alice, bob) })
+		const clock = makeClock(NOW)
+		const resource = makeResource()
+		const { participant, events } = harness({ self: alice, clock, resource: resource.resource })
+
+		await participant.update(record) // alice promises; the promise phase is incomplete → pending → a timer arms
+		expect(clock.liveTimers()).toBe(1)
+		expect(clock.armed[0].delayMs).toBe(LONG_TTL + SKEW_GRACE_MS) // fires a skew grace past the code's own expiry
+
+		clock.set(expiresAt(record.transactionCode) + 1)
+		await participant.onDeadline(record.transactionCode)
+
+		const held = await participant.serveRecord(record.transactionCode)
+		expect(held!.promises.some((s) => s.type === 'NP')).toBe(false) // alice holds P; it cannot NP over its own P
+		expect(await participant.outcome(record.transactionCode)).toBe('pending')
+		expect(eventsOfType(events, 'deadline-reached').map((e) => e.acted)).toEqual([false])
+	})
+
+	it('(d) arms on a non-terminal record and clears on a terminal one in a single update', async () => {
+		const solo = makeParty()
+		const clock = makeClock(NOW)
+		const { participant } = harness({ self: solo, clock })
+		await participant.update(makeRecord([member(solo, [P, V])], { n1: link(solo, solo) })) // cascades to commit → terminal
+		expect(clock.liveTimers()).toBe(0) // a settled record leaves no timer armed
+	})
+
+	it('(e) leaks no timer across settle or abort', async () => {
+		// A committing update leaves nothing armed.
+		const solo = makeParty()
+		const c1 = makeClock(NOW)
+		const h1 = harness({ self: solo, clock: c1 })
+		await h1.participant.update(makeRecord([member(solo, [P, V])], { n1: link(solo, solo) }))
+		expect(c1.liveTimers()).toBe(0)
+
+		// An abort that voids leaves nothing armed.
+		const alice = makeParty()
+		const bob = makeParty()
+		const base = makeRecord([member(alice, [P]), member(bob, [P, V])], { n1: link(alice, bob) })
+		const store = new MemoryTrxStore<TTerms, TPayload>()
+		await store.saveRecord(base) // seeded without our promise, so abort may sign NP and void
+		const c2 = makeClock(NOW)
+		const h2 = harness({ self: alice, store, clock: c2 })
+		await h2.participant.abort(base.transactionCode)
+		expect(c2.liveTimers()).toBe(0)
+	})
+
+	it('(f) onDeadline is a safe no-op on an unknown, released, or non-member transaction', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		const ref = makeParty()
+		const base = makeRecord([member(alice, [P]), member(bob, [P]), member(ref, [V])], { n1: link(alice, bob) })
+
+		// Unknown transaction: nothing stored.
+		const unknown = harness({ self: ref })
+		await expect(unknown.participant.onDeadline('not-a-transaction')).resolves.toBeUndefined()
+		expect(eventsOfType(unknown.events, 'deadline-reached')).toEqual([])
+
+		// Released transaction: the release flag short-circuits.
+		const releasedStore = new MemoryTrxStore<TTerms, TPayload>()
+		await releasedStore.saveRecord(base)
+		await releasedStore.setReleased(base.transactionCode)
+		const rel = harness({ self: ref, store: releasedStore })
+		await rel.participant.onDeadline(base.transactionCode)
+		expect(eventsOfType(rel.events, 'deadline-reached')).toEqual([])
+
+		// Non-member: a stranger over the same stored record does nothing.
+		const nonMemberStore = new MemoryTrxStore<TTerms, TPayload>()
+		await nonMemberStore.saveRecord(base)
+		const stranger = harness({ self: makeParty(), store: nonMemberStore })
+		await stranger.participant.onDeadline(base.transactionCode)
+		expect(eventsOfType(stranger.events, 'deadline-reached')).toEqual([])
+	})
+
+	it('(g) the promise pre-gate signs NP when too little of the lift window remains', async () => {
+		const alice = makeParty()
+		const bob = makeParty()
+		// A transaction code whose whole remaining window is under the promise margin, but still unexpired + valid.
+		const record = makeRecord([member(alice, [P]), member(bob, [P, V])], { n1: link(alice, bob) }, {
+			transactionCode: generate(MIN_PROMISE_MARGIN_MS - 1000, { now: NOW }),
+		})
+		const resource = makeResource({ shouldPromise: true }) // would gladly promise — the pre-gate refuses first
+		const { participant, events } = harness({ self: alice, resource: resource.resource })
+
+		await participant.update(record)
+		expect(eventsOfType(events, 'promise-signed').map((e) => e.signatureType)).toEqual(['NP'])
+		expect(resource.shouldPromiseCtxs).toEqual([]) // the pre-gate short-circuits before the terms gate
+		expect(resource.promiseCtxs).toEqual([]) // nothing was ever held
+		expect(await participant.outcome(record.transactionCode)).toBe('void') // the NP voids the lift
 	})
 })

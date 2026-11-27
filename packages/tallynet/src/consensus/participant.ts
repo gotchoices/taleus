@@ -33,10 +33,10 @@
  */
 
 import { bytesToBase64url } from '../base64url.js'
-import type { Clock } from '../clock.js'
+import type { Clock, TimerHandle } from '../clock.js'
 import type { Hasher, RandomSource, Signer, Verifier } from '../crypto.js'
 import { Rule, RuleSet, type RuleResponse } from '../rule.js'
-import { expiresAt, generate, isExpired, isValid } from '../session-code.js'
+import { DEFAULT_MAX_TTL_MS, expiresAt, generate, isExpired, isValid } from '../session-code.js'
 import { noopTraceSink, safeTraceSink, type TraceBase, type TraceSink } from '../trace.js'
 import type { SessionCodeValidators } from '../discovery/participant.js'
 import { consensusMethodError, MemberTypes, type Address, type DependentMember, type MemberType, type Plan, type UniQuery } from '../discovery/types.js'
@@ -102,6 +102,16 @@ export interface TrxParticipantConfig<TTerms, TPayload> {
 	log?: Logger
 	/** Session-code checks (validate BOTH `transactionCode` and `sessionCode`); default wraps `session-code.ts`. */
 	sessionCodes?: SessionCodeValidators
+	/**
+	 * Minimum lift window (ms) this node needs before it will promise. Default {@link MIN_PROMISE_MARGIN_MS}.
+	 * Per-node, not global (principle 0): the protocol enforces the check; each node sets its value.
+	 */
+	minPromiseMarginMs?: number
+	/**
+	 * Grace (ms) past the transaction-code expiry before this node fires its void timer. Default
+	 * {@link SKEW_GRACE_MS}. Keep comfortably < minPromiseMarginMs. Per-node (principle 0).
+	 */
+	skewGraceMs?: number
 }
 
 /** What {@link TrxParticipant.proceed} needs to start a discovered lift. */
@@ -146,6 +156,10 @@ export class TrxParticipant<TTerms, TPayload> {
 	private readonly log: Logger
 	private readonly sessionCodes: SessionCodeValidators
 	private readonly newRecordRules: RuleSet<TrxRuleTest<TTerms, TPayload>>
+	private readonly minPromiseMarginMs: number
+	private readonly skewGraceMs: number
+	/** Per-transaction one-shot deadline timers. In-memory only (restart re-arm is a seam; see design.md). */
+	private readonly deadlineTimers = new Map<string, TimerHandle>()
 
 	constructor(config: TrxParticipantConfig<TTerms, TPayload>) {
 		this.self = config.self
@@ -162,6 +176,8 @@ export class TrxParticipant<TTerms, TPayload> {
 		this.traceSink = safeTraceSink(config.trace ?? noopTraceSink)
 		this.log = config.log ?? (() => {})
 		this.sessionCodes = config.sessionCodes ?? defaultSessionCodeValidators
+		this.minPromiseMarginMs = config.minPromiseMarginMs ?? MIN_PROMISE_MARGIN_MS
+		this.skewGraceMs = config.skewGraceMs ?? SKEW_GRACE_MS
 		this.newRecordRules = this.buildNewRecordRules()
 
 		// A misconfigured signer (its key not matching our member key) would sign signatures no peer
@@ -180,16 +196,13 @@ export class TrxParticipant<TTerms, TPayload> {
 		const merged = await this.validateAndMerge(record, fromAddress)
 		// If we are not a member, we are a pure relay: merge and push, but never promise/vote/release.
 		if (this.memberByKey(merged.topology, this.self.key)) {
-			// Loop one state-advancing step at a time until a step takes no action (a solo node can
-			// cascade promise → vote → release in one update; a many-party lift advances one step here).
-			while (await this.advanceState(merged)) {
-				/* keep advancing */
-			}
+			await this.runAdvanceLoop(merged)
 		}
 		// `record` is the raw incoming copy (validateAndMerge never mutates incoming.promises/commits), so it
 		// still classifies as "theirs" against our merged copy — surface a settled-outcome contradiction if any.
 		await this.detectContradiction(record, merged)
 		await this.push(merged)
+		await this.updateDeadlineTimer(merged)
 		return merged
 	}
 
@@ -307,7 +320,10 @@ export class TrxParticipant<TTerms, TPayload> {
 	 * (`discover` returns them best-first); `proceed` never ranks, and mints nothing but the code.
 	 */
 	async proceed(args: ProceedArgs<TTerms, TPayload>): Promise<TrxRecord<TTerms, TPayload>> {
-		const transactionCode = generate(args.ttlMs ?? DEFAULT_TTL, { now: this.clock.now(), random: this.random })
+		// Clamp to DEFAULT_MAX_TTL_MS: a code minted beyond it is rejected by our OWN new-record
+		// TransactionCode rule (isValid enforces the ceiling), which would throw from the update below.
+		const ttlMs = Math.min(args.ttlMs ?? args.query.ttlMs ?? DEFAULT_TTL, DEFAULT_MAX_TTL_MS)
+		const transactionCode = generate(ttlMs, { now: this.clock.now(), random: this.random })
 		const record = mintRecord({ plan: args.plan, query: args.query, payload: args.payload, transactionCode })
 		return this.update(record)
 	}
@@ -659,10 +675,13 @@ export class TrxParticipant<TTerms, TPayload> {
 			return 'ourCommitNeeded'
 		}
 		// NOTE: a stuck commit phase (a tie, or voters still to vote) stays `propagating` and does NOT
-		// settle in-band — v1 has no timer. This is the seam for `tallynet-propagation-timeouts`: a
-		// timeout-triggered voter NC (void-on-timeout) would be injected here, keyed off the record's
-		// deadline `this.sessionCodes.expiresAt(record.transactionCode)`; stalled-transaction recovery
-		// hangs off the same point. Do not add a timer here — the extension owns it.
+		// settle from classification alone. The deadline timer ({@link updateDeadlineTimer} /
+		// {@link onDeadline}) re-runs the advance loop once the transaction code's own expiry passes
+		// (decision 1): an un-voted voter then votes `NC` (void-on-timeout, decision 3) through the
+		// expired-code path in {@link castCommit}, so a voter majority (commit OR void) is always eventually
+		// reached and every hold releases. A tie of voters that have ALL already voted still cannot settle
+		// (a documented limit); periodic re-push/pull recovery for a genuinely stalled transaction is
+		// `tallynet-stalled-recovery` (6.2). No behavioural change here — the tick just re-enters this loop.
 		return 'propagating'
 	}
 
@@ -762,6 +781,12 @@ export class TrxParticipant<TTerms, TPayload> {
 		if (this.anyCodeExpired(record)) {
 			return SignatureTypesLocal.noPromise
 		}
+		// Not enough of the lift window left to promise safely (decision 1's protocol pre-gate). Codes are
+		// well-formed here (anyCodeExpired returned false), so expiresAt cannot throw.
+		if (this.sessionCodes.expiresAt(record.transactionCode) - this.clock.now() < this.minPromiseMarginMs) {
+			this.log('tallynet consensus: too little time left to promise on transaction %s (pre-gate)', record.transactionCode)
+			return SignatureTypesLocal.noPromise
+		}
 		try {
 			if (!(await (this.resource.acceptsProposal?.(context) ?? true))) {
 				this.log('tallynet consensus: proposal refused (voter set / method / contract) on transaction %s', record.transactionCode)
@@ -842,6 +867,103 @@ export class TrxParticipant<TTerms, TPayload> {
 		}
 		record[bucket] = [...record[bucket], signature]
 		await this.store.saveRecord(record)
+	}
+
+	/* ── deadline timer ─────────────────────────────────────────────────────────────────── */
+
+	/** Run the state-advance loop; returns true if any step signed something (drove a vote/promise). */
+	private async runAdvanceLoop(record: TrxRecord<TTerms, TPayload>): Promise<boolean> {
+		let acted = false
+		while (await this.advanceState(record)) {
+			acted = true
+		}
+		return acted
+	}
+
+	/**
+	 * Arm or clear our deadline timer after adopting a record. Members only (a pure relay holds no
+	 * stake). A settled/released record clears any timer; a still-`pending` one arms (or keeps) a
+	 * one-shot timer at the transaction code's own expiry (decision 1) + our skew grace (decision 6).
+	 */
+	private async updateDeadlineTimer(record: TrxRecord<TTerms, TPayload>): Promise<void> {
+		if (!this.memberByKey(record.topology, this.self.key)) {
+			return
+		}
+		// NOTE: one extra classification per update (recordOutcome re-verifies commits). Fine at lift
+		// scale; if voter sets grow, cache verification (see countVerifiedCommits NOTE).
+		const settled = (await this.recordOutcome(record)) !== 'pending'
+		if (settled || (await this.store.isReleased(record.transactionCode))) {
+			this.clearDeadline(record.transactionCode)
+			return
+		}
+		this.scheduleDeadlineTick(record)
+	}
+
+	/**
+	 * Arm (or leave armed) the one-shot deadline timer for a non-terminal record. Idempotent: a code
+	 * that already has a live timer keeps it (never stack one per delivery). The deadline is the
+	 * transaction code's embedded expiry (decision 1) judged against OUR clock (decision 6); it fires a
+	 * `skewGraceMs` grace past expiry so a modestly-fast clock does not prematurely void.
+	 *
+	 * We do NOT arm once the code is already expired at `now`: the expired-code path (NC/NP) already
+	 * runs inline in `advanceState` during the very update that reaches here, so a zero-delay timer
+	 * would only re-run a no-op — and, worse, re-arm in a loop as onDeadline's push re-delivers (see
+	 * design.md). One-shot in 6.1; **SEAM for `tallynet-stalled-recovery` (6.2)**: the periodic
+	 * re-push/pull retry loop re-arms here on each fire.
+	 */
+	private scheduleDeadlineTick(record: TrxRecord<TTerms, TPayload>): void {
+		const transactionCode = record.transactionCode
+		if (this.deadlineTimers.has(transactionCode)) {
+			return
+		}
+		let expiry: number
+		try {
+			expiry = this.sessionCodes.expiresAt(transactionCode)
+		} catch {
+			return // a malformed code cannot be scheduled against (validation should already have refused it)
+		}
+		const now = this.clock.now()
+		if (now >= expiry) {
+			return // deadline already passed; the expired path runs inline, so a timer adds nothing (6.2 owns retry)
+		}
+		const handle = this.clock.setTimer(() => {
+			this.deadlineTimers.delete(transactionCode) // one-shot: spent the moment it fires
+			return this.onDeadline(transactionCode)
+		}, Math.max(0, expiry + this.skewGraceMs - now))
+		this.deadlineTimers.set(transactionCode, handle)
+	}
+
+	/** Cancel and forget the deadline timer for `transactionCode` (idempotent). */
+	private clearDeadline(transactionCode: string): void {
+		const handle = this.deadlineTimers.get(transactionCode)
+		if (handle === undefined) {
+			return
+		}
+		this.deadlineTimers.delete(transactionCode)
+		this.clock.clearTimer(handle)
+	}
+
+	/**
+	 * The deadline fired (or a test/host drove it): reload the stored record and, if we are still a
+	 * member of a non-terminal, unreleased lift, re-run the advance loop now the code has expired.
+	 * The expired-code paths already in `advanceState` do the work — an un-voted voter over a COMPLETE
+	 * promise set votes `NC` (void-on-timeout, decision 3); a holding-but-un-promised participant
+	 * signs `NP` (wake-from-sleep). A node with nothing to do signs nothing and stays `pending`
+	 * (decision 5: no unilateral void from silence). One-shot: does NOT re-arm (6.2 owns retry).
+	 * Independently callable so a unit test can drive the timeout against a seeded store.
+	 */
+	async onDeadline(transactionCode: string): Promise<void> {
+		const record = await this.store.getRecord(transactionCode)
+		if (!record || !this.memberByKey(record.topology, this.self.key) || (await this.store.isReleased(transactionCode))) {
+			this.clearDeadline(transactionCode)
+			return
+		}
+		const acted = await this.runAdvanceLoop(record)
+		this.traceSink({ ...this.traceBase(record), type: 'deadline-reached', transactionCode, acted })
+		await this.push(record)
+		if ((await this.recordOutcome(record)) !== 'pending') {
+			this.clearDeadline(transactionCode) // a timeout NC may have settled us
+		}
 	}
 
 	/* ── push ─────────────────────────────────────────────────────────────────────────── */
@@ -1082,6 +1204,19 @@ export const DEFAULT_TTL = 600_000
  * (`C` and `NC`), so 4 leaves slack for out-of-order re-delivery while denying a peer unbounded growth.
  */
 export const MAX_PENDING_COMMITS_PER_VOTER = 4
+
+/**
+ * Default grace (ms) past the transaction-code expiry before a node fires its void timer (decision 6:
+ * trust only our own clock). Small, and < {@link MIN_PROMISE_MARGIN_MS}. Per-node default.
+ */
+export const SKEW_GRACE_MS = 5_000
+
+/**
+ * Default minimum lift window (ms) a node requires before it will promise (decision 1's pre-gate).
+ * Comfortably > {@link SKEW_GRACE_MS}: a node that DID promise must still have margin to vote before its
+ * own void timer fires. Per-node default.
+ */
+export const MIN_PROMISE_MARGIN_MS = 30_000
 
 /** A shallow copy with copied signature arrays — enough to freeze a push snapshot (the core is immutable). */
 function snapshotRecord<TTerms, TPayload>(record: TrxRecord<TTerms, TPayload>): TrxRecord<TTerms, TPayload> {

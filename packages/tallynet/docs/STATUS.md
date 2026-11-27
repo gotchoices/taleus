@@ -36,7 +36,7 @@ The feature-by-feature check that the rewrite kept everything ChipNet got right 
 | 2 | Make the simulator's virtual clock drain robustly | `debt-tallynet-virtual-clock-drain` |
 | 3 | Regression check against ChipNet, feature by feature | `tallynet-chipnet-regression` |
 | 4 | Voter model, proposal parameters, record availability (principles 0–4 in design.md § Lift design principles; decisions in § Lift proposal and settlement) | `tallynet-terms-and-proposal-params` → `tallynet-lift-policy-hooks` → `tallynet-originator-proceed` → `tallynet-record-availability`; sim `tallysim-voter-model` → `tallysim-viewer-voter-model` |
-| 5 | Liveness: pre-promise void, voter timeouts, stalled-lift recovery | `tallynet-propagation-timeouts` |
+| 5 | Liveness: **void-on-timeout built** (an un-voted voter is driven to `NC` at the transaction code's deadline — `tallynet-deadline-timeout-votes`); **pending** periodic re-push/pull stalled-lift recovery (`tallynet-stalled-recovery`) and simulator timeout scenarios (`tallysim-timeout-scenarios`) | `tallynet-deadline-timeout-votes` (done) → `tallynet-stalled-recovery` → `tallysim-timeout-scenarios` |
 | 6 | Hostile actors in the simulator | `tallysim-hostile-actors` |
 | 7 | Reputation, evidence and expulsion policy (brainstorm first) | `feat-tallynet-hostile-peers` |
 | 8 | Trading model: balances that build up and drain over time (brainstorm first) | `feat-tallysim-trading-model` |

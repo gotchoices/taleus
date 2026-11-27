@@ -69,6 +69,7 @@ export type TraceEvent =
 	| (TraceBase & { type: 'resources-released';   transactionCode: string; success: boolean })
 	| (TraceBase & { type: 'equivocation-proof-kept'; transactionCode: string; signer: string })
 	| (TraceBase & { type: 'contradiction-detected';  transactionCode: string; ourOutcome: 'commit' | 'void'; peerOutcome: 'commit' | 'void' })
+	| (TraceBase & { type: 'deadline-reached';      transactionCode: string; acted: boolean })
 
 /** A trace sink receives every event. Default is a no-op. A throwing sink must never break the engine. */
 export type TraceSink = (event: TraceEvent) => void

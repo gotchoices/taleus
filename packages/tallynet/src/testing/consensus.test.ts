@@ -414,7 +414,10 @@ describe('consensus end to end — dropped pushes', () => {
 		for (const name of ['A', 'B', 'T']) {
 			expect(doubles.get(name)!.releaseSuccesses).toEqual([]) // nothing settled → nothing released
 		}
-		expect(net.clock.pendingTimers).toBe(0) // a dropped push arms no timer; nothing leaks
+		// The holders' deadline timers fire once (one-shot) at ~expiry+grace and no-op — each holds an incomplete
+		// promise set, so none can void unilaterally — and the voter never received a record, so the heap drains
+		// to 0 and no node falsely settles.
+		expect(net.clock.pendingTimers).toBe(0)
 		expect(net.deliveryErrors).toEqual([])
 	})
 })
@@ -1235,6 +1238,35 @@ describe('consensus end to end — record availability (a pull routes around a r
 		expect(doubles.get('A')!.releaseSuccesses).toEqual([true])
 		expect(doubles.get('Z')!.releaseSuccesses).toEqual([]) // Z never saw the commit → never released
 		expect(net.clock.pendingTimers).toBe(0)
+		expect(net.deliveryErrors).toEqual([])
+	})
+})
+
+describe('consensus end to end — settling by deadline', () => {
+	it('a promise phase that only completes after the code expires voids the whole route by deadline', async () => {
+		// A—B carries a 400_000 ms latency; A—V (the sole voter) is instant. A promises at t=0 and reaches V at
+		// once, but B's promise does not arrive until t=400_000; B then completes the promise phase and its
+		// completed record returns to A at t=800_000 — past the 600_000 ms code expiry. A re-pushes the complete
+		// set to V, whose completing-promise update now lands post-expiry: castCommit's expired path votes NC,
+		// and as the sole voter that voids the whole route. (Each node's own deadline timer fires at ~605_000 and
+		// no-ops — it held an incomplete set then — so this exercises deadline-DRIVEN settlement; onDeadline's own
+		// voter-NC branch is unreachable via normal delivery and is covered only at the unit level, see
+		// participant.test.ts "deadline timer" (a). Keep the ab latency 400_000 exactly: 2×=800_000 > 600_000 so
+		// the completed set lands post-expiry, yet each single 400_000 hop leaves B's promise margin ≥ 30_000.)
+		const graph = makeGraph(['A', 'B', 'V'], [['ab', 'A', 'B'], ['av', 'A', 'V']])
+		const members: LiftMemberSpec[] = [
+			{ name: 'A', roles: [PART] },
+			{ name: 'B', roles: [PART] },
+			{ name: 'V', roles: [VOTER] },
+		]
+		const { net, doubles } = makeNet({ graph, conditions: { ab: { latencyMs: 400_000 } } })
+		const tx = await runLift(net, { members, route: ['A', 'B'], extraLinks: [['A', 'V']], payload: PAYLOAD })
+
+		expect(await outcomes(net, ['A', 'B', 'V'], tx)).toEqual(['void', 'void', 'void'])
+		for (const name of ['A', 'B', 'V']) {
+			expect(doubles.get(name)!.releaseSuccesses).toEqual([false]) // released once, as a void
+		}
+		expect(net.clock.pendingTimers).toBe(0) // one-shot deadlines fire and drain; no node re-arms past expiry
 		expect(net.deliveryErrors).toEqual([])
 	})
 })
