@@ -169,6 +169,9 @@ describe('voter harness — a network split stays pending while cut off, then co
 		// fresh inbound delivery, and a dropped push queues no timer — so nothing would ever wake an abandoned
 		// voter. This cannot go through runLiftForOutcome: its start+runUntilIdle is atomic and cannot flip T2
 		// open mid-drive, and the P0/A/B triangle is not a line/cycle route anyway.)
+		// NOTE: this hand-driven split/rejoin re-drives the lift (start → advance → runUntilIdle) on a 3-member
+		// triangle, so re-drive cost is negligible here. If this pattern is ever generalised to large routes,
+		// the re-drive-to-idle after the heal becomes the cost to watch — not work now, just where it would bite.
 		const sim = buildSimNetwork(network, {}, 0, undefined, undefined, {
 			identitySeed: IDENTITY_SEED,
 			refuseRelayFor: (id) => id === P0,

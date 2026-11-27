@@ -10,7 +10,8 @@ over it on compressed, deterministic time, moves money on commit, and records th
 is **`pCommitGivenFound`** = P(commit | a route was found and a lift attempted) — the consensus complement of
 `found-vs-oracle`'s `pFoundGivenExists`. The three outcomes are **commit** (settled, balances moved), **void**
 (a participant refused, so the lift was cleanly abandoned) and **pending** (the lift *stalled* — a needed
-message was lost and v1 has no timeout to clean it up).
+message was lost, and the recovery loop that now runs on every stall could reach no settled evidence to pull,
+so it abandoned and the lift stays hanging).
 
 ## Specs (`specs/*.json`)
 
@@ -89,10 +90,16 @@ drive `pCommitGivenFound` down, but by **different routes through the metrics** 
   tallied as `voidReasons.stalled`. `pCommitGivenFound` therefore falls `1.00 → 0.93 → 0.88 → 0.77 → 0.65 →
   0.57`. The stalls are the **sleeping/dropped-target asymmetry** in action: discovery peer-matches a dark
   terminus (or crosses what later becomes a dropped needed edge) and still *finds* the route, but the consensus
-  record push over that link is lost, and with no v1 propagation timeout the lift settles nowhere. No record in
-  this sweep voids by refusal (`refused-promise` = 0) — drops produce only stalls and missing routes.
+  record push over that link is lost. The commit engine's recovery loop runs on every such stall, but this
+  sweep publishes no contact points, so a stranded member's pull has nowhere to reach the settled evidence; the
+  loop abandons past its give-up ceiling and the lift settles nowhere (`permanentlyPendingCount` matches
+  `pendingCount` at every cell). No record in this sweep voids by refusal (`refused-promise` = 0) — drops
+  produce only stalls and missing routes.
 
 The headline for Taleus: a found route is **not** a committed payment. A cooperative, reliable network commits
 every route it finds (`pCommitGivenFound` = 1 at zero failure injection, the correctness floor), but refusing
-nodes abandon lifts *cleanly* (void) while lost messages leave them *hanging* (pending/stall) — and until the
-`tallynet-propagation-timeouts` work lands, a single lost push is enough to strand an otherwise-valid lift.
+nodes abandon lifts *cleanly* (void) while lost messages leave them *hanging* (pending/stall). The commit
+engine's recovery loop now heals a stall wherever a pull can reach the settled evidence, but a dropped link
+with no reachable evidence — exactly this sweep's case, which has no contact points — still strands the lift;
+the self-*re-routing* that would close that last gap (choosing an alternate path to the evidence when the
+direct one is dark) is the still-deferred `tallynet-propagation-timeouts` work.

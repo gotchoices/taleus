@@ -1030,14 +1030,15 @@ effect, never a depleted tally), 50 queries, seeds `[1, 2]`, consensus enabled. 
    `conditions.dropFraction ∈ {0..0.5}` (the shared conditions map, degrading both phases), routes found fall
    `50 → 33.5` while, among those found, `pending` stalls rise `0 → 14.5` — the sleeping/dropped-target
    asymmetry (§ *Failure injection in the consensus phase*): discovery peer-matches a dark terminus and still
-   finds the route, but the consensus push over the dropped link is lost and, with no v1 timeout, the lift
-   settles nowhere. `pCommitGivenFound` falls `1.00 → 0.57`; every non-commit here is a `stalled` pending (no
-   refusals).
+   finds the route, but the consensus push over the dropped link is lost and, with no contact point for the
+   recovery loop to pull from, the loop reaches no settled evidence and the lift settles nowhere.
+   `pCommitGivenFound` falls `1.00 → 0.57`; every non-commit here is a `stalled` pending (no refusals).
 
 The headline for Taleus: **a found route is not a committed payment** — a cooperative, reliable network commits
 every route it finds (the correctness floor, `pCommitGivenFound = 1`), but refusing nodes abandon lifts
-*cleanly* while lost messages leave them *hanging*, and until `tallynet-propagation-timeouts` lands a single
-lost push strands an otherwise-valid lift.
+*cleanly* while lost messages leave them *hanging*: the recovery loop heals a stall wherever a pull can reach
+the settled evidence, but a dropped edge with no reachable evidence still strands the lift until the
+self-*re-routing* of `tallynet-propagation-timeouts` lands.
 
 ## Trace & replay format
 
